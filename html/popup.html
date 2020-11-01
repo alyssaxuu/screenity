@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;600;700&display=swap" rel="stylesheet">
+        <link rel="stylesheet" href="../css/libraries/nice-select.css">
+        <link rel="stylesheet" href="../css/popup.css">
+    </head>
+    <body>
+        <div id='navigation'>
+            <div id='logo'><img src='../assets/images/popup/popup-logo.svg'>Screenly</div>
+            <div id='more'><img src='/assets/images/popup/popup-more.svg'></div>
+            <div id='more-select'>
+                <a id="shortcuts">Keyboard shortcuts</a>
+                <a href="https://github.com" target="_blank">GitHub</a>
+                <a href="https://github.com" target="_blank">Rate extension</a>
+                <a href="https://twitter.com/alyssaxuu" target="_blank">Made by Alyssa X</a>
+            </div>
+        </div>
+        <div id='tabs'>
+            <div id='recording-type'>
+                <div id='tab-only' class='type type-active'><img src='../assets/images/popup/tab-only-active.svg'><p>Tab only</p></div>
+                <div id='desktop' class='type'><img src='../assets/images/popup/desktop.svg'><p>Desktop</p></div>
+                <div id='camera-only' class='type'><img src='../assets/images/popup/camera-only.svg'><p>Camera only</p></div>
+            </div>
+        </div>
+        <div id='body'>
+            <label for="camera-select">Camera</label>
+            <select id="camera-select"><option value='disabled'>Disabled</option></select>
+            <label class='check'>
+              <input id='flip' type='checkbox'>
+              <span></span>
+                Flip camera
+            </label>
+            <label for="mic-select" id="mic-label">Microphone</label>
+            <select id="mic-select"><option value='disabled'>Disabled</option></select>
+            <label class='check'>
+              <input id='push' type='checkbox'>
+              <span></span>
+                Push to talk (Ctrl+M)
+            </label>
+            <label class='check'>
+              <input type='checkbox' id="countdown">
+              <span></span>
+                <p id='count-select'>3 second</p> countdown
+            </label>
+            <label class='check'>
+              <input id='persistent' type='checkbox'>
+              <span></span>
+                Only show toolbar on hover
+            </label>
+            <button id="record" style="margin-top: 10px" class="record-disabled">Loading...</button>
+            <div id='countdown-select'>
+                <div id='3-seconds' class='countdown'>3 seconds</div>
+                <div id='5-seconds' class='countdown'>5 seconds</div>
+                <div id='10-seconds' class='countdown'>10 seconds</div>
+            </div>
+        </div>
+        <script src="../js/libraries/jquery-3.5.1.min.js"></script>
+        <script src="../js/libraries/jquery.nice-select.min.js"></script>
+        <script src="../js/popup.js"></script>
+    </body>
+</html>
