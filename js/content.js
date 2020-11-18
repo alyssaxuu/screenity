@@ -25,6 +25,10 @@ $(document).ready(function(){
     var mdown = false;
     var holdtalk = false;
     var persistent = false;
+    var lastx = 0;
+    var lasty = 0;
+    var lastscrollx = 0;
+    var lastscrolly = 0;
     
     // Get defaults
     function getDefaults() {
@@ -96,26 +100,26 @@ $(document).ready(function(){
             
             // Extension wrapper
             var wrapper = "<div id='"+uniqueid+"' style='width: 100%;height:100%;position:absolute;'></div>";
-            $("body").prepend(wrapper);
+            $("body").append(wrapper);
             
             // Inject the iframe
             var iframeinject = "<div id='canvas-cont'><canvas id='canvas-draw'></canvas></div><div id='click-highlight'></div><div id='detect-iframe'><div id='hide-camera' class='camera-hidden'><img src='"+chrome.extension.getURL('./assets/images/close.svg')+"' class='noselect'></div><div id='change-size' class='camera-hidden'><div id='small-size' class='size-active choose-size'></div><div id='medium-size' class='choose-size'></div><div id='large-size' class='choose-size'></div></div></div><div id='wrap-iframe' class='notransition'><iframe src='"+chrome.extension.getURL('./html/camera.html')+"' allow='camera'></iframe></div><canvas id='canvas-freedraw' width=500 height=500></canvas><canvas id='canvas-focus' width=500 height=500></canvas>";
             $("#"+uniqueid).prepend(iframeinject);
 
             // Inject the toolbar
-            var toolbarinject = "<div id='pen-slider' class='toolbar-inactive'><input type='range' min=1 max=50><img class='slider-track' src='"+chrome.extension.getURL('./assets/images/slider-track.svg')+"'></div><div id='eraser-slider' class='toolbar-inactive'><input type='range' min=1 max=50><img class='slider-track' src='"+chrome.extension.getURL('./assets/images/slider-track.svg')+"'></div><iframe id='toolbar-settings' class='toolbar-inactive' src='"+chrome.extension.getURL('./html/settings.html')+"'></iframe><div id='toolbar-record-cursor' class='toolbar-inactive'><div id='click-tool' class='tool'><img src='"+chrome.extension.getURL('./assets/images/click.svg')+"'/></div><div id='focus-tool' class='tool' title='Highlight cursor'><img src='"+chrome.extension.getURL('./assets/images/focus.svg')+"'/></div><div id='hide-cursor-tool' class='tool' title='Hide cursor when it's inactive><img src='"+chrome.extension.getURL('./assets/images/hide-cursor.svg')+"'/></div></div>   <div id='toolbar-record-pen' class='toolbar-inactive'><div id='pen-tool' class='tool' title='Pen tool'><img src='"+chrome.extension.getURL('./assets/images/pen.svg')+"'/></div><div id='eraser' class='tool' title='Eraser tool'><img src='"+chrome.extension.getURL('./assets/images/eraser.svg')+"'/></div><div id='color' class='tool' title='Change the annotation color'><div id='color-icon'></div></div><div id='text' class='tool' title='Text tool'><img src='"+chrome.extension.getURL('./assets/images/text.svg')+"'/></div><div id='arrow' class='tool' title='Arrow tool'><img src='"+chrome.extension.getURL('./assets/images/arrow.svg')+"'/></div><div id='clear' class='tool' title='Delete all annotations'><img src='"+chrome.extension.getURL('./assets/images/clear.svg')+"'/></div></div>   <div id='toolbar-record' class='toolbar-inactive'><div id='pause' class='tool' title='Pause/resume recording'><img src='"+chrome.extension.getURL('./assets/images/pausewhite.svg')+"'/></div><div id='cursor' class='tool' title='Cursor settings'><img src='"+chrome.extension.getURL('./assets/images/cursor.svg')+"'/></div><div id='pen' class='tool' title='Annotation tools'><img src='"+chrome.extension.getURL('./assets/images/pen.svg')+"'/></div><div id='camera' title='Enable camera' class='tool'><img src='"+chrome.extension.getURL('./assets/images/camera.svg')+"'/></div><div id='mic' class='tool tool-active' title='Enable/disable microphone'><img src='"+chrome.extension.getURL('./assets/images/mic-off.svg')+"'/></div><div id='tab-audio' class='tool tool-active' title='Enable/disable browser audio'><img src='"+chrome.extension.getURL('./assets/images/tab-audio-off.svg')+"'/></div><div id='settings' class='tool' title='Recording settings'><img src='"+chrome.extension.getURL('./assets/images/settings.svg')+"'/></div></div>";
+            var toolbarinject = "<div id='color-pckr-thing'></div><div id='pen-slider' class='toolbar-inactive'><input type='range' min=1 max=50><img class='slider-track' src='"+chrome.extension.getURL('./assets/images/slider-track.svg')+"'></div><div id='eraser-slider' class='toolbar-inactive'><input type='range' min=1 max=50><img class='slider-track' src='"+chrome.extension.getURL('./assets/images/slider-track.svg')+"'></div><iframe id='toolbar-settings' class='toolbar-inactive' src='"+chrome.extension.getURL('./html/settings.html')+"'></iframe><div id='toolbar-record-cursor' class='toolbar-inactive noselect'><div id='click-tool' class='tool' title='Highlight clicks'><img src='"+chrome.extension.getURL('./assets/images/click.svg')+"'/></div><div id='focus-tool' class='tool' title='Highlight cursor'><img src='"+chrome.extension.getURL('./assets/images/focus.svg')+"'/></div><div id='hide-cursor-tool' class='tool' title='Hide cursor when inactive'><img src='"+chrome.extension.getURL('./assets/images/hide-cursor.svg')+"'/></div></div>   <div id='toolbar-record-pen' class='toolbar-inactive noselect'><div id='pen-tool' class='tool' title='Pen tool'><img src='"+chrome.extension.getURL('./assets/images/pen.svg')+"' class=/></div><div id='eraser' class='tool' title='Eraser tool'><img src='"+chrome.extension.getURL('./assets/images/eraser.svg')+"'/></div><div id='color-pckr' class='tool' title='Change the annotation color'><div id='color-icon'></div></div><div id='text' class='tool' title='Text tool'><img src='"+chrome.extension.getURL('./assets/images/text.svg')+"'/></div><div id='arrow' class='tool' title='Arrow tool'><img src='"+chrome.extension.getURL('./assets/images/arrow.svg')+"'/></div><div id='clear' class='tool' title='Delete all annotations'><img src='"+chrome.extension.getURL('./assets/images/clear.svg')+"'/></div></div>   <div id='toolbar-record' class='toolbar-inactive noselect'><div id='pause' class='tool' title='Pause/resume recording'><img src='"+chrome.extension.getURL('./assets/images/pausewhite.svg')+"'/></div><div id='cursor' class='tool' title='Cursor settings'><img src='"+chrome.extension.getURL('./assets/images/cursor.svg')+"'/></div><div id='pen' class='tool' title='Annotation tools'><img src='"+chrome.extension.getURL('./assets/images/pen.svg')+"'/></div><div id='camera' title='Enable camera' class='tool'><img src='"+chrome.extension.getURL('./assets/images/camera.svg')+"'/></div><div id='mic' class='tool tool-active' title='Enable/disable microphone'><img src='"+chrome.extension.getURL('./assets/images/mic-off.svg')+"'/></div><div id='tab-audio' class='tool tool-active' title='Enable/disable browser audio'><img src='"+chrome.extension.getURL('./assets/images/tab-audio-off.svg')+"'/></div><div id='settings' class='tool' title='Recording settings'><img src='"+chrome.extension.getURL('./assets/images/settings.svg')+"'/></div></div>";
             $("#"+uniqueid).prepend(toolbarinject);
             
             getDefaults();
             
             // Initialize color picker
             pickr = Pickr.create({
-            el: '#color',
+            el: '#color-pckr',
             theme: 'nano',
             swatches: false,
             default: "#EB205D",
             useAsButton: true,
-            autoReposition: false,
+            autoReposition: true,
             position: "top-middle",
             components: {
                 preview: true,
@@ -283,7 +287,7 @@ $(document).ready(function(){
         ctx_focus.globalCompositeOperation = "source-over";
         ctx_focus.fill();
         ctx_focus.beginPath();
-        ctx_focus.arc(e.pageX, e.pageY, 50, 0, 2 * Math.PI);
+        ctx_focus.arc(lastx, lasty, 50, 0, 2 * Math.PI);
         ctx_focus.globalCompositeOperation = "destination-out";
         ctx_focus.fill();
     }
@@ -327,6 +331,7 @@ $(document).ready(function(){
                 cornerColor: '#0E98FC',
                 centeredScaling: false,
                 borderOpacityWhenMoving: 1,
+                hasControls: true,
                 hasRotationPoint: false,
                 lockScalingFlip: true,
                 lockSkewingX: true,
@@ -370,6 +375,13 @@ $(document).ready(function(){
         canvas_focus.height = $(document).height();
     }
     
+    // Detect document dimensions changing
+    const resizeObserver = new ResizeObserver(entries => {
+        onResize();
+    });
+    document.body.style.height = "unset";
+    resizeObserver.observe(document.body);
+    
     // Show click highlight
     function mouseClick(e) {
         $("#"+uniqueid+" #click-highlight").css("top", e.clientY+$(window).scrollTop()-15+"px");
@@ -378,7 +390,7 @@ $(document).ready(function(){
     }
     
     // Reset drawing toolbar
-    function resetDrawingTools(){
+    function resetDrawingTools() {
         arrowon = false;
         window.arrowon = arrowon;
         drawing = false;
@@ -411,18 +423,62 @@ $(document).ready(function(){
     // Pause the recording
     function pauseRecording() {
         recording = false;
+        
+        // Hide opened toolbars
         hideTools();
+        moretools = false;
+        $("#"+uniqueid+" #toolbar-record-pen").addClass("toolbar-inactive");
+        $("#"+uniqueid+" #toolbar-record-cursor").addClass("toolbar-inactive");
+        $("#"+uniqueid+" #toolbar-settings").addClass("toolbar-inactive");
         $("#"+uniqueid+" #toolbar-record").removeClass("toolbar-inactive");
+        $("#"+uniqueid+" .pen-options").removeClass("pen-options");
+        $("#"+uniqueid+" #toolbar-record #settings").removeClass("pen-options");
+        
+        // Replace icons & tooltips
         $("#"+uniqueid+" #pause img").attr("src", chrome.extension.getURL('./assets/images/play.svg'));
         $("#"+uniqueid+" #cursor img").attr("src", chrome.extension.getURL('./assets/images/complete.svg'));
         $("#"+uniqueid+" #cursor").attr("title", "Save recording");
         $("#"+uniqueid+" #pen img").attr("src", chrome.extension.getURL('./assets/images/cancel.svg'));
         $("#"+uniqueid+" #pen").attr("title", "Discard recording");
-        $("#"+uniqueid+" .pen-options").removeClass("pen-options")
+        $("#"+uniqueid+" #toolbar-record #settings img").attr("src", chrome.extension.getURL('./assets/images/settings.svg'));
+        
+        
+        // Hide tools
         $("#"+uniqueid+" #camera").addClass("hide-button");
         $("#"+uniqueid+" #mic").addClass("hide-button");
         $("#"+uniqueid+" #tab-audio").addClass("hide-button");
         $("#"+uniqueid+" #settings").addClass("hide-button");
+        
+        // Disable all tools
+        $("#"+uniqueid+" #pen-slider").addClass("toolbar-inactive");
+        drawing = false;
+        arrowon = false;
+        texton = false;
+        clickon = false;
+        hideon = false;
+        focuson = false;
+        $("#"+uniqueid+" #canvas-freedraw").css("pointer-events", 'none');
+        $("#"+uniqueid+" #canvas-cont").css("pointer-events", 'none');
+        $("#"+uniqueid+" #canvas-focus").css("pointer-events", 'none');
+        $("#"+uniqueid+" #toolbar-record #pen").removeClass("tool-active");
+        $("#"+uniqueid+" #toolbar-record-pen #pen-tool").removeClass("tool-active");
+        $("#"+uniqueid+" #toolbar-record-pen #eraser").removeClass("tool-active");
+        $("#"+uniqueid+" #toolbar-record-pen #text").removeClass("tool-active");
+        $("#"+uniqueid+" #toolbar-record #arrow").removeClass("tool-active");
+        $("#"+uniqueid+" #toolbar-record-cursor #click-tool").removeClass("tool-active");
+        $("#"+uniqueid+" #toolbar-record-cursor #focus-tool").removeClass("tool-active");
+        $("#"+uniqueid+" #toolbar-record-cursor #hide-cursor-tool").removeClass("tool-active");
+        
+        // Replace images for all tools
+        $("#"+uniqueid+" #text img").attr("src", chrome.extension.getURL('./assets/images/text.svg'));
+        $("#"+uniqueid+" #pen-tool img").attr("src", chrome.extension.getURL('./assets/images/pen.svg'));
+        $("#"+uniqueid+" #eraser img").attr("src", chrome.extension.getURL('./assets/images/eraser.svg'));
+        $("#"+uniqueid+" #arrow img").attr("src", chrome.extension.getURL('./assets/images/arrow.svg'));
+        $("#"+uniqueid+" #click-tool img").attr("src", chrome.extension.getURL('./assets/images/click.svg'));
+        $("#"+uniqueid+" #focus-tool img").attr("src", chrome.extension.getURL('./assets/images/focus.svg'));
+        $("#"+uniqueid+" #hide-cursor-tool img").attr("src", chrome.extension.getURL('./assets/images/hide-cursor.svg'));
+        ctx_focus.clearRect(0, 0, canvas_focus.width, canvas_focus.height);
+        canvas.defaultCursor = "crosshair";
     }
     
     // Resume the recording
@@ -432,7 +488,7 @@ $(document).ready(function(){
         $("#"+uniqueid+" #cursor img").attr("src", chrome.extension.getURL('./assets/images/cursor.svg'));
         $("#"+uniqueid+" #cursor").attr("title", "Cursor settings");
         $("#"+uniqueid+" #pen img").attr("src", chrome.extension.getURL('./assets/images/pen.svg'));
-        $("#"+uniqueid+" #cursor").attr("title", "Annotation tools");
+        $("#"+uniqueid+" #pen").attr("title", "Annotation tools");
         $("#"+uniqueid+" .hide-button").removeClass("hide-button");
     }
     
@@ -504,7 +560,7 @@ $(document).ready(function(){
             $("#"+uniqueid+" #wrap-iframe").css({"width": "330px", "height": "330px"});
             $("#"+uniqueid+" #hide-camera").css({"left": "27px", "top": "27px"});
         } else {
-            $("#"+uniqueid+".size-active").removeClass("size-active");
+            $("#"+uniqueid+" .size-active").removeClass("size-active");
             $("#"+uniqueid+" #large-size").addClass("size-active");
             $("#"+uniqueid+" #detect-iframe").css({"width": "580px", "height": "580px"});
             $("#"+uniqueid+" #wrap-iframe").css({"width": "580px", "height": "580px"});
@@ -514,7 +570,7 @@ $(document).ready(function(){
     
     // Detect when a color has been selected
     pickr.on("change", (color,instance) => {
-       $("#"+uniqueid+" #color-icon").css("background-color", color.toRGBA()); 
+       $("#"+uniqueid+" #color-icon").css("background-color", color.toRGBA().toString()); 
         if (canvas.getActiveObject() && canvas.getActiveObject().type == "textbox") {
             canvas.getActiveObject().set("fill", color.toRGBA().toString());
         } else if (canvas.getActiveObject()) {
@@ -621,6 +677,8 @@ $(document).ready(function(){
     
     // Detect cursor moving anywhere on the page
     $(document).on("mousemove", function(e){
+      lastx = e.pageX;
+      lasty = e.pageY;
       if (dragging && cameraon) {
         // Drag the camera container
         drag.css("left", e.clientX-dragx-$(window).scrollLeft()+"px",);
@@ -649,6 +707,21 @@ $(document).ready(function(){
       }
     });
     
+    $(document).on("scroll", function(e){
+        if (focuson) {
+            if (lastscrollx != $(document).scrollLeft()){
+                lastx -= lastscrollx;
+                lastscrollx = $(document).scrollLeft();
+                lastx += lastscrollx;
+            }
+            if (lastscrolly != $(document).scrollTop()){
+                lasty -= lastscrolly;
+                lastscrolly = $(document).scrollTop();
+                lasty += lastscrolly;
+            }   
+            focus(e);  
+        }
+    })
     // Detect click anywhere on the page (except tools)
     $(document).on("mousedown", function(e){
         if (clickon && !$("#"+uniqueid+" .pcr-app").is(e.target) && $("#"+uniqueid+" .pcr-app").has(e.target).length === 0 && !$("#"+uniqueid+" #toolbar-record").is(e.target) && $("#"+uniqueid+" #toolbar-record").has(e.target).length === 0 && !$("#"+uniqueid+" #toolbar-record-pen").is(e.target) && $("#"+uniqueid+" #toolbar-record-pen").has(e.target).length === 0 && !$("#"+uniqueid+" #toolbar-record-cursor").is(e.target) && $("#"+uniqueid+" #toolbar-record-cursor").has(e.target).length === 0 && !$("#"+uniqueid+" #toolbar-settings").is(e.target) && $("#"+uniqueid+" #toolbar-settings").has(e.target).length === 0 && !$("#"+uniqueid+" #pen-slider").is(e.target) && $("#"+uniqueid+" #pen-slider").has(e.target).length === 0 && !$("#"+uniqueid+" #eraser-slider").is(e.target) && $("#"+uniqueid+" #eraser-slider").has(e.target).length === 0) {
@@ -757,7 +830,12 @@ $(document).ready(function(){
             moretools = true;
             $("#"+uniqueid+" #toolbar-settings").removeClass("toolbar-inactive");
             $("#"+uniqueid+" #toolbar-record #pen").removeClass("pen-options");
-            $("#"+uniqueid+" #toolbar-record #pen img").attr("src", chrome.extension.getURL('./assets/images/pen.svg'));
+            if (arrowon || texton || drawing) {
+                $("#"+uniqueid+" #toolbar-record #pen").addClass("tool-active");
+                $("#"+uniqueid+" #toolbar-record #pen img").attr("src", chrome.extension.getURL('./assets/images/penactive.svg'));
+            } else {
+                $("#"+uniqueid+" #toolbar-record #pen img").attr("src", chrome.extension.getURL('./assets/images/pen.svg'));
+            }
             $("#"+uniqueid+" #toolbar-record #cursor").removeClass("pen-options");
             $("#"+uniqueid+" #toolbar-record #cursor img").attr("src", chrome.extension.getURL('./assets/images/cursor.svg'));
             $("#"+uniqueid+" #toolbar-record-cursor").addClass("toolbar-inactive");
@@ -827,9 +905,15 @@ $(document).ready(function(){
             if ($("#"+uniqueid+" #toolbar-record #pen").hasClass("pen-options")) {
                 moretools = false;
                 $("#"+uniqueid+" #toolbar-record #pen").removeClass("pen-options");
-                $("#"+uniqueid+" #toolbar-record #pen img").attr("src", chrome.extension.getURL('./assets/images/pen.svg'));
                 $("#"+uniqueid+" #toolbar-record-pen").addClass("toolbar-inactive");
+                if (arrowon || texton || drawing) {
+                    $("#"+uniqueid+" #toolbar-record #pen").addClass("tool-active");
+                    $("#"+uniqueid+" #toolbar-record #pen img").attr("src", chrome.extension.getURL('./assets/images/penactive.svg'));
+                } else {
+                    $("#"+uniqueid+" #toolbar-record #pen img").attr("src", chrome.extension.getURL('./assets/images/pen.svg'));
+                }
             } else {
+                $("#"+uniqueid+" #toolbar-record #pen").removeClass("tool-active");
                 moretools = true;
                 $("#"+uniqueid+" #toolbar-record #settings").removeClass("pen-options");
                 $("#"+uniqueid+" #toolbar-record #settings img").attr("src", chrome.extension.getURL('./assets/images/settings.svg'));
@@ -860,7 +944,12 @@ $(document).ready(function(){
                 $("#"+uniqueid+" #toolbar-record #settings img").attr("src", chrome.extension.getURL('./assets/images/settings.svg'));
                 $("#"+uniqueid+" #toolbar-settings").addClass("toolbar-inactive");
                 $("#"+uniqueid+" #toolbar-record #pen").removeClass("pen-options");
-                $("#"+uniqueid+" #toolbar-record #pen img").attr("src", chrome.extension.getURL('./assets/images/pen.svg'));
+                if (arrowon || texton || drawing) {
+                    $("#"+uniqueid+" #toolbar-record #pen").addClass("tool-active");
+                    $("#"+uniqueid+" #toolbar-record #pen img").attr("src", chrome.extension.getURL('./assets/images/penactive.svg'));
+                } else {
+                    $("#"+uniqueid+" #toolbar-record #pen img").attr("src", chrome.extension.getURL('./assets/images/pen.svg'));
+                }
                 $("#"+uniqueid+" #toolbar-record-pen").addClass("toolbar-inactive");
                 $("#"+uniqueid+" #toolbar-record #cursor").addClass("pen-options");
                 $("#"+uniqueid+" #toolbar-record #cursor img").attr("src", chrome.extension.getURL('./assets/images/close.svg'));
@@ -887,6 +976,7 @@ $(document).ready(function(){
            tooltype = 'draw';
            drawing = true;
            $("#"+uniqueid+" #canvas-freedraw").css("pointer-events", 'all');
+           $("#"+uniqueid+" #canvas-cont").css("pointer-events", 'none');
            $("#"+uniqueid+" #pen-tool").addClass("tool-active");
            $("#"+uniqueid+" #pen-tool img").attr("src", chrome.extension.getURL('./assets/images/penactive.svg'));
        }
@@ -908,6 +998,7 @@ $(document).ready(function(){
            drawing = true;
            tooltype = 'erase';
            $("#"+uniqueid+" #canvas-freedraw").css("pointer-events", 'all');
+           $("#"+uniqueid+" #canvas-cont").css("pointer-events", 'none');
            $("#"+uniqueid+" #eraser").addClass("tool-active");
            $("#"+uniqueid+" #eraser img").attr("src", chrome.extension.getURL('./assets/images/eraseractive.svg'));
        }
@@ -925,6 +1016,7 @@ $(document).ready(function(){
            resetDrawingTools();
            texton = true;
            $("#"+uniqueid+" #canvas-cont").css("pointer-events", 'all');
+           $("#"+uniqueid+" #canvas-freedraw").css("pointer-events", 'none');
            $("#"+uniqueid+" #text").addClass("tool-active");
            $("#"+uniqueid+" #text img").attr("src", chrome.extension.getURL('assets/images/textactive.svg'));
            canvas.defaultCursor = "text";
@@ -944,6 +1036,7 @@ $(document).ready(function(){
            arrowon = true;
            window.arrowon = arrowon;
            $("#"+uniqueid+" #canvas-cont").css("pointer-events", 'all');
+           $("#"+uniqueid+" #canvas-freedraw").css("pointer-events", 'none');
            $("#"+uniqueid+" #arrow").addClass("tool-active");
            $("#"+uniqueid+" #arrow img").attr("src", chrome.extension.getURL('./assets/images/arrowactive.svg'));
            canvas.defaultCursor = "crosshair";

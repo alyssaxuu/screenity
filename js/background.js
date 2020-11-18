@@ -27,7 +27,7 @@ chrome.runtime.onInstalled.addListener(function() {
         toolbar: true,
         countdown: true,
         countdown_time: 3,
-        flip: false,
+        flip: true,
         pushtotalk: false,
         camera: 0,
         mic: 0,
@@ -283,10 +283,10 @@ function injectContent(start) {
                 }
 
                 chrome.tabs.insertCSS(tab.id, {
-                    file: './css/libraries/pickr.css'
+                    file: './css/content.css'
                 })
                 chrome.tabs.insertCSS(tab.id, {
-                    file: './css/content.css'
+                    file: './css/libraries/pickr.css'
                 })
                 maintabs.push(tab.id);
             } else if (camtabs.indexOf(tab.id) == -1 && recording_type == "camera-only") {
@@ -401,6 +401,8 @@ function resumeRecording() {
 }
 
 function stopRecording(save) {
+    tabid = 0;
+    
     // Show default icon
     chrome.browserAction.setIcon({path: "../assets/extension-icons/logo-32.png"});
     
@@ -415,6 +417,8 @@ function stopRecording(save) {
         // Check if it's a desktop or tab recording (recording done in background script)
         if (recording_type != "camera-only") {
             mediaRecorder.stop();
+        } else {
+            recording = false;
         }
 
         // Remove injected content
@@ -525,19 +529,22 @@ function countdownOver() {
 }
 
 // Inject content when tab redirects while recording
-chrome.tabs.onUpdated.addListener(function(tabId, changeInfo, tab) {
-    if (recording && tabId == tabid && recording_type == "tab-only" && changeInfo.status == "complete") {
-        injectContent(false)
-        getDeviceId();
-        maintabs.splice(maintabs.indexOf(tabid), 1);
-        tabid = 0;
-    } else if (recording && recording_type == "desktop" && changeInfo.status == "complete") {
-        injectContent(false)
-        getDeviceId();
-        maintabs.splice(maintabs.indexOf(tabid), 1);
-        tabid = 0;
-    }
-});
+function pageUpdated(sender) {
+    chrome.tabs.getSelected(null, function(tab) {
+        if (sender.tab.id == tab.id) {
+            if (recording && tab.id == tabid && recording_type == "tab-only") {
+                injectContent(false)
+                getDeviceId();
+                tabid = 0;
+            } else if (recording && recording_type == "desktop") {
+                injectContent(false)
+                getDeviceId();
+                tabid = 0;
+            }
+            maintabs.splice(maintabs.indexOf(tabid), 1);
+        }
+    });
+}
 
 // Changed tab selection
 chrome.tabs.onActivated.addListener(function(tabId, changeInfo, tab) {
@@ -668,6 +675,8 @@ chrome.runtime.onMessage.addListener(
                     type: "end-recording"
                 });
             });
+        } else if (request.type == "sources-loaded") {
+            pageUpdated(sender);
         }
     }
 );

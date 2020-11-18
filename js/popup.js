@@ -13,7 +13,7 @@ $(document).ready(function(){
     });
     chrome.storage.sync.get(['flip'], function(result) {
         if (result.flip) {
-            $("#flip-camera").prop("checked", true);  
+            $("#flip").prop("checked", true);  
         }
     });
     chrome.storage.sync.get(['pushtotalk'], function(result) {
@@ -57,20 +57,22 @@ $(document).ready(function(){
         }
     }
     
-    // Request extension audio access (for background)
-    navigator.mediaDevices.getUserMedia({audio:true}).then(function(stream){
-       var audiodevices = [];
-        navigator.mediaDevices.enumerateDevices().then(function(devices) {
-          devices.forEach(function(device) {
-              if (device.kind == "audioinput") {
-                  audiodevices.push({label:device.label, id:device.deviceId});
-              }
-          }); 
-            getAudio(audiodevices);
+    // Request extension audio access if website denies it (for background)
+    function audioRequest() {
+        navigator.mediaDevices.getUserMedia({audio:true}).then(function(stream){
+           var audiodevices = [];
+            navigator.mediaDevices.enumerateDevices().then(function(devices) {
+              devices.forEach(function(device) {
+                  if (device.kind == "audioinput") {
+                      audiodevices.push({label:device.label, id:device.deviceId});
+                  }
+              }); 
+              getAudio(audiodevices);
+            });
+        }).catch(function(error){
+            $("#mic-select").html("<option value='disabled'>Disabled (allow access)</option>");
         });
-    }).catch(function(error){
-        $("#mic-select").html("<option value='disabled'>Disabled (allow access)</option>");
-    });
+    }
     
     
     // Get available audio devices
@@ -251,6 +253,14 @@ $(document).ready(function(){
                 $("#record").html("Start recording");
             }
             $("#record").removeClass("record-disabled");
+        } else if (request.type == "sources-audio") {
+            getAudio(request.devices);
+            
+            // Allow user to start recording
+            if (!recording) {
+                $("#record").html("Start recording");
+            }
+            $("#record").removeClass("record-disabled");
         } else if (request.type == "sources-noaccess") {
             $("#camera-select").html("<option value='disabled-access'>Disabled (allow access in URL bar)</option>");
             $("#camera-select").niceSelect('update');
@@ -265,6 +275,14 @@ $(document).ready(function(){
             if ($(".type-active").attr("id") != "camera-only") {
                 $("#record").removeClass("record-disabled");
             }
+        } else if (request.type == "sources-loaded") {
+            chrome.tabs.getSelected(null, function(tab) {
+                chrome.tabs.sendMessage(tab.id, {
+                    type: "camera-request"
+                });
+            });
+        } else if (request.type == "sources-audio-noaccess") {
+            audioRequest();   
         }
     });
 });

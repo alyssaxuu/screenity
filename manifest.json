@@ -1,7 +1,7 @@
 {
   "name": "Screenity - Screen Recorder & Annotation Tool",
   "description": "The most powerful screen recorder for Chrome. Capture, annotate, edit, and more.",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "manifest_version": 2,
   "background": {
     "scripts": ["js/background.js"],
@@ -35,8 +35,7 @@
   "permissions": [
     "<all_urls>","activeTab", "tabCapture", "tabs", "downloads", "desktopCapture", "storage", "identity", "https://www.googleapis.com/*"
   ],
-        "web_accessible_resources": [
-        "html/camera.html","html/sources.html","html/settings.html","js/content.js","css/content.css","assets/images/*","js/sources.js", "js/cameracontent.js", "css/cameracontent.css", "js/libraries/plyr.min.js", "css/libraries/plyr.min.css"
+        "web_accessible_resources": [        "html/camera.html","html/sources.html","html/settings.html","js/content.js","css/content.css","assets/images/*","js/sources.js", "js/cameracontent.js", "css/cameracontent.css", "js/libraries/plyr.min.js", "css/libraries/plyr.min.css", "js/audiosources.js", "html/audiosources.html"
     ],
     "commands": {
         "cancel": {

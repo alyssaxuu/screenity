@@ -146,7 +146,11 @@ $(document).ready(function(){
     // Save on Drive
     function saveDrive() {
         chrome.identity.getAuthToken({ 'interactive': true }, function(token) {
+            if (!token) {
+              return;
+            }
             $("#share span").html("Saving...");
+            $("#share").css("pointer-events", "none");
             var metadata = {
                 name: 'video.mp4',
                 mimeType: 'video/mp4'
@@ -166,6 +170,7 @@ $(document).ready(function(){
             xhr.onload = () => {
                 var fileId = xhr.response.id;
                 $("#share span").html("Save to Drive");
+                $("#share").css("pointer-events", "all");
                 
                 // Open file in Drive in a new tab
                 chrome.tabs.create({
