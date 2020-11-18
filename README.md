@@ -10,14 +10,14 @@ Screenity is a feature-packed screen and camera recorder for Chrome. Annotate yo
 Made by [Alyssa X](https://alyssax.com)
 
 ## Features
-🎥 Make unlimited recordings of your tab, desktop, any application, and camera
-✏️ Annotate by drawing anywhere on the screen, adding text, and creating arrows
-👀 Highlight your clicks, focus on your mouse, or hide it from the recording
-🎙️ Individual microphone and computer audio controls, push to talk, and more
-⚙️ Custom countdowns, show controls only on hover, and many other customization options
-💾 Export as mp4, gif, and webm, or save the video directly to Google Drive
-✂️ Trim or remove sections of your recording
-...and much more - all for free & no sign in needed!
+🎥 Make unlimited recordings of your tab, desktop, any application, and camera<br>
+✏️ Annotate by drawing anywhere on the screen, adding text, and creating arrows<br>
+👀 Highlight your clicks, focus on your mouse, or hide it from the recording<br>
+🎙️ Individual microphone and computer audio controls, push to talk, and more<br>
+⚙️ Custom countdowns, show controls only on hover, and many other customization options<br>
+💾 Export as mp4, gif, and webm, or save the video directly to Google Drive<br>
+✂️ Trim or remove sections of your recording<br>
+...and much more - all for free & no sign in needed!<br>
 
 [Here's a Google Sheet](https://docs.google.com/spreadsheets/d/1juc1zWC2QBxYqlhpDZZUNHl3P6Tens6YiChchFcEJVw/edit?usp=sharing) to compare Screenity's features with other free & premium screen recorders available for Chrome.
 
