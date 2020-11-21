@@ -516,7 +516,6 @@ $(document).ready(function(){
     function micEnabled(enable) {
         micon = enable;
         if (enable) {
-            
             $("#"+uniqueid+" #mic").addClass("tool-active");
             $("#"+uniqueid+" #mic img").attr("src", chrome.extension.getURL('./assets/images/mic-off.svg'));
             audioEnable("mic", true);
@@ -565,6 +564,74 @@ $(document).ready(function(){
             $("#"+uniqueid+" #detect-iframe").css({"width": "580px", "height": "580px"});
             $("#"+uniqueid+" #wrap-iframe").css({"width": "580px", "height": "580px"});
             $("#"+uniqueid+" #hide-camera").css({"left": "64px", "top": "64px"});
+        }
+    }
+    
+    // When the mouse button is clicked
+    function mouseDown(e) {
+        if (clickon && !$("#"+uniqueid+" .pcr-app").is(e.target) && $("#"+uniqueid+" .pcr-app").has(e.target).length === 0 && !$("#"+uniqueid+" #toolbar-record").is(e.target) && $("#"+uniqueid+" #toolbar-record").has(e.target).length === 0 && !$("#"+uniqueid+" #toolbar-record-pen").is(e.target) && $("#"+uniqueid+" #toolbar-record-pen").has(e.target).length === 0 && !$("#"+uniqueid+" #toolbar-record-cursor").is(e.target) && $("#"+uniqueid+" #toolbar-record-cursor").has(e.target).length === 0 && !$("#"+uniqueid+" #toolbar-settings").is(e.target) && $("#"+uniqueid+" #toolbar-settings").has(e.target).length === 0 && !$("#"+uniqueid+" #pen-slider").is(e.target) && $("#"+uniqueid+" #pen-slider").has(e.target).length === 0 && !$("#"+uniqueid+" #eraser-slider").is(e.target) && $("#"+uniqueid+" #eraser-slider").has(e.target).length === 0) {
+            mouseClick(e)
+        }
+        mousedown = true;
+    }
+    
+    // When the mouse button is released
+    function mouseUp(e) {
+       $("#"+uniqueid+" #detect-iframe").css("pointer-events", "all");
+       $("#"+uniqueid+" #toolbar-record").css("pointer-events", "all");
+       pendown = false;
+       mousedown = false;
+       dragging = false; 
+        window.setTimeout(function(){
+            $(".show-click").removeClass("show-click");
+        }, 200);
+        
+        // Hide tools (if setting is enabled)
+        if (!$("#"+uniqueid+" .pcr-app").is(e.target) && $("#"+uniqueid+" .pcr-app").has(e.target).length === 0 &!$("#"+uniqueid+" #toolbar-record").is(e.target) && $("#"+uniqueid+" #toolbar-record").has(e.target).length === 0 && !$("#"+uniqueid+" #toolbar-record-pen").is(e.target) && $("#"+uniqueid+" #toolbar-record-pen").has(e.target).length === 0 && !$("#"+uniqueid+" #toolbar-record-cursor").is(e.target) && $("#"+uniqueid+" #toolbar-record-cursor").has(e.target).length === 0 && !$("#"+uniqueid+" #toolbar-settings").is(e.target) && $("#"+uniqueid+" #toolbar-settings").has(e.target).length === 0 && !$("#"+uniqueid+" #pen-slider").is(e.target) && $("#"+uniqueid+" #pen-slider").has(e.target).length === 0 && !$("#"+uniqueid+" #eraser-slider").is(e.target) && $("#"+uniqueid+" #eraser-slider").has(e.target).length === 0)  {
+            hideTools();
+        }
+    }
+    
+    // When the mouse moves
+    function mouseMove(e) {
+        lastx = e.pageX;
+        lasty = e.pageY;
+        if (dragging && cameraon) {
+        // Drag the camera container
+        drag.css("left", e.clientX-dragx-$(window).scrollLeft()+"px",);
+        drag.css("top", e.clientY-dragy-$(window).scrollTop()+"px");
+        $("#"+uniqueid+" #detect-iframe").css("left", e.clientX-dragx-$(window).scrollLeft()+"px");
+        $("#"+uniqueid+" #detect-iframe").css("top", e.clientY-dragy-$(window).scrollTop()+"px");
+        } else {
+          // Free drawing
+          if (pendown) {
+            draw(e);
+          }
+          // Highlight cursor
+          if (focuson) {
+            focus(e);  
+          }
+        } 
+        // Hide cursor if inactive for more than 2 seconds
+        if (hideon) {
+          clearTimeout(timer);
+          $(".no-cursor").removeClass("no-cursor");
+          timer = window.setTimeout(function(){
+              $("body").addClass("no-cursor");
+          },2000)
+        } else {
+          $(".no-cursor").removeClass("no-cursor");
+        }
+    }
+    
+    // Start freedrawing
+    function startDrawing(e) {
+        if (drawing) {
+            last_mousex = parseInt(e.pageX);
+            last_mousey = parseInt(e.pageY);
+            mousex = parseInt(e.pageX);
+            mousey = parseInt(e.pageY);
+            pendown = true;
         }
     }
     
@@ -675,38 +742,7 @@ $(document).ready(function(){
         dragging = true;
     });
     
-    // Detect cursor moving anywhere on the page
-    $(document).on("mousemove", function(e){
-      lastx = e.pageX;
-      lasty = e.pageY;
-      if (dragging && cameraon) {
-        // Drag the camera container
-        drag.css("left", e.clientX-dragx-$(window).scrollLeft()+"px",);
-        drag.css("top", e.clientY-dragy-$(window).scrollTop()+"px");
-        $("#"+uniqueid+" #detect-iframe").css("left", e.clientX-dragx-$(window).scrollLeft()+"px");
-        $("#"+uniqueid+" #detect-iframe").css("top", e.clientY-dragy-$(window).scrollTop()+"px");
-      } else {
-          // Free drawing
-          if (pendown) {
-            draw(e);
-          }
-          // Highlight cursor
-          if (focuson) {
-            focus(e);  
-          }
-      } 
-      // Hide cursor if inactive for more than 2 seconds
-      if (hideon) {
-          clearTimeout(timer);
-          $(".no-cursor").removeClass("no-cursor");
-          timer = window.setTimeout(function(){
-              $("body").addClass("no-cursor");
-          },2000)
-      } else {
-          $(".no-cursor").removeClass("no-cursor");
-      }
-    });
-    
+    // Detect scroll to update focus circle position
     $(document).on("scroll", function(e){
         if (focuson) {
             if (lastscrollx != $(document).scrollLeft()){
@@ -722,13 +758,6 @@ $(document).ready(function(){
             focus(e);  
         }
     })
-    // Detect click anywhere on the page (except tools)
-    $(document).on("mousedown", function(e){
-        if (clickon && !$("#"+uniqueid+" .pcr-app").is(e.target) && $("#"+uniqueid+" .pcr-app").has(e.target).length === 0 && !$("#"+uniqueid+" #toolbar-record").is(e.target) && $("#"+uniqueid+" #toolbar-record").has(e.target).length === 0 && !$("#"+uniqueid+" #toolbar-record-pen").is(e.target) && $("#"+uniqueid+" #toolbar-record-pen").has(e.target).length === 0 && !$("#"+uniqueid+" #toolbar-record-cursor").is(e.target) && $("#"+uniqueid+" #toolbar-record-cursor").has(e.target).length === 0 && !$("#"+uniqueid+" #toolbar-settings").is(e.target) && $("#"+uniqueid+" #toolbar-settings").has(e.target).length === 0 && !$("#"+uniqueid+" #pen-slider").is(e.target) && $("#"+uniqueid+" #pen-slider").has(e.target).length === 0 && !$("#"+uniqueid+" #eraser-slider").is(e.target) && $("#"+uniqueid+" #eraser-slider").has(e.target).length === 0) {
-            mouseClick(e)
-        }
-        mousedown = true;
-    })
     
     // Prevent camera being dragged while drawing
     $(document).on("mousemove", "#"+uniqueid+" #detect-iframe", function(e){
@@ -737,38 +766,37 @@ $(document).ready(function(){
         }
     })
     
-    // Detect mouse up anywhere on the page
-    $(document).on("mouseup", function(e){
-       $("#"+uniqueid+" #detect-iframe").css("pointer-events", "all");
-       $("#"+uniqueid+" #toolbar-record").css("pointer-events", "all");
-       pendown = false;
-       mousedown = false;
-       dragging = false; 
-        window.setTimeout(function(){
-            $(".show-click").removeClass("show-click");
-        }, 200);
-        
-        // Hide tools (if setting is enabled)
-        if (!$("#"+uniqueid+" .pcr-app").is(e.target) && $("#"+uniqueid+" .pcr-app").has(e.target).length === 0 &!$("#"+uniqueid+" #toolbar-record").is(e.target) && $("#"+uniqueid+" #toolbar-record").has(e.target).length === 0 && !$("#"+uniqueid+" #toolbar-record-pen").is(e.target) && $("#"+uniqueid+" #toolbar-record-pen").has(e.target).length === 0 && !$("#"+uniqueid+" #toolbar-record-cursor").is(e.target) && $("#"+uniqueid+" #toolbar-record-cursor").has(e.target).length === 0 && !$("#"+uniqueid+" #toolbar-settings").is(e.target) && $("#"+uniqueid+" #toolbar-settings").has(e.target).length === 0 && !$("#"+uniqueid+" #pen-slider").is(e.target) && $("#"+uniqueid+" #pen-slider").has(e.target).length === 0 && !$("#"+uniqueid+" #eraser-slider").is(e.target) && $("#"+uniqueid+" #eraser-slider").has(e.target).length === 0)  {
-            hideTools();
-        }
-    });
-    
     // Detect click on freedrawing canvas (to start drawing)
     $(document).on('mousedown', canvas_free_id, function(e) {
-        if (drawing) {
-            last_mousex = parseInt(e.pageX);
-            last_mousey = parseInt(e.pageY);
-            mousex = parseInt(e.pageX);
-            mousey = parseInt(e.pageY);
-            pendown = true;
-        }
+        startDrawing(e);
+    });
+    $(document).on('touchstart', canvas_free_id, function(e) {
+        startDrawing(e);
     });
     
-    // Stop freedrawing on mouse up
-    $(document).on('mouseup', canvas_free_id, function(e) {
-        pendown = false;
+    // Detect click anywhere on the page (except tools)
+    $(document).on("mousedown", function(e){
+        mouseDown(e);
     });
+    $(document).on("touchstart", function(e){
+        mouseDown(e);
+    });
+    
+    // Detect mouse up anywhere on the page
+    $(document).on("mouseup", function(e){
+        mouseUp(e);
+    });
+    $(document).on("touchend", function(e){
+        mouseUp(e);
+    });
+    
+    // Detect cursor moving anywhere on the page
+    $(document).on("mousemove", function(e){
+        mouseMove(e);
+    });
+    $(document).on("touchmove", function(e){
+        mouseMove(e);
+    })
     
     // Change line thickness for pen and eraser
     $(document).on("input change", "#"+uniqueid+" #pen-slider input", function(){
