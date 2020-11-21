@@ -9,6 +9,9 @@
 #screenity-screen-recorder-extension * {
     pointer-events: unset;
 }
+#screenity-screen-recorder-extension *:not(.pcr-app *) {
+    all: unset;
+}
 #screenity-screen-recorder-extension #wrap-iframe {
     position: fixed;
     border-radius: 50%;
@@ -282,6 +285,7 @@
     bottom: 100px;
     display: block;
     z-index: 9999999999;
+    pointer-events: all!important;
 }
 #screenity-screen-recorder-extension #eraser-slizer {
     left: 123px!important;

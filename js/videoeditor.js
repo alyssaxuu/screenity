@@ -1,5 +1,4 @@
 $(document).ready(function(){
-    
     var blobs = recordedBlobs;
     var player;
     var trimslider = document.getElementById('trimslider');
@@ -34,8 +33,8 @@ $(document).ready(function(){
     // Initialize range sliders
     function initRanges() {
         noUiSlider.create(trimslider, {
-            start: [0, blobs.length],
-            connect: true,
+            start: [blobs.length],
+            connect: "upper",
             range: {
                 'min': 0,
                 'max': blobs.length
@@ -57,7 +56,7 @@ $(document).ready(function(){
     // Update range values
     function updateRanges(blobs) {
         trimslider.noUiSlider.updateOptions({
-           start: [0, blobs.length],
+           start: [blobs.length],
             range: {
                 'min': 0,
                 'max': blobs.length
@@ -201,8 +200,8 @@ $(document).ready(function(){
             
             // Check when trim slider values change
             trimslider.noUiSlider.on('slide', function(values, handle) {
-                $("#trim-start input").val(timestamp(values[0]));
-                $("#trim-end input").val(timestamp(values[1]));
+                $("#trim-start input").val(timestamp(0));
+                $("#trim-end input").val(timestamp(values[0]));
                 player.currentTime = parseFloat(values[handle]);
             });
             
@@ -219,7 +218,7 @@ $(document).ready(function(){
 
     // Applying a trim
     $("#apply-trim").on("click", function(){
-        trim(parseInt(trimslider.noUiSlider.get()[0]), parseInt(trimslider.noUiSlider.get()[1]));
+        trim(0, parseInt(trimslider.noUiSlider.get()[0]));
     });
     
     // Removing part of the video
@@ -242,9 +241,9 @@ $(document).ready(function(){
         reset();
     });
     
+    // For mobile version
     $("#show-hide").on("click", function(){
         $("#settings").toggleClass("hidepanel");
         $("#export").toggleClass("hidepanel");
-    })
-    
+    }) 
 });

@@ -6,27 +6,24 @@ $(document).ready(function(){
     $("#mic-select").niceSelect();
     
     // Get default settings (set by the user)
-    chrome.storage.sync.get(['toolbar'], function(result) {
+    chrome.storage.sync.get(null, function(result) {
         if (!result.toolbar) {
             $("#persistent").prop("checked", true);  
         }
-    });
-    chrome.storage.sync.get(['flip'], function(result) {
         if (result.flip) {
             $("#flip").prop("checked", true);  
         }
-    });
-    chrome.storage.sync.get(['pushtotalk'], function(result) {
         if (result.pushtotalk) {
             $("#push").prop("checked", true);  
         }
-    });
-    chrome.storage.sync.get(['countdown'], function(result) {
         if (result.countdown) {
             $("#countdown").prop("checked", true);  
         }
-    });
-    chrome.storage.sync.get(['type'], function(result) {
+        if (result.quality == "max") {
+            $("#quality").html("Smaller file size");
+        } else {
+            $("#quality").html("Highest quality")
+        }
         if ($(".type-active").attr("id") == "tab-only") {
            $(".type-active").find("img").attr("src", chrome.extension.getURL('./assets/images/popup/tab-only.svg'));
         } else if ($(".type-active").attr("id") == "desktop") {
@@ -132,7 +129,7 @@ $(document).ready(function(){
     
     // Check if current tab is unable to be recorded
     chrome.tabs.query({active: true, lastFocusedWindow: true}, tabs => {
-        if (tabs[0].url.includes("chrome://") || tabs[0].url.includes("chrome.com")) {
+        if (tabs[0].url.includes("chrome://") || tabs[0].url.includes("chrome-extension://") || tabs[0].url.includes("chrome.com") || tabs[0].url.includes("chrome.google.com")) {
             $("#record").addClass("record-disabled");
             $("#record").html("Can't record in this page");
         }
@@ -240,6 +237,23 @@ $(document).ready(function(){
              url: "chrome://extensions/shortcuts"
         });
     })
+    
+    // Higher quality or smaller file size for the recording
+    $("#quality").on("click", function(e){
+        chrome.storage.sync.get(['quality'], function(result) {
+            if (result.quality == "max") {
+                chrome.storage.sync.set({
+                    quality: "min"
+                });
+                $("#quality").html("Highest quality");
+            } else {
+                chrome.storage.sync.set({
+                    quality: "max"
+                });
+                $("#quality").html("Smaller file size");
+            }
+        });
+    });
     
     // Receive messages
     chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {

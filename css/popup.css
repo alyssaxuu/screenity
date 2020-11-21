@@ -282,6 +282,7 @@ label span:hover {
     opacity: 1!important;
 }
 #more-select {
+    z-index: 2;
     top: 40px;
     right: 25px;
     position: absolute;
@@ -290,7 +291,7 @@ label span:hover {
     box-sizing: border-box;
     box-shadow: 0px 10px 40px rgba(53, 87, 98, 0.1);
     border-radius: 5px;
-    height: 122px;
+    height: 152px;
     width: 140px;
     visibility: hidden;
     transform: scale(0);

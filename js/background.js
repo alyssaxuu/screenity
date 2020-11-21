@@ -4,6 +4,7 @@ var output = new MediaStream();
 var micsource;
 var syssource;
 var mediaRecorder = '';
+var mediaConstraints;
 var micstream;
 var audiodevices = [];
 var cancel = false;
@@ -17,6 +18,7 @@ var newwindow = null;
 var micable = true;
 var width = 1920;
 var height = 1080;
+var quality = "max";
 
 // Get list of available audio devices
 getDeviceId();
@@ -31,7 +33,8 @@ chrome.runtime.onInstalled.addListener(function() {
         pushtotalk: false,
         camera: 0,
         mic: 0,
-        type: "tab-only"
+        type: "tab-only",
+        quality: "max"
     });
     
     // Inject content scripts in existing tabs
@@ -52,9 +55,17 @@ function newRecording(stream) {
     chrome.browserAction.setIcon({path: "../assets/extension-icons/logo-32-rec.png"});
     
     // Start Media Recorder
-    mediaRecorder = new MediaRecorder(stream, {
-        mimeType: 'video/webm;codecs=vp8,opus'
-    });
+    if (quality == "max") {
+        mediaConstraints = {
+            mimeType: 'video/webm;codecs=vp8,opus'
+        }
+    } else {
+        mediaConstraints = {
+            mimeType: 'video/webm;codecs=vp8,opus',
+            bitsPerSecond: 1000
+        }
+    }
+    mediaRecorder = new MediaRecorder(stream, mediaConstraints);
     injectContent(true);
 }
 
@@ -209,36 +220,38 @@ function record() {
     })
     
     var constraints;
-    
-    chrome.storage.sync.get(['mic'], function(result) {
-        // Set microphone constraints
-        constraints = {
-            audio: {
-                deviceId: result.mic
+    chrome.storage.sync.get(['quality'], function(result) {
+        quality = result.quality;
+        chrome.storage.sync.get(['mic'], function(result) {
+            // Set microphone constraints
+            constraints = {
+                audio: {
+                    deviceId: result.mic
+                }
             }
-        }
-    
-        // Start microphone stream
-        navigator.mediaDevices.getUserMedia(constraints).then(function(mic) {
-            micable = true;
-            micstream = mic;
-            micsource = audioCtx.createMediaStreamSource(mic);
 
-            // Check recording type
-            if (recording_type == "desktop") {
-                getDesktop();
-            } else if (recording_type == "tab-only") {
-                getTab();
-            }
-        }).catch(function(error) {
-            micable = false;
+            // Start microphone stream
+            navigator.mediaDevices.getUserMedia(constraints).then(function(mic) {
+                micable = true;
+                micstream = mic;
+                micsource = audioCtx.createMediaStreamSource(mic);
 
-            // Check recording type
-            if (recording_type == "desktop") {
-                getDesktop();
-            } else if (recording_type == "tab-only") {
-                getTab();
-            }
+                // Check recording type
+                if (recording_type == "desktop") {
+                    getDesktop();
+                } else if (recording_type == "tab-only") {
+                    getTab();
+                }
+            }).catch(function(error) {
+                micable = false;
+
+                // Check recording type
+                if (recording_type == "desktop") {
+                    getDesktop();
+                } else if (recording_type == "tab-only") {
+                    getTab();
+                }
+            });
         });
     });
 }
