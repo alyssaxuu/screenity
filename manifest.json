@@ -9,7 +9,7 @@
   },
     "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA9pb4XFYH1UnRSPKMiLJkrawC33zmGf2x2OjCGvENRqqpIsVPzdbBtkx7y1Ho4rFcXx8CYNyt4E9avnuMVQgE43FIZJwmZYjyNXUEskd2FPZmpqqHGK3zSNgB6rP12Cgazk7WMjl24CpEOS6K7ZiE/7uSK17kv9ZcKgoMlnWEh5HhdjtnvfZkMCQvWN2IxGLjFiB7C2zsjayIijTS+rA6nXstVy07hur4rFayrkLXu4SbRggNzb7YKIevs05F+whBuEAcPmd4ZOh3y+JCMJydjZ8iEDFkkFxVuwrMngdvUn4iqnDHneogHyS1zaD2XkQ9SAX1IcAmMbOSTWQCUX0LgwIDAQAB",
     "oauth2": {
-        "client_id": "560517327251-m7n1k3kddknu7s9s4ejvrs1bj91gutd7.apps.googleusercontent.com",
+        "client_id": "CLIENT_ID",
         "scopes": [
           "https://www.googleapis.com/auth/drive.appdata",
         "https://www.googleapis.com/auth/drive.file"
