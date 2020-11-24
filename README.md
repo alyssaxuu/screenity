@@ -9,6 +9,9 @@ Screenity is a feature-packed screen and camera recorder for Chrome. Annotate yo
 
 Made by [Alyssa X](https://alyssax.com)
 
+<a href="https://www.producthunt.com/posts/screenity?utm_source=badge-top-post-badge&utm_medium=badge&utm_souce=badge-screenity" target="_blank"><img src="https://api.producthunt.com/widgets/embed-image/v1/top-post-badge.svg?post_id=275308&theme=light&period=daily" alt="Screenity - The most powerful screen recorder for Chrome | Product Hunt" style="width: 250px; height: 54px;" width="250" height="54" /></a>
+<a href="https://news.ycombinator.com/item?id=25150804" target="_blank"><img height=53 src="https://hackerbadge.now.sh/api?id=25150804&type=orange" alt="Featured on HackerNews"></a>
+
 ## Features
 🎥 Make unlimited recordings of your tab, desktop, any application, and camera<br>
 ✏️ Annotate by drawing anywhere on the screen, adding text, and creating arrows<br>
