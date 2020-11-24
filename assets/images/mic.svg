@@ -1,13 +1,7 @@
 <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-<g clip-path="url(#clip0)">
-<path d="M10 0.833496C9.33696 0.833496 8.70107 1.09689 8.23223 1.56573C7.76339 2.03457 7.5 2.67045 7.5 3.3335V10.0002C7.5 10.6632 7.76339 11.2991 8.23223 11.7679C8.70107 12.2368 9.33696 12.5002 10 12.5002C10.663 12.5002 11.2989 12.2368 11.7678 11.7679C12.2366 11.2991 12.5 10.6632 12.5 10.0002V3.3335C12.5 2.67045 12.2366 2.03457 11.7678 1.56573C11.2989 1.09689 10.663 0.833496 10 0.833496V0.833496Z" stroke="black" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-<path d="M15.8333 8.3335V10.0002C15.8333 11.5473 15.2187 13.031 14.1247 14.125C13.0308 15.2189 11.5471 15.8335 9.99996 15.8335C8.45286 15.8335 6.96913 15.2189 5.87517 14.125C4.78121 13.031 4.16663 11.5473 4.16663 10.0002V8.3335" stroke="black" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-<path d="M10 15.8335V19.1668" stroke="black" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-<path d="M6.66663 19.1665H13.3333" stroke="black" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-</g>
-<defs>
-<clipPath id="clip0">
-<rect width="20" height="20" fill="white"/>
-</clipPath>
-</defs>
+<path d="M2 2L18 18" stroke="black" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M12 7.95914V4.14496C12.0005 3.61356 11.8167 3.10093 11.4843 2.70657C11.1519 2.31221 10.6945 2.06426 10.201 2.01085C9.70757 1.95745 9.21318 2.1024 8.81385 2.41757C8.41452 2.73273 8.13874 3.19563 8.04004 3.7164" stroke="black" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M5.00013 9V10.3258C4.99284 11.2505 5.2834 12.1561 5.83453 12.9264C6.38566 13.6968 7.17222 14.2968 8.0933 14.6494C9.01439 15.002 10.028 15.0912 11.0041 14.9055C11.9801 14.7198 12.8742 14.2676 13.5714 13.6071C14.9011 12.3476 14.9997 10.5992 15 10.3258V9" stroke="black" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M10 15V18" stroke="black" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M7 18H13" stroke="black" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>

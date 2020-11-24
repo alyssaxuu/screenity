@@ -703,7 +703,7 @@ $(document).ready(function(){
     })
     
     // Turn on/off tab audio
-    $(document).on("click", "#"+uniqueid+"#tab-audio", function(){
+    $(document).on("click", "#"+uniqueid+" #tab-audio", function(){
         if (tabaudioon) {
             audioEnable("tab", false);
             tabaudioon = false;
