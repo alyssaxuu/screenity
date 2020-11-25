@@ -18,7 +18,7 @@ $(document).ready(function(){
     
     // Get available audio devices
     function getAudio(request) {
-        $("#audio-select").html("<option value='disabled'>Disabled</option>");
+        $("#audio-select").html("<option value='disabled'>"+chrome.i18n.getMessage("disabled")+"</option>");
         request.audiodevices.forEach(function(device) {
             $("#audio-select").append("<option value='"+device.id+"'>"+device.label+"</option>")
         });
@@ -34,7 +34,7 @@ $(document).ready(function(){
     
     // Get available camera devices
     function getCamera(request) {
-        $("#camera-select").html("<option value='disabled'>Disabled</option>");
+        $("#camera-select").html("<option value='disabled'>"+chrome.i18n.getMessage("disabled")+"</option>");
         request.cameradevices.forEach(function(device) {
             $("#camera-select").append("<option value='"+device.id+"'>"+device.label+"</option>")
         });
@@ -75,4 +75,11 @@ $(document).ready(function(){
             getCamera(request);
         }
     });
+    
+    // Localization (strings in different languages)
+    $("#camera-select-label").html(chrome.i18n.getMessage("camera"));
+    $("#flip-label").html(chrome.i18n.getMessage("flip_camera"));
+    $("#mic-label").html(chrome.i18n.getMessage("microphone"));
+    $("#push-label").html(chrome.i18n.getMessage("push_to_talk"));
+    $("#hover-label").html(chrome.i18n.getMessage("only_on_hover"));
 });

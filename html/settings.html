@@ -8,24 +8,24 @@
     <body>
         <div id="settings">
         <div id="settings-container">
-            <label for="camera-select">Camera source</label>
+            <label for="camera-select" id="camera-select-label">Camera source</label>
             <select id="camera-select"></select>
             <label class='check'>
               <input id='flip-camera' type='checkbox'>
               <span></span>
-              Flip camera horizontally
+              <labelp id="flip-label">Flip camera horizontally</labelp>
             </label>
-            <label for="audio-select">Microphone source</label>
+            <label for="audio-select" id="mic-label">Microphone source</label>
             <select id="audio-select"></select>
             <label class='check'>
               <input id='push-talk' type='checkbox'>
               <span></span>
-                Push to talk (Ctrl+M)
+                <labelp id="push-label">Push to talk (Ctrl+M)</labelp>
             </label>
             <label class='check'>
               <input type='checkbox' id="persistent">
               <span></span>
-              Only show toolbar on hover
+                <labelp id="hover-label">Only show toolbar on hover</labelp>
             </label>
         </div>
         </div>

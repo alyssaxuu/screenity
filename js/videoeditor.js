@@ -117,6 +117,7 @@ $(document).ready(function(){
     
     // Download video in different formats
     function download() {
+        $("#download-label").html(chrome.i18n.getMessage("downloading"))
         if ($("#format-select").val() == "mp4") {
             var superBuffer = new Blob(blobs, {
                 type: 'video/mp4'
@@ -125,6 +126,7 @@ $(document).ready(function(){
             chrome.downloads.download({
                 url: url
             });
+            $("#download-label").html(chrome.i18n.getMessage("download"))
             
         } else if ($("#format-select").val() == "webm") {
             var superBuffer2 = new Blob(blobs, {
@@ -134,6 +136,7 @@ $(document).ready(function(){
             chrome.downloads.download({
                 url: url
             });
+            $("#download-label").html(chrome.i18n.getMessage("download"))
         } else if ($("#format-select").val() == "gif") {
             var superBuffer = new Blob(blobs, {
                 type: 'video/webm'
@@ -148,7 +151,7 @@ $(document).ready(function(){
             if (!token) {
               return;
             }
-            $("#share span").html("Saving...");
+            $("#share span").html($("#download-label").html(chrome.i18n.getMessage("saving")));
             $("#share").css("pointer-events", "none");
             var metadata = {
                 name: 'video.mp4',
@@ -245,5 +248,26 @@ $(document).ready(function(){
     $("#show-hide").on("click", function(){
         $("#settings").toggleClass("hidepanel");
         $("#export").toggleClass("hidepanel");
-    }) 
+    }) ;
+    
+    // Localization (strings in different languages)
+    $("#made-with").html(chrome.i18n.getMessage("made_with"));
+    $("#by-alyssa").html(chrome.i18n.getMessage("by_alyssa"));
+    $("#rate-label").html(chrome.i18n.getMessage("rate_extension"));
+    $("#show-hide").html(chrome.i18n.getMessage("show_hide"));
+    $("#edit-label").html(chrome.i18n.getMessage("edit_recording"));
+    $("h2").html(chrome.i18n.getMessage("edit_recording_desc"));
+    $("#format-select-label").html(chrome.i18n.getMessage("format"));
+    $("#webm-default").html(chrome.i18n.getMessage("webm"));
+    $("#trim-label").html(chrome.i18n.getMessage("trim_video"));
+    $(".start-label").html(chrome.i18n.getMessage("start"));
+    $(".end-label").html(chrome.i18n.getMessage("end"));
+    $("#apply-trim").html(chrome.i18n.getMessage("apply"));
+    $("#remove-label").html(chrome.i18n.getMessage("remove_part"));
+    $("#format-select-label").html(chrome.i18n.getMessage("format"));
+    $("#apply-remove").html(chrome.i18n.getMessage("apply"));
+    $("#reset").html(chrome.i18n.getMessage("reset"));
+    $("#download-label").html(chrome.i18n.getMessage("download"));
+    $("#share span").html(chrome.i18n.getMessage("save_drive"));
+    $("#apply-trim").html(chrome.i18n.getMessage("apply"));
 });

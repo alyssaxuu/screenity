@@ -15,42 +15,42 @@
                 <img id="main-logo" src="../assets/images/popup/popup-logo.svg">
                 <h1>Screenity</h1>
                 <span class="vertical-line"></span>
-                <a href="https://alyssax.com" target="_blank" id="credits">Made with <img src="../assets/images/editor/heart.svg"> by Alyssa X</a>
+                <a href="https://alyssax.com" target="_blank" id="credits"><labelp id="made-with">Made with</labelp> <img src="../assets/images/editor/heart.svg"> <labelp id="by-alyssa">by Alyssa X</labelp></a>
             </div>
             <div id="links">
                 <a href="https://github.com/alyssaxuu/screenity" target="_blank">Github</a>
                 <a href="https://twitter.com/alyssaxuu" target="_blank">Twitter</a>
-                <a id="rate" href="https://chrome.google.com/webstore/detail/screenity-screen-recorder/kbbdabhdfibnancpjfhlkhafgdilcnji" target="_blank"><img src="../assets/images/editor/star.svg"> Rate extension</a>
+                <a id="rate" href="https://chrome.google.com/webstore/detail/screenity-screen-recorder/kbbdabhdfibnancpjfhlkhafgdilcnji" target="_blank"><img src="../assets/images/editor/star.svg"> <labelp id="rate-label">Rate extension</labelp></a>
             </div>
             <div id="show-hide">Show/hide options</div>
         </div>
         <div id="settings">
-            <h1>Edit your recording</h1>
+            <h1 id="edit-label">Edit your recording</h1>
             <h2>Add the finishing touches to your video.</h2>
-            <label for="format-select">Export format</label>
+            <label for="format-select" id="format-select-label">Export format</label>
             <select id="format-select">
-                <option value="webm">WEBM (default)</option>
+                <option value="webm" id="webm-default">WEBM (default)</option>
                 <option value="mp4">MP4</option>
                 <option value="gif">GIF</option>
             </select>
             <label id="trim-label">Trim video</label>
             <div id="trim-start">
-                <label for="tstart">Start</label>
+                <label for="tstart" class="start-label">Start</label>
                 <input name="tstart" disabled value="00:00:00">
             </div>
             <div id="trim-end">
-                <label for="tend">End</label>
+                <label for="tend" class="end-label">End</label>
                 <input name="tend" disabled value="00:00:00">
             </div>
             <div id="apply-trim">Apply</div>
             <div id="trimslider"></div>
             <label id="remove-label">Remove part of the video</label>
             <div id="remove-start">
-                <label for="rstart">Start</label>
+                <label for="rstart" class="start-label">Start</label>
                 <input name="rstart" disabled value="00:00:00">
             </div>
             <div id="remove-end">
-                <label for="rend">End</label>
+                <label for="rend" class="end-label">End</label>
                 <input name="rend" disabled value="00:00:00">
             </div>
             <div id="apply-remove">Apply</div>
@@ -59,15 +59,13 @@
         </div>
         <div id="export">
             <div id="export-cont">
-                <div id="download"><img src="../assets/images/editor/download.svg"> Download</div>
+                <div id="download"><img src="../assets/images/editor/download.svg"> <labelp id="download-label">Download</labelp></div>
                 <div id="share"><img src="../assets/images/editor/drive.svg"> <span>Save to Drive</span></div>
             </div>
         </div>
         <div id="content">
             <video id="video" controls></video>
         </div>
-        <button id="trim">Trim video</button>
-        <button id="duration">Get duration</button>
         <script src="../js/libraries/jquery-3.5.1.min.js"></script>
         <script src="../js/libraries/jquery.nice-select.min.js"></script>
         <script src="../js/libraries/plyr.min.js"></script>

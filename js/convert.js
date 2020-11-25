@@ -76,6 +76,7 @@ function PostBlob(blob) {
     chrome.downloads.download({
         url: url
     });
+    $("#download-label").html(chrome.i18n.getMessage("download"))
     setTimeout(() => {
         window.URL.revokeObjectURL(URL.createObjectURL(blob));
     }, 100);
