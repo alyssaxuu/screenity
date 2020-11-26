@@ -20,6 +20,7 @@ Made by [Alyssa X](https://alyssax.com)
 ⚙️ Custom countdowns, show controls only on hover, and many other customization options<br>
 💾 Export as mp4, gif, and webm, or save the video directly to Google Drive<br>
 ✂️ Trim or remove sections of your recording<br>
+🌐 Available in English, Catalan, and Spanish (more languages coming soon!)<br>
 ...and much more - all for free & no sign in needed!<br>
 
 [Here's a Google Sheet](https://docs.google.com/spreadsheets/d/1juc1zWC2QBxYqlhpDZZUNHl3P6Tens6YiChchFcEJVw/edit?usp=sharing) to compare Screenity's features with other free & premium screen recorders available for Chrome.
