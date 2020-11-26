@@ -151,7 +151,7 @@ $(document).ready(function(){
             if (!token) {
               return;
             }
-            $("#share span").html($("#download-label").html(chrome.i18n.getMessage("saving")));
+            $("#share span").html(chrome.i18n.getMessage("saving"));
             $("#share").css("pointer-events", "none");
             var metadata = {
                 name: 'video.mp4',
