@@ -379,7 +379,9 @@ $(document).ready(function(){
     const resizeObserver = new ResizeObserver(entries => {
         onResize();
     });
-    document.body.style.height = "unset";
+    if (window.location.href.includes("twitter.com") || window.location.href.includes("facebook.com") || window.location.href.includes("pinterest.com") || window.location.href.includes("reddit.com")) {
+        document.body.style.height = "unset";
+    }
     resizeObserver.observe(document.body);
     
     // Show click highlight
