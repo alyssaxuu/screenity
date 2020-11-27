@@ -810,7 +810,7 @@ $(document).ready(function(){
     
     // Delete selected object (only for arrows and text)
     $(document).on("keydown", function(e){
-        if ((e.keyCode == 46 || e.key == 'Delete' || e.code == 'Delete' || e.key == 'Backspace') && canvas.getActiveObject()) {
+        if ((e.keyCode == 46 || e.key == 'Delete' || e.code == 'Delete' || e.key == 'Backspace') && canvas.getActiveObject() && !canvas.getActiveObject().isEditing) {
             canvas.remove(canvas.getActiveObject());
             canvas.renderAll(); 
         }
@@ -884,7 +884,7 @@ $(document).ready(function(){
         penhover = false;
         window.setTimeout(function(){
             if (!sliderhover && drawing && tooltype == "draw"){
-                $("#"+uniqueid+" #pen-slider").addClass("toolbar-inactive");  
+               $("#"+uniqueid+" #pen-slider").addClass("toolbar-inactive");  
             }
         },50)
     });

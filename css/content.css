@@ -9,7 +9,7 @@
 #screenity-screen-recorder-extension * {
     pointer-events: unset;
 }
-#screenity-screen-recorder-extension *:not(.pcr-app *) {
+#screenity-screen-recorder-extension *:not(.pcr-app *):not(#pen-slider *) {
     all: unset;
 }
 #screenity-screen-recorder-extension #wrap-iframe {
@@ -287,7 +287,7 @@
     z-index: 9999999999;
     pointer-events: all!important;
 }
-#screenity-screen-recorder-extension #eraser-slizer {
+#screenity-screen-recorder-extension #eraser-slider {
     left: 123px!important;
 }
 #screenity-screen-recorder-extension #pen-slider input, #screenity-screen-recorder-extension #eraser-slider input {
