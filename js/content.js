@@ -360,6 +360,15 @@ $(document).ready(function(){
         textediting = true;
     }
     
+    // Automatically increase textbox width (do not break words)
+    canvas.on(("text:changed"),function()  {
+        var linewidth = canvas.getActiveObject().__lineWidths[canvas.getActiveObject().__lineWidths.length-1]; 
+        if (!isNaN(linewidth) && linewidth+25 > canvas.getActiveObject().width) {
+            canvas.getActiveObject().set("width",(linewidth+25));
+            canvas.renderAll();
+        }
+    })
+    
     // Resize canvas to fit document
     function onResize() {
         canvas.setWidth($(document).width());
