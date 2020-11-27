@@ -568,7 +568,7 @@ chrome.tabs.onActivated.addListener(function(tabId, changeInfo, tab) {
                 type: "end"
             });
         });
-    } else if (recording && recording_type == "desktop" && maintabs.indexOf(tab.id) == -1) {
+    } else if (recording && recording_type == "desktop" && maintabs.indexOf(tabId) == -1) {
         // Inject content for entire desktop recordings (content should be on any tab)
         injectContent(false);
     }
