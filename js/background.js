@@ -19,6 +19,8 @@ var micable = true;
 var width = 1920;
 var height = 1080;
 var quality = "max";
+var camerasize = "small-size";
+var camerapos = {x:"10px", y:"10px"};
 
 // Get list of available audio devices
 getDeviceId();
@@ -138,6 +140,7 @@ function getDesktop() {
 
         // Stop recording if stream is ended via Chrome UI or another method
         stream.getVideoTracks()[0].onended = function() {
+            cancel = false;
             mediaRecorder.stop();
         }
     })
@@ -279,7 +282,7 @@ function injectContent(start) {
                 // Check if it's a new or ongoing recording
                 if (start) {
                     chrome.tabs.executeScript(tab.id, {
-                        code: 'window.countdownactive = ' + result.countdown
+                        code: 'window.countdownactive = ' + result.countdown + ';window.camerasize = "' + camerasize + '";window.camerapos = {x:"'+camerapos.x+'",y:"'+camerapos.y+'"};'
                     }, function() {
                         chrome.tabs.executeScript(tab.id, {
                             file: './js/content.js'
@@ -287,7 +290,7 @@ function injectContent(start) {
                     });
                 } else {
                     chrome.tabs.executeScript(tab.id, {
-                        code: 'window.countdownactive = false;'
+                        code: 'window.countdownactive = false;window.camerasize = "' + camerasize + '";window.camerapos = {x:"'+camerapos.x+'",y:"'+camerapos.y+'"};'
                     }, function() {
                         chrome.tabs.executeScript(tab.id, {
                             file: './js/content.js'
@@ -343,7 +346,7 @@ function injectContent(start) {
                     } else {
                         chrome.tabs.sendMessage(tab.id, {
                             type: "restart-cam",
-                            countdown: false
+                            countdown: false,
                         });
                     }
                 } else {
@@ -355,7 +358,9 @@ function injectContent(start) {
                     } else {
                         chrome.tabs.sendMessage(tab.id, {
                             type: "restart",
-                            countdown: false
+                            countdown: false,
+                            camerapos: camerapos,
+                            camerasize: camerasize
                         });
                     }
                 }
@@ -690,6 +695,11 @@ chrome.runtime.onMessage.addListener(
             });
         } else if (request.type == "sources-loaded") {
             pageUpdated(sender);
+        } else if (request.type == "camera-size") {
+            camerasize = request.size;
+        } else if (request.type == "camera-pos") {
+            camerapos.x = request.x;
+            camerapos.y = request.y;
         }
     }
 );

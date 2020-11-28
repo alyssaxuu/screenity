@@ -2,7 +2,7 @@
   "name": "__MSG_extName__",
   "description": "__MSG_extDesc__",
   "offline_enabled": true,
-  "version": "2.3.6",
+  "version": "2.3.7",
   "manifest_version": 2,
   "default_locale": "en",
   "background": {

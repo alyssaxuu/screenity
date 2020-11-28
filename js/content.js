@@ -3,6 +3,7 @@ $(document).ready(function(){
     var recording = true;
     var drag, dragx, dragy, timer, pickr;
     var dragging = false;
+    var dragged = false;
     var drawing = false;
     var erasing = false;
     var mousedown = false;
@@ -157,6 +158,10 @@ $(document).ready(function(){
                 chrome.runtime.sendMessage({type: "countdown"});
                 if (persistent) {
                     $("#"+uniqueid+" #toolbar-record").removeClass("toolbar-inactive");
+                }
+                if (camerasize && camerapos) {
+                    cameraSize(camerasize);
+                    setCameraPos(camerapos.x, camerapos.y);
                 }
             }
             
@@ -576,6 +581,14 @@ $(document).ready(function(){
             $("#"+uniqueid+" #wrap-iframe").css({"width": "580px", "height": "580px"});
             $("#"+uniqueid+" #hide-camera").css({"left": "64px", "top": "64px"});
         }
+        chrome.runtime.sendMessage({type: "camera-size", size:id});
+    }
+    
+    function setCameraPos(x,y) {
+        $("#"+uniqueid+" #wrap-iframe").css("left", x,);
+        $("#"+uniqueid+" #wrap-iframe").css("top", y);
+        $("#"+uniqueid+" #detect-iframe").css("left", x);
+        $("#"+uniqueid+" #detect-iframe").css("top", y);
     }
     
     // When the mouse button is clicked
@@ -588,6 +601,10 @@ $(document).ready(function(){
     
     // When the mouse button is released
     function mouseUp(e) {
+       if (dragged) {
+           chrome.runtime.sendMessage({type: "camera-pos", x:$("#"+uniqueid+" #detect-iframe").css("left"), y:$("#"+uniqueid+" #detect-iframe").css("top")});
+           dragged = false;
+       }
        $("#"+uniqueid+" #detect-iframe").css("pointer-events", "all");
        $("#"+uniqueid+" #toolbar-record").css("pointer-events", "all");
        pendown = false;
@@ -608,11 +625,12 @@ $(document).ready(function(){
         lastx = e.pageX;
         lasty = e.pageY;
         if (dragging && cameraon) {
-        // Drag the camera container
-        drag.css("left", e.clientX-dragx-$(window).scrollLeft()+"px",);
-        drag.css("top", e.clientY-dragy-$(window).scrollTop()+"px");
-        $("#"+uniqueid+" #detect-iframe").css("left", e.clientX-dragx-$(window).scrollLeft()+"px");
-        $("#"+uniqueid+" #detect-iframe").css("top", e.clientY-dragy-$(window).scrollTop()+"px");
+            // Drag the camera container
+            drag.css("left", e.clientX-dragx-$(window).scrollLeft()+"px",);
+            drag.css("top", e.clientY-dragy-$(window).scrollTop()+"px");
+            $("#"+uniqueid+" #detect-iframe").css("left", e.clientX-dragx-$(window).scrollLeft()+"px");
+            $("#"+uniqueid+" #detect-iframe").css("top", e.clientY-dragy-$(window).scrollTop()+"px");
+            dragged = true;
         } else {
           // Free drawing
           if (pendown) {
@@ -1157,6 +1175,8 @@ $(document).ready(function(){
                 $("#toolbar-record").addClass("toolbar-inactive");
             }
         } else if (request.type == "restart") {
+            camerapos = request.camerapos;
+            camerasize = request.camerasize;
             injectCode(true, request.countdown);
         } else if (request.type == "update-camera") {
             if (request.id == "disabled" || request.id == 0) {
