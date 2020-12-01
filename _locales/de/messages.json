@@ -24,7 +24,7 @@
       "description": "Pause/Resume keyboard shortcut name"
     },
     "tab_only": {
-      "message": "Nur Registerkarte",
+      "message": "Registerkarte",
       "description": "Tab only label in popup"
     },
     "desktop": {
@@ -32,7 +32,7 @@
       "description": "Desktop label in popup"
     },
     "camera_only": {
-      "message": "Nur Kamera",
+      "message": "Kamera",
       "description": "Camera only label in popup"
     },
     "camera": {
@@ -52,7 +52,7 @@
       "description": "Push to talk label in popup"
     },
     "only_on_hover": {
-      "message": "Symbolleiste nur beim Berühren anzeigen",
+      "message": "Symbolleiste ausblenden",
       "description": "Only show toolbar on hover label in popup"
     },
     "disabled": {
@@ -80,7 +80,7 @@
       "description": "Stop recording state in popup"
     },
     "second": {
-      "message": "Sekunde",
+      "message": "Sekunden",
       "description": "Seconds label for countdown"
     },
     "seconds": {
@@ -104,7 +104,7 @@
       "description": "Highest quality label in popup"
     },
     "rate_extension": {
-      "message": "Browsererweiterung bewerten",
+      "message": "Bewerten Screenity",
       "description": "Rate extension label in popup"
     },
     "made_by_alyssa": {
@@ -168,7 +168,7 @@
       "description": "Download button in video editor"
     },
     "save_drive": {
-      "message": "Zu Drive hinzufügen",
+      "message": "Google Drive",
       "description": "Save to Drive button in video editor"
     },
     "saving": {
