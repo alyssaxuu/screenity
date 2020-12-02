@@ -20,7 +20,7 @@ Made by [Alyssa X](https://alyssax.com)
 ⚙️ Custom countdowns, show controls only on hover, and many other customization options<br>
 💾 Export as mp4, gif, and webm, or save the video directly to Google Drive<br>
 ✂️ Trim or remove sections of your recording<br>
-🌐 Available in English, Catalan, Spanish (by [Carmen Madrazo](https://twitter.com/Carmen_M_A)), French (by [Marie](https://twitter.com/marie_dm_)), Portuguese, Brazilian Portuguese, German (by [Chris Heilmann](https://github.com/codepo8)), and Korean (by [
+🌐 Available in English, Catalan, Spanish (by [Carmen Madrazo](https://twitter.com/Carmen_M_A)), French (by [Marie](https://twitter.com/marie_dm_)), Portuguese, Brazilian Portuguese, German (by [Christian Heilmann](https://github.com/codepo8)), and Korean (by [
 Dong-Hyeon, Kim](https://github.com/blood72)). More languages coming soon!<br>
 ...and much more - all for free & no sign in needed!<br>
 
