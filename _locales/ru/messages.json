@@ -32,7 +32,7 @@
       "description": "Desktop label in popup"
     },
     "camera_only": {
-      "message": "Только камера",
+      "message": "Камера",
       "description": "Camera only label in popup"
     },
     "camera": {
