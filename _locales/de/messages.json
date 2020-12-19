@@ -4,7 +4,7 @@
       "description": "Extension name"
     },
     "extDesc": {
-      "message": "Das mächtigste Bildschirmaufnamewerkzeug für Chrome/Edge. Nehmen sie Videos auf, beschriften sie diese, bearbeiten sie die Videos und mehr.",
+      "message": "Das mächtigste Bildschirmaufnahmewerkzeug für Chrome/Edge. Videos aufnehmen, beschriften, bearbeiten und mehr.",
       "description": "Extension description"
     },
     "extCancel": {
@@ -24,11 +24,11 @@
       "description": "Pause/Resume keyboard shortcut name"
     },
     "tab_only": {
-      "message": "Registerkarte",
+      "message": "Tab",
       "description": "Tab only label in popup"
     },
     "desktop": {
-      "message": "Schreibtisch",
+      "message": "Desktop",
       "description": "Desktop label in popup"
     },
     "camera_only": {
@@ -44,11 +44,11 @@
       "description": "Microphone dropdown label in popup"
     },
     "flip_camera": {
-      "message": "Camera umdrehen",
+      "message": "Kamera umdrehen",
       "description": "Flip camera label in popup"
     },
     "push_to_talk": {
-      "message": "Drücken um zu Sprechen",
+      "message": "Drücken, um zu sprechen",
       "description": "Push to talk label in popup"
     },
     "only_on_hover": {
@@ -64,7 +64,7 @@
       "description": "Loading state in popup"
     },
     "start_recording": {
-      "message": "Aufnahme beginnen",
+      "message": "Aufnahme starten",
       "description": "Start recording state in popup"
     },
     "starting_recording": {
@@ -80,7 +80,7 @@
       "description": "Stop recording state in popup"
     },
     "second": {
-      "message": "Sekunden",
+      "message": "Sekunde",
       "description": "Seconds label for countdown"
     },
     "seconds": {
@@ -92,7 +92,7 @@
       "description": "Countdown label in popup"
     },
     "keyboard_shortcuts": {
-      "message": "Tastaturkürzel",
+      "message": "Tastenkombinationen",
       "description": "Keyboard shortcuts label in popup"
     },
     "smaller_file_size": {
@@ -104,7 +104,7 @@
       "description": "Highest quality label in popup"
     },
     "rate_extension": {
-      "message": "Bewerten Screenity",
+      "message": "Screenity bewerten",
       "description": "Rate extension label in popup"
     },
     "made_by_alyssa": {
@@ -112,7 +112,7 @@
       "description": "Made by Alyssa X label in popup"
     },
     "disabled_allow_access": {
-      "message": "Nicht erlaubt (bitte in der URL Leiste Zugang erlauben)",
+      "message": "Nicht erlaubt (bitte in der URL-Leiste Zugriff erlauben)",
       "description": "Disabled requiring permission for camera/mic in popup"
     },
     "made_with": {
