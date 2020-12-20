@@ -32,7 +32,7 @@
       "description": "Desktop label in popup"
     },
     "camera_only": {
-      "message": "நிழற்படக் கருவி மட்டும்",
+      "message": "நிழற்படக் கருவி",
       "description": "Camera only label in popup"
     },
     "camera": {
@@ -116,11 +116,11 @@
       "description": "Disabled requiring permission for camera/mic in popup"
     },
     "made_with": {
-      "message": "உடன் செய்யப்பட்டது",
+      "message": "Made with",
       "description": "Made with label in video editor"
     },
     "by_alyssa": {
-      "message": "வழங்கியவர் அலிஸா எக்ஸ்",
+      "message": "by Alyssa X",
       "description": "By Alyssa X label in video editor"
     },
     "edit_recording": {
