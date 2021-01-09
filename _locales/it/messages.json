@@ -24,7 +24,7 @@
       "description": "Pause/Resume keyboard shortcut name"
     },
     "tab_only": {
-      "message": "Solo questa scheda",
+      "message": "Solo scheda",
       "description": "Tab only label in popup"
     },
     "desktop": {
@@ -32,7 +32,7 @@
       "description": "Desktop label in popup"
     },
     "camera_only": {
-      "message": "Solo fotocamera",
+      "message": "Fotocamera",
       "description": "Camera only label in popup"
     },
     "camera": {
@@ -52,7 +52,7 @@
       "description": "Push to talk label in popup"
     },
     "only_on_hover": {
-      "message": "Mostra la barra degli strumenti solo al passaggio del mouse",
+      "message": "Nascondi la barra degli strumenti",
       "description": "Only show toolbar on hover label in popup"
     },
     "disabled": {
@@ -80,7 +80,7 @@
       "description": "Stop recording state in popup"
     },
     "second": {
-      "message": "secondo",
+      "message": "secondi",
       "description": "Seconds label for countdown"
     },
     "seconds": {
@@ -88,7 +88,7 @@
       "description": "Seconds label for countdown (plural)"
     },
     "countdown": {
-      "message": "Conto alla rovescia",
+      "message": "conto alla rovescia",
       "description": "Countdown label in popup"
     },
     "keyboard_shortcuts": {
@@ -104,7 +104,7 @@
       "description": "Highest quality label in popup"
     },
     "rate_extension": {
-      "message": "Dai un voto all'estensione",
+      "message": "Dai un voto",
       "description": "Rate extension label in popup"
     },
     "made_by_alyssa": {
