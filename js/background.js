@@ -21,6 +21,7 @@ var height = 1080;
 var quality = "max";
 var camerasize = "small-size";
 var camerapos = {x:"10px", y:"10px"};
+var isMac = navigator.platform.toUpperCase().indexOf('MAC')>=0;
 
 // Get list of available audio devices
 getDeviceId();
@@ -115,9 +116,18 @@ function getDesktop() {
     };
     navigator.mediaDevices.getDisplayMedia(constraints).then(function(stream) {
         output = new MediaStream();
-        // Get microphone audio (system audio is unreliable & doesn't work on Mac)
-        if (micable) {
-            micsource.connect(destination);
+        if (isMac) {
+            // Get microphone audio (system audio is unreliable & doesn't work on Mac)
+            if (micable) {
+                micsource.connect(destination);
+                output.addTrack(destination.stream.getAudioTracks()[0]);
+            }
+        } else {
+            syssource = audioCtx.createMediaStreamSource(stream);
+            if (micable) {
+                micsource.connect(destination);
+            }
+            syssource.connect(destination);
             output.addTrack(destination.stream.getAudioTracks()[0]);
         }
         output.addTrack(stream.getVideoTracks()[0]);
