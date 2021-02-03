@@ -24,7 +24,7 @@
       "description": "Pause/Resume keyboard shortcut name"
     },
     "tab_only": {
-      "message": "Yalnızca sekme",
+      "message": "Sekme",
       "description": "Tab only label in popup"
     },
     "desktop": {
@@ -32,7 +32,7 @@
       "description": "Desktop label in popup"
     },
     "camera_only": {
-      "message": "Yalnızca kamera",
+      "message": "Kamera",
       "description": "Camera only label in popup"
     },
     "camera": {
@@ -52,7 +52,7 @@
       "description": "Push to talk label in popup"
     },
     "only_on_hover": {
-      "message": "Araç çubuğunu yalnızca fare ile üzerine gelindiğinde göster",
+      "message": "Sekmeyi gizle",
       "description": "Only show toolbar on hover label in popup"
     },
     "disabled": {
@@ -156,7 +156,7 @@
       "description": "Remove part of the video label in video editor"
     },
     "apply": {
-      "message": "Değişiklikleri Uygula",
+      "message": "Videoyu kes",
       "description": "Apply button in video editor"
     },
     "reset": {
@@ -183,4 +183,4 @@
       "message": "İndiriliyor...",
       "description": "Downloading button in video editor"
     }
-}
+} 
