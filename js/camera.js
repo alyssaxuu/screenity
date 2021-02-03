@@ -78,7 +78,7 @@ function startRecording(){
             chrome.runtime.sendMessage({type: "end-camera-recording"});
             recording = false;
             if (!cancel) {
-                newwindow = window.open('../html/videoeditor.html');
+                newwindow = window.open('../html/videoeditor.html', "_blank");
                 newwindow.recordedBlobs = recordedBlobs;
             }
             camerastream.getTracks().forEach(function(track) {
