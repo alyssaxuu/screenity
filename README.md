@@ -27,7 +27,7 @@ Made by [Alyssa X](https://alyssax.com)
 💾 Export as mp4, gif, and webm, or save the video directly to Google Drive<br>
 ✂️ Trim or remove sections of your recording<br>
 🌐 Available in English, Catalan, Spanish (by [Carmen Madrazo](https://twitter.com/Carmen_M_A)), French (by [Marie](https://twitter.com/marie_dm_)), Portuguese, Brazilian Portuguese, German (by [Christian Heilmann](https://github.com/codepo8)), Korean (by [
-Dong-Hyeon, Kim](https://github.com/blood72)), Chinese (by [xkonglong](https://github.com/xkonglong)), Russian (by [Artem](https://github.com/blinovartem)), Tamil (by [MC Naveen](https://github.com/mcnaveen)), and Italian (by [Angelo](https://github.com/AngeloBottazzo))<br>
+Dong-Hyeon, Kim](https://github.com/blood72)), Chinese (by [xkonglong](https://github.com/xkonglong)), Russian (by [Artem](https://github.com/blinovartem)), Tamil (by [MC Naveen](https://github.com/mcnaveen)), Turkish (by [Can Mavioğlu](https://github.com/canmavi)) and Italian (by [Angelo](https://github.com/AngeloBottazzo))<br>
 ...and much more - all for free & no sign in needed!<br>
 
 [Here's a Google Sheet](https://docs.google.com/spreadsheets/d/1juc1zWC2QBxYqlhpDZZUNHl3P6Tens6YiChchFcEJVw/edit?usp=sharing) to compare Screenity's features with other free & premium screen recorders available for Chrome.
