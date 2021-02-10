@@ -278,7 +278,7 @@ function uuidv4() {
 function triggerDownload(extension, url) {
     const filenameType = $("#filename-select").val();
     const filename = filenameType === 'timestamp'
-        ? new Date().toISOString().replace(/:/g, '-')
+        ? new Date().toISOString().replace(/[:\.]/g, '-')
         : uuidv4();
 
     chrome.downloads.download({
