@@ -16,8 +16,31 @@ $(document).ready(function(){
     $("#format-select").niceSelect();
     $("#filename-select").niceSelect();
     $("#g-savetodrive").attr("src", url);
-    
-    
+
+    // set up saving/retrieving preferences for select boxes
+    [
+        { element: '#filename-select', key: 'filename' },
+        { element: '#format-select', key: 'format' },
+    ].forEach(selectControl => {
+        // get preference for select and set it as initial value
+        chrome.storage.sync.get([selectControl.key], function (result) {
+            if (result[selectControl.key]) {
+                $(selectControl.element).val(result[selectControl.key]);
+                $(selectControl.element).niceSelect('update');
+            }
+        });
+
+        // on changing select, save the selection to user's settings
+        $(selectControl.element).on('change', e => {
+            chrome.storage.sync.set(
+                { [selectControl.key]: e.target.value },
+                () => {
+                    console.log(`Saved ${selectControl.key} value to ${e.target.value}`)
+                }
+            );
+        });
+    });
+
     // Convert seconds to timestamp
     function timestamp(value) {
         var sec_num = value;
