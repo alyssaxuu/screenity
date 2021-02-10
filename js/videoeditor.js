@@ -4,16 +4,17 @@ $(document).ready(function(){
     var trimslider = document.getElementById('trimslider');
     var removeslider = document.getElementById('removeslider');
     var setup = true;
-    
+
     // Show recorded video
     var superBuffer = new Blob(recordedBlobs, {
         type: 'video/webm'
     });
-    
+
     // Create the src url from the blob. #t=duration is a Chrome bug workaround, as the webm generated through Media Recorder has a N/A duration in its metadata, so you can't seek the video in the player. Using Media Fragments (https://www.w3.org/TR/media-frags/#URIfragment-user-agent) and setting the duration manually in the src url fixes the issue.
     var url = window.URL.createObjectURL(superBuffer);
     $("#video").attr("src", url+"#t="+blobs.length);
     $("#format-select").niceSelect();
+    $("#filename-select").niceSelect();
     $("#g-savetodrive").attr("src", url);
     
     
@@ -114,7 +115,7 @@ $(document).ready(function(){
         $("#video").attr("src", url+"#t="+blobs.length);
         updateRanges(blobs);
     }
-    
+
     // Download video in different formats
     function download() {
         $("#download-label").html(chrome.i18n.getMessage("downloading"))
@@ -123,9 +124,7 @@ $(document).ready(function(){
                 type: 'video/mp4'
             });
             var url = window.URL.createObjectURL(superBuffer);
-            chrome.downloads.download({
-                url: url
-            });
+            triggerDownload('mp4', url);
             $("#download-label").html(chrome.i18n.getMessage("download"))
             
         } else if ($("#format-select").val() == "webm") {
@@ -133,9 +132,7 @@ $(document).ready(function(){
                 type: 'video/webm'
             });
             var url = window.URL.createObjectURL(superBuffer2);
-            chrome.downloads.download({
-                url: url
-            });
+            triggerDownload('webm', url);
             $("#download-label").html(chrome.i18n.getMessage("download"))
         } else if ($("#format-select").val() == "gif") {
             var superBuffer = new Blob(blobs, {
@@ -271,3 +268,21 @@ $(document).ready(function(){
     $("#share span").html(chrome.i18n.getMessage("save_drive"));
     $("#apply-trim").html(chrome.i18n.getMessage("apply"));
 });
+
+function uuidv4() {
+    return ([1e7] + -1e3 + -4e3 + -8e3 + -1e11).replace(/[018]/g, c =>
+        (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16)
+    );
+}
+
+function triggerDownload(extension, url) {
+    const filenameType = $("#filename-select").val();
+    const filename = filenameType === 'timestamp'
+        ? new Date().toISOString().replace(/:/g, '-')
+        : uuidv4();
+
+    chrome.downloads.download({
+        filename: `${filename}.${extension}`,
+        url,
+    });
+}

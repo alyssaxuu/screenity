@@ -38,12 +38,12 @@ function convertStreams(videoBlob, setting) {
                 var blob = new File([result.data], 'test.gif', {
                     type: 'image/gif'
                 });
-                PostBlob(blob);
+                PostBlob('gif', blob);
             } else if (setting == "mp4") {
                 var blob = new File([result.data], 'test.mp4', {
                     type: 'video/mp4'
                 });
-                PostBlob(blob);
+                PostBlob('mp4', blob);
             }
         }
     };
@@ -71,11 +71,9 @@ function convertStreams(videoBlob, setting) {
     };
 }
 
-function PostBlob(blob) {
-    var url = URL.createObjectURL(blob);;
-    chrome.downloads.download({
-        url: url
-    });
+function PostBlob(fileType, blob) {
+    var url = URL.createObjectURL(blob);
+    triggerDownload(fileType, url);
     $("#download-label").html(chrome.i18n.getMessage("download"))
     setTimeout(() => {
         window.URL.revokeObjectURL(URL.createObjectURL(blob));
