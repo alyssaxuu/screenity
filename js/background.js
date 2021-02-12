@@ -116,7 +116,7 @@ function getDesktop() {
     };
     navigator.mediaDevices.getDisplayMedia(constraints).then(function(stream) {
         output = new MediaStream();
-        if (isMac) {
+        if (stream.getAudioTracks().length == 0) {
             // Get microphone audio (system audio is unreliable & doesn't work on Mac)
             if (micable) {
                 micsource.connect(destination);
