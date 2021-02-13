@@ -9,7 +9,7 @@
 #screenity-screen-recorder-extension * {
     pointer-events: unset;
 }
-#screenity-screen-recorder-extension *:not(.pcr-app *):not(#pen-slider *) {
+#screenity-screen-recorder-extension :not(.pcr-app*) {
     all: unset;
 }
 #screenity-screen-recorder-extension #wrap-iframe {
