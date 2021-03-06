@@ -52,7 +52,7 @@
       "description": "Push to talk label in popup"
     },
     "only_on_hover": {
-      "message": "Tampilkan toolbar saat mengarahkan kursor",
+      "message": "Sembunyikan toolbar",
       "description": "Only show toolbar on hover label in popup"
     },
     "disabled": {
