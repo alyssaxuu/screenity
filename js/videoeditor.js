@@ -153,9 +153,74 @@ $(document).ready(function(){
             }
             $("#share span").html(chrome.i18n.getMessage("saving"));
             $("#share").css("pointer-events", "none");
+
+            // Check for folder existence
+            const url = 'https://www.googleapis.com/drive/v3/files?q=' + encodeURIComponent("mimeType = 'application/vnd.google-apps.folder' and name = 'Screenity Videos'");
+            var xhr = new XMLHttpRequest();
+            xhr.open('GET', url);
+            xhr.setRequestHeader('Authorization', 'Bearer ' + token);
+            xhr.responseType = 'json';
+            xhr.onload = () => {
+              var res = xhr.response.files;
+              if (res.length > 0) {
+                var folderId = res[0].id;
+                  
+                // If folder already exists, the upload the video
+                return actuallyUpload(folderId);
+              } else {
+                // If the folder does NOT exist, then create the folder
+                return createFolder();
+              }
+            };
+            xhr.send();
+        });
+    }
+
+    // Create the "Screenity" folder, if it doesn't already exist
+    function createFolder() {
+        chrome.identity.getAuthToken({ 'interactive': true }, function(token) {
+            if (!token) {
+              return;
+            }
+            $("#share span").html(chrome.i18n.getMessage("saving"));
+            $("#share").css("pointer-events", "none");
+            
+            // Create or find folder (Note: If you change the folder name here, also change on row 158)
+            var folderName = "Screenity Videos"
+            var metadata = {
+                name: [folderName],
+                mimeType: 'application/vnd.google-apps.folder'
+            };
+            
+            var form = new FormData();
+            form.append('metadata', new Blob([JSON.stringify(metadata)], {type: 'application/json'}));
+            
+            var xhr = new XMLHttpRequest();
+            xhr.open('POST', 'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart');
+            xhr.setRequestHeader('Authorization', 'Bearer ' + token);
+            xhr.responseType = 'json';
+            xhr.onload = () => {
+                var folderId = xhr.response.id;
+                
+                // After creating the folder, now proceed to upload
+                return actuallyUpload(folderId);
+            };
+            xhr.send(form);
+        });
+    }
+
+    // Now that the folder has been located or created, time to upload the video
+    function actuallyUpload(folderId) {
+        chrome.identity.getAuthToken({ 'interactive': true }, function(token) {
+            if (!token) {
+              return;
+            }
+            $("#share span").html(chrome.i18n.getMessage("saving"));
+            $("#share").css("pointer-events", "none");
             var metadata = {
                 name: 'video.mp4',
-                mimeType: 'video/mp4'
+                mimeType: 'video/mp4',
+                parents: [folderId]
             };
             var superBuffer = new Blob(blobs, {
                 type: 'video/mp4'
@@ -178,6 +243,10 @@ $(document).ready(function(){
                 chrome.tabs.create({
                      url: "https://drive.google.com/file/d/"+fileId
                 });
+                
+                // This line copies the upload URL to clipboard
+                // Fails if the user leaves the current tab before upload is complete
+                navigator.clipboard.writeText("https://drive.google.com/file/d/"+fileId);
             };
             xhr.send(form);
         });
