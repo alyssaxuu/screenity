@@ -74,13 +74,12 @@ function startRecording(){
         mediaRecorder.onstop = () => {
             // Show default icon
             chrome.browserAction.setIcon({path: "../assets/extension-icons/logo-32.png"});
-            
-            chrome.runtime.sendMessage({type: "end-camera-recording"});
             recording = false;
             if (!cancel) {
                 newwindow = window.open('../html/videoeditor.html', "_blank");
                 newwindow.recordedBlobs = recordedBlobs;
             }
+            chrome.runtime.sendMessage({type: "end-camera-recording"});
             camerastream.getTracks().forEach(function(track) {
               track.stop();
             });

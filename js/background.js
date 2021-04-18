@@ -19,6 +19,7 @@ var micable = true;
 var width = 1920;
 var height = 1080;
 var quality = "max";
+var fps = 60;
 var camerasize = "small-size";
 var camerapos = {x:"10px", y:"10px"};
 var isMac = navigator.platform.toUpperCase().indexOf('MAC')>=0;
@@ -37,7 +38,8 @@ chrome.runtime.onInstalled.addListener(function() {
         camera: 0,
         mic: 0,
         type: "tab-only",
-        quality: "max"
+        quality: "max",
+        fps: 60
     });
     
     // Inject content scripts in existing tabs
@@ -112,7 +114,8 @@ function endRecording(stream, recordedBlobs) {
 function getDesktop() {
     var constraints = {
         audio: true,
-        video: true
+        video: true,
+        maxframeRate: fps
     };
     navigator.mediaDevices.getDisplayMedia(constraints).then(function(stream) {
         output = new MediaStream();
@@ -169,10 +172,9 @@ function getTab() {
                     minHeight: height,
                     maxWidth: width,
                     maxHeight: height,
-                    maxFrameRate: 60
+                    maxFrameRate: fps
                 },
             },
-            
         }, function(stream) {
             // Combine tab and microphone audio
             output = new MediaStream();
@@ -185,9 +187,9 @@ function getTab() {
             output.addTrack(stream.getVideoTracks()[0]);
             
             // Keep playing tab audio
-            let audio = new Audio();
-            audio.srcObject = stream;
-            audio.play();
+            this.context = new AudioContext();
+            this.stream = this.context.createMediaStreamSource(stream);
+            this.stream.connect(this.context.destination);
             
             // Set up media recorder & inject content
             newRecording(output)
@@ -233,37 +235,40 @@ function record() {
     })
     
     var constraints;
-    chrome.storage.sync.get(['quality'], function(result) {
-        quality = result.quality;
-        chrome.storage.sync.get(['mic'], function(result) {
-            // Set microphone constraints
-            constraints = {
-                audio: {
-                    deviceId: result.mic
+    chrome.storage.sync.get(['fps'], function(result) {
+        fps = result.fps;
+        chrome.storage.sync.get(['quality'], function(result) {
+            quality = result.quality;
+            chrome.storage.sync.get(['mic'], function(result) {
+                // Set microphone constraints
+                constraints = {
+                    audio: {
+                        deviceId: result.mic
+                    }
                 }
-            }
 
-            // Start microphone stream
-            navigator.mediaDevices.getUserMedia(constraints).then(function(mic) {
-                micable = true;
-                micstream = mic;
-                micsource = audioCtx.createMediaStreamSource(mic);
+                // Start microphone stream
+                navigator.mediaDevices.getUserMedia(constraints).then(function(mic) {
+                    micable = true;
+                    micstream = mic;
+                    micsource = audioCtx.createMediaStreamSource(mic);
 
-                // Check recording type
-                if (recording_type == "desktop") {
-                    getDesktop();
-                } else if (recording_type == "tab-only") {
-                    getTab();
-                }
-            }).catch(function(error) {
-                micable = false;
+                    // Check recording type
+                    if (recording_type == "desktop") {
+                        getDesktop();
+                    } else if (recording_type == "tab-only") {
+                        getTab();
+                    }
+                }).catch(function(error) {
+                    micable = false;
 
-                // Check recording type
-                if (recording_type == "desktop") {
-                    getDesktop();
-                } else if (recording_type == "tab-only") {
-                    getTab();
-                }
+                    // Check recording type
+                    if (recording_type == "desktop") {
+                        getDesktop();
+                    } else if (recording_type == "tab-only") {
+                        getTab();
+                    }
+                });
             });
         });
     });
@@ -447,6 +452,15 @@ function stopRecording(save) {
             mediaRecorder.stop();
         } else {
             recording = false;
+            if (cancel) {
+                chrome.tabs.sendMessage(tab.id, {
+                    type: "stop-cancel"
+                });
+            } else {
+                chrome.tabs.sendMessage(tab.id, {
+                    type: "stop-save"
+                });
+            }
         }
 
         // Remove injected content

@@ -4,6 +4,7 @@ $(document).ready(function(){
     var trimslider = document.getElementById('trimslider');
     var removeslider = document.getElementById('removeslider');
     var setup = true;
+    var downloaded = false;
     
     // Show recorded video
     var superBuffer = new Blob(recordedBlobs, {
@@ -117,6 +118,7 @@ $(document).ready(function(){
     
     // Download video in different formats
     function download() {
+        downloaded = true;
         $("#download-label").html(chrome.i18n.getMessage("downloading"))
         if ($("#format-select").val() == "mp4") {
             var superBuffer = new Blob(blobs, {
@@ -147,6 +149,7 @@ $(document).ready(function(){
     
     // Save on Drive
     function saveDrive() {
+        downloaded = true;
         chrome.identity.getAuthToken({ 'interactive': true }, function(token) {
             if (!token) {
               return;
@@ -270,4 +273,11 @@ $(document).ready(function(){
     $("#download-label").html(chrome.i18n.getMessage("download"));
     $("#share span").html(chrome.i18n.getMessage("save_drive"));
     $("#apply-trim").html(chrome.i18n.getMessage("apply"));
+    
+    // Automatically download when closing if the user hasn't downloaded the file
+    addEventListener("unload", function(event) {
+        if (!downloaded) {
+            download();
+        }
+    }, true);
 });
