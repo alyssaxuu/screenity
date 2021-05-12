@@ -1,0 +1,186 @@
+{
+    "extName": {
+      "message": "Screenity - Scherm Opname & Annotaties",
+      "description": "Extension name"
+    },
+    "extDesc": {
+      "message": "De beste screen recorder voor Chrome. Opnemen, annotaties toevoegen, bewerken en nog veel meer.",
+      "description": "Extension description"
+    },
+    "extCancel": {
+      "message": "Annuleer opname",
+      "description": "Cancel recording keyboard shortcut name"
+    },
+    "extMute": {
+      "message": "Demp microfoon",
+      "description": "Mute/Unmute microphone keyboard shortcut name"
+    },
+    "extStop": {
+      "message": "Stop opname",
+      "description": "Stop recording keyboard shortcut name"
+    },
+    "extPause": {
+      "message": "Pauze/Play opname",
+      "description": "Pause/Resume keyboard shortcut name"
+    },
+    "tab_only": {
+      "message": "Alleen tab",
+      "description": "Tab only label in popup"
+    },
+    "desktop": {
+      "message": "Desktop",
+      "description": "Desktop label in popup"
+    },
+    "camera_only": {
+      "message": "Alleen camera",
+      "description": "Camera only label in popup"
+    },
+    "camera": {
+      "message": "Camera",
+      "description": "Camera dropdown label in popup"
+    },
+    "microphone": {
+      "message": "Microfoon",
+      "description": "Microphone dropdown label in popup"
+    },
+    "flip_camera": {
+      "message": "Spiegel camera",
+      "description": "Flip camera label in popup"
+    },
+    "push_to_talk": {
+      "message": "Push-to-talk",
+      "description": "Push to talk label in popup"
+    },
+    "only_on_hover": {
+      "message": "Laat toolbar alleen zien bij hover",
+      "description": "Only show toolbar on hover label in popup"
+    },
+    "disabled": {
+      "message": "Uitgeschakeld",
+      "description": "Disabled dropdown state in popup"
+    },
+    "loading": {
+      "message": "Laden...",
+      "description": "Loading state in popup"
+    },
+    "start_recording": {
+      "message": "Start opname",
+      "description": "Start recording state in popup"
+    },
+    "starting_recording": {
+      "message": "Opname starten...",
+      "description": "Starting recording state in popup"
+    },
+    "cannot_record": {
+      "message": "Kan niet opnemen in deze pagina",
+      "description": "Can't record in this page state in popup"
+    },
+    "stop_recording": {
+      "message": "Stop opname",
+      "description": "Stop recording state in popup"
+    },
+    "second": {
+      "message": "seconde",
+      "description": "Seconds label for countdown"
+    },
+    "seconds": {
+      "message": "seconden",
+      "description": "Seconds label for countdown (plural)"
+    },
+    "countdown": {
+      "message": "aftellen",
+      "description": "Countdown label in popup"
+    },
+    "keyboard_shortcuts": {
+      "message": "Sneltoetsen",
+      "description": "Keyboard shortcuts label in popup"
+    },
+    "smaller_file_size": {
+      "message": "Kleinere bestandsgrootte",
+      "description": "Smaller file size label in popup"
+    },
+    "highest_quality": {
+      "message": "Hoogste kwaliteit",
+      "description": "Highest quality label in popup"
+    },
+    "rate_extension": {
+      "message": "Beoordeel app",
+      "description": "Rate extension label in popup"
+    },
+    "made_by_alyssa": {
+      "message": "Gemaakt door Alyssa X",
+      "description": "Made by Alyssa X label in popup"
+    },
+    "disabled_allow_access": {
+      "message": "Uitgeschakeld (toestaan in URL balk)",
+      "description": "Disabled requiring permission for camera/mic in popup"
+    },
+    "made_with": {
+      "message": "Gemaakt met",
+      "description": "Made with label in video editor"
+    },
+    "by_alyssa": {
+      "message": "door Alyssa X",
+      "description": "By Alyssa X label in video editor"
+    },
+    "edit_recording": {
+      "message": "Opname bewerken",
+      "description": "Edit your recording label in video editor"
+    },
+    "edit_recording_desc": {
+      "message": "Zet de puntjes op de i voor je video.",
+      "description": "Edit recording description in video editor"
+    },
+    "format": {
+      "message": "Exporteer als",
+      "description": "Export format label in video editor"
+    },
+    "webm": {
+      "message": "WEBM (standaard)",
+      "description": "Webm dropdown label in video editor"
+    },
+    "trim_video": {
+      "message": "Trim video",
+      "description": "Trim video label in video editor"
+    },
+    "start": {
+      "message": "Start",
+      "description": "Start label in video editor"
+    },
+    "end": {
+      "message": "Einde",
+      "description": "End label in video editor"
+    },
+    "remove_part": {
+      "message": "Verwijder een deel van de video",
+      "description": "Remove part of the video label in video editor"
+    },
+    "apply": {
+      "message": "Toepassen",
+      "description": "Apply button in video editor"
+    },
+    "reset": {
+      "message": "Wijzigingen resetten (ga terug naar eerste opname)",
+      "description": "Reset label in video editor"
+    },
+    "download": {
+      "message": "Download",
+      "description": "Download button in video editor"
+    },
+    "save_drive": {
+      "message": "Opslaan als",
+      "description": "Save to Drive button in video editor"
+    },
+    "saving": {
+      "message": "Opslaan...",
+      "description": "Saving to Drive button in video editor"
+    },
+    "show_hide": {
+      "message": "Opties weergeven/verbergen",
+      "description": "Show/hide options panel in video editor (small screen)"
+    },
+    "downloading": {
+      "message": "Downloaden...",
+      "description": "Downloading button in video editor"
+    }
+}
