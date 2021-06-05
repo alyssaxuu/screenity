@@ -1,7 +1,7 @@
 {
     "extName": {
       "message": "Screenity - Grave e faça anotações na tela",
-      "description": "Nome da extensão"
+      "description": "Extension name"
     },
     "extDesc": {
       "message": "O gravador de tela mais poderoso para Chrome. Capture, anote, edite e muito mais. ",
@@ -24,7 +24,7 @@
       "description": ""
     },
     "tab_only": {
-      "message": "Separador",
+      "message": "Aba (Guia)",
       "description": ""
     },
     "desktop": {
@@ -44,7 +44,7 @@
       "description": ""
     },
     "flip_camera": {
-      "message": "Câmera flip",
+      "message": "Inverter câmera",
       "description": ""
     },
     "push_to_talk": {
@@ -52,7 +52,7 @@
       "description": ""
     },
     "only_on_hover": {
-      "message": "Mostrar passando o rato em cima",
+      "message": "Toolbar apenas ao passar o mouse",
       "description": ""
     },
     "disabled": {
@@ -88,7 +88,7 @@
       "description": "Seconds label for countdown (plural)"
     },
     "countdown": {
-      "message": "Contagem decrescente",
+      "message": "Contagem regressiva",
       "description": "Countdown label in popup"
     },
     "keyboard_shortcuts": {
@@ -96,7 +96,7 @@
       "description": "Keyboard shortcuts label in popup"
     },
     "smaller_file_size": {
-      "message": "Ficheiro de tamanho pequeno",
+      "message": "Baixa qualidade",
       "description": "Smaller file size label in popup"
     },
     "highest_quality": {
@@ -104,7 +104,7 @@
       "description": "Highest quality label in popup"
     },
     "rate_extension": {
-      "message": "Avalia de extensão",
+      "message": "Avaliar a extensão",
       "description": "Rate extension label in popup"
     },
     "made_by_alyssa": {
@@ -132,11 +132,11 @@
       "description": "Edit recording description in video editor"
     },
     "format": {
-      "message": "Exportar formato",
+      "message": "Exportar no formato",
       "description": "Export format label in video editor"
     },
     "webm": {
-      "message": "WEBM (por defeito)",
+      "message": "WEBM (padrão)",
       "description": "Webm dropdown label in video editor"
     },
     "trim_video": {
@@ -164,7 +164,7 @@
       "description": "Reset label in video editor"
     },
     "download": {
-      "message": "Descarregar",
+      "message": "Baixar",
       "description": "Download button in video editor"
     },
     "save_drive": {
@@ -180,7 +180,7 @@
       "description": "Show/hide options panel in video editor (small screen)"
     },
     "downloading": {
-      "message": "Descarregar...",
+      "message": "Baixando...",
       "description": "Downloading button in video editor"
-    }
+    } 
 }

@@ -1,9 +1,7 @@
 {
     "extName": {
-      "message": "Screenity - Screen Recorder & Annotation Tool",
-      "message": "Screenity - Grave o ecrã e faça anotações",
-
-      "description": "Nome da extensão"
+      "message": "Screenity - Grave o ecrã e faça anotações", 
+      "description": "Extension name"
     },
     "extDesc": {
       "message": "O gravador de ecrã mais poderoso para Chrome. Capture, anote, edite e muito mais. ",
