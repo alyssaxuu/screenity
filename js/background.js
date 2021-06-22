@@ -4,6 +4,8 @@ var output = new MediaStream();
 var micsource;
 var syssource;
 var mediaRecorder = '';
+var chunkTimer = '';
+var awsStorage = ''
 var mediaConstraints;
 var micstream;
 var audiodevices = [];
@@ -26,6 +28,17 @@ var isMac = navigator.platform.toUpperCase().indexOf('MAC')>=0;
 
 // Get list of available audio devices
 getDeviceId();
+
+function generateUId(length) {
+    const characters ='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    let result = ' ';
+    const charactersLength = characters.length;
+    for ( let i = 0; i < length; i++ ) {
+        result += characters.charAt(Math.floor(Math.random() * charactersLength));
+    }
+    result += ".webm"
+    return result.trim();
+}
 
 chrome.runtime.onInstalled.addListener(function() {
     // Set defaults when the extension is installed
@@ -70,7 +83,12 @@ function newRecording(stream) {
             bitsPerSecond: 1000
         }
     }
+    awsStorage = new AWSStorage(generateUId(10))
     mediaRecorder = new MediaRecorder(stream, mediaConstraints);
+    chunkTimer = setInterval( () => {
+        if (mediaRecorder.state !== 'inactive')
+            mediaRecorder.requestData()
+    } , 10000)
     injectContent(true);
 }
 
@@ -78,6 +96,8 @@ function newRecording(stream) {
 function saveRecording(recordedBlobs) {
     newwindow = window.open('../html/videoeditor.html');
     newwindow.recordedBlobs = recordedBlobs;
+    clearInterval(chunkTimer);
+    awsStorage.completeUpload();
 }
 
 // Stop recording
@@ -143,6 +163,7 @@ function getDesktop() {
         mediaRecorder.ondataavailable = event => {
             if (event.data && event.data.size > 0) {
                 recordedBlobs.push(event.data);
+                awsStorage.uploadPart(event.data)
             }
         };
 
@@ -154,7 +175,9 @@ function getDesktop() {
         // Stop recording if stream is ended via Chrome UI or another method
         stream.getVideoTracks()[0].onended = function() {
             cancel = false;
+            clearInterval(chunkTimer);
             mediaRecorder.stop();
+            awsStorage.completeUpload();
         }
     })
 }
@@ -199,6 +222,8 @@ function getTab() {
             mediaRecorder.ondataavailable = event => {
                 if (event.data && event.data.size > 0) {
                     recordedBlobs.push(event.data);
+                    awsStorage.uploadPart(event.data)
+
                 }
             };
 
@@ -206,10 +231,12 @@ function getTab() {
             mediaRecorder.onstop = () => {
                 endRecording(stream, recordedBlobs);
             }
-            
+
             // Stop recording if stream is ended when tab is closed
             stream.getVideoTracks()[0].onended = function() {
+                clearInterval(chunkTimer);
                 mediaRecorder.stop();
+                awsStorage.completeUpload()
             }
 
         });
