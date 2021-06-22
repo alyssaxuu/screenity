@@ -4,11 +4,10 @@ class Chunks {
         this.partNumber = PartNumber
     }
 }
+const MIN_SIZE = 6000000
+const BASE_URL = "https://bauuv39b7h.execute-api.us-east-1.amazonaws.com/dev/";
 
 class AWSStorage {
-
-    MIN_SIZE = 6000;
-    BASE_URL = "https://bauuv39b7h.execute-api.us-east-1.amazonaws.com/dev/";
 
     constructor(FileName){
         this.FileName = FileName
