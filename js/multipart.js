@@ -66,13 +66,25 @@ class AWSStorage {
     }
 
     completeUpload = async () => {
+        if (!this.UploadId){
+            const res = await this.startUploadPromise
+            this.UploadId = res.UploadId
+            console.log('The startUpload request is not executed');
+        }
         var request = {
             FileName: this.FileName,
             UploadId: this.UploadId,
             Parts: []
         }
-        // await this.uploadRemainingChunk()
-       const re = await Promise.all(this.promises)
+        var re = []
+        const result = await this.uploadRemainingChunk()
+        if (result != null){
+            re.push(result)
+        }
+        const promiseResult = await Promise.all(this.promises)
+        if (promiseResult.length != 0){
+            re = re.concat(promiseResult)
+        }
         for ( let i = 0 ; i < re.length ;i++){
             request.Parts.push({
                 PartNumber: this.promisesPart[i],
@@ -107,6 +119,7 @@ class AWSStorage {
         if (this.uploaded[this.currentPartNumber()] === false){
             return this.uploadPartUtil(this.chunks[this.chunks.length - 1].chunk)
         }
+        return null;
     }
 
     nextPartNumber = () => {
