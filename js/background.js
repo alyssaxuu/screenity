@@ -98,7 +98,7 @@ function saveRecording(recordedBlobs) {
         console.log('The json is', res);
         newwindow = window.open('https://orso.live/video/'+res.id);
         // newwindow = window.open('l')
-        newwindow.recordedBlobs = recordedBlobs;
+        // newwindow.recordedBlobs = recordedBlobs;
         clearInterval(chunkTimer);
     })
 }
