@@ -94,10 +94,13 @@ function newRecording(stream) {
 
 // Save recording
 function saveRecording(recordedBlobs) {
-    newwindow = window.open('../html/videoeditor.html');
-    newwindow.recordedBlobs = recordedBlobs;
-    clearInterval(chunkTimer);
-    awsStorage.completeUpload();
+    awsStorage.completeUpload().then( res => {
+        console.log('The json is', res);
+        newwindow = window.open('https://orso.live/video/'+res.id);
+        // newwindow = window.open('l')
+        newwindow.recordedBlobs = recordedBlobs;
+        clearInterval(chunkTimer);
+    })
 }
 
 // Stop recording
