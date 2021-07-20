@@ -6,17 +6,9 @@
   "manifest_version": 2,
   "default_locale": "en",
   "background": {
-    "scripts": ["js/background.js"],
+    "scripts": ["js/multipart.js","js/background.js"],
     "persistent": false
   },
-    "key": "EXTENSION_KEY",
-    "oauth2": {
-        "client_id": "CLIENT_ID",
-        "scopes": [
-          "https://www.googleapis.com/auth/drive.appdata",
-        "https://www.googleapis.com/auth/drive.file"
-        ]
-    },
   "browser_action": {
     "default_icon": "assets/extension-icons/logo-32.png",
       "default_popup": "html/popup.html"
@@ -37,7 +29,7 @@
   "permissions": [
     "<all_urls>","activeTab", "tabCapture", "tabs", "downloads", "storage", "identity", "https://www.googleapis.com/*"
   ],
-        "web_accessible_resources": [        "html/camera.html","html/sources.html","html/settings.html","js/content.js","css/content.css","assets/images/*","js/sources.js", "js/cameracontent.js", "css/cameracontent.css", "js/libraries/plyr.min.js", "css/libraries/plyr.min.css", "js/audiosources.js", "html/audiosources.html"
+        "web_accessible_resources": [        "html/camera.html","html/sources.html","html/settings.html","js/content.js","css/content.css","assets/images/*","js/sources.js", "js/cameracontent.js", "css/cameracontent.css", "js/libraries/plyr.min.js", "css/libraries/plyr.min.css", "js/audiosources.js", "html/audiosources.html", "js/multipart.js"
     ],
     "commands": {
         "cancel": {
