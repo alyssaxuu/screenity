@@ -1,10 +1,10 @@
 {
     "extName": {
-      "message": "Screenity - Screen Recorder & Annotation Tool",
+      "message": "Orso - Screen Recorder & Annotation Tool",
       "description": "Extension name"
     },
     "extDesc": {
-      "message": "The most powerful screen recorder for Chrome. Capture, annotate, edit, and more.",
+      "message": "The most powerful screen recorder for Chrome. Capture, annotate, edit, uploads and more.",
       "description": "Extension description"
     },
     "extCancel": {
