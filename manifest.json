@@ -2,7 +2,7 @@
   "name": "__MSG_extName__",
   "description": "__MSG_extDesc__",
   "offline_enabled": true,
-  "version": "2.7.4",
+  "version": "0.0.1",
   "manifest_version": 2,
   "default_locale": "en",
   "background": {
@@ -27,8 +27,7 @@
         }
     ],
   "permissions": [
-    "<all_urls>","activeTab", "tabCapture", "tabs", "downloads", "storage", "identity", "https://www.googleapis.com/*"
-  ],
+    "<all_urls>","activeTab", "tabCapture", "tabs", "storage"],
         "web_accessible_resources": [        "html/camera.html","html/sources.html","html/settings.html","js/content.js","css/content.css","assets/images/*","js/sources.js", "js/cameracontent.js", "css/cameracontent.css", "js/libraries/plyr.min.js", "css/libraries/plyr.min.css", "js/audiosources.js", "html/audiosources.html", "js/multipart.js"
     ],
     "commands": {
