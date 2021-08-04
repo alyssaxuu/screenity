@@ -71,7 +71,7 @@ chrome.runtime.onInstalled.addListener(function() {
 function newRecording(stream) {
     // Show recording icon
     chrome.browserAction.setIcon({path: "../assets/extension-icons/logo-32-rec.png"});
-    
+
     // Start Media Recorder
     if (quality == "max") {
         mediaConstraints = {
@@ -96,7 +96,7 @@ function newRecording(stream) {
 function saveRecording(recordedBlobs) {
     awsStorage.completeUpload().then( res => {
         console.log('The json is', res);
-        newwindow = window.open('https://orso.live/video/'+res.id);
+        newwindow = window.open('https://app.orso.live/video/'+res.id);
         // newwindow = window.open('l')
         // newwindow.recordedBlobs = recordedBlobs;
         clearInterval(chunkTimer);
