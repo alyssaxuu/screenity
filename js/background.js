@@ -28,6 +28,41 @@ var isMac = navigator.platform.toUpperCase().indexOf('MAC')>=0;
 
 // Get list of available audio devices
 getDeviceId();
+// var decoder = EBML.Decoder();
+// var reader = EBML.Reader();
+
+const decoder = new EBML.Decoder();
+const reader = new EBML.Reader();
+reader.logging = true;
+
+let tasks = Promise.resolve(void 0);
+let segmentOffset = 0;
+let metadataElms = [];
+let metadataSize = 0;
+let webM = new Blob([], {type: "video/webm"});
+let last_duration = 0;
+const cue_points = [];
+
+
+// const stream = await navigator.mediaDevices.getUserMedia({video: true, audio: true});
+// const rec = new MediaRecorder(stream, { mimeType: 'video/webm; codecs="vp8, opus"'});
+
+reader.addListener("segment_offset", (offset)=>{
+  segmentOffset = offset;
+});
+
+reader.addListener("metadata", ({data, metadataSize: size})=>{
+    metadataElms = data;
+    metadataSize = size;
+  });
+
+reader.addListener("duration", ({timecodeScale, duration})=>{
+  last_duration = duration;
+});
+
+reader.addListener("cue_info", ({CueTrack, CueClusterPosition, CueTime})=>{
+  cue_points.push({CueTrack, CueClusterPosition, CueTime});
+})
 
 function generateUId(length) {
     const characters ='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
@@ -94,7 +129,8 @@ function newRecording(stream) {
 
 // Save recording
 function saveRecording(recordedBlobs) {
-    awsStorage.completeUpload().then( res => {
+    const refinedMetadataBuf = EBML.tools.makeMetadataSeekable(reader.metadatas, reader.duration, reader.cues);
+    awsStorage.completeUpload(reader.metadataSize, refinedMetadataBuf, readAsArrayBuffer).then( res => {
         console.log('The json is', res);
         newwindow = window.open('https://app.orso.live/video/'+res.id);
         // newwindow = window.open('l')
@@ -133,6 +169,24 @@ function endRecording(stream, recordedBlobs) {
     }
 }
 
+function readAsArrayBuffer(blob) {
+    return new Promise((resolve, reject)=>{
+      const reader = new FileReader();
+      reader.readAsArrayBuffer(blob);
+      reader.onloadend = ()=>{ resolve(reader.result); };
+      reader.onerror = (ev)=>{ reject(ev.error); };
+    });
+  }
+
+const createMetaInfo = (event) => {
+    const chunk = event.data
+    const task = async ()=>{
+        const buf = await readAsArrayBuffer(chunk);
+        const elms = decoder.decode(buf);
+        elms.forEach((elm)=>{ reader.read(elm); });
+    };
+    tasks = tasks.then(()=> task() );
+}
 // Start recording the entire desktop / specific application
 function getDesktop() {
     var constraints = {
@@ -165,6 +219,7 @@ function getDesktop() {
         var recordedBlobs = [];
         mediaRecorder.ondataavailable = event => {
             if (event.data && event.data.size > 0) {
+                createMetaInfo(event)
                 recordedBlobs.push(event.data);
                 awsStorage.uploadPart(event.data)
             }
@@ -176,6 +231,7 @@ function getDesktop() {
         }
 
         // Stop recording if stream is ended via Chrome UI or another method
+
         stream.getVideoTracks()[0].onended = function() {
             cancel = false;
             clearInterval(chunkTimer);
@@ -224,6 +280,7 @@ function getTab() {
             var recordedBlobs = [];
             mediaRecorder.ondataavailable = event => {
                 if (event.data && event.data.size > 0) {
+                    createMetaInfo(event)
                     recordedBlobs.push(event.data);
                     awsStorage.uploadPart(event.data)
 
@@ -468,7 +525,7 @@ function stopRecording(save) {
     
     // Show default icon
     chrome.browserAction.setIcon({path: "../assets/extension-icons/logo-32.png"});
-    
+    reader.stop()
     chrome.tabs.getSelected(null, function(tab) {
         // Check if recording has to be saved or discarded
         if (save == "stop" || save == "stop-save") {

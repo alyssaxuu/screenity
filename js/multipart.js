@@ -27,6 +27,34 @@ class AWSStorage {
         return res.json()
     }
 
+    uploadFirst = async (metadataSize, refinedMetadataBuf, readAsArrayBuffer) => {
+        var newChunk = this.chunks[0]['chunk']
+        const partNumber = 1
+        const UploadUrl = await (await this.getUploadUrl(partNumber, newChunk.type));
+        await this.modifyMetadata(metadataSize, refinedMetadataBuf, readAsArrayBuffer)
+        const res = fetch(UploadUrl, {
+            method: 'PUT',
+            headers: {
+                ContentType: newChunk.type,
+                // 'x-amz-acl': 'public-read'
+            },
+            body: this.chunks[0]['chunk']
+        })
+        this.uploaded[partNumber] = true
+        this.promises.push(res);
+        this.promisesPart.push(partNumber)
+        return
+    }
+
+    modifyMetadata = async (metadataSize, refinedMetadataBuf, readAsArrayBuffer) => {
+        const chunk = this.chunks[0]['chunk']
+        const webMBuf = await readAsArrayBuffer(chunk);
+        const body = webMBuf.slice(metadataSize)
+        const refinedWebM = new Blob([refinedMetadataBuf, body], {type: webM.type});
+        this.chunks[0] = new Chunks(refinedWebM, 0)
+        return
+    }
+
     uploadPartUtil = async (newChunk) => {
         if (!this.UploadId){
             const res = await this.startUploadPromise
@@ -34,6 +62,8 @@ class AWSStorage {
             console.log('The startUpload request is not executed');
         }
         const partNumber = this.currentPartNumber()
+        if (partNumber === 1)
+            return
         const UploadUrl = await (await this.getUploadUrl(partNumber, newChunk.type));
         console.log('The uploadURL is', UploadUrl);
         const res = fetch(UploadUrl, {
@@ -65,7 +95,7 @@ class AWSStorage {
         // return {ETag: res.headers.get('ETag')}
     }
 
-    completeUpload = async () => {
+    completeUpload = async (metadataSize, refinedMetadataBuf, readAsArrayBuffer) => {
         if (!this.UploadId){
             const res = await this.startUploadPromise
             this.UploadId = res.UploadId
@@ -77,6 +107,7 @@ class AWSStorage {
             Parts: []
         }
         var re = []
+        await this.uploadFirst(metadataSize, refinedMetadataBuf, readAsArrayBuffer)
         const result = await this.uploadRemainingChunk()
         if (result != null){
             re.push(result)
@@ -91,6 +122,8 @@ class AWSStorage {
                 ETag: re[i].headers.get('ETag')
             })
         }
+
+        request.Parts.sort((e1, e2) => { return e1.PartNumber - e2.PartNumber })
 
         const COMPLETE_UPLOAD = "upload/complete"
         console.log('In the completeUpload method', request);
