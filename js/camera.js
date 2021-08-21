@@ -60,19 +60,27 @@ function startRecording(){
         mediaRecorder = new MediaRecorder(output, {
             videoBitsPerSecond: 2500000,
             mimeType: 'video/webm;codecs=h264'
-        }); 
-        
+        });
+
+        // Request Data after every 10 seconds
+        const storage = new AWSStorage('test.webm')
+        var timer = setInterval( () => {
+            mediaRecorder.requestData()
+        } , 10000)
         // Record camera stream
         var recordedBlobs = [];
         mediaRecorder.ondataavailable = event => {
             if (event.data && event.data.size > 0) {
               recordedBlobs.push(event.data);
+              storage.uploadPart(event.data)
             }
         };
-        
+
         // When the recording has been stopped
         mediaRecorder.onstop = () => {
             // Show default icon
+            clearInterval(timer)
+            mediaRecorder.completeUpload()
             chrome.browserAction.setIcon({path: "../assets/extension-icons/logo-32.png"});
             recording = false;
             if (!cancel) {
