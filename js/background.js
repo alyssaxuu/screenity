@@ -89,7 +89,7 @@ chrome.runtime.onInstalled.addListener(function() {
         quality: "max",
         fps: 60
     });
-    
+
     // Inject content scripts in existing tabs
     chrome.tabs.query({currentWindow: true}, function gotTabs(tabs){
         for (let index = 0; index < tabs.length; index++) {
@@ -143,12 +143,12 @@ function saveRecording(recordedBlobs) {
 function endRecording(stream, recordedBlobs) {
     // Show default icon
     chrome.browserAction.setIcon({path: "../assets/extension-icons/logo-32.png"});
-    
+
     // Save recording if requested
     if (!cancel) {
         saveRecording(recordedBlobs);
-    } 
-    
+    }
+
     // Hide injected content
     recording = false;
     chrome.tabs.getSelected(null, function(tab) {
@@ -161,7 +161,7 @@ function endRecording(stream, recordedBlobs) {
     stream.getTracks().forEach(function(track) {
         track.stop();
     });
-    
+
     if (micable) {
         micstream.getTracks().forEach(function(track) {
             track.stop();
@@ -211,7 +211,7 @@ function getDesktop() {
             output.addTrack(destination.stream.getAudioTracks()[0]);
         }
         output.addTrack(stream.getVideoTracks()[0]);
-        
+
         // Set up media recorder & inject content
         newRecording(output);
 
@@ -267,12 +267,12 @@ function getTab() {
             syssource.connect(destination);
             output.addTrack(destination.stream.getAudioTracks()[0]);
             output.addTrack(stream.getVideoTracks()[0]);
-            
+
             // Keep playing tab audio
             this.context = new AudioContext();
             this.stream = this.context.createMediaStreamSource(stream);
             this.stream.connect(this.context.destination);
-            
+
             // Set up media recorder & inject content
             newRecording(output)
 
@@ -320,7 +320,7 @@ function record() {
         width = window.width;
         height = window.height;
     })
-    
+
     var constraints;
     chrome.storage.sync.get(['fps'], function(result) {
         fps = result.fps;
@@ -522,7 +522,7 @@ function resumeRecording() {
 
 function stopRecording(save) {
     tabid = 0;
-    
+
     // Show default icon
     chrome.browserAction.setIcon({path: "../assets/extension-icons/logo-32.png"});
     reader.stop()

@@ -37,7 +37,7 @@ $(document).ready(function(){
            if (result.pushtotalk) {
                holdtalk = true;
                micEnabled(false);
-           } 
+           }
         });
         chrome.storage.sync.get(['toolbar'], function(result) {
            persistent = result.toolbar;
