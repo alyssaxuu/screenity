@@ -6,7 +6,7 @@
   "manifest_version": 2,
   "default_locale": "en",
   "background": {
-    "scripts": ["js/multipart.js","js/background.js"],
+    "scripts": ["js/multipart.js","js/libraries/EBML.js","js/background.js"],
     "persistent": false
   },
   "browser_action": {
