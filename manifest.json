@@ -2,7 +2,7 @@
   "name": "__MSG_extName__",
   "description": "__MSG_extDesc__",
   "offline_enabled": true,
-  "version": "2.7.4",
+  "version": "2.7.6",
   "manifest_version": 2,
   "default_locale": "en",
   "background": {
@@ -38,7 +38,7 @@
     "<all_urls>","activeTab", "tabCapture", "tabs", "downloads", "storage", "identity", "https://www.googleapis.com/*"
   ],
   "web_accessible_resources": [        
-    "html/camera.html","html/sources.html","html/settings.html","js/content.js","css/content.css","assets/images/*","js/sources.js", "js/cameracontent.js", "css/cameracontent.css", "js/libraries/plyr.min.js", "css/libraries/plyr.min.css", "js/audiosources.js", "html/audiosources.html"
+    "html/camera.html","html/sources.html","html/settings.html","js/content.js","js/libraries/ffmpeg.js", "css/content.css","assets/images/*","js/sources.js", "js/cameracontent.js", "css/cameracontent.css", "js/libraries/plyr.min.js", "css/libraries/plyr.min.css", "js/audiosources.js", "html/audiosources.html"
   ],
   "content_security_policy": "script-src 'self' 'unsafe-eval' chrome-extension://kbbdabhdfibnancpjfhlkhafgdilcnji/js/libraries/ffmpeg.js 'unsafe-inline'; object-src 'self'",
   "commands": {
