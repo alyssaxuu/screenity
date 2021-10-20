@@ -40,7 +40,6 @@
   "web_accessible_resources": [        
     "html/camera.html","html/sources.html","html/settings.html","js/content.js","js/libraries/ffmpeg.js", "css/content.css","assets/images/*","js/sources.js", "js/cameracontent.js", "css/cameracontent.css", "js/libraries/plyr.min.js", "css/libraries/plyr.min.css", "js/audiosources.js", "html/audiosources.html"
   ],
-  "content_security_policy": "script-src 'self' 'unsafe-eval' chrome-extension://kbbdabhdfibnancpjfhlkhafgdilcnji/js/libraries/ffmpeg.js 'unsafe-inline'; object-src 'self'",
   "commands": {
       "cancel": {
           "suggested_key": {
