@@ -9,66 +9,67 @@
     "scripts": ["js/background.js"],
     "persistent": false
   },
-    "key": "EXTENSION_KEY",
-    "oauth2": {
-        "client_id": "CLIENT_ID",
-        "scopes": [
-          "https://www.googleapis.com/auth/drive.appdata",
-        "https://www.googleapis.com/auth/drive.file"
-        ]
-    },
+  "key": "EXTENSION_KEY",
+  "oauth2": {
+      "client_id": "CLIENT_ID",
+      "scopes": [
+        "https://www.googleapis.com/auth/drive.appdata",
+      "https://www.googleapis.com/auth/drive.file"
+      ]
+  },
   "browser_action": {
     "default_icon": "assets/extension-icons/logo-32.png",
       "default_popup": "html/popup.html"
   },
-    "icons": {
-      "16": "assets/extension-icons/logo-16.png",
-      "128": "assets/extension-icons/logo-128.png",
-      "48": "assets/extension-icons/logo-48.png"
-    },
-    "content_scripts": [
-        {
-            "matches": [
-            "<all_urls>"
-            ],
-            "js": ["js/detect.js"]
-        }
-    ],
+  "icons": {
+    "16": "assets/extension-icons/logo-16.png",
+    "128": "assets/extension-icons/logo-128.png",
+    "48": "assets/extension-icons/logo-48.png"
+  },
+  "content_scripts": [
+      {
+          "matches": [
+          "<all_urls>"
+          ],
+          "js": ["js/detect.js"]
+      }
+  ],
   "permissions": [
     "<all_urls>","activeTab", "tabCapture", "tabs", "downloads", "storage", "identity", "https://www.googleapis.com/*"
   ],
-        "web_accessible_resources": [        "html/camera.html","html/sources.html","html/settings.html","js/content.js","css/content.css","assets/images/*","js/sources.js", "js/cameracontent.js", "css/cameracontent.css", "js/libraries/plyr.min.js", "css/libraries/plyr.min.css", "js/audiosources.js", "html/audiosources.html"
-    ],
-    "commands": {
-        "cancel": {
-            "suggested_key": {
-              "default": "Alt+C",
-              "mac": "Alt+C"
-            },
-            "description": "__MSG_extCancel__"
-        },
-        "mute/unmute": {
-            "suggested_key": {
-              "default": "Alt+M",
-              "mac": "Alt+M"
-            },
-            "description": "__MSG_extMute__"
-        },
-        "stop": {
-            "suggested_key": {
-              "default": "Alt+S",
-              "mac": "Alt+S"
-            },
-            "description": "__MSG_extStop__"
-        },
-        "pause/resume": {
-            "suggested_key": {
-              "default": "Alt+P",
-              "mac": "Alt+P"
-            },
-            "description": "__MSG_extPause__"
-        }
-        
-    }
+  "web_accessible_resources": [        
+    "html/camera.html","html/sources.html","html/settings.html","js/content.js","css/content.css","assets/images/*","js/sources.js", "js/cameracontent.js", "css/cameracontent.css", "js/libraries/plyr.min.js", "css/libraries/plyr.min.css", "js/audiosources.js", "html/audiosources.html"
+  ],
+  "content_security_policy": "script-src 'self' 'unsafe-eval' chrome-extension://kbbdabhdfibnancpjfhlkhafgdilcnji/js/libraries/ffmpeg.js 'unsafe-inline'; object-src 'self'",
+  "commands": {
+      "cancel": {
+          "suggested_key": {
+            "default": "Alt+C",
+            "mac": "Alt+C"
+          },
+          "description": "__MSG_extCancel__"
+      },
+      "mute/unmute": {
+          "suggested_key": {
+            "default": "Alt+M",
+            "mac": "Alt+M"
+          },
+          "description": "__MSG_extMute__"
+      },
+      "stop": {
+          "suggested_key": {
+            "default": "Alt+S",
+            "mac": "Alt+S"
+          },
+          "description": "__MSG_extStop__"
+      },
+      "pause/resume": {
+          "suggested_key": {
+            "default": "Alt+P",
+            "mac": "Alt+P"
+          },
+          "description": "__MSG_extPause__"
+      }
+   }
 }
 
