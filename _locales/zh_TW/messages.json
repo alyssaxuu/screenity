@@ -1,0 +1,186 @@
+{
+    "extName": {
+      "message": "Screenity - 螢幕錄影 & 劃記工具",
+      "description": "Extension name"
+    },
+    "extDesc": {
+      "message": "最強大的Chrome螢幕錄影工具，擷取、劃記、編輯還有更多！",
+      "description": "Extension description"
+    },
+    "extCancel": {
+      "message": "取消錄製",
+      "description": "Cancel recording keyboard shortcut name"
+    },
+    "extMute": {
+      "message": "麥克風 靜音/取消靜音",
+      "description": "Mute/Unmute microphone keyboard shortcut name"
+    },
+    "extStop": {
+      "message": "停止錄製",
+      "description": "Stop recording keyboard shortcut name"
+    },
+    "extPause": {
+      "message": "暫停/繼續 錄製",
+      "description": "Pause/Resume keyboard shortcut name"
+    },
+    "tab_only": {
+      "message": "僅分頁",
+      "description": "Tab only label in popup"
+    },
+    "desktop": {
+      "message": "桌面",
+      "description": "Desktop label in popup"
+    },
+    "camera_only": {
+      "message": "僅相機",
+      "description": "Camera only label in popup"
+    },
+    "camera": {
+      "message": "相機",
+      "description": "Camera dropdown label in popup"
+    },
+    "microphone": {
+      "message": "麥克風",
+      "description": "Microphone dropdown label in popup"
+    },
+    "flip_camera": {
+      "message": "轉換鏡頭",
+      "description": "Flip camera label in popup"
+    },
+    "push_to_talk": {
+      "message": "隨按即說 Push to talk",
+      "description": "Push to talk label in popup"
+    },
+    "only_on_hover": {
+      "message": "僅在懸停時顯示工具列",
+      "description": "Only show toolbar on hover label in popup"
+    },
+    "disabled": {
+      "message": "已禁用",
+      "description": "Disabled dropdown state in popup"
+    },
+    "loading": {
+      "message": "載入中...",
+      "description": "Loading state in popup"
+    },
+    "start_recording": {
+      "message": "開始錄製",
+      "description": "Start recording state in popup"
+    },
+    "starting_recording": {
+      "message": "開始錄製中...",
+      "description": "Starting recording state in popup"
+    },
+    "cannot_record": {
+      "message": "無法錄製這個頁面",
+      "description": "Can't record in this page state in popup"
+    },
+    "stop_recording": {
+      "message": "停止錄製",
+      "description": "Stop recording state in popup"
+    },
+    "second": {
+      "message": "秒",
+      "description": "Seconds label for countdown"
+    },
+    "seconds": {
+      "message": "秒",
+      "description": "Seconds label for countdown (plural)"
+    },
+    "countdown": {
+      "message": "倒數",
+      "description": "Countdown label in popup"
+    },
+    "keyboard_shortcuts": {
+      "message": "快捷鍵",
+      "description": "Keyboard shortcuts label in popup"
+    },
+    "smaller_file_size": {
+      "message": "較小的檔案大小",
+      "description": "Smaller file size label in popup"
+    },
+    "highest_quality": {
+      "message": "較好的影片品質",
+      "description": "Highest quality label in popup"
+    },
+    "rate_extension": {
+      "message": "給extension評價",
+      "description": "Rate extension label in popup"
+    },
+    "made_by_alyssa": {
+      "message": "Made by Alyssa X",
+      "description": "Made by Alyssa X label in popup"
+    },
+    "disabled_allow_access": {
+      "message": "已禁用 (在 URL 列允許存取)",
+      "description": "Disabled requiring permission for camera/mic in popup"
+    },
+    "made_with": {
+      "message": "Made with",
+      "description": "Made with label in video editor"
+    },
+    "by_alyssa": {
+      "message": "by Alyssa X （翻譯：sk5s）",
+      "description": "By Alyssa X label in video editor"
+    },
+    "edit_recording": {
+      "message": "編輯錄影",
+      "description": "Edit your recording label in video editor"
+    },
+    "edit_recording_desc": {
+      "message": "Add the finishing touches to your video.",
+      "description": "Edit recording description in video editor"
+    },
+    "format": {
+      "message": "匯出格式",
+      "description": "Export format label in video editor"
+    },
+    "webm": {
+      "message": "WEBM (預設)",
+      "description": "Webm dropdown label in video editor"
+    },
+    "trim_video": {
+      "message": "影片修剪",
+      "description": "Trim video label in video editor"
+    },
+    "start": {
+      "message": "開始",
+      "description": "Start label in video editor"
+    },
+    "end": {
+      "message": "結束",
+      "description": "End label in video editor"
+    },
+    "remove_part": {
+      "message": "移除部分影片",
+      "description": "Remove part of the video label in video editor"
+    },
+    "apply": {
+      "message": "確認",
+      "description": "Apply button in video editor"
+    },
+    "reset": {
+      "message": "重置更動（恢復為原始錄製）",
+      "description": "Reset label in video editor"
+    },
+    "download": {
+      "message": "下載",
+      "description": "Download button in video editor"
+    },
+    "save_drive": {
+      "message": "儲存到雲端硬碟",
+      "description": "Save to Drive button in video editor"
+    },
+    "saving": {
+      "message": "儲存中...",
+      "description": "Saving to Drive button in video editor"
+    },
+    "show_hide": {
+      "message": "顯示/隱藏 選項",
+      "description": "Show/hide options panel in video editor (small screen)"
+    },
+    "downloading": {
+      "message": "下載中...",
+      "description": "Downloading button in video editor"
+    }
+}
