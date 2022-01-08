@@ -9,7 +9,6 @@
     "scripts": ["js/background.js"],
     "persistent": false
   },
-  "key": "EXTENSION_KEY",
   "oauth2": {
       "client_id": "CLIENT_ID",
       "scopes": [
