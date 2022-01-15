@@ -12,11 +12,13 @@ Made by [Alyssa X](https://alyssax.com)
 <a href="https://www.producthunt.com/posts/screenity?utm_source=badge-top-post-badge&utm_medium=badge&utm_souce=badge-screenity" target="_blank"><img src="https://api.producthunt.com/widgets/embed-image/v1/top-post-badge.svg?post_id=275308&theme=light&period=daily" alt="Screenity - The most powerful screen recorder for Chrome | Product Hunt" style="width: 250px; height: 54px;" width="250" height="54" /></a>
 <a href="https://news.ycombinator.com/item?id=25150804" target="_blank"><img height=53 src="https://hackerbadge.now.sh/api?id=25150804&type=orange" alt="Featured on HackerNews"></a>
 
+Also available for [Microsoft Edge](https://microsoftedge.microsoft.com/addons/detail/screenity-screen-record/nbdkgeeeabnfegekngimpknhnkmocjcj)
+
 ## Table of contents
-- [Features](#features)
-- [Translating Screenity to other languages](#translating-screenity-to-other-languages)
-- [Self-hosting Screenity](#self-hosting-screenity)
-- [Libraries used](#libraries-used)
+  - [Features](#features)
+  - [Translating Screenity to other languages](#translating-screenity-to-other-languages)
+  - [Self-hosting Screenity](#self-hosting-screenity)
+  - [Libraries used](#libraries-used)
 
 ## Features
 🎥 Make unlimited recordings of your tab, desktop, any application, and camera<br>
@@ -50,6 +52,7 @@ You can run Screenity locally without having to install it from the Chrome Store
 2. Go to chrome://extensions/ in your browser, and [enable developer mode](https://developer.chrome.com/docs/extensions/mv2/faq/#:~:text=You%20can%20start%20by%20turning,a%20packaged%20extension%2C%20and%20more.).
 3. Drag the folder that contains the code (make sure it's a folder and not a ZIP file, so unzip first), or click on the "Load unpacked" button and locate the folder.
 4. That's it, you will now be able to use Screenity locally. Make sure you pin it on the toolbar by clicking the "puzzle" icon in the toolbar and pinning Screenity.
+5. To enable the Google Drive Upload (authorization consent screen) you must change the client_id in the manifest.json file with your linked extension key. You can create it accessing Google Cloud [https://console.cloud.google.com/apis/credentials](https://console.cloud.google.com/apis/credentials)?project=your_project and selecting menu "Create Credential" > "OAuth Client ID >  Chrome App. To create an extension key, you can follow the steps [here](https://developer.chrome.com/docs/extensions/mv3/manifest/key/). After these steps, reload your Extension Folder in Extensions (Developer Mode).
 
 ## Libraries used
 
