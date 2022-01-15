@@ -52,7 +52,7 @@ You can run Screenity locally without having to install it from the Chrome Store
 2. Go to chrome://extensions/ in your browser, and [enable developer mode](https://developer.chrome.com/docs/extensions/mv2/faq/#:~:text=You%20can%20start%20by%20turning,a%20packaged%20extension%2C%20and%20more.).
 3. Drag the folder that contains the code (make sure it's a folder and not a ZIP file, so unzip first), or click on the "Load unpacked" button and locate the folder.
 4. That's it, you will now be able to use Screenity locally. Make sure you pin it on the toolbar by clicking the "puzzle" icon in the toolbar and pinning Screenity.
-5. To enable the Google Drive Upload (authorization consent screen) you must change the client_id in the manifest.json file with your linked extension key. You can create it accessing Google Cloud [https://console.cloud.google.com/apis/credentials](https://console.cloud.google.com/apis/credentials)?project=your_project and selecting menu "Create Credential" > "OAuth Client ID >  Chrome App. After this steps, reload your Extension Folder in Extensions (Developer Mode).
+5. To enable the Google Drive Upload (authorization consent screen) you must change the client_id in the manifest.json file with your linked extension key. You can create it accessing Google Cloud [https://console.cloud.google.com/apis/credentials](https://console.cloud.google.com/apis/credentials)?project=your_project and selecting menu "Create Credential" > "OAuth Client ID >  Chrome App. To create an extension key, you can follow the steps [here](https://developer.chrome.com/docs/extensions/mv3/manifest/key/). After these steps, reload your Extension Folder in Extensions (Developer Mode).
 
 ## Libraries used
 
