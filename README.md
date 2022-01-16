@@ -63,6 +63,8 @@ You can run Screenity locally without having to install it from the Chrome Store
 - [Nouislider](https://github.com/leongersen/noUiSlider) -  for the range sliders used for trimming / removing parts of the recording
 - [Pickr](https://github.com/Simonwep/pickr) - for the color picker
 - [Plyr](https://github.com/sampotts/plyr) - for the video player shown when editing the recording
+- [StreamSaver.js](https://github.com/jimmywarting/StreamSaver.js) - for saving the video asynchronously while recording
+- [fix-webm-duration](https://github.com/yusitnikov/fix-webm-duration) - for making the downloaded videos seekable
 
 #
  Feel free to reach out to me through email at hi@alyssax.com or [on Twitter](https://twitter.com/alyssaxuu) if you have any questions or feedback! Hope you find this useful 💜
