@@ -23,6 +23,7 @@ var fps = 60;
 var camerasize = "small-size";
 var camerapos = {x:"10px", y:"10px"};
 var isMac = navigator.platform.toUpperCase().indexOf('MAC')>=0;
+const streamSaver = window.streamSaver;
 
 // Get list of available audio devices
 getDeviceId();
@@ -39,7 +40,9 @@ chrome.runtime.onInstalled.addListener(function() {
         mic: 0,
         type: "tab-only",
         quality: "max",
-        fps: 60
+        fps: 60,
+				start:0,
+				total:0
     });
     
     // Inject content scripts in existing tabs
@@ -75,20 +78,24 @@ function newRecording(stream) {
 }
 
 // Save recording
-function saveRecording(recordedBlobs) {
+function saveRecording(url, blobs) {
     newwindow = window.open('../html/videoeditor.html');
-    newwindow.recordedBlobs = recordedBlobs;
+    newwindow.url = url;
+		newwindow.recordedBlobs = blobs;
 }
 
 // Stop recording
-function endRecording(stream, recordedBlobs) {
+function endRecording(stream, writer, recordedBlobs) {
+
+		// Get video duration
+		chrome.storage.sync.get(['start', 'total'], function(result) {
+			chrome.storage.sync.set({
+					total: Date.now() - result.start + result.total
+			});
+		});
+
     // Show default icon
     chrome.browserAction.setIcon({path: "../assets/extension-icons/logo-32.png"});
-    
-    // Save recording if requested
-    if (!cancel) {
-        saveRecording(recordedBlobs);
-    } 
     
     // Hide injected content
     recording = false;
@@ -102,12 +109,26 @@ function endRecording(stream, recordedBlobs) {
     stream.getTracks().forEach(function(track) {
         track.stop();
     });
-    
     if (micable) {
         micstream.getTracks().forEach(function(track) {
             track.stop();
         });
     }
+
+		// Show download shelf again
+		chrome.downloads.setShelfEnabled(true);
+
+		setTimeout(() => {
+			writer.close();
+			chrome.downloads.search({limit: 1}, function(data) {
+				// Save recording if requested
+				if (!cancel) {
+					saveRecording("file://"+data[0].filename, recordedBlobs);
+				} else {
+					chrome.downloads.removeFile(data[0].id);
+				}
+			});
+		}, 1000)
 }
 
 // Start recording the entire desktop / specific application
@@ -138,17 +159,28 @@ function getDesktop() {
         // Set up media recorder & inject content
         newRecording(output);
 
-        // Record desktop stream
-        var recordedBlobs = [];
-        mediaRecorder.ondataavailable = event => {
-            if (event.data && event.data.size > 0) {
-                recordedBlobs.push(event.data);
-            }
-        };
+        // Hide the downloads shelf
+				chrome.downloads.setShelfEnabled(false);
+
+				// This will write the stream to the filesystem asynchronously
+				const { readable, writable } = new TransformStream({
+						transform: (chunk, ctrl) => chunk.arrayBuffer().then(b => ctrl.enqueue(new Uint8Array(b)))
+				})
+				const writer = writable.getWriter()
+				readable.pipeTo(streamSaver.createWriteStream('screenity.webm'));
+
+				// Record tab stream
+				var recordedBlobs = [];
+				mediaRecorder.ondataavailable = event => {
+						if (event.data && event.data.size > 0) {
+								writer.write(event.data);
+								recordedBlobs.push(event.data);
+						}
+				};
 
         // When the recording is stopped
         mediaRecorder.onstop = () => {
-            endRecording(stream, recordedBlobs);
+            endRecording(stream, writer, recordedBlobs);
         }
 
         // Stop recording if stream is ended via Chrome UI or another method
@@ -194,30 +226,43 @@ function getTab() {
             // Set up media recorder & inject content
             newRecording(output)
 
+						// Hide the downloads shelf
+						chrome.downloads.setShelfEnabled(false);
+
+						// This will write the stream to the filesystem asynchronously
+						const { readable, writable } = new TransformStream({
+								transform: (chunk, ctrl) => chunk.arrayBuffer().then(b => ctrl.enqueue(new Uint8Array(b)))
+						})
+						const writer = writable.getWriter()
+        		readable.pipeTo(streamSaver.createWriteStream('screenity.webm'));
+
             // Record tab stream
-            var recordedBlobs = [];
+						var recordedBlobs = [];
             mediaRecorder.ondataavailable = event => {
                 if (event.data && event.data.size > 0) {
-                    recordedBlobs.push(event.data);
+										writer.write(event.data);
+										recordedBlobs.push(event.data);
                 }
             };
 
             // When the recording is stopped
             mediaRecorder.onstop = () => {
-                endRecording(stream, recordedBlobs);
+                endRecording(stream, writer, recordedBlobs);
             }
             
             // Stop recording if stream is ended when tab is closed
             stream.getVideoTracks()[0].onended = function() {
                 mediaRecorder.stop();
             }
-
         });
     });
 }
 
 // Inject content scripts to start recording
 function startRecording() {
+		chrome.storage.sync.set({
+			start: Date.now()
+		});
     if (recording_type == "camera-only") {
         injectContent(true);
         recording = true;
@@ -427,15 +472,27 @@ function updateMicrophone(id, request) {
 // Recording controls
 function pauseRecording() {
     mediaRecorder.pause();
+
+		// Get video duration so far
+		chrome.storage.sync.get(['start'], function(result) {
+			chrome.storage.sync.set({
+					total: Date.now() - result.start
+			});
+		});
 }
 
 function resumeRecording() {
     mediaRecorder.resume();
+
+		// New start time
+		chrome.storage.sync.set({
+				start: Date.now()
+		});
 }
 
 function stopRecording(save) {
     tabid = 0;
-    
+
     // Show default icon
     chrome.browserAction.setIcon({path: "../assets/extension-icons/logo-32.png"});
     
@@ -717,6 +774,9 @@ chrome.runtime.onMessage.addListener(
                     type: "end-recording"
                 });
             });
+						if (!request.cancel) {
+							saveRecording("", request.blobs);
+						} 
         } else if (request.type == "sources-loaded") {
             pageUpdated(sender);
         } else if (request.type == "camera-size") {
@@ -724,6 +784,12 @@ chrome.runtime.onMessage.addListener(
         } else if (request.type == "camera-pos") {
             camerapos.x = request.x;
             camerapos.y = request.y;
-        }
+        } else if (request.type == "test") {
+					chrome.tabs.getSelected(null, function(tab) {
+						chrome.tabs.sendMessage(tab.id, {
+								type: "hello"
+						});
+				});
+				}
     }
 );

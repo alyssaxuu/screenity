@@ -10,18 +10,16 @@ function processInWebWorker() {
 
 var worker;
 
-function convertStreams(videoBlob, setting) {
+function convertStreams(url, setting, start, end) {
     var aab;
     var buffersReady;
-    var workerReady;
-    var posted;
 
-    var fileReader = new FileReader();
-    fileReader.onload = function() {
-        aab = this.result;
-        postMessage();
-    };
-    fileReader.readAsArrayBuffer(videoBlob);
+		var fileReader = new FileReader();
+		fileReader.onload = function() {
+				aab = this.result;
+				postMessage();
+		};
+		fileReader.readAsArrayBuffer(url);
 
     if (!worker) {
         worker = processInWebWorker();
@@ -52,7 +50,7 @@ function convertStreams(videoBlob, setting) {
         if (setting == "gif") {
             worker.postMessage({
                 type: 'command',
-                arguments: '-i video.webm -r 10 output-10.gif'.split(' '),
+                arguments: '-i video.webm -r 10 output.gif'.split(' '),
                 files: [{
                     data: new Uint8Array(aab),
                     name: 'video.webm'
@@ -67,7 +65,16 @@ function convertStreams(videoBlob, setting) {
                     name: 'video.webm'
                 }]
             });
-        }
+        } else if (setting == "trim") {
+						worker.postMessage({
+							type: 'command',
+							arguments: '--ss '+start+' -to '+end+'-i video.webm -c copy output.webm'.split(' '),
+							files: [{
+									data: new Uint8Array(aab),
+									name: 'video.webm'
+							}]
+						});
+				}
     };
 }
 

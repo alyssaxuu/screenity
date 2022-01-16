@@ -12,6 +12,10 @@ $(document).ready(function(){
     
     injectCode(true, countdownactive);
     micEnabled(true);
+
+		// Temporary workaround. Seems to not work if the user hasn't interacted with the page before starting recording the camera
+		alert("Starting recording")
+		chrome.runtime.sendMessage({type: "test"});
     
     // Inject all the content
     function injectCode(inject, active) {

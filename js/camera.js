@@ -1,7 +1,7 @@
 var facingMode = "user";
 var cameradevices = [];
 var audiodevices = [];
-var mediaRecorder = '';
+var mediaRecorder;
 var camerastream;
 var micstream;
 var output = new MediaStream();
@@ -46,7 +46,7 @@ function startRecording(){
     audioCtx = new AudioContext();
     destination = audioCtx.createMediaStreamDestination();
     navigator.mediaDevices.getUserMedia({
-            audio: true
+        audio: true
     }).then(function(mic) {
         // Show recording icon
         chrome.browserAction.setIcon({path: "../assets/extension-icons/logo-32-rec.png"});
@@ -55,12 +55,17 @@ function startRecording(){
         micstream = mic;
         micsource = audioCtx.createMediaStreamSource(mic);
         micsource.connect(destination);
+				output = new MediaStream();
+				output.addTrack(camerastream.getVideoTracks()[0]);
         output.addTrack(destination.stream.getAudioTracks()[0]);
-        output.addTrack(camerastream.getVideoTracks()[0]);
+
         mediaRecorder = new MediaRecorder(output, {
             videoBitsPerSecond: 2500000,
             mimeType: 'video/webm;codecs=h264'
         }); 
+
+				audioCtx.resume();
+
         
         // Record camera stream
         var recordedBlobs = [];
@@ -72,24 +77,26 @@ function startRecording(){
         
         // When the recording has been stopped
         mediaRecorder.onstop = () => {
-            // Show default icon
-            chrome.browserAction.setIcon({path: "../assets/extension-icons/logo-32.png"});
-            recording = false;
-            if (!cancel) {
-                newwindow = window.open('../html/videoeditor.html', "_blank");
-                newwindow.recordedBlobs = recordedBlobs;
-            }
-            chrome.runtime.sendMessage({type: "end-camera-recording"});
-            camerastream.getTracks().forEach(function(track) {
-              track.stop();
-            });
-            micstream.getTracks().forEach(function(track) {
-              track.stop();
-            });
+					// Show default icon
+					chrome.browserAction.setIcon({path: "../assets/extension-icons/logo-32.png"});
+					recording = false;
+
+					if (!cancel) {
+							newwindow = window.open('../html/videoeditor.html', "_blank");
+							newwindow.recordedBlobs = recordedBlobs;
+							newwindow.url = "";
+					}
+
+					camerastream.getTracks().forEach(function(track) {
+						track.stop();
+					});
+					micstream.getTracks().forEach(function(track) {
+						track.stop();
+					});
         }
         
         // Start recording
-        mediaRecorder.start();
+        mediaRecorder.start(1000);
     });
 }
 
@@ -162,13 +169,13 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
         } else {
             document.getElementById("injected-video").style.transform = "translateX(-50%) scaleX(1)";
         }
-    } else if (request.type == "camera-record") {
+    } else if (request.type == "hello") {
         startRecording();
     } else if (request.type == "mic-switch") {
         if (!request.enable) {
-            micsource.disconnect(destination);
+          micsource.disconnect(destination);
         } else {
-            micsource.connect(destination);
+          micsource.connect(destination);
         }
     } else if (request.type == "pause-camera") {
         mediaRecorder.pause();

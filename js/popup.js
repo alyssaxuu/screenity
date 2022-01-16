@@ -291,7 +291,7 @@ $(document).ready(function(){
                 $("#fps").html("60FPS video");
             } else {
                 chrome.storage.sync.set({
-                    fps: "max"
+                    fps: "60"
                 });
                 $("#fps").html("30FPS video");
             }
