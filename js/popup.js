@@ -20,7 +20,7 @@ $(document).ready(function(){
             $("#countdown").prop("checked", true);  
         }
         if (result.countdown_time != 3) {
-            $("#countdown-time").html(result.countdown_time);
+            $("#countdown-time").html(result.countdown_time + " ");
         }
         if (result.quality == "max") {
             $("#quality").html(chrome.i18n.getMessage("smaller_file_size"));
