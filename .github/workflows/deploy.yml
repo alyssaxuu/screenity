@@ -1,0 +1,16 @@
+name: "submit"
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Zip directory
+        run: zip extension.zip -r *  -x .github/*
+      - name: Browser Plugin Publish
+        uses: plasmo-corp/bpp@v0.0.0
+        with:
+          artifact: ./extension.zip
+          keys: ${{ secrets.SUBMIT_KEYS }}
