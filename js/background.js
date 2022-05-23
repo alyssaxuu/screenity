@@ -22,7 +22,7 @@ var quality = "max";
 var fps = 60;
 var camerasize = "small-size";
 var camerapos = {x:"10px", y:"10px"};
-var isMac = navigator.platform.toUpperCase().indexOf('MAC')>=0;
+var isMac = navigator.userAgentData.platform.toUpperCase().indexOf('MAC')>=0;
 const streamSaver = window.streamSaver;
 
 // Get list of available audio devices
@@ -65,11 +65,11 @@ function newRecording(stream) {
     // Start Media Recorder
     if (quality == "max") {
         mediaConstraints = {
-            mimeType: 'video/webm;codecs=vp8,opus'
+            mimeType: 'video/webm;codecs=vp8,vp9,opus'
         }
     } else {
         mediaConstraints = {
-            mimeType: 'video/webm;codecs=vp8,opus',
+            mimeType: 'video/webm;codecs=vp8,vp9,opus',
             bitsPerSecond: 1000
         }
     }
@@ -275,8 +275,8 @@ function startRecording() {
 function record() {
     // Get window dimensions to record
     chrome.windows.getCurrent(function(window){
-        width = window.width;
-        height = window.height;
+        width = window.innerWidth;
+        height = window.innerHeight;
     })
     
     var constraints;
