@@ -21,14 +21,14 @@ var height = 1080;
 var quality = "max";
 var fps = 60;
 var camerasize = "small-size";
-var camerapos = {x:"10px", y:"10px"};
-var isMac = navigator.platform.toUpperCase().indexOf('MAC')>=0;
+var camerapos = { x: "10px", y: "10px" };
+var isMac = navigator.userAgentData.platform.toUpperCase().indexOf('MAC') >= 0;
 const streamSaver = window.streamSaver;
 
 // Get list of available audio devices
 getDeviceId();
 
-chrome.runtime.onInstalled.addListener(function() {
+chrome.runtime.onInstalled.addListener(function () {
     // Set defaults when the extension is installed
     chrome.storage.sync.set({
         toolbar: true,
@@ -41,12 +41,12 @@ chrome.runtime.onInstalled.addListener(function() {
         type: "tab-only",
         quality: "max",
         fps: 60,
-				start:0,
-				total:0
+        start: 0,
+        total: 0
     });
-    
+
     // Inject content scripts in existing tabs
-    chrome.tabs.query({currentWindow: true}, function gotTabs(tabs){
+    chrome.tabs.query({ currentWindow: true }, function gotTabs(tabs) {
         for (let index = 0; index < tabs.length; index++) {
             if (!tabs[index].url.includes("chrome://") && !tabs[index].url.includes("chrome.com")) {
                 chrome.tabs.executeScript(tabs[index].id, {
@@ -60,16 +60,16 @@ chrome.runtime.onInstalled.addListener(function() {
 // Set up recording
 function newRecording(stream) {
     // Show recording icon
-    chrome.browserAction.setIcon({path: "../assets/extension-icons/logo-32-rec.png"});
-    
+    chrome.browserAction.setIcon({ path: "../assets/extension-icons/logo-32-rec.png" });
+
     // Start Media Recorder
     if (quality == "max") {
         mediaConstraints = {
-            mimeType: 'video/webm;codecs=vp8,opus'
+            mimeType: 'video/webm;codecs=vp8,vp9,opus'
         }
     } else {
         mediaConstraints = {
-            mimeType: 'video/webm;codecs=vp8,opus',
+            mimeType: 'video/webm;codecs=vp8,vp9,opus',
             bitsPerSecond: 1000
         }
     }
@@ -81,54 +81,54 @@ function newRecording(stream) {
 function saveRecording(url, blobs) {
     newwindow = window.open('../html/videoeditor.html');
     newwindow.url = url;
-		newwindow.recordedBlobs = blobs;
+    newwindow.recordedBlobs = blobs;
 }
 
 // Stop recording
 function endRecording(stream, writer, recordedBlobs) {
 
-		// Get video duration
-		chrome.storage.sync.get(['start', 'total'], function(result) {
-			chrome.storage.sync.set({
-					total: Date.now() - result.start + result.total
-			});
-		});
+    // Get video duration
+    chrome.storage.sync.get(['start', 'total'], function (result) {
+        chrome.storage.sync.set({
+            total: Date.now() - result.start + result.total
+        });
+    });
 
     // Show default icon
-    chrome.browserAction.setIcon({path: "../assets/extension-icons/logo-32.png"});
-    
+    chrome.browserAction.setIcon({ path: "../assets/extension-icons/logo-32.png" });
+
     // Hide injected content
     recording = false;
-    chrome.tabs.getSelected(null, function(tab) {
+    chrome.tabs.getSelected(null, function (tab) {
         chrome.tabs.sendMessage(tab.id, {
             type: "end"
         });
     });
 
     // Stop tab and microphone streams
-    stream.getTracks().forEach(function(track) {
+    stream.getTracks().forEach(function (track) {
         track.stop();
     });
     if (micable) {
-        micstream.getTracks().forEach(function(track) {
+        micstream.getTracks().forEach(function (track) {
             track.stop();
         });
     }
 
-		// Show download shelf again
-		chrome.downloads.setShelfEnabled(true);
+    // Show download shelf again
+    chrome.downloads.setShelfEnabled(true);
 
-		setTimeout(() => {
-			writer.close();
-			chrome.downloads.search({limit: 1}, function(data) {
-				// Save recording if requested
-				if (!cancel) {
-					saveRecording("file://"+data[0].filename, recordedBlobs);
-				} else {
-					chrome.downloads.removeFile(data[0].id);
-				}
-			});
-		}, 1000)
+    setTimeout(() => {
+        writer.close();
+        chrome.downloads.search({ limit: 1 }, function (data) {
+            // Save recording if requested
+            if (!cancel) {
+                saveRecording("file://" + data[0].filename, recordedBlobs);
+            } else {
+                chrome.downloads.removeFile(data[0].id);
+            }
+        });
+    }, 1000)
 }
 
 // Start recording the entire desktop / specific application
@@ -138,7 +138,7 @@ function getDesktop() {
         video: true,
         maxframeRate: fps
     };
-    navigator.mediaDevices.getDisplayMedia(constraints).then(function(stream) {
+    navigator.mediaDevices.getDisplayMedia(constraints).then(function (stream) {
         output = new MediaStream();
         if (stream.getAudioTracks().length == 0) {
             // Get microphone audio (system audio is unreliable & doesn't work on Mac)
@@ -155,28 +155,28 @@ function getDesktop() {
             output.addTrack(destination.stream.getAudioTracks()[0]);
         }
         output.addTrack(stream.getVideoTracks()[0]);
-        
+
         // Set up media recorder & inject content
         newRecording(output);
 
         // Hide the downloads shelf
-				chrome.downloads.setShelfEnabled(false);
+        chrome.downloads.setShelfEnabled(false);
 
-				// This will write the stream to the filesystem asynchronously
-				const { readable, writable } = new TransformStream({
-						transform: (chunk, ctrl) => chunk.arrayBuffer().then(b => ctrl.enqueue(new Uint8Array(b)))
-				})
-				const writer = writable.getWriter()
-				readable.pipeTo(streamSaver.createWriteStream('screenity.webm'));
+        // This will write the stream to the filesystem asynchronously
+        const { readable, writable } = new TransformStream({
+            transform: (chunk, ctrl) => chunk.arrayBuffer().then(b => ctrl.enqueue(new Uint8Array(b)))
+        })
+        const writer = writable.getWriter()
+        readable.pipeTo(streamSaver.createWriteStream('screenity.webm'));
 
-				// Record tab stream
-				var recordedBlobs = [];
-				mediaRecorder.ondataavailable = event => {
-						if (event.data && event.data.size > 0) {
-								writer.write(event.data);
-								recordedBlobs.push(event.data);
-						}
-				};
+        // Record tab stream
+        var recordedBlobs = [];
+        mediaRecorder.ondataavailable = event => {
+            if (event.data && event.data.size > 0) {
+                writer.write(event.data);
+                recordedBlobs.push(event.data);
+            }
+        };
 
         // When the recording is stopped
         mediaRecorder.onstop = () => {
@@ -184,7 +184,7 @@ function getDesktop() {
         }
 
         // Stop recording if stream is ended via Chrome UI or another method
-        stream.getVideoTracks()[0].onended = function() {
+        stream.getVideoTracks()[0].onended = function () {
             cancel = false;
             mediaRecorder.stop();
         }
@@ -193,7 +193,7 @@ function getDesktop() {
 
 // Start recording the current tab
 function getTab() {
-    chrome.tabs.getSelected(null, function(tab) {
+    chrome.tabs.getSelected(null, function (tab) {
         chrome.tabCapture.capture({
             video: true,
             audio: true,
@@ -207,7 +207,7 @@ function getTab() {
                     maxFrameRate: fps
                 },
             },
-        }, function(stream) {
+        }, function (stream) {
             // Combine tab and microphone audio
             output = new MediaStream();
             syssource = audioCtx.createMediaStreamSource(stream);
@@ -217,31 +217,31 @@ function getTab() {
             syssource.connect(destination);
             output.addTrack(destination.stream.getAudioTracks()[0]);
             output.addTrack(stream.getVideoTracks()[0]);
-            
+
             // Keep playing tab audio
             this.context = new AudioContext();
             this.stream = this.context.createMediaStreamSource(stream);
             this.stream.connect(this.context.destination);
-            
+
             // Set up media recorder & inject content
             newRecording(output)
 
-						// Hide the downloads shelf
-						chrome.downloads.setShelfEnabled(false);
+            // Hide the downloads shelf
+            chrome.downloads.setShelfEnabled(false);
 
-						// This will write the stream to the filesystem asynchronously
-						const { readable, writable } = new TransformStream({
-								transform: (chunk, ctrl) => chunk.arrayBuffer().then(b => ctrl.enqueue(new Uint8Array(b)))
-						})
-						const writer = writable.getWriter()
-        		readable.pipeTo(streamSaver.createWriteStream('screenity.webm'));
+            // This will write the stream to the filesystem asynchronously
+            const { readable, writable } = new TransformStream({
+                transform: (chunk, ctrl) => chunk.arrayBuffer().then(b => ctrl.enqueue(new Uint8Array(b)))
+            })
+            const writer = writable.getWriter()
+            readable.pipeTo(streamSaver.createWriteStream('screenity.webm'));
 
             // Record tab stream
-						var recordedBlobs = [];
+            var recordedBlobs = [];
             mediaRecorder.ondataavailable = event => {
                 if (event.data && event.data.size > 0) {
-										writer.write(event.data);
-										recordedBlobs.push(event.data);
+                    writer.write(event.data);
+                    recordedBlobs.push(event.data);
                 }
             };
 
@@ -249,9 +249,9 @@ function getTab() {
             mediaRecorder.onstop = () => {
                 endRecording(stream, writer, recordedBlobs);
             }
-            
+
             // Stop recording if stream is ended when tab is closed
-            stream.getVideoTracks()[0].onended = function() {
+            stream.getVideoTracks()[0].onended = function () {
                 mediaRecorder.stop();
             }
         });
@@ -260,9 +260,9 @@ function getTab() {
 
 // Inject content scripts to start recording
 function startRecording() {
-		chrome.storage.sync.set({
-			start: Date.now()
-		});
+    chrome.storage.sync.set({
+        start: Date.now()
+    });
     if (recording_type == "camera-only") {
         injectContent(true);
         recording = true;
@@ -274,17 +274,17 @@ function startRecording() {
 // Get microphone audio and start recording video
 function record() {
     // Get window dimensions to record
-    chrome.windows.getCurrent(function(window){
-        width = window.width;
-        height = window.height;
+    chrome.windows.getCurrent(function (window) {
+        width = window.innerWidth;
+        height = window.innerHeight;
     })
-    
+
     var constraints;
-    chrome.storage.sync.get(['fps'], function(result) {
+    chrome.storage.sync.get(['fps'], function (result) {
         fps = result.fps;
-        chrome.storage.sync.get(['quality'], function(result) {
+        chrome.storage.sync.get(['quality'], function (result) {
             quality = result.quality;
-            chrome.storage.sync.get(['mic'], function(result) {
+            chrome.storage.sync.get(['mic'], function (result) {
                 // Set microphone constraints
                 constraints = {
                     audio: {
@@ -293,7 +293,7 @@ function record() {
                 }
 
                 // Start microphone stream
-                navigator.mediaDevices.getUserMedia(constraints).then(function(mic) {
+                navigator.mediaDevices.getUserMedia(constraints).then(function (mic) {
                     micable = true;
                     micstream = mic;
                     micsource = audioCtx.createMediaStreamSource(mic);
@@ -304,7 +304,7 @@ function record() {
                     } else if (recording_type == "tab-only") {
                         getTab();
                     }
-                }).catch(function(error) {
+                }).catch(function (error) {
                     micable = false;
 
                     // Check recording type
@@ -321,8 +321,8 @@ function record() {
 
 // Inject content script
 function injectContent(start) {
-    chrome.storage.sync.get(['countdown'], function(result) {
-        chrome.tabs.getSelected(null, function(tab) {
+    chrome.storage.sync.get(['countdown'], function (result) {
+        chrome.tabs.getSelected(null, function (tab) {
             if (maintabs.indexOf(tab.id) == -1 && recording_type != "camera-only") {
                 // Inject content if it's not a camera recording and the script hasn't been injected before in this tab
                 tabid = tab.id;
@@ -342,16 +342,16 @@ function injectContent(start) {
                 // Check if it's a new or ongoing recording
                 if (start) {
                     chrome.tabs.executeScript(tab.id, {
-                        code: 'window.countdownactive = ' + result.countdown + ';window.camerasize = "' + camerasize + '";window.camerapos = {x:"'+camerapos.x+'",y:"'+camerapos.y+'"};'
-                    }, function() {
+                        code: 'window.countdownactive = ' + result.countdown + ';window.camerasize = "' + camerasize + '";window.camerapos = {x:"' + camerapos.x + '",y:"' + camerapos.y + '"};'
+                    }, function () {
                         chrome.tabs.executeScript(tab.id, {
                             file: './js/content.js'
                         });
                     });
                 } else {
                     chrome.tabs.executeScript(tab.id, {
-                        code: 'window.countdownactive = false;window.camerasize = "' + camerasize + '";window.camerapos = {x:"'+camerapos.x+'",y:"'+camerapos.y+'"};'
-                    }, function() {
+                        code: 'window.countdownactive = false;window.camerasize = "' + camerasize + '";window.camerapos = {x:"' + camerapos.x + '",y:"' + camerapos.y + '"};'
+                    }, function () {
                         chrome.tabs.executeScript(tab.id, {
                             file: './js/content.js'
                         });
@@ -376,7 +376,7 @@ function injectContent(start) {
                 if (start) {
                     chrome.tabs.executeScript(tab.id, {
                         code: 'window.countdownactive = ' + result.countdown
-                    }, function() {
+                    }, function () {
                         chrome.tabs.executeScript(tab.id, {
                             file: './js/cameracontent.js'
                         });
@@ -384,7 +384,7 @@ function injectContent(start) {
                 } else {
                     chrome.tabs.executeScript(tab.id, {
                         code: 'window.countdownactive = false;'
-                    }, function() {
+                    }, function () {
                         chrome.tabs.executeScript(tab.id, {
                             file: './js/cameracontent.js'
                         });
@@ -445,21 +445,21 @@ function updateMicrophone(id, request) {
             });
         } else {
             // Stop current microphone stream
-            micstream.getTracks().forEach(function(track) {
+            micstream.getTracks().forEach(function (track) {
                 track.stop();
             });
 
             // Start a new microphone stream using the provided device ID
-            chrome.tabs.getSelected(null, function(tab) {
+            chrome.tabs.getSelected(null, function (tab) {
                 navigator.mediaDevices.getUserMedia({
                     audio: {
                         deviceId: id
                     }
-                }).then(function(mic) {
+                }).then(function (mic) {
                     micstream = mic;
                     micsource = audioCtx.createMediaStreamSource(mic);
                     micsource.connect(destination);
-                }).catch(function(error) {
+                }).catch(function (error) {
                     chrome.tabs.sendMessage(tab.id, {
                         type: "no-mic-access"
                     });
@@ -473,30 +473,30 @@ function updateMicrophone(id, request) {
 function pauseRecording() {
     mediaRecorder.pause();
 
-		// Get video duration so far
-		chrome.storage.sync.get(['start'], function(result) {
-			chrome.storage.sync.set({
-					total: Date.now() - result.start
-			});
-		});
+    // Get video duration so far
+    chrome.storage.sync.get(['start'], function (result) {
+        chrome.storage.sync.set({
+            total: Date.now() - result.start
+        });
+    });
 }
 
 function resumeRecording() {
     mediaRecorder.resume();
 
-		// New start time
-		chrome.storage.sync.set({
-				start: Date.now()
-		});
+    // New start time
+    chrome.storage.sync.set({
+        start: Date.now()
+    });
 }
 
 function stopRecording(save) {
     tabid = 0;
 
     // Show default icon
-    chrome.browserAction.setIcon({path: "../assets/extension-icons/logo-32.png"});
-    
-    chrome.tabs.getSelected(null, function(tab) {
+    chrome.browserAction.setIcon({ path: "../assets/extension-icons/logo-32.png" });
+
+    chrome.tabs.getSelected(null, function (tab) {
         // Check if recording has to be saved or discarded
         if (save == "stop" || save == "stop-save") {
             cancel = false;
@@ -530,8 +530,8 @@ function stopRecording(save) {
 // Get a list of the available audio devices
 function getDeviceId() {
     audiodevices = [];
-    navigator.mediaDevices.enumerateDevices().then(function(devices) {
-        devices.forEach(function(device) {
+    navigator.mediaDevices.enumerateDevices().then(function (devices) {
+        devices.forEach(function (device) {
             if (device.kind == "audioinput") {
                 audiodevices.push({
                     label: device.label,
@@ -539,7 +539,7 @@ function getDeviceId() {
                 });
             }
         });
-        chrome.runtime.sendMessage({type: "audio-done", devices:audiodevices});
+        chrome.runtime.sendMessage({ type: "audio-done", devices: audiodevices });
     });
 }
 
@@ -548,15 +548,15 @@ function audioSwitch(source, enable) {
     if (recording_type != "camera-only") {
         // Start a new microphone stream if one doesn't exist already
         if (!micable) {
-            chrome.tabs.getSelected(null, function(tab) {
+            chrome.tabs.getSelected(null, function (tab) {
                 navigator.mediaDevices.getUserMedia({
                     audio: true
-                }).then(function(mic) {
+                }).then(function (mic) {
                     micable = true;
                     micstream = mic;
                     micsource = audioCtx.createMediaStreamSource(mic);
                     micsource.connect(destination);
-                }).catch(function(error) {
+                }).catch(function (error) {
                     chrome.tabs.sendMessage(tab.id, {
                         type: "no-mic-access"
                     });
@@ -573,7 +573,7 @@ function audioSwitch(source, enable) {
             syssource.connect(destination);
         }
     } else {
-        chrome.tabs.getSelected(null, function(tab) {
+        chrome.tabs.getSelected(null, function (tab) {
             chrome.tabs.sendMessage(tab.id, {
                 type: "mic-switch",
                 enable: enable
@@ -584,7 +584,7 @@ function audioSwitch(source, enable) {
 
 // Update camera device
 function updateCamera(request) {
-    chrome.tabs.getSelected(null, function(tab) {
+    chrome.tabs.getSelected(null, function (tab) {
         // Save user preference
         chrome.storage.sync.set({
             camera: request.id
@@ -600,7 +600,7 @@ function updateCamera(request) {
 
 // Toggle push to talk
 function pushToTalk(request, id) {
-    chrome.tabs.getSelected(null, function(tab) {
+    chrome.tabs.getSelected(null, function (tab) {
         pushtotalk = request.enabled;
 
         // Send user preference to content script
@@ -614,7 +614,7 @@ function pushToTalk(request, id) {
 // Countdown is over / recording can start
 function countdownOver() {
     if (recording_type == "camera-only") {
-        chrome.tabs.getSelected(null, function(tab) {
+        chrome.tabs.getSelected(null, function (tab) {
             chrome.tabs.sendMessage(tab.id, {
                 type: "camera-record"
             });
@@ -629,7 +629,7 @@ function countdownOver() {
 
 // Inject content when tab redirects while recording
 function pageUpdated(sender) {
-    chrome.tabs.getSelected(null, function(tab) {
+    chrome.tabs.getSelected(null, function (tab) {
         if (sender.tab.id == tab.id) {
             if (recording && tab.id == tabid && recording_type == "tab-only") {
                 injectContent(false)
@@ -646,10 +646,10 @@ function pageUpdated(sender) {
 }
 
 // Changed tab selection
-chrome.tabs.onActivated.addListener(function(tabId, changeInfo, tab) {
+chrome.tabs.onActivated.addListener(function (tabId, changeInfo, tab) {
     if (!recording) {
         // Hide injected content if the recording is already over
-        chrome.tabs.getSelected(null, function(tab) {
+        chrome.tabs.getSelected(null, function (tab) {
             chrome.tabs.sendMessage(tab.id, {
                 type: "end"
             });
@@ -660,24 +660,24 @@ chrome.tabs.onActivated.addListener(function(tabId, changeInfo, tab) {
     }
 });
 
-chrome.tabs.onRemoved.addListener(function(tabid, removed) {
+chrome.tabs.onRemoved.addListener(function (tabid, removed) {
     // Stop recording if tab is closed in a camera only recording
     if (tabid == tabid && recording && recording_type == "camera-only") {
         recording = false;
-        
+
         // Show default icon
-        chrome.browserAction.setIcon({path: "../assets/extension-icons/logo-32.png"});
+        chrome.browserAction.setIcon({ path: "../assets/extension-icons/logo-32.png" });
         tabid = 0;
     }
 })
 
 // Keyboard shortcuts
-chrome.commands.onCommand.addListener(function(command) {
+chrome.commands.onCommand.addListener(function (command) {
     if (recording) {
         if (command == "stop") {
             stopRecording(command);
         } else if (command == "pause/resume") {
-            chrome.tabs.getSelected(null, function(tab) {
+            chrome.tabs.getSelected(null, function (tab) {
                 chrome.tabs.sendMessage(tab.id, {
                     type: "pause/resume"
                 });
@@ -685,7 +685,7 @@ chrome.commands.onCommand.addListener(function(command) {
         } else if (command == "cancel") {
             stopRecording(command);
         } else if (command == "mute/unmute" && !pushtotalk) {
-            chrome.tabs.getSelected(null, function(tab) {
+            chrome.tabs.getSelected(null, function (tab) {
                 chrome.tabs.sendMessage(tab.id, {
                     type: "mute/unmute"
                 });
@@ -696,21 +696,21 @@ chrome.commands.onCommand.addListener(function(command) {
 
 // Listen for messages from content / popup
 chrome.runtime.onMessage.addListener(
-    function(request, sender, sendResponse) {
+    function (request, sender, sendResponse) {
         if (request.type == "record") {
             startRecording();
         } else if (request.type == "pause") {
             pauseRecording();
-            sendResponse({success: true});
+            sendResponse({ success: true });
         } else if (request.type == "resume") {
             resumeRecording();
-            sendResponse({success: true});
+            sendResponse({ success: true });
         } else if (request.type == "stop-save") {
             stopRecording(request.type);
         } else if (request.type == "stop-cancel") {
             stopRecording(request.type);
         } else if (request.type == "audio-request") {
-            sendResponse({devices: audiodevices});
+            sendResponse({ devices: audiodevices });
         } else if (request.type == "update-mic") {
             updateMicrophone(request.id, request);
         } else if (request.type == "update-camera") {
@@ -718,7 +718,7 @@ chrome.runtime.onMessage.addListener(
         } else if (request.type == "audio-switch") {
             audioSwitch(request.source, request.enable);
         } else if (request.type == "camera-list") {
-            chrome.tabs.getSelected(null, function(tab) {
+            chrome.tabs.getSelected(null, function (tab) {
                 chrome.tabs.sendMessage(tab.id, {
                     type: request.type,
                     devices: request.devices,
@@ -726,7 +726,7 @@ chrome.runtime.onMessage.addListener(
                 });
             });
         } else if (request.type == "flip-camera") {
-            chrome.tabs.getSelected(null, function(tab) {
+            chrome.tabs.getSelected(null, function (tab) {
                 chrome.tabs.sendMessage(tab.id, {
                     type: request.type,
                     enabled: request.enabled
@@ -735,7 +735,7 @@ chrome.runtime.onMessage.addListener(
         } else if (request.type == "push-to-talk") {
             pushtotalk(request);
         } else if (request.type == "switch-toolbar") {
-            chrome.tabs.getSelected(null, function(tab) {
+            chrome.tabs.getSelected(null, function (tab) {
                 chrome.tabs.sendMessage(tab.id, {
                     type: request.type,
                     enabled: request.enabled
@@ -746,21 +746,21 @@ chrome.runtime.onMessage.addListener(
         } else if (request.type == "recording-type") {
             recording_type = request.recording;
         } else if (request.type == "record-request") {
-            sendResponse({recording: recording});
+            sendResponse({ recording: recording });
         } else if (request.type == "pause-camera") {
-            chrome.tabs.getSelected(null, function(tab) {
+            chrome.tabs.getSelected(null, function (tab) {
                 chrome.tabs.sendMessage(tab.id, {
                     type: "pause-camera"
                 });
             });
         } else if (request.type == "resume-camera") {
-            chrome.tabs.getSelected(null, function(tab) {
+            chrome.tabs.getSelected(null, function (tab) {
                 chrome.tabs.sendMessage(tab.id, {
                     type: "resume-record"
                 });
             });
         } else if (request.type == "no-camera-access") {
-            chrome.tabs.getSelected(null, function(tab) {
+            chrome.tabs.getSelected(null, function (tab) {
                 chrome.tabs.sendMessage(tab.id, {
                     type: "no-camera-access"
                 });
@@ -769,14 +769,14 @@ chrome.runtime.onMessage.addListener(
             getDeviceId();
         } else if (request.type == "end-camera-recording") {
             recording = false;
-            chrome.tabs.getSelected(null, function(tab) {
+            chrome.tabs.getSelected(null, function (tab) {
                 chrome.tabs.sendMessage(tab.id, {
                     type: "end-recording"
                 });
             });
-						if (!request.cancel) {
-							saveRecording("", request.blobs);
-						} 
+            if (!request.cancel) {
+                saveRecording("", request.blobs);
+            }
         } else if (request.type == "sources-loaded") {
             pageUpdated(sender);
         } else if (request.type == "camera-size") {
@@ -785,11 +785,11 @@ chrome.runtime.onMessage.addListener(
             camerapos.x = request.x;
             camerapos.y = request.y;
         } else if (request.type == "test") {
-					chrome.tabs.getSelected(null, function(tab) {
-						chrome.tabs.sendMessage(tab.id, {
-								type: "hello"
-						});
-				});
-				}
+            chrome.tabs.getSelected(null, function (tab) {
+                chrome.tabs.sendMessage(tab.id, {
+                    type: "hello"
+                });
+            });
+        }
     }
 );
