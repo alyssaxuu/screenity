@@ -1,11 +1,11 @@
 # Screenity
 ![Demo](https://media.giphy.com/media/6hc709nFEYnEtzIIyN/giphy.gif)
 <br>
-The most powerful screen recorder & annotation tool for Chrome 🎥
+Screenity is the most powerful screen recorder & annotation tool for Chrome 🎥
 
 [Get it now - it's free!](https://chrome.google.com/webstore/detail/screenity-screen-recorder/kbbdabhdfibnancpjfhlkhafgdilcnji)
 
-Screenity is a feature-packed screen and camera recorder for Chrome. Annotate your screen to give feedback, emphasize your clicks, edit your recording, and much more.
+Screenity is a feature-packed screen and camera recorder for Chrome that lets you annotate your screen to give feedback, emphasize your clicks, edit your recording, and much more.
 
 > You can support this project (and many others) through [GitHub Sponsors](https://github.com/sponsors/alyssaxuu)! ❤️
 
