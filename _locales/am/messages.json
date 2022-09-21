@@ -1,0 +1,186 @@
+{
+    "extName": {
+      "message": "Screenity - ስክሪን መቅጅያ እና ማብራሪያ መሳሪያ",
+      "description": "Extension name"
+    },
+    "extDesc": {
+      "message": "በጣም ሃይለኛ ስክሪን መቅጂያ የክሮም ቅጥያ መሳሪያ። መቅዳት ፣ ማብራራት ፣ ማረሚያ እና ወዘተ... መስራት ሚችል።",
+      "description": "Extension description"
+    },
+    "extCancel": {
+      "message": "እየተቀዳ ያለውን መሰርዝ",
+      "description": "Cancel recording keyboard shortcut name"
+    },
+    "extMute": {
+      "message": "የማይክራፎን ድምፅ መክልክል/መፍቀድ",
+      "description": "Mute/Unmute microphone keyboard shortcut name"
+    },
+    "extStop": {
+      "message": "እየተቀዳ ያለውን ማቆም",
+      "description": "Stop recording keyboard shortcut name"
+    },
+    "extPause": {
+      "message": "እየተቀዳ ያለውን ለአፍታ አቁም",
+      "description": "Pause/Resume keyboard shortcut name"
+    },
+    "tab_only": {
+      "message": "ትር(Tab) ብቻ",
+      "description": "Tab only label in popup"
+    },
+    "desktop": {
+      "message": "ዴስክቶፕ",
+      "description": "Desktop label in popup"
+    },
+    "camera_only": {
+      "message": "ካሜራ ብቻ",
+      "description": "Camera only label in popup"
+    },
+    "camera": {
+      "message": "ካሜራ",
+      "description": "Camera dropdown label in popup"
+    },
+    "microphone": {
+      "message": "ማይክራፎን",
+      "description": "Microphone dropdown label in popup"
+    },
+    "flip_camera": {
+      "message": "ካሜራውን መገልበጥ",
+      "description": "Flip camera label in popup"
+    },
+    "push_to_talk": {
+      "message": "ለማውራት መጫን",
+      "description": "Push to talk label in popup"
+    },
+    "only_on_hover": {
+      "message": "መሳሪያ አሞሌውን በማንዛበብ(hover) ላይ አሳይ",
+      "description": "Only show toolbar on hover label in popup"
+    },
+    "disabled": {
+      "message": "አጥፋ",
+      "description": "Disabled dropdown state in popup"
+    },
+    "loading": {
+      "message": "በመክፈት ላይ...",
+      "description": "Loading state in popup"
+    },
+    "start_recording": {
+      "message": "መቅዳት ጀምር",
+      "description": "Start recording state in popup"
+    },
+    "starting_recording": {
+      "message": "መቅዳት በመጀመር ላይ...",
+      "description": "Starting recording state in popup"
+    },
+    "cannot_record": {
+      "message": "ይሄ ድህረ ገጽ ላይ መቅዳት አይቻልም",
+      "description": "Can't record in this page state in popup"
+    },
+    "stop_recording": {
+      "message": "መቅዳት አቁም",
+      "description": "Stop recording state in popup"
+    },
+    "second": {
+      "message": "ሴኮንድ",
+      "description": "Seconds label for countdown"
+    },
+    "seconds": {
+      "message": "ሴኮንዶች",
+      "description": "Seconds label for countdown (plural)"
+    },
+    "countdown": {
+      "message": "ቆጠራ",
+      "description": "Countdown label in popup"
+    },
+    "keyboard_shortcuts": {
+      "message": "ኪቦርድ አቋራጮች",
+      "description": "Keyboard shortcuts label in popup"
+    },
+    "smaller_file_size": {
+      "message": "አነስ ያለ ፋይል ሳይዝ",
+      "description": "Smaller file size label in popup"
+    },
+    "highest_quality": {
+      "message": "ከፍ ያለ ጥራት ያለው",
+      "description": "Highest quality label in popup"
+    },
+    "rate_extension": {
+      "message": "አስተያየት ስጥ",
+      "description": "Rate extension label in popup"
+    },
+    "made_by_alyssa": {
+      "message": "በAlyssa X የተሰራ",
+      "description": "Made by Alyssa X label in popup"
+    },
+    "disabled_allow_access": {
+      "message": "መስራት አቁሟል (መስራ  URL bar)",
+      "description": "Disabled requiring permission for camera/mic in popup"
+    },
+    "made_with": {
+      "message": "የተሰራው",
+      "description": "Made with label in video editor"
+    },
+    "by_alyssa": {
+      "message": "በAlyssa X",
+      "description": "By Alyssa X label in video editor"
+    },
+    "edit_recording": {
+      "message": "የተቀዳውን አርም",
+      "description": "Edit your recording label in video editor"
+    },
+    "edit_recording_desc": {
+      "message": "የመጨረሻ ማስተካከያዎችን ፈፅም",
+      "description": "Edit recording description in video editor"
+    },
+    "format": {
+      "message": "የቅርጸቱን ውጤት ስጠኝ",
+      "description": "Export format label in video editor"
+    },
+    "webm": {
+      "message": "WEBM (ነባሪ)",
+      "description": "Webm dropdown label in video editor"
+    },
+    "trim_video": {
+      "message": "ቪዲዮውን አሳጥር",
+      "description": "Trim video label in video editor"
+    },
+    "start": {
+      "message": "መጀመሪያ",
+      "description": "Start label in video editor"
+    },
+    "end": {
+      "message": "መጨረሻ",
+      "description": "End label in video editor"
+    },
+    "remove_part": {
+      "message": "የተወሰነ የቪዲዮውን ክፍል አሳጥር",
+      "description": "Remove part of the video label in video editor"
+    },
+    "apply": {
+      "message": "ለውጥ",
+      "description": "Apply button in video editor"
+    },
+    "reset": {
+      "message": "ለውጦችን መልስ (ወደ መጀመሪያው ቅጂ መልስ)",
+      "description": "Reset label in video editor"
+    },
+    "download": {
+      "message": "አውርድ",
+      "description": "Download button in video editor"
+    },
+    "save_drive": {
+      "message": "ወደ ድራይቭ",
+      "description": "Save to Drive button in video editor"
+    },
+    "saving": {
+      "message": "በማስቀመጥ ላይ...",
+      "description": "Saving to Drive button in video editor"
+    },
+    "show_hide": {
+      "message": "አማራጮችን አሳይ/ደብቅ",
+      "description": "Show/hide options panel in video editor (small screen)"
+    },
+    "downloading": {
+      "message": "በማውረድ ላይ...",
+      "description": "Downloading button in video editor"
+    }
+}
