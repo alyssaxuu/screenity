@@ -1,0 +1,186 @@
+{
+    "extName" : {
+      "message" : " Screenity - Screen Recorder & Annotation Tool " ,
+      "description" : " Udvidelsesnavn "
+    },
+    "extDesc" : {
+      "message" : " Den mest kraftfulde skærmoptager til Chrome. Optag, annotér, rediger og mere. " ,
+      "description" : " Udvidelsesbeskrivelse "
+    },
+    "extCancel" : {
+      "message" : " Annuller optagelse " ,
+      "description" : " Annuller optagelse af tastaturgenvejsnavn "
+    },
+    "extMute" : {
+      "message" : " Slå mikrofon fra/til " ,
+      "description" : " Slå lyd fra/til mikrofonens tastaturgenvejsnavn "
+    },
+    "extStop" : {
+      "message" : " Stop optagelsen " ,
+      "description" : " Stop optagelse af tastaturgenvejsnavn "
+    },
+    "extPause" : {
+      "message" : " Pause/Genoptag optagelse " ,
+      "description" : " Pause/Genoptag tastaturgenvejsnavn "
+    },
+    "kun tab" : {
+      "message" : " Kun faneblade " ,
+      "description" : " Kun faneetiketter i pop op "
+    },
+    "desktop" : {
+      "message" : " Desktop " ,
+      "description" : " Skrivebordsetiket i pop op "
+    },
+    "camera_only" : {
+      "message" : " Kun kamera " ,
+      "description" : " Kun kameraetiket i pop op "
+    },
+    "kamera" : {
+      "message" : " Kamera " ,
+      "description" : " Kamera dropdown etiket i pop op "
+    },
+    "mikrofon" : {
+      "message" : " Mikrofon " ,
+      "description" : " Mikrofon dropdown etiket i pop op "
+    },
+    "flip_camera" : {
+      "message" : " Vend kamera " ,
+      "description" : " Vend kameraetiket i pop op "
+    },
+    "push_to_talk" : {
+      "message" : " Tryk for at tale " ,
+      "description" : " Tryk og tal etiket i pop op "
+    },
+    "kun_på_hover" : {
+      "message" : " Vis kun værktøjslinje ved svævning " ,
+      "description" : " Vis kun værktøjslinje på svævetabel i popup "
+    },
+    "deaktiveret" : {
+      "message" : " Deaktiveret " ,
+      "description" : " Deaktiveret dropdown-tilstand i pop op "
+    },
+    "indlæser" : {
+      "message" : " Indlæser... " ,
+      "description" : " Indlæser tilstand i pop op "
+    },
+    "start_optagelse" : {
+      "message" : " Start optagelsen " ,
+      "description" : " Start optagelsestilstand i pop op "
+    },
+    "start_optagelse" : {
+      "message" : " Starter optagelse... " ,
+      "description" : " Starter optagelsestilstand i pop op "
+    },
+    "cannot_record" : {
+      "message" : " Kan ikke optage på denne side " ,
+      "description" : " Kan ikke optage i denne sidetilstand i pop op "
+    },
+    "stop_recording" : {
+      "message" : " Stop optagelsen " ,
+      "description" : " Stop optagelsestilstand i pop op "
+    },
+    "second" : {
+      "message" : " sekund " ,
+      "description" : " Sekunder etiket til nedtælling "
+    },
+    "sekunder" : {
+      "message" : " sekunder " ,
+      "description" : " Sekunder etiket for nedtælling (flertal) "
+    },
+    "nedtælling" : {
+      "message" : " nedtælling " ,
+      "description" : " Nedtællingsetiket i pop op "
+    },
+    "keyboard_shortcuts" : {
+      "message" : " Tastaturgenveje " ,
+      "description" : " Tastaturgenvejsetiket i pop op "
+    },
+    "smaller_file_size" : {
+      "message" : " Mindre filstørrelse " ,
+      "description" : " Mindre filstørrelse etiket i pop op "
+    },
+    "højeste_kvalitet" : {
+      "message" : " Højeste kvalitet " ,
+      "description" : " Højeste kvalitetsmærke i pop op "
+    },
+    "rate_extension" : {
+      "message" : " Bedøm forlængelse " ,
+      "description" : " Bedøm udvidelsesetiket i popup "
+    },
+    "made_by_alyssa" : {
+      "message" : " Lavet af Alyssa X " ,
+      "description" : " Lavet af Alyssa X label i pop op "
+    },
+    "disabled_allow_access" : {
+      "message" : " Deaktiveret (tillad adgang i URL-linjen) " ,
+      "description" : " Deaktiveret kræver tilladelse til kamera/mikrofon i popup "
+    },
+    "made_with" : {
+      "message" : " Lavet med " ,
+      "description" : " Lavet med etiket i videoeditor "
+    },
+    "by_alyssa" : {
+      "message" : " af Alyssa X " ,
+      "description" : " Af Alyssa X-etiket i videoeditor "
+    },
+    "edit_recording" : {
+      "message" : " Rediger din optagelse " ,
+      "description" : " Rediger din optagelabel i videoeditor "
+    },
+    "edit_recording_desc" : {
+      "message" : " Tilføj prikken over i'et til din video. " ,
+      "description" : " Rediger optagelsesbeskrivelse i videoredigering "
+    },
+    "format" : {
+      "message" : " Eksporter format " ,
+      "description" : " Eksporter formatetiket i videoeditor "
+    },
+    "webm" : {
+      "message" : " WEBM (standard) " ,
+      "description" : " Webm dropdown etiket i videoeditor "
+    },
+    "trim_video" : {
+      "message" : " Trim video " ,
+      "description" : " Trim videoetiket i videoeditor "
+    },
+    "start" : {
+      "message" : " Start " ,
+      "description" : " Start etiket i videoeditor "
+    },
+    "slut" : {
+      "message" : " Afslut " ,
+      "description" : " Slut etiket i videoeditor "
+    },
+    "remove_part" : {
+      "message" : " Fjern en del af videoen " ,
+      "description" : " Fjern en del af videoetiketten i videoredigeringsprogram "
+    },
+    "anvend" : {
+      "message" : " Anvend " ,
+      "description" : " Anvend knap i videoredigeringsprogram "
+    },
+    "nulstil" : {
+      "message" : " Nulstil ændringer (vend tilbage til indledende optagelse) " ,
+      "description" : " Nulstil etiket i videoeditor "
+    },
+    "download" : {
+      "message" : " Download " ,
+      "description" : " Download-knap i videoredigeringsprogram "
+    },
+    "save_drive" : {
+      "message" : " Gem til Drev " ,
+      "description" : " Gem til Drev-knap i videoredigeringsprogram "
+    },
+    "sparer" : {
+      "message" : " Gemmer... " ,
+      "description" : " Gem til Drev-knap i videoredigeringsprogram "
+    },
+    "show_hide" : {
+      "message" : " Vis/skjul muligheder " ,
+      "description" : " Vis/skjul indstillingspanel i videoeditor (lille skærm) "
+    },
+    "downloader" : {
+      "message" : " Downloader... " ,
+      "description" : " Download-knap i videoredigeringsprogram "
+    }
+}
