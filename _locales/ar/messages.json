@@ -60,7 +60,7 @@
       "description": "Disabled dropdown state in popup"
     },
     "loading": {
-      "message": "...جار التحميل",
+      "message": "...جاري التحميل",
       "description": "Loading state in popup"
     },
     "start_recording": {
@@ -68,7 +68,7 @@
       "description": "Start recording state in popup"
     },
     "starting_recording": {
-      "message": "...جار بدء التسجيل",
+      "message": "...جاري بدء التسجيل",
       "description": "Starting recording state in popup"
     },
     "cannot_record": {
@@ -172,7 +172,7 @@
       "description": "Save to Drive button in video editor"
     },
     "saving": {
-      "message": "...جار الحفظ",
+      "message": "...جاري الحفظ",
       "description": "Saving to Drive button in video editor"
     },
     "show_hide": {
@@ -180,7 +180,7 @@
       "description": "Show/hide options panel in video editor (small screen)"
     },
     "downloading": {
-      "message": "...جار التحميل",
+      "message": "...جاري التحميل",
       "description": "Downloading button in video editor"
     }
 }
