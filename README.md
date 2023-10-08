@@ -18,7 +18,6 @@ Also available for [Microsoft Edge](https://microsoftedge.microsoft.com/addons/d
 
 ## Table of contents
   - [Features](#features)
-  - [Translating Screenity to other languages](#translating-screenity-to-other-languages)
   - [Self-hosting Screenity](#self-hosting-screenity)
   - [Libraries used](#libraries-used)
 
@@ -36,16 +35,6 @@ Pranjal Aggarwal](https://github.com/pranjalagg)), and Indonesian (by [Galang Ap
 ...and much more - all for free & no sign in needed!<br>
 
 [Here's a Google Sheet](https://docs.google.com/spreadsheets/d/1juc1zWC2QBxYqlhpDZZUNHl3P6Tens6YiChchFcEJVw/edit?usp=sharing) to compare Screenity's features with other free & premium screen recorders available for Chrome.
-
-## Translating Screenity to other languages
-If you'd like to translate Screenity to a new language, here's what you should do:
-
-1. Make sure the language you want to translate Screenity into is supported by the Chrome Store. [Here's a list](https://developer.chrome.com/docs/webstore/i18n/#choosing-locales-to-support) of all the supported locales.
-2. Create a new folder under [_locales](https://github.com/alyssaxuu/screenity/tree/master/_locales) with the [locale name for your language](https://developer.chrome.com/docs/webstore/i18n/#choosing-locales-to-support).
-3. Make a copy of [this file](https://github.com/alyssaxuu/screenity/blob/master/_locales/en/messages.json) and translate the "message". The "description" shouldn't be translated, it's only there to give you some context where the string will show in the extension.
-4. Translate the [Chrome Store description](https://chrome.google.com/webstore/detail/screenity-screen-recorder/kbbdabhdfibnancpjfhlkhafgdilcnji?hl=en&authuser=0) so it can be published there, you can simply make a comment with it when you make a pull request. [Here's an example](https://github.com/alyssaxuu/screenity/pull/39) of how that pull request should look like.
-
-Before submitting the pull request, it would be helpful if you tried running the extension in the new language, to make sure everything looks right.
 
 ## Self-hosting Screenity
 You can run Screenity locally without having to install it from the Chrome Store. Here's how:
