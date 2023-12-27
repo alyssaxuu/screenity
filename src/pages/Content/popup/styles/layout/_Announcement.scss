@@ -1,0 +1,85 @@
+@use "../../../styles/_variables" as *;
+
+.announcement {
+  width: 100%;
+  top: 0px;
+  left: 0px;
+  padding-bottom: 24px;
+}
+.announcement-wrap {
+  width: 85%;
+  margin: auto;
+}
+.announcement-hero {
+  width: 100%;
+  margin-bottom: 16px;
+  margin-top: 44px;
+
+  img {
+    width: 100%;
+    border-radius: 15px;
+  }
+}
+.announcement-details {
+  text-align: center;
+}
+.announcement-title {
+  font-family: $font-bold;
+  font-size: 16px;
+  color: $color-text-primary;
+  letter-spacing: -0.8px;
+  margin-bottom: 12px;
+  text-align: center;
+}
+.announcement-description {
+  font-family: $font-medium;
+  font-size: 14px;
+  color: $color-text-secondary;
+  text-align: center;
+  margin-bottom: 24px;
+  line-height: 1.6;
+  letter-spacing: -0.6px;
+
+  a {
+    text-decoration: none !important;
+    color: $color-primary !important;
+    cursor: pointer !important;
+  }
+}
+.announcement-cta {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  height: 44px;
+  border-radius: $container-border-radius;
+  background: $gradient-primary;
+  color: $color-text-contrast;
+  font-family: $font-medium;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+  animation: background-size 6s ease-in-out infinite;
+  animation-play-state: paused;
+  filter: $gradient-shadow-primary;
+
+  &:hover {
+    animation-play-state: running !important;
+  }
+}
+@keyframes background-size {
+  /* Animate scale and position in and out looping */
+  0% {
+    background-size: 100% 100%;
+    background-position: 0% 0%;
+  }
+  50% {
+    background-size: 150% 150%;
+    background-position: 100% 0%;
+  }
+  100% {
+    background-size: 100% 100%;
+    background-position: 0% 0%;
+  }
+}

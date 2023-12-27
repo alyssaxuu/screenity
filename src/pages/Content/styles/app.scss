@@ -1,0 +1,40 @@
+@use '../toolbar/styles/_Page.scss';
+@use '../popup/styles/_Popup.scss';
+@use '../canvas/styles/_Canvas.scss';
+@use '../camera/styles/_Camera.scss';
+@use '../countdown/styles/_Countdown.scss';
+@use '../modal/styles/_Modal.scss';
+@use '../region/styles/_Region.scss';
+@use '../camera-only/styles/CameraOnly.scss';
+
+html {
+	font-size: 16px;
+}
+
+
+
+.screenity-scrollbar::-webkit-scrollbar {
+  background-color: rgba(0,0,0,0);
+  width: 16px;
+  height: 16px;
+  z-index: 999999;
+}
+.screenity-scrollbar::-webkit-scrollbar-track {
+  background-color: rgba(0,0,0,0);
+}
+.screenity-scrollbar::-webkit-scrollbar-thumb {
+  background-color: rgba(0,0,0,0);
+  border-radius:16px;
+  border:0px solid #fff;
+}
+.screenity-scrollbar::-webkit-scrollbar-button {
+  display:none;
+}
+.screenity-scrollbar:hover::-webkit-scrollbar-thumb {
+  background-color: #a0a0a5;
+  border:4px solid #fff;
+}
+::-webkit-scrollbar-thumb:hover {
+    background-color:#a0a0a5;
+    border:4px solid #f4f4f4
+}

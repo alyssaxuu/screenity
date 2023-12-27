@@ -1,0 +1,115 @@
+@use '../../../styles/_variables' as *;
+
+.video-item-root {
+	width: calc(100% - 2 * #{$spacing-03});
+	border-radius: 15px;
+	padding: $spacing-03;
+	display: block;
+	.video-item {
+		width: 100%;
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		justify-content: space-between;
+	}
+	.video-item-left {
+		display: flex;
+		flex-grow: 1;
+		flex-direction: row;
+		align-items: center;
+		min-width: 0;
+		justify-content: left;
+	}
+	.video-item-thumbnail {
+		min-width: 48px;
+		width: 48px;
+		height: 38px;
+		background: grey;
+		border-radius: 5px;
+		margin-right: $spacing-04;
+	}
+	.video-item-info {
+		display: block;
+		overflow: hidden;
+		white-space: nowrap;
+		text-overflow: ellipsis;
+		padding-right: $spacing-02;
+	}
+	.video-item-info-title {
+		color: $color-text-primary;
+		white-space: nowrap;
+		text-overflow: ellipsis;
+		overflow: hidden;
+	}
+	.video-item-info-date {
+		margin-top: $spacing-02;
+		color: $color-text-secondary;
+		font-size: $font-size-small;
+		white-space: nowrap;
+		text-overflow: ellipsis;
+		overflow: hidden;
+	}
+}
+
+.video-item-root:hover {
+		cursor: pointer;
+		background: #E9EAEE;
+}
+.video-item-root:focus-visible {
+	box-shadow: $focus-border;
+	outline: none!important;
+}
+
+/* Actions */
+.video-item-right {
+	display: flex;
+	align-items: center;
+	justify-content: right;
+	gap: $spacing-03;
+	min-width: max-content;
+	opacity: 0;
+
+
+	.copy-link {
+		background: $color-background;
+		height: 32px;
+		padding-left: $spacing-03;
+		padding-right: $spacing-03;
+		border-radius: 10px;
+		display: flex;
+		flex-direction: row;
+		justify-content: center;
+		align-items: center;
+	}
+	.copy-link img {
+		margin-right: $spacing-02;
+	}
+	.copy-link:focus-visible {
+		box-shadow: $focus-border;
+		outline: none!important;
+	}
+	.more-actions {
+		height: 32px;
+		width: 32px;
+		background: $color-background;
+		text-align: center;
+		border-radius: 10px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+	}
+	.more-actions:focus-visible {
+		box-shadow: $focus-border;
+		outline: none!important;
+	}
+}
+
+.video-item-root:hover, .video-item-root:focus-visible {
+	.video-item-right {
+		opacity: 1;
+	}
+}
+
+.video-item-right:focus-within {
+	opacity: 1;
+}

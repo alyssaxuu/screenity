@@ -1,0 +1,69 @@
+@mixin font($font-family, $font-file) {
+  @font-face {
+    font-family: $font-family;
+         src: url($font-file+'.ttf') format('truetype');
+    font-weight: normal;
+    font-style: normal;
+  }
+}
+
+@include font('Satoshi-Light', 'chrome-extension://__MSG_@@extension_id__/assets/fonts/Satoshi-Light');
+@include font('Satoshi-Medium', 'chrome-extension://__MSG_@@extension_id__/assets/fonts/Satoshi-Medium');
+@include font('Satoshi-Bold', 'chrome-extension://__MSG_@@extension_id__/assets/fonts/Satoshi-Bold');
+@include font('Gloria Hallelujah', 'chrome-extension://__MSG_@@extension_id__/assets/fonts/GloriaHallelujah-Regular');
+
+/* Colors */
+$color-background: #FFF;
+$color-light-grey: #F6F7FB;
+$color-primary: #3080F8;
+$color-border: #E8E8E8;
+$color-text-contrast: #FFF;
+$color-text-primary: #29292F;
+$color-text-secondary: #6E7684;
+$color-red: #D2234D;
+$color-red-light: #FAF0F4; 
+$color-primary-transparent: rgba(48, 128, 248, 0.1);
+$color-icon: #9797A4;
+
+/* Font */
+//$font-size-normal: 0.875rem;
+//$font-size-small: 0.75rem;
+$font-size-normal: 14px;
+$font-size-small: 12px;
+$font-weight-bold: 700;
+$font-weight-normal: 500;
+$font-weight-light: 400;
+$font-light: 'Satoshi-Light', sans-serif;
+$font-medium: 'Satoshi-Medium', sans-serif;
+$font-bold: 'Satoshi-Bold', sans-serif;
+
+/* Spacing */
+/*
+$spacing-01: 0.125rem;
+$spacing-02: 0.25rem;
+$spacing-03: 0.5rem;
+$spacing-04: 0.75rem;
+$spacing-05: 1rem;
+*/
+$spacing-01: 2px;
+$spacing-02: 4px; 
+$spacing-03: 8px;
+$spacing-04: 12px; 
+$spacing-05: 16px;
+
+/* Container */
+$container-border-radius: 30px;
+$container-border: 1px solid $color-border;
+$container-shadow: drop-shadow(0px 4px 100px rgba(0, 0, 0, 0.35));
+$container-shadow-focus: 2px 2px 10px rgba(0, 0, 0, 0.1);
+
+/* Gradients */
+$gradient-primary: radial-gradient(117.41% 117.78% at 35.44% 0%, #2BAEF8 23.13%, #3582F6 46.35%, #486DEF 74.48%, #7B9AEA 100%);
+$gradient-shadow-primary: drop-shadow(0px 4px 20px rgba(86, 123, 218, 0.5));
+
+/* Events */
+$focus-border: 0px 0px 0px 2px rgba(48, 128, 248, 0.5);
+$focus-inner-border: inset 0px 0px 0px 2px rgba(48, 128, 248, 0.5);
+
+/* Z-index */
+$z-index-max: 99999999999;

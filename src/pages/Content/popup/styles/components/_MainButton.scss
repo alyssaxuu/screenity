@@ -1,0 +1,161 @@
+@use '../../../styles/_variables' as *;
+
+
+.main-button {
+	width: 100%;
+	height: 45px;
+	border-radius: $container-border-radius;
+	display: flex;
+	flex-direction: row;
+	justify-content: center;
+	align-items: center;
+	position: relative;
+	box-sizing: border-box;
+
+
+	.main-button-label {
+		color: $color-text-contrast;
+		text-align: center;
+		vertical-align: middle;
+		align-items: center;
+	}
+	.main-button-shortcut {
+		position: absolute;
+		font-size: $font-size-small;
+		right: $spacing-05;
+		color: $color-text-contrast;
+		opacity: .7;
+	}
+	&:hover {
+		cursor: pointer;
+	}
+	&:disabled {
+		cursor: not-allowed;
+		opacity: .5;
+	}
+}
+.main-button:focus {
+	box-shadow: $focus-border!important;
+}
+
+@property --x {
+  syntax: '<percentage>';
+  inherits: false;
+  initial-value: 35.44%;
+}
+@property --y {
+  syntax: '<percentage>';
+  inherits: false;
+  initial-value: 0%;
+}
+
+.recording-button {
+	margin-top: $spacing-03;
+	filter: $gradient-shadow-primary;
+	background:radial-gradient(127.41% 127.78% at 35.44% 0%, #2BAEF8 23.13%, #3582F6 46.35%, #486DEF 74.48%, #7B9AEA 100%);
+	animation: 0;
+	animation: background-size 6s ease-in-out infinite;
+	animation-play-state: paused;
+	position: relative;
+	z-index: 2;
+}
+@keyframes background-size {
+	/* Animate scale and position in and out looping */
+	0% {
+		background-size: 100% 100%;
+		background-position: 0% 0%;
+	}
+	50% {
+		background-size: 150% 150%;
+		background-position: 100% 0%;
+
+	}
+	100% {
+		background-size: 100% 100%;
+		background-position: 0% 0%;
+	}
+}
+
+.recording-button:hover {
+	animation-play-state: running!important;
+}
+.recording-button:before {
+	content: "";
+	position: absolute;
+	display: block;
+	top: 0px;
+	left: 0px;
+	width: 100%;
+	height: 100%;
+	box-sizing: border-box;
+	border-radius: $container-border-radius;
+	transition: all .25s ease-in-out;
+}
+.recording-button:hover:before {
+	box-shadow: 0px 0px 0px 4px rgba(52, 138, 247, 0.25);
+}
+@keyframes pulse-animation {
+	0% {
+		box-shadow: 0px 0px 0px 2px rgba(52, 138, 247, 0.25);
+	}
+	25% {
+		box-shadow: 0px 0px 0px 6px rgba(52, 138, 247, 0.25);
+	}
+	50% {
+		box-shadow: 0px 0px 0px 2px rgba(52, 138, 247, 0.25);
+	}
+	100% {
+		box-shadow: 0px 0px 0px 2px rgba(52, 138, 247, 0.25);
+	}
+}
+@keyframes gradient-animation {
+	0% {
+		--x: 35.44%;
+		--y: 0%;
+	}
+	25% {
+		--x: 100%;
+		--y: 30%;
+	}
+	50% {
+		--x: 70%;
+		--y: 100%;
+	}
+	75% {
+		--x: 30%;
+		--y: 90%;
+	}
+	100% {
+		--x: 35.44%;
+		--y: 0%;
+	}
+}
+
+.dashboard-button {
+	background: $color-text-primary;
+	box-shadow: 0px 0px 0px 0px rgba(41, 41, 47, 0.25);
+	transition: all .25s ease-in-out;
+}
+.dashboard-button:hover {
+	box-shadow: 0px 0px 0px 4px rgba(41, 41, 47, 0.25);
+}
+
+.alarm-time-button {
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	border-radius: 15px;
+	padding: 4px 8px;
+	position: absolute;
+	color: $color-text-contrast;
+	opacity: .7;
+	font-family: $font-medium;
+	font-size: 12px;
+	left: 6px;
+
+	svg {
+		margin-top: 4px;
+		margin-right: 4px;
+		width: 14px;
+	}
+}

@@ -1,0 +1,15 @@
+@use '../../styles/_variables' as *;
+@use './layout/Toolbar';
+@use './layout/DrawingToolbar';
+@use './layout/ShapeToolbar';
+@use './components/Tooltip';
+@use './components/RadialMenu';
+@use './components/ColorWheel';
+@use './components/StrokeWidth';
+@use './components/Toast';
+
+.toolbar-page {
+	width: 100%;
+	height: 100%;
+	pointer-events: none!important;
+}

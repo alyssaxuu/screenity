@@ -1,0 +1,139 @@
+@use '../../styles/_variables' as *;
+
+.countdown {
+	width: 100%;
+	height: 100%;
+	position: absolute;
+	top: 0px;
+	left: 0px;
+	z-index: $z-index-max;
+}
+
+.countdown-circle {
+	width: 200px;
+	height: 200px;
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	position: absolute;
+	top: 50%;
+	left: 50%;
+	transform: translate(-50%, -50%);
+	z-index: 999;
+	text-align: center;
+}
+.countdown-overlay {
+	width: 100%;
+	height: 100%;
+	background: rgba(0, 0, 0, 0.5);
+	position: absolute;
+	top: 0px;
+	left: 0px;
+	z-index: 99;
+	display: flex;
+	justify-content: center;
+	align-items: center;
+}
+.countdown-number {
+  position: absolute;
+  width: 20px;
+  height: 60px;
+  z-index: 9999999;
+  left: 0px;
+  right: 0px;
+  top: 0px;
+  bottom: 0px;
+  margin: auto;
+  font-weight: 300!important;
+  font-family: $font-light!important;
+	font-size: 48px!important;
+	color: $color-text-contrast;
+	text-align: center;
+  display: block;
+  transition: all .6s ease-in-out;
+}
+.background {
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  left: 0px;
+  top: 0px;
+  filter:url('#goo');
+  transform: rotate(0deg);
+	transition: all 3s ease-in-out;
+}
+.circle {
+  z-index: 9;
+  position: absolute;
+  transform: scale(.8);
+  top: 0px;
+  left: 0px;
+  right: 0px;
+  bottom: 0px;
+  margin: auto;
+  border-radius: 50%;
+	background: radial-gradient(118.30% 119.01% at 35.44% 0.00%, #2BAEF8 23.13%, #3582F6 46.35%, #486DEF 74.48%, #7B9AEA 100%);
+  width: 200px;
+  height: 200px;
+  transition: all 1.5s ease-in-out;
+}
+.c {
+  width: 50px;
+  height: 50px;
+  z-index: 999;
+  border-radius: 50%;
+  position: absolute;
+  top: 0px;
+  right: 0px;
+  left: 0px;
+  bottom: 0px;
+  margin: auto;
+  transition: cubic-bezier(0.82, 0.1, 0.24, 0.99) 1.5s;
+  opacity: 1;
+}
+.c2 {
+  background: radial-gradient(118.30% 119.01% at 35.44% 0.00%, #2B96F8 23.13%, #356BF6 64.58%);
+	transform: translate(20px, 20px);
+}
+.c3 {
+  background: radial-gradient(118.30% 119.01% at 35.44% 0.00%, #4884CA 15.30%, #2B89F8 78.83%);
+	transform: translate(-30px, -40px);
+}
+.c3:after {
+  content: '';
+  position: absolute;
+  width: 150px;
+  height: 150px;
+  filter: blur(50px);
+  border-radius: 50%;
+  top: 0px;
+  right: 0px;
+  left: 0px;
+  bottom: 0px;
+  margin: auto;
+  transition: cubic-bezier(0.82, 0.1, 0.24, 0.99) 1.5s;
+  background: #CBE8F7;
+  z-index: -1;
+}
+.recording-countdown .c2 {
+  transform: translate(-15px, 15px);
+}
+.recording-countdown .c3 {
+  transform: translate(-10px, -5px);
+}
+.countdown-info {
+	position: absolute;
+	left: 0px;
+	right: 0px;
+	margin: auto;
+	bottom: 20px;
+	border-radius: 30px;
+	border: 2px solid rgba(255, 255, 255, 0.3);
+	text-align: center;
+	display: block;
+	padding: 10px 20px;
+	font-family: $font-medium;
+	color: $color-text-contrast;
+	z-index: $z-index-max;
+	width: fit-content;
+}

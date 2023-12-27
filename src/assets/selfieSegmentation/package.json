@@ -1,0 +1,27 @@
+{
+  "name": "@mediapipe/selfie_segmentation",
+  "version": "0.1.1675465747",
+  "description": "Mediapipe Selfie Segmentation Solution",
+  "main": "selfie_segmentation.js",
+  "module": "selfie_segmentation.js",
+  "jsdelivr": "selfie_segmentation.js",
+  "unpkg": "selfie_segmentation.js",
+  "types": "index.d.ts",
+  "author": "mhays@google.com",
+  "license": "Apache-2.0",
+  "homepage": "https://google.github.io/mediapipe/solutions/selfie_segmentation",
+  "keywords": [ "AR", "ML", "Augmented" ],
+  "devDependencies": {
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+  },
+  "browser": {
+    "node-fetch": false,
+    "util": false,
+    "crypto": false
+  },
+  "sideEffects" : []
+}

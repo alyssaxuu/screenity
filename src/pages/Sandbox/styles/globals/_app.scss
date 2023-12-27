@@ -1,0 +1,197 @@
+@use "./variables.scss" as *;
+
+body {
+  background: $color-light-grey;
+  font-family: $font-medium;
+  font-size: $font-size-normal;
+  height: 100vh;
+  overflow-y: hidden;
+  margin: 0px;
+}
+
+// max width 900px
+@media (max-width: 900px) {
+  body {
+    overflow-y: unset !important;
+  }
+}
+
+/* Button component */
+.button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  border: none;
+  padding: 8px 16px;
+  gap: 6px;
+  text-align: center;
+  box-sizing: border-box;
+  border-radius: $container-border-radius;
+  font-family: $font-bold;
+  font-weight: 500;
+
+  &.primaryButton:disabled,
+  &.secondaryButton:disabled {
+    background-color: $color-light-grey !important;
+    color: $color-icon !important;
+    cursor: not-allowed !important;
+    border: 1px solid transparent !important;
+
+    svg {
+      color: $color-icon !important;
+      margin-top: 5px;
+    }
+  }
+
+  &.simpleButton:disabled {
+    opacity: 0.5;
+    cursor: not-allowed !important;
+  }
+
+  &.primaryButton {
+    color: $color-text-contrast;
+    background-color: $color-primary;
+    height: 40px;
+
+    svg {
+      margin-top: 5px;
+      color: $color-text-contrast;
+    }
+    &:hover {
+      background-color: darken($color-primary, 10%);
+      cursor: pointer;
+    }
+  }
+
+  &.secondaryButton {
+    color: $color-text-primary;
+    background-color: #fff;
+    border: 1px solid $color-border;
+    height: 40px;
+    svg {
+      margin-top: 5px;
+      color: $color-icon;
+    }
+    &:hover {
+      background-color: $color-light-grey;
+      cursor: pointer;
+    }
+  }
+
+  &.simpleButton {
+    color: $color-text-secondary;
+    background: none;
+
+    svg {
+      margin-top: 5px;
+    }
+
+    &:hover {
+      background-color: $color-light-grey;
+      cursor: pointer;
+    }
+  }
+
+  &.blueButton {
+    color: $color-primary;
+  }
+
+  &.blackButton {
+    color: $color-text-primary !important;
+  }
+}
+
+/* Define variables for handle size, border width, and margin */
+$handle-size: 15px;
+$border-width: 4px;
+$margin-offset: 8px;
+
+/* Disable transitions for Cropper */
+.cropper,
+.advanced-cropper-artificial-transition,
+.advanced-cropper-background-image,
+.advanced-cropper-wrapper,
+.advanced-cropper,
+.CropperBackgroundWrapper,
+.cropper * {
+  transition: none !important;
+}
+
+.cropper {
+  max-width: 80%;
+  height: 80%;
+  border-radius: 15px;
+  margin: auto !important;
+  position: absolute !important;
+  top: 0px;
+  left: 0px;
+  right: 0px;
+  bottom: 0px !important;
+  display: block;
+  transition: none !important;
+  padding-left: 40px;
+  padding-right: 40px;
+}
+.advanced-cropper-artificial-transition {
+  transition: none !important;
+}
+
+.advanced-cropper-background-image {
+  transition: none !important;
+}
+
+.advanced-cropper-wrapper,
+.advanced-cropper,
+.CropperBackgroundWrapper {
+  /* tile background image svg */
+  background-image: url("chrome-extension://__MSG_@@extension_id__/assets/editor/transparenttile.png") !important;
+  background-repeat: repeat !important;
+  background-size: 20px !important;
+  transition: none !important;
+}
+/* Custom styles for the handles */
+.advanced-cropper-simple-handler {
+  width: $handle-size !important; /* Adjust the handle width */
+  height: $handle-size !important; /* Adjust the handle height */
+  background-color: transparent !important;
+  position: absolute;
+  border-style: solid; /* Specify the border style as solid */
+  border-width: 0 !important; /* Initialize border width to 0 */
+  border-radius: 2px;
+
+  &--west-north,
+  &--west-south {
+    margin-left: $margin-offset !important; /* Offset from the left */
+  }
+
+  &--west-north,
+  &--east-north {
+    margin-top: $margin-offset !important; /* Offset from the top */
+  }
+
+  &--west-south,
+  &--east-south {
+    margin-bottom: $margin-offset !important; /* Offset from the bottom */
+  }
+
+  &--east {
+    margin-right: $margin-offset !important;
+    border-right-width: $border-width !important; /* Border on the right */
+  }
+
+  &--west {
+    margin-left: $margin-offset;
+    border-left-width: $border-width !important; /* Border on the left */
+  }
+
+  &--north {
+    margin-top: $margin-offset;
+    border-top-width: $border-width !important; /* Border on the top */
+  }
+
+  &--south {
+    margin-bottom: $margin-offset;
+    border-bottom-width: $border-width !important; /* Border on the bottom */
+  }
+}
