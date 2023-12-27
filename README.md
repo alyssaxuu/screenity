@@ -1,4 +1,6 @@
 # Screenity
+[![jiewjjc232](https://github.com/alyssaxuu/screenity/assets/7581348/ed55e52e-4adf-442b-b774-6856abacdffb)](https://screenity.io)
+
 
 The free and privacy-friendly screen recorder with no limits 🎥
 
@@ -20,7 +22,7 @@ Made by [Alyssa X](https://alyssax.com)
 - [Features](#features)
 - [Self-hosting Screenity](#self-hosting-screenity)
 - [Creating a development version](#creating-a-development-version)
-  - [Enabling Save to Drive](#enabling-save-to-drive)
+  - [Enabling Save to Google Drive](#enabling-save-to-google-drive)
 - [Acknowledgements](#acknowledgements)
 
 ## Features
@@ -83,6 +85,6 @@ You can create it accessing [Google Cloud Console](https://console.cloud.google.
 - Thanks to [HelpKit](https://www.helpkit.so/) for sponsoring this project by hosting the [Screenity Help Center](https://help.screenity.io/).
 - Thanks to [Mei Xuan](https://www.behance.net/meixuanloo) for helping with the Chinese translation of the extension.
 
-If you need any help, or want to become a Screenity expert, you can browse articles and guides in the [help center](https://help.screenity.io). You can also send any feedback or ideas in this [form](https://tally.so/r/3ElpXq), or contact through [this page](https://help.screenity.io/contact)
+If you need any help, or want to become a Screenity expert, you can browse articles and guides in the [help center](https://help.screenity.io). You can also submit any feedback or ideas in this [form](https://tally.so/r/3ElpXq), or contact through [this page](https://help.screenity.io/contact)
 
 Feel free to reach out to me through email at hi@alyssax.com or [on Twitter](https://twitter.com/alyssaxuu) if you have any questions or feedback! Hope you find this useful 💜
