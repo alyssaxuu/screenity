@@ -123,9 +123,10 @@ const VideoPlayer = (props) => {
       for (let mutation of mutationsList) {
         if (
           document.querySelector(".plyr--video") &&
-          !contentStateRef.mp4ready &&
-          !contentStateRef.blob &&
-          !bannerRef.current
+          !contentStateRef.current.mp4ready &&
+          !contentStateRef.current.blob &&
+          !bannerRef.current &&
+          !contentStateRef.current.noffmpeg
         ) {
           bannerRef.current = document.createElement("div");
           bannerRef.current.classList.add("videoBanner");

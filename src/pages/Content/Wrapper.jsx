@@ -132,7 +132,8 @@ const Wrapper = () => {
                     window.location.href.indexOf(
                       chrome.runtime.getURL("playground.html")
                     ) === -1 &&
-                    !contentState.pendingRecording
+                    !contentState.pendingRecording &&
+                    !contentState.customRegion
                   ) {
                     setContentState({
                       ...contentState,

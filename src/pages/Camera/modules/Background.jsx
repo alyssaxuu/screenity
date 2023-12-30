@@ -199,8 +199,8 @@ const Background = (props) => {
 
   const renderBlur = async (img, people) => {
     try {
-      const backgroundBlurAmount = 4;
-      const edgeBlurAmount = 3;
+      const backgroundBlurAmount = 16;
+      const edgeBlurAmount = 10;
       const flipHorizontal = false;
       const foregroundThresholdProbability = 0.6;
 

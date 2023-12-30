@@ -512,6 +512,16 @@ const GrabIconPopup = (props) => {
   );
 };
 
+const MoreIconPopup = (props) => {
+  return (
+    <ReactSVG
+      src={URL + "more-icon-popup.svg"}
+      width={props.width}
+      height={props.height}
+    />
+  );
+};
+
 const OnboardingArrow = (props) => {
   return (
     <ReactSVG
@@ -605,4 +615,5 @@ export {
   NoInternet,
   CloseButtonToolbar,
   HelpIconPopup,
+  MoreIconPopup,
 };

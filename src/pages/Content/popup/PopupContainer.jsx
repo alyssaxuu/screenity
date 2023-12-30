@@ -30,6 +30,7 @@ import VideosTab from "./layout/VideosTab";
 
 // Layouts
 import Announcement from "./layout/Announcement";
+import SettingsMenu from "./layout/SettingsMenu";
 
 // Context
 import { contentStateContext } from "../context/ContentState";

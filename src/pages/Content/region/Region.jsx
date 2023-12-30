@@ -144,10 +144,10 @@ const ResizableBox = () => {
           e.target.className.indexOf("react-draggable") === -1 &&
           e.target.className.indexOf("region-rect") === -1
         ) {
-          setContentState((prevContentState) => ({
-            ...prevContentState,
-            showExtension: false,
-          }));
+          // setContentState((prevContentState) => ({
+          //   ...prevContentState,
+          //   showExtension: false,
+          // }));
         }
       }}
       ref={parentRef}

@@ -81,7 +81,9 @@ chrome.commands.onCommand.addListener(async (command) => {
           !activeTab.url.includes("/playground.html") &&
           !activeTab.url.includes("/setup.html"))
       ) &&
-      !activeTab.url.includes("stackoverflow.com/")
+      !activeTab.url.includes("stackoverflow.com/") &&
+      !activeTab.url.includes("chrome.google.com/webstore") &&
+      !activeTab.url.includes("chromewebstore.google.com")
     ) {
       chrome.tabs.sendMessage(activeTab.id, { type: "start-stream" });
     } else {
@@ -313,7 +315,9 @@ chrome.action.onClicked.addListener(async (tab) => {
           !tab.url.includes("/playground.html") &&
           !tab.url.includes("/setup.html"))
       ) &&
-      !tab.url.includes("stackoverflow.com/")
+      !tab.url.includes("stackoverflow.com/") &&
+      !tab.url.includes("chrome.google.com/webstore") &&
+      !tab.url.includes("chromewebstore.google.com")
     ) {
       chrome.tabs.sendMessage(tab.id, { type: "toggle-popup" });
       chrome.storage.local.set({ activeTab: tab.id });

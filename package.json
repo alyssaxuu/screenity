@@ -13,6 +13,7 @@
     "@mediapipe/selfie_segmentation": "^0.1.1675465747",
     "@radix-ui/react-alert-dialog": "^1.0.4",
     "@radix-ui/react-collapsible": "^1.0.2",
+    "@radix-ui/react-dropdown-menu": "^2.0.6",
     "@radix-ui/react-popover": "^1.0.5",
     "@radix-ui/react-select": "^1.2.1",
     "@radix-ui/react-slider": "^1.1.2",

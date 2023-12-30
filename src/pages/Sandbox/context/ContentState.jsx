@@ -62,6 +62,7 @@ const ContentState = (props) => {
     driveEnabled: false,
     hasBeenEdited: false,
     dragInteracted: false,
+    noffmpeg: false,
   };
 
   const [contentState, setContentState] = useState(defaultState);
@@ -362,6 +363,9 @@ const ContentState = (props) => {
       setContentState((prevContentState) => ({
         ...prevContentState,
         ffmpeg: true,
+        noffmpeg: true,
+        ffmpegLoaded: true,
+        isFfmpegRunning: false,
       }));
 
       // if (!navigator.onLine) {

@@ -18,7 +18,7 @@ const RightPanel = () => {
   const [webmFallback, setWebmFallback] = useState(false);
 
   const saveToDrive = () => {
-    if (!contentState.mp4ready) return;
+    if (!contentState.mp4ready || !contentState.noffmpeg) return;
     setContentState((prevContentState) => ({
       ...prevContentState,
       saveDrive: true,
@@ -45,7 +45,11 @@ const RightPanel = () => {
           }
         });
     };
-    reader.readAsDataURL(contentState.blob);
+    if (!contentState.noffmpeg) {
+      reader.readAsDataURL(contentState.blob);
+    } else {
+      reader.readAsDataURL(contentState.webm);
+    }
   };
 
   const signOutDrive = () => {
@@ -139,29 +143,30 @@ const RightPanel = () => {
               </div>
             </div>
           )}
-          {contentState.updateChrome && !contentState.offline && (
-            <div className={styles.alert}>
-              <div className={styles.buttonLeft}>
-                <ReactSVG src={URL + "editor/icons/alert.svg"} />
-              </div>
-              <div className={styles.buttonMiddle}>
-                <div className={styles.buttonTitle}>
-                  {chrome.i18n.getMessage("updateChromeLabelTitle")}
+          {(contentState.updateChrome || contentState.noffmpeg) &&
+            !contentState.offline && (
+              <div className={styles.alert}>
+                <div className={styles.buttonLeft}>
+                  <ReactSVG src={URL + "editor/icons/alert.svg"} />
                 </div>
-                <div className={styles.buttonDescription}>
-                  {chrome.i18n.getMessage("updateChromeLabelDescription")}
+                <div className={styles.buttonMiddle}>
+                  <div className={styles.buttonTitle}>
+                    {chrome.i18n.getMessage("updateChromeLabelTitle")}
+                  </div>
+                  <div className={styles.buttonDescription}>
+                    {chrome.i18n.getMessage("updateChromeLabelDescription")}
+                  </div>
+                </div>
+                <div
+                  className={styles.buttonRight}
+                  onClick={() => {
+                    chrome.runtime.sendMessage({ type: "chrome-update-info" });
+                  }}
+                >
+                  {chrome.i18n.getMessage("learnMoreLabel")}
                 </div>
               </div>
-              <div
-                className={styles.buttonRight}
-                onClick={() => {
-                  chrome.runtime.sendMessage({ type: "chrome-update-info" });
-                }}
-              >
-                {chrome.i18n.getMessage("learnMoreLabel")}
-              </div>
-            </div>
-          )}
+            )}
           {contentState.duration > contentState.editLimit &&
             !contentState.offline &&
             !contentState.updateChrome && (
@@ -190,7 +195,8 @@ const RightPanel = () => {
           {(!contentState.mp4ready || contentState.isFfmpegRunning) &&
             contentState.duration <= contentState.editLimit &&
             !contentState.offline &&
-            !contentState.updateChrome && (
+            !contentState.updateChrome &&
+            !contentState.noffmpeg && (
               <div className={styles.alert}>
                 <div className={styles.buttonLeft}>
                   <ReactSVG src={URL + "editor/icons/alert.svg"} />
@@ -227,7 +233,8 @@ const RightPanel = () => {
                 onClick={handleEdit}
                 disabled={
                   contentState.duration > contentState.editLimit ||
-                  !contentState.mp4ready
+                  !contentState.mp4ready ||
+                  contentState.noffmpeg
                 }
               >
                 <div className={styles.buttonLeft}>
@@ -240,7 +247,7 @@ const RightPanel = () => {
                   <div className={styles.buttonDescription}>
                     {contentState.offline && !contentState.ffmpegLoaded
                       ? chrome.i18n.getMessage("noConnectionLabel")
-                      : contentState.updateChrome
+                      : contentState.updateChrome || contentState.noffmpeg
                       ? chrome.i18n.getMessage("notAvailableLabel")
                       : contentState.mp4ready
                       ? chrome.i18n.getMessage("editButtonDescription")
@@ -257,7 +264,8 @@ const RightPanel = () => {
                 onClick={handleCrop}
                 disabled={
                   contentState.duration > contentState.editLimit ||
-                  !contentState.mp4ready
+                  !contentState.mp4ready ||
+                  contentState.noffmpeg
                 }
               >
                 <div className={styles.buttonLeft}>
@@ -270,7 +278,7 @@ const RightPanel = () => {
                   <div className={styles.buttonDescription}>
                     {contentState.offline && !contentState.ffmpegLoaded
                       ? chrome.i18n.getMessage("noConnectionLabel")
-                      : contentState.updateChrome
+                      : contentState.updateChrome || contentState.noffmpeg
                       ? chrome.i18n.getMessage("notAvailableLabel")
                       : contentState.mp4ready
                       ? chrome.i18n.getMessage("cropButtonDescription")
@@ -287,7 +295,8 @@ const RightPanel = () => {
                 onClick={handleAddAudio}
                 disabled={
                   contentState.duration > contentState.editLimit ||
-                  !contentState.mp4ready
+                  !contentState.mp4ready ||
+                  contentState.noffmpeg
                 }
               >
                 <div className={styles.buttonLeft}>
@@ -300,7 +309,7 @@ const RightPanel = () => {
                   <div className={styles.buttonDescription}>
                     {contentState.offline && !contentState.ffmpegLoaded
                       ? chrome.i18n.getMessage("noConnectionLabel")
-                      : contentState.updateChrome
+                      : contentState.updateChrome || contentState.noffmpeg
                       ? chrome.i18n.getMessage("notAvailableLabel")
                       : contentState.mp4ready
                       ? chrome.i18n.getMessage("addAudioButtonDescription")
@@ -332,7 +341,10 @@ const RightPanel = () => {
                 role="button"
                 className={styles.button}
                 onClick={saveToDrive}
-                disabled={contentState.saveDrive || !contentState.mp4ready}
+                disabled={
+                  contentState.saveDrive ||
+                  (!contentState.mp4ready && !contentState.noffmpeg)
+                }
               >
                 <div className={styles.buttonLeft}>
                   <ReactSVG src={URL + "editor/icons/drive.svg"} />
@@ -350,7 +362,7 @@ const RightPanel = () => {
                       ? chrome.i18n.getMessage("noConnectionLabel")
                       : contentState.updateChrome
                       ? chrome.i18n.getMessage("notAvailableLabel")
-                      : contentState.mp4ready
+                      : contentState.mp4ready || contentState.noffmpeg
                       ? chrome.i18n.getMessage("saveDriveButtonDescription")
                       : chrome.i18n.getMessage("preparingLabel")}
                   </div>
@@ -374,7 +386,10 @@ const RightPanel = () => {
                   contentState.download();
                 }}
                 disabled={
-                  contentState.isFfmpegRunning || !contentState.mp4ready
+                  contentState.isFfmpegRunning ||
+                  contentState.noffmpeg ||
+                  !contentState.mp4ready ||
+                  contentState.noffmpeg
                 }
               >
                 <div className={styles.buttonLeft}>
@@ -389,7 +404,7 @@ const RightPanel = () => {
                   <div className={styles.buttonDescription}>
                     {contentState.offline && !contentState.ffmpegLoaded
                       ? chrome.i18n.getMessage("noConnectionLabel")
-                      : contentState.updateChrome
+                      : contentState.updateChrome || contentState.noffmpeg
                       ? chrome.i18n.getMessage("notAvailableLabel")
                       : contentState.mp4ready
                       ? chrome.i18n.getMessage("downloadMP4ButtonDescription")
@@ -438,7 +453,8 @@ const RightPanel = () => {
                 disabled={
                   contentState.isFfmpegRunning ||
                   contentState.duration > 30 ||
-                  !contentState.mp4ready
+                  !contentState.mp4ready ||
+                  contentState.noffmpeg
                 }
               >
                 <div className={styles.buttonLeft}>
@@ -453,7 +469,7 @@ const RightPanel = () => {
                   <div className={styles.buttonDescription}>
                     {contentState.offline && !contentState.ffmpegLoaded
                       ? chrome.i18n.getMessage("noConnectionLabel")
-                      : contentState.updateChrome
+                      : contentState.updateChrome || contentState.noffmpeg
                       ? chrome.i18n.getMessage("notAvailableLabel")
                       : contentState.mp4ready
                       ? chrome.i18n.getMessage("downloadGIFButtonDescription")
