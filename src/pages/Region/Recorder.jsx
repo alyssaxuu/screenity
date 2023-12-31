@@ -84,11 +84,13 @@ const Recorder = () => {
     recordingRef.current = true;
 
     // I don't know what the ideal chunk size should be here
-    recorder.current.start(3000, {
-      videoBitsPerSecond: 2000000,
-      mimeType: "video/webm; codecs=vp9",
+    chrome.storage.local.get(["quality"], (result) => {
+      recorder.current.start(3000, {
+        videoBitsPerSecond: result.quality === "max" ? 2000000 : 1000,
+        mimeType: "video/webm; codecs=vp9",
 
-      // vp8, opus ?
+        // vp8, opus ?
+      });
     });
 
     recorder.current.onstop = async (e) => {

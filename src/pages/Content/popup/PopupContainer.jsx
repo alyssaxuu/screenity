@@ -46,6 +46,7 @@ const PopupContainer = (props) => {
   const [shake, setShake] = React.useState("");
   const [dragging, setDragging] = React.useState("");
   const [onboarding, setOnboarding] = useState(false);
+  const [open, setOpen] = useState(false);
   const recordTabRef = useRef(null);
   const videoTabRef = useRef(null);
   const pillRef = useRef(null);
@@ -290,17 +291,26 @@ const PopupContainer = (props) => {
           "react-draggable" + " " + elastic + " " + shake + " " + dragging
         }
         enableResizing={false}
-        dragHandleClassName="popup-grab"
+        dragHandleClassName="drag-area"
         onDragStart={handleDragStart}
         onDrag={handleDrag}
         onDragStop={handleDrop}
         ref={DragRef}
       >
         <div className="popup-container" ref={PopupRef}>
-          <div className="popup-controls">
-            <div className="popup-control popup-grab">
-              <GrabIconPopup />
-            </div>
+          <div
+            className={open ? "popup-drag-head" : "popup-drag-head drag-area"}
+          ></div>
+          <div
+            className={
+              open ? "popup-controls open" : "popup-controls drag-area"
+            }
+          >
+            <SettingsMenu
+              shadowRef={props.shadowRef}
+              open={open}
+              setOpen={setOpen}
+            />
             <div
               style={{ marginBottom: "-4px", cursor: "pointer" }}
               onClick={() => {

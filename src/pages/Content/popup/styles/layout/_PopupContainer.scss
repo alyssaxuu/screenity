@@ -3,6 +3,19 @@
 .popup-container:hover .popup-controls {
   opacity: 1;
 }
+.open {
+  opacity: 1 !important;
+}
+.popup-drag-head {
+  position: fixed;
+  top: 0px;
+  left: 0px;
+  width: 100%;
+  height: 100px;
+  z-index: 1;
+  border-radius: 30px 30px 0px 0px;
+  opacity: 0;
+}
 .popup-controls {
   opacity: 0;
   position: absolute;

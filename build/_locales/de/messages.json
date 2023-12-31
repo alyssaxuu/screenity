@@ -778,5 +778,13 @@
   "streamErrorModalDescription": {
     "message": "Es sieht so aus, als ob beim Starten der Aufnahme ein Fehler aufgetreten ist. Starten Sie Ihren Browser neu und versuchen Sie es erneut. Wenn das Problem weiterhin besteht, kontaktieren Sie uns bitte unter support@screenity.io.",
     "description": "Beschreibung des Stream-Fehlermodals"
+  },
+  "highestQuality": {
+    "message": "Höchste Qualität",
+    "description": "Beschriftung für den Wechsel zur höchsten Qualität im Popup-Fenster"
+  },
+  "restoreRecording": {
+    "message": "Letzte Aufnahme wiederherstellen",
+    "description": "Schaltfläche zum Wiederherstellen der letzten Aufnahme im Popup-Fenster"
   }
 }

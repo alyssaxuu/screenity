@@ -778,5 +778,13 @@
   "streamErrorModalDescription": {
     "message": "녹화를 시작하는 중에 오류가 발생한 것 같습니다. 브라우저를 다시 시작하고 다시 시도해보세요. 문제가 계속되면 support@screenity.io로 문의해주세요.",
     "description": "스트림 오류 모달 설명"
+  },
+  "highestQuality": {
+    "message": "최상 품질",
+    "description": "팝업에서 최상 품질 레이블 토글"
+  },
+  "restoreRecording": {
+    "message": "최근 녹음 복원",
+    "description": "팝업에서 최근 녹음 복원 버튼"
   }
 }

@@ -778,5 +778,13 @@
   "streamErrorModalDescription": {
     "message": "Il semble y avoir une erreur lors du démarrage de l'enregistrement. Redémarrez votre navigateur et réessayez. Si le problème persiste, veuillez nous contacter à l'adresse support@screenity.io.",
     "description": "Description du modal d'erreur de flux"
+  },
+  "highestQuality": {
+    "message": "Meilleure qualité",
+    "description": "Étiquette pour basculer vers la meilleure qualité dans la fenêtre contextuelle"
+  },
+  "restoreRecording": {
+    "message": "Restaurer l'enregistrement précédent",
+    "description": "Bouton pour restaurer l'enregistrement précédent dans la fenêtre contextuelle"
   }
 }

@@ -779,5 +779,13 @@
   "streamErrorModalDescription": {
     "message": "Houve um erro ao iniciar a gravação. Reinicia o teu navegador e tenta novamente. Se o problema persistir, por favor, entra em contato conosco em support@screenity.io.",
     "description": "Descrição do modal de erro de transmissão"
+  },
+  "highestQuality": {
+    "message": "Qualidade mais alta",
+    "description": "Rótulo de alternar a qualidade mais alta no popup"
+  },
+  "restoreRecording": {
+    "message": "Restaurar a última gravação",
+    "description": "Botão para restaurar a última gravação no popup"
   }
 }

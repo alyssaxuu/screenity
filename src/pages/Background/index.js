@@ -1,5 +1,9 @@
 import saveToDrive from "./modules/saveToDrive";
 
+import Localbase from "localbase";
+
+const db = new Localbase("db");
+
 // Get current tab (requires activeTab permission)
 const getCurrentTab = async () => {
   const queryOptions = { active: true, lastFocusedWindow: true };
@@ -1125,7 +1129,61 @@ const isPinned = async (sendResponse) => {
 
 // Listen for messages
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  if (request.type === "check-capture-permissions") {
+  if (request.type === "restore-recording") {
+    // Make a video out of the db chunks, and download it
+    db.collection("chunks")
+      .get()
+      .then((chunks) => {
+        // Check if there's any chunks
+        if (chunks.empty || chunks.length === 0) {
+          return;
+        }
+
+        chrome.tabs.create(
+          {
+            url: "editor.html",
+            active: true,
+          },
+          async (tab) => {
+            // Wait for the tab to be loaded
+            await new Promise((resolve) => {
+              chrome.tabs.onUpdated.addListener(function listener(tabId, info) {
+                if (info.status === "complete" && tabId === tab.id) {
+                  // Send the blob to the tab
+                  chrome.tabs.sendMessage(
+                    tab.id,
+                    {
+                      type: "restore-recording",
+                      blob: chunks,
+                    },
+                    () => {
+                      // Remove the listener
+                      chrome.tabs.onUpdated.removeListener(listener);
+                      resolve();
+                    }
+                  );
+                  chrome.tabs.onUpdated.removeListener(listener);
+                  resolve();
+                }
+              });
+            });
+          }
+        );
+      });
+  } else if (request.type === "check-restore") {
+    // Check if there's any chunks
+    db.collection("chunks")
+      .get()
+      .then((chunks) => {
+        // Check if there's any chunks
+        if (chunks.empty || chunks.length === 0) {
+          sendResponse({ restore: false });
+          return;
+        }
+        sendResponse({ restore: true });
+      });
+    return true;
+  } else if (request.type === "check-capture-permissions") {
     chrome.permissions.contains(
       {
         permissions: ["desktopCapture", "alarms", "offscreen"],

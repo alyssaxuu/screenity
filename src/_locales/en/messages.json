@@ -778,5 +778,13 @@
   "streamErrorModalDescription": {
     "message": "Looks like there was an error starting the recording. Restart your browser and try again. If the issue persists, please contact us at support@screenity.io.",
     "description": "Stream error modal description"
+  },
+  "highestQuality": {
+    "message": "Highest quality",
+    "description": "Highest quality toggle label in popup"
+  },
+  "restoreRecording": {
+    "message": "Restore last recording",
+    "description": "Restore last recording button in popup"
   }
 }

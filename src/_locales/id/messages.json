@@ -778,5 +778,13 @@
   "streamErrorModalDescription": {
     "message": "Sepertinya ada kesalahan saat memulai perekaman. Restart browser Anda dan coba lagi. Jika masalah masih berlanjut, silakan hubungi kami di support@screenity.io.",
     "description": "Deskripsi modal kesalahan stream"
+  },
+  "highestQuality": {
+    "message": "Kualitas Tertinggi",
+    "description": "Label untuk mengganti kualitas tertinggi di popup"
+  },
+  "restoreRecording": {
+    "message": "Kembalikan Rekaman Terakhir",
+    "description": "Tombol untuk mengembalikan rekaman terakhir di popup"
   }
 }

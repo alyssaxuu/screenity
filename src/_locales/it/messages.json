@@ -779,5 +779,13 @@
   "streamErrorModalDescription": {
     "message": "Si è verificato un errore durante l'avvio della registrazione. Riavvia il tuo browser e riprova. Se il problema persiste, contattaci all'indirizzo support@screenity.io.",
     "description": "Descrizione del modalità di errore di streaming"
+  },
+  "highestQuality": {
+    "message": "Qualità più alta",
+    "description": "Etichetta per attivare la qualità più alta nella finestra popup"
+  },
+  "restoreRecording": {
+    "message": "Ripristina l'ultima registrazione",
+    "description": "Pulsante per ripristinare l'ultima registrazione nella finestra popup"
   }
 }

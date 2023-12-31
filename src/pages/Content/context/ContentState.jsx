@@ -570,6 +570,7 @@ const ContentState = (props) => {
     hideUI: false,
     bigTab: "record",
     askDismiss: true,
+    quality: "max",
   });
   contentStateRef.current = contentState;
 
@@ -1025,6 +1026,8 @@ const ContentState = (props) => {
         "askDismiss",
         "swatch",
         "color",
+        "strokeWidth",
+        "quality",
       ],
       (result) => {
         setContentState((prevContentState) => ({
@@ -1194,6 +1197,14 @@ const ContentState = (props) => {
             result.color !== undefined && result.color !== null
               ? result.color
               : prevContentState.color,
+          strokeWidth:
+            result.strokeWidth !== undefined && result.strokeWidth !== null
+              ? result.strokeWidth
+              : prevContentState.strokeWidth,
+          quality:
+            result.quality !== undefined && result.quality !== null
+              ? result.quality
+              : prevContentState.quality,
         }));
 
         if (

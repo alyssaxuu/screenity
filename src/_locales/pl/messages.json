@@ -778,5 +778,13 @@
   "streamErrorModalDescription": {
     "message": "Wygląda na to, że wystąpił błąd podczas rozpoczynania nagrywania. Uruchom przeglądarkę ponownie i spróbuj jeszcze raz. Jeśli problem będzie się utrzymywał, skontaktuj się z nami pod adresem support@screenity.io.",
     "description": "Opis okna modalnego błędu strumienia"
+  },
+  "highestQuality": {
+    "message": "Najwyższa jakość",
+    "description": "Etykieta przełącznika na najwyższą jakość w okienku"
+  },
+  "restoreRecording": {
+    "message": "Przywróć ostatnie nagranie",
+    "description": "Przycisk przywracania ostatniego nagrania w okienku"
   }
 }

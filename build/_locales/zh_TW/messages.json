@@ -778,5 +778,13 @@
   "streamErrorModalDescription": {
     "message": "看起來啟動錄製時出現了錯誤。請重新啟動您的瀏覽器並重試。如果問題仍然存在，請通過 support@screenity.io 與我們聯繫。",
     "description": "流錯誤模態框描述"
+  },
+  "highestQuality": {
+    "message": "最高品質",
+    "description": "在彈出視窗中切換到最高品質的標籤"
+  },
+  "restoreRecording": {
+    "message": "還原最近的錄音",
+    "description": "在彈出視窗中還原最近的錄音按鈕"
   }
 }

@@ -778,5 +778,13 @@
   "streamErrorModalDescription": {
     "message": "Kaydın başlatılmasında bir hata oluştu gibi görünüyor. Tarayıcınızı yeniden başlatın ve tekrar deneyin. Sorun devam ederse, lütfen support@screenity.io adresinden bize ulaşın.",
     "description": "Akış hatası modal açıklaması"
+  },
+  "highestQuality": {
+    "message": "En Yüksek Kalite",
+    "description": "Açılır penceredeki en yüksek kalite etiketi"
+  },
+  "restoreRecording": {
+    "message": "Son kaydı geri yükle",
+    "description": "Açılır penceredeki son kaydı geri yükle düğmesi"
   }
 }

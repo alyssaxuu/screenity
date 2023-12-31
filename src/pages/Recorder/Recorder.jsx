@@ -46,12 +46,13 @@ const Recorder = () => {
     isRestarting.current = false;
     index.current = 0;
 
-    // I don't know what the ideal chunk size should be here
-    recorder.current.start(3000, {
-      videoBitsPerSecond: 2000000,
-      mimeType: "video/webm; codecs=vp9",
-
-      // vp8, opus ?
+    chrome.storage.local.get(["quality"], (result) => {
+      // I don't know what the ideal chunk size should be here
+      recorder.current.start(3000, {
+        videoBitsPerSecond: result.quality === "max" ? 2000000 : 1000,
+        mimeType: "video/webm; codecs=vp9",
+        // vp8, opus ?
+      });
     });
 
     recorder.current.onstop = async (e) => {
@@ -76,8 +77,14 @@ const Recorder = () => {
       // Convert blob to base64
       const reader = new FileReader();
       reader.readAsDataURL(e.data);
+
       reader.onloadend = function () {
         const base64data = reader.result;
+        // Save to localbase
+        db.collection("chunks").add({
+          index: index.current,
+          chunk: base64data,
+        });
         chunkQueue.current.push(base64data);
 
         // If no message is currently being sent, start sending chunks from the queue
