@@ -95,8 +95,9 @@
     "message": "Afficher plus d'options",
     "description": "Étiquette Afficher plus d'options"
   },
+
   "systemAudioLabel": {
-    "message": "Inclure l'audio de l'onglet",
+    "message": "Inclure l'audio système",
     "description": "Étiquette de l'audio système/onglet"
   },
   "hideToolbarLabel": {
@@ -786,5 +787,29 @@
   "restoreRecording": {
     "message": "Restaurer l'enregistrement précédent",
     "description": "Bouton pour restaurer l'enregistrement précédent dans la fenêtre contextuelle"
+  },
+  "havingIssuesButton": {
+    "message": "Vous rencontrez des problèmes ?",
+    "description": "Bouton de signalement de problèmes dans l'éditeur"
+  },
+  "havingIssuesModalTitle": {
+    "message": "Vous ne pouvez pas voir votre enregistrement ?",
+    "description": "Titre de la fenêtre modale de signalement de problèmes dans l'éditeur"
+  },
+  "havingIssuesModalDescription": {
+    "message": "Si vous avez terminé votre enregistrement et que vous vous trouvez sur cette page sans voir votre vidéo, vous pouvez essayer de télécharger les données brutes de la vidéo si elles sont disponibles. Vous pouvez également nous contacter et soumettre un rapport de bug.",
+    "description": "Description de la fenêtre modale de signalement de problèmes dans l'éditeur"
+  },
+  "havingIssuesModalButton": {
+    "message": "Télécharger les données brutes de la vidéo",
+    "description": "Bouton de téléchargement dans la fenêtre modale de signalement de problèmes dans l'éditeur"
+  },
+  "havingIssuesModalButton2": {
+    "message": "Signaler un bug",
+    "description": "Deuxième bouton dans la fenêtre modale de signalement de problèmes dans l'éditeur"
+  },
+  "noRecordingFound": {
+    "message": "Aucun enregistrement trouvé, désolé :(",
+    "description": "Message d'alerte en cas d'absence d'enregistrement dans l'éditeur"
   }
 }

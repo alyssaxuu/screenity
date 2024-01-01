@@ -96,8 +96,8 @@
     "description": "Show more options label"
   },
   "systemAudioLabel": {
-    "message": "탭 오디오 포함",
-    "description": "Tab/system audio label"
+    "message": "시스템 오디오 포함",
+    "description": "탭/시스템 오디오 레이블"
   },
   "hideToolbarLabel": {
     "message": "툴바 숨기기",
@@ -786,5 +786,29 @@
   "restoreRecording": {
     "message": "최근 녹음 복원",
     "description": "팝업에서 최근 녹음 복원 버튼"
+  },
+  "havingIssuesButton": {
+    "message": "문제가 있나요?",
+    "description": "에디터 내 문제 버튼"
+  },
+  "havingIssuesModalTitle": {
+    "message": "녹화물이 보이지 않나요?",
+    "description": "에디터 내 문제 모달 제목"
+  },
+  "havingIssuesModalDescription": {
+    "message": "녹화를 완료하고 비디오를 보지 못한 채 이 페이지에 남아 있다면, 사용 가능한 경우 원시 비디오 데이터를 다운로드하거나 버그 보고서를 제출할 수 있습니다.",
+    "description": "에디터 내 문제 모달 설명"
+  },
+  "havingIssuesModalButton": {
+    "message": "원시 비디오 데이터 다운로드",
+    "description": "에디터 내 문제 모달 버튼"
+  },
+  "havingIssuesModalButton2": {
+    "message": "버그 신고",
+    "description": "에디터 내 문제 모달 두 번째 버튼"
+  },
+  "noRecordingFound": {
+    "message": "녹화된 것을 찾을 수 없습니다, 죄송합니다 :(",
+    "description": "에디터 내 녹화된 것을 찾을 수 없음 경고"
   }
 }

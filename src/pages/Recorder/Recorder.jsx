@@ -71,6 +71,13 @@ const Recorder = () => {
           isSending.current = false;
         }
       }, 1000);
+
+      setTimeout(() => {
+        isFinished.current = true;
+        chrome.runtime.sendMessage({ type: "video-ready" });
+        chunkQueue.current = [];
+        isSending.current = false;
+      }, 5000);
     };
 
     recorder.current.ondataavailable = async (e) => {

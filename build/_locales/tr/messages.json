@@ -96,8 +96,8 @@
     "description": "Daha fazla seçenekler etiketi"
   },
   "systemAudioLabel": {
-    "message": "Sesleri dahil et",
-    "description": "Sistem/ses sekmesi etiketi"
+    "message": "Sistem sesini dahil et",
+    "description": "Sistem sesi etiketi/sekmeleri"
   },
   "hideToolbarLabel": {
     "message": "Araç çubuğunu gizle",
@@ -786,5 +786,29 @@
   "restoreRecording": {
     "message": "Son kaydı geri yükle",
     "description": "Açılır penceredeki son kaydı geri yükle düğmesi"
+  },
+  "havingIssuesButton": {
+    "message": "Sorun mu yaşıyorsunuz?",
+    "description": "Editörde sorunlar düğmesi"
+  },
+  "havingIssuesModalTitle": {
+    "message": "Kaydınızı göremiyor musunuz?",
+    "description": "Editörde sorunlar modal başlığı"
+  },
+  "havingIssuesModalDescription": {
+    "message": "Kaydınızı tamamladınız ve videonuzu görmeyen bir sayfadaysanız, mevcutsa ham video verilerini indirmeyi deneyebilirsiniz. Ayrıca bize ulaşabilir ve bir hata raporu gönderebilirsiniz.",
+    "description": "Editörde sorunlar modal açıklaması"
+  },
+  "havingIssuesModalButton": {
+    "message": "Ham video verilerini indir",
+    "description": "Editörde sorunlar modal düğmesi"
+  },
+  "havingIssuesModalButton2": {
+    "message": "Hata Bildir",
+    "description": "Editörde sorunlar modal düğme 2"
+  },
+  "noRecordingFound": {
+    "message": "Kayıt bulunamadı, üzgünüz :(",
+    "description": "Editörde kayıt bulunamadı uyarısı"
   }
 }

@@ -571,6 +571,7 @@ const ContentState = (props) => {
     bigTab: "record",
     askDismiss: true,
     quality: "max",
+    systemAudio: true,
   });
   contentStateRef.current = contentState;
 
@@ -1028,6 +1029,7 @@ const ContentState = (props) => {
         "color",
         "strokeWidth",
         "quality",
+        "systemAudio",
       ],
       (result) => {
         setContentState((prevContentState) => ({
@@ -1205,6 +1207,10 @@ const ContentState = (props) => {
             result.quality !== undefined && result.quality !== null
               ? result.quality
               : prevContentState.quality,
+          systemAudio:
+            result.systemAudio !== undefined && result.systemAudio !== null
+              ? result.systemAudio
+              : prevContentState.systemAudio,
         }));
 
         if (

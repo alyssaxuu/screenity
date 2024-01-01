@@ -95,9 +95,10 @@
     "message": "Mostrar más opciones",
     "description": "Etiqueta de mostrar más opciones"
   },
+
   "systemAudioLabel": {
-    "message": "Incluir el audio de la pestaña",
-    "description": "Etiqueta de audio del sistema/pestaña"
+    "message": "Incluir audio del sistema",
+    "description": "Etiqueta de audio del sistema/tabulador"
   },
   "hideToolbarLabel": {
     "message": "Ocultar barra de herramientas",
@@ -787,5 +788,29 @@
   "restoreRecording": {
     "message": "Restablecer última grabación",
     "description": "Botón para restaurar la última grabación en el popup"
+  },
+  "havingIssuesButton": {
+    "message": "¿Tienes problemas?",
+    "description": "Botón de problemas en el editor"
+  },
+  "havingIssuesModalTitle": {
+    "message": "¿No puedes ver tu grabación?",
+    "description": "Título del modal de problemas en el editor"
+  },
+  "havingIssuesModalDescription": {
+    "message": "Si has completado tu grabación y te encuentras en esta página sin ver tu video, puedes intentar descargar los datos de video sin procesar si están disponibles. También puedes ponerte en contacto y enviar un informe de error.",
+    "description": "Descripción del modal de problemas en el editor"
+  },
+  "havingIssuesModalButton": {
+    "message": "Descargar datos de video sin procesar",
+    "description": "Botón del modal de problemas en el editor"
+  },
+  "havingIssuesModalButton2": {
+    "message": "Informar un error",
+    "description": "Segundo botón del modal de problemas en el editor"
+  },
+  "noRecordingFound": {
+    "message": "No se encontró ninguna grabación, lo siento :(",
+    "description": "Alerta de no se encontró ninguna grabación en el editor"
   }
 }

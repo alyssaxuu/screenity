@@ -95,9 +95,10 @@
     "message": "Tampilkan opsi lebih lanjut",
     "description": "Label tampilkan opsi lebih lanjut"
   },
+
   "systemAudioLabel": {
-    "message": "Sertakan audio tab",
-    "description": "Label tab/audio sistem"
+    "message": "Sertakan audio sistem",
+    "description": "Label audio sistem/tab"
   },
   "hideToolbarLabel": {
     "message": "Sembunyikan toolbar",
@@ -786,5 +787,29 @@
   "restoreRecording": {
     "message": "Kembalikan Rekaman Terakhir",
     "description": "Tombol untuk mengembalikan rekaman terakhir di popup"
+  },
+  "havingIssuesButton": {
+    "message": "Mengalami masalah?",
+    "description": "Tombol masalah di editor"
+  },
+  "havingIssuesModalTitle": {
+    "message": "Tidak dapat melihat rekaman Anda?",
+    "description": "Judul modal masalah di editor"
+  },
+  "havingIssuesModalDescription": {
+    "message": "Jika Anda telah menyelesaikan rekaman Anda dan mendapati diri Anda berada di halaman ini tanpa melihat video Anda, Anda dapat mencoba mengunduh data video mentah jika tersedia. Anda juga dapat menghubungi kami dan mengirimkan laporan bug.",
+    "description": "Deskripsi modal masalah di editor"
+  },
+  "havingIssuesModalButton": {
+    "message": "Unduh data video mentah",
+    "description": "Tombol modal masalah di editor"
+  },
+  "havingIssuesModalButton2": {
+    "message": "Laporkan bug",
+    "description": "Tombol kedua dalam modal masalah di editor"
+  },
+  "noRecordingFound": {
+    "message": "Tidak ada rekaman yang ditemukan, maaf :(",
+    "description": "Peringatan tidak ada rekaman ditemukan di editor"
   }
 }

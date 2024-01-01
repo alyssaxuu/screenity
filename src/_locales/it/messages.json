@@ -95,9 +95,10 @@
     "message": "Mostra più opzioni",
     "description": "Etichetta per mostrare più opzioni"
   },
+
   "systemAudioLabel": {
-    "message": "Includi l'audio del sistema/scheda",
-    "description": "Etichetta dell'audio di sistema/scheda"
+    "message": "Includi l'audio di sistema",
+    "description": "Etichetta audio di sistema/etichetta tab"
   },
   "hideToolbarLabel": {
     "message": "Nascondi la barra degli strumenti",
@@ -787,5 +788,29 @@
   "restoreRecording": {
     "message": "Ripristina l'ultima registrazione",
     "description": "Pulsante per ripristinare l'ultima registrazione nella finestra popup"
+  },
+  "havingIssuesButton": {
+    "message": "Riscontri problemi?",
+    "description": "Pulsante dei problemi nell'editor"
+  },
+  "havingIssuesModalTitle": {
+    "message": "Non riesci a vedere la tua registrazione?",
+    "description": "Titolo del modal dei problemi nell'editor"
+  },
+  "havingIssuesModalDescription": {
+    "message": "Se hai completato la tua registrazione e ti trovi su questa pagina senza vedere il tuo video, puoi tentare di scaricare i dati video grezzi se sono disponibili. Puoi anche metterti in contatto e inviare una segnalazione di errore.",
+    "description": "Descrizione del modal dei problemi nell'editor"
+  },
+  "havingIssuesModalButton": {
+    "message": "Scarica dati video grezzi",
+    "description": "Pulsante nel modal dei problemi nell'editor"
+  },
+  "havingIssuesModalButton2": {
+    "message": "Segnala un errore",
+    "description": "Secondo pulsante nel modal dei problemi nell'editor"
+  },
+  "noRecordingFound": {
+    "message": "Nessuna registrazione trovata, mi dispiace :(",
+    "description": "Avviso di nessuna registrazione trovata nell'editor"
   }
 }

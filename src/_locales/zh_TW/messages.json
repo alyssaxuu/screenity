@@ -95,9 +95,10 @@
     "message": "显示更多选项",
     "description": "Show more options label"
   },
+
   "systemAudioLabel": {
-    "message": "包括标签音频",
-    "description": "Tab/system audio label"
+    "message": "包括系統音訊",
+    "description": "標籤/系統音訊標籤"
   },
   "hideToolbarLabel": {
     "message": "隐藏工具栏",
@@ -786,5 +787,29 @@
   "restoreRecording": {
     "message": "還原最近的錄音",
     "description": "在彈出視窗中還原最近的錄音按鈕"
+  },
+  "havingIssuesButton": {
+    "message": "遇到問題了嗎？",
+    "description": "編輯器中的問題按鈕"
+  },
+  "havingIssuesModalTitle": {
+    "message": "無法查看您的錄影？",
+    "description": "編輯器中的問題模式對話框標題"
+  },
+  "havingIssuesModalDescription": {
+    "message": "如果您已經完成錄製並發現自己在此頁面上看不到您的視頻，您可以嘗試下載原始視頻數據（如果可用）。您還可以聯繫我們並提交錯誤報告。",
+    "description": "編輯器中的問題模式對話框描述"
+  },
+  "havingIssuesModalButton": {
+    "message": "下載原始視頻數據",
+    "description": "編輯器中的問題模式對話框按鈕"
+  },
+  "havingIssuesModalButton2": {
+    "message": "報告問題",
+    "description": "編輯器中的問題模式對話框第二個按鈕"
+  },
+  "noRecordingFound": {
+    "message": "未找到錄製，抱歉 :(",
+    "description": "編輯器中的未找到錄製警告"
   }
 }

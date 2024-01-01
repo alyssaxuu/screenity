@@ -95,9 +95,10 @@
     "message": "Pokaż więcej opcji",
     "description": "Etykieta przycisku Pokaż więcej opcji"
   },
+
   "systemAudioLabel": {
-    "message": "Uwzględnij dźwięk systemu",
-    "description": "Etykieta dźwięku systemowego/tablicy"
+    "message": "Uwzględnij dźwięk systemowy",
+    "description": "Etykieta dźwięku systemowego/karta"
   },
   "hideToolbarLabel": {
     "message": "Ukryj pasek narzędzi",
@@ -786,5 +787,29 @@
   "restoreRecording": {
     "message": "Przywróć ostatnie nagranie",
     "description": "Przycisk przywracania ostatniego nagrania w okienku"
+  },
+  "havingIssuesButton": {
+    "message": "Masz problemy?",
+    "description": "Przycisk problemów w edytorze"
+  },
+  "havingIssuesModalTitle": {
+    "message": "Nie widzisz swojego nagrania?",
+    "description": "Tytuł okna modalnego problemów w edytorze"
+  },
+  "havingIssuesModalDescription": {
+    "message": "Jeśli ukończyłeś nagrywanie i znajdujesz się na tej stronie, nie widząc swojego filmu, możesz spróbować pobrać surowe dane wideo, jeśli są dostępne. Możesz również skontaktować się z nami i zgłosić błąd.",
+    "description": "Opis okna modalnego problemów w edytorze"
+  },
+  "havingIssuesModalButton": {
+    "message": "Pobierz surowe dane wideo",
+    "description": "Przycisk w oknie modalnym problemów w edytorze"
+  },
+  "havingIssuesModalButton2": {
+    "message": "Zgłoś błąd",
+    "description": "Drugi przycisk w oknie modalnym problemów w edytorze"
+  },
+  "noRecordingFound": {
+    "message": "Nie znaleziono nagrania, przepraszamy :(",
+    "description": "Komunikat o braku nagrania w edytorze"
   }
 }

@@ -96,8 +96,8 @@
     "description": "Label für die Schaltfläche 'Weitere Optionen anzeigen'"
   },
   "systemAudioLabel": {
-    "message": "Tab/Audiosystem einschließen",
-    "description": "Label für die Schaltfläche 'Tab/Audiosystem einschließen'"
+    "message": "Systemaudio einschließen",
+    "description": "Tab/Systemaudio-Beschriftung"
   },
   "hideToolbarLabel": {
     "message": "Symbolleiste ausblenden",
@@ -786,5 +786,29 @@
   "restoreRecording": {
     "message": "Letzte Aufnahme wiederherstellen",
     "description": "Schaltfläche zum Wiederherstellen der letzten Aufnahme im Popup-Fenster"
+  },
+  "havingIssuesButton": {
+    "message": "Haben Sie Probleme?",
+    "description": "Schaltfläche 'Probleme' im Editor"
+  },
+  "havingIssuesModalTitle": {
+    "message": "Können Sie Ihre Aufnahme nicht sehen?",
+    "description": "Titel des Modalfensters 'Probleme' im Editor"
+  },
+  "havingIssuesModalDescription": {
+    "message": "Wenn Sie Ihre Aufnahme abgeschlossen haben und sich auf dieser Seite befinden, ohne Ihr Video zu sehen, können Sie versuchen, die Rohvideodaten herunterzuladen, sofern verfügbar. Sie können auch Kontakt aufnehmen und einen Fehlerbericht senden.",
+    "description": "Beschreibung des Modalfensters 'Probleme' im Editor"
+  },
+  "havingIssuesModalButton": {
+    "message": "Rohvideodaten herunterladen",
+    "description": "Schaltfläche im Modalfenster 'Probleme' im Editor"
+  },
+  "havingIssuesModalButton2": {
+    "message": "Fehler melden",
+    "description": "Zweite Schaltfläche im Modalfenster 'Probleme' im Editor"
+  },
+  "noRecordingFound": {
+    "message": "Keine Aufzeichnung gefunden, tut uns leid :(",
+    "description": "Meldung 'Keine Aufzeichnung gefunden' im Editor"
   }
 }

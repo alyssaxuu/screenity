@@ -96,7 +96,7 @@
     "description": "Show more options label"
   },
   "systemAudioLabel": {
-    "message": "Include tab audio",
+    "message": "Include system audio",
     "description": "Tab/system audio label"
   },
   "hideToolbarLabel": {
@@ -786,5 +786,29 @@
   "restoreRecording": {
     "message": "Restore last recording",
     "description": "Restore last recording button in popup"
+  },
+  "havingIssuesButton": {
+    "message": "Having issues?",
+    "description": "Having issues button in editor"
+  },
+  "havingIssuesModalTitle": {
+    "message": "Can't see your recording?",
+    "description": "Having issues modal title in editor"
+  },
+  "havingIssuesModalDescription": {
+    "message": "If you've completed your recording and find yourself on this page without seeing your video, you can attempt to download the raw video data if it's available. You can also reach out and submit a bug report.",
+    "description": "Having issues modal description in editor"
+  },
+  "havingIssuesModalButton": {
+    "message": "Download raw video data",
+    "description": "Having issues modal button in editor"
+  },
+  "havingIssuesModalButton2": {
+    "message": "Report bug",
+    "description": "Having issues modal button 2 in editor"
+  },
+  "noRecordingFound": {
+    "message": "No recording found, sorry :(",
+    "description": "No recording found alert in editor"
   }
 }

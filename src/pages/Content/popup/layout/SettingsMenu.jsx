@@ -60,6 +60,27 @@ const SettingsMenu = (props) => {
               <img src={CheckWhiteIcon} />
             </DropdownMenu.ItemIndicator>
           </DropdownMenu.CheckboxItem>
+          <DropdownMenu.CheckboxItem
+            className="DropdownMenuItem"
+            onSelect={(e) => {
+              e.preventDefault();
+            }}
+            onCheckedChange={(checked) => {
+              setContentState((prevContentState) => ({
+                ...prevContentState,
+                systemAudio: checked,
+              }));
+              chrome.storage.local.set({
+                systemAudio: checked,
+              });
+            }}
+            checked={contentState.systemAudio}
+          >
+            {chrome.i18n.getMessage("systemAudioLabel")}
+            <DropdownMenu.ItemIndicator className="ItemIndicator">
+              <img src={CheckWhiteIcon} />
+            </DropdownMenu.ItemIndicator>
+          </DropdownMenu.CheckboxItem>
           <DropdownMenu.Item
             className="DropdownMenuItem"
             onSelect={(e) => {

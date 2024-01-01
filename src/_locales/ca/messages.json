@@ -95,9 +95,10 @@
     "message": "Mostra més opcions",
     "description": "Etiqueta de 'Mostra més opcions' en el pop-up"
   },
+
   "systemAudioLabel": {
-    "message": "Inclou l'àudio de la pestanya",
-    "description": "Etiqueta de l'àudio de la pestanya/sistema"
+    "message": "Inclou l'àudio del sistema",
+    "description": "Etiqueta de l'àudio del sistema/pestanya"
   },
   "hideToolbarLabel": {
     "message": "Amaga la barra d'eines",
@@ -787,5 +788,29 @@
   "restoreRecording": {
     "message": "Restaurar l'última gravació",
     "description": "Botó per restaurar l'última gravació al quadre emergent"
+  },
+  "havingIssuesButton": {
+    "message": "Tens problemes?",
+    "description": "Botó de problemes a l'editor"
+  },
+  "havingIssuesModalTitle": {
+    "message": "No pots veure la teva gravació?",
+    "description": "Títol del modal de problemes a l'editor"
+  },
+  "havingIssuesModalDescription": {
+    "message": "Si has completat la teva gravació i et trobes en aquesta pàgina sense veure el teu vídeo, pots intentar descarregar les dades de vídeo en brut si estan disponibles. També pots posar-te en contacte i enviar un informe d'error.",
+    "description": "Descripció del modal de problemes a l'editor"
+  },
+  "havingIssuesModalButton": {
+    "message": "Descarregar dades de vídeo en brut",
+    "description": "Botó del modal de problemes a l'editor"
+  },
+  "havingIssuesModalButton2": {
+    "message": "Informar d'un error",
+    "description": "Segon botó del modal de problemes a l'editor"
+  },
+  "noRecordingFound": {
+    "message": "No s'ha trobat cap gravació, ho sento :(",
+    "description": "Alerta de no s'ha trobat cap gravació a l'editor"
   }
 }

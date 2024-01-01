@@ -1119,6 +1119,11 @@ const handleMessage = async (request, sender, sendResponse) => {
       url: "https://screenity.io/",
       active: true,
     });
+  } else if (request.type === "report-bug") {
+    chrome.tabs.create({
+      url: "https://tally.so/r/3ElpXq",
+      active: true,
+    });
   }
 };
 
@@ -1177,10 +1182,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       .then((chunks) => {
         // Check if there's any chunks
         if (chunks.empty || chunks.length === 0) {
-          sendResponse({ restore: false });
+          sendResponse({ restore: false, chunks: [] });
           return;
         }
-        sendResponse({ restore: true });
+        sendResponse({ restore: true, chunks: chunks });
       });
     return true;
   } else if (request.type === "check-capture-permissions") {

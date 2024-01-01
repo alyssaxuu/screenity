@@ -63,6 +63,7 @@ const ContentState = (props) => {
     hasBeenEdited: false,
     dragInteracted: false,
     noffmpeg: false,
+    openModal: null,
   };
 
   const [contentState, setContentState] = useState(defaultState);
@@ -245,7 +246,6 @@ const ContentState = (props) => {
       // Restore recording
       const chunks = message.blob;
       chunks.forEach((chunk) => {
-        console.log(chunk);
         const chunkData = base64ToUint8Array(chunk.chunk);
         videoChunks.current.push(chunkData);
       });

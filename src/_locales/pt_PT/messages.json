@@ -95,9 +95,10 @@
     "message": "Mostrar mais opções",
     "description": "Etiqueta de mostrar mais opções"
   },
+
   "systemAudioLabel": {
-    "message": "Incluir áudio da página",
-    "description": "Etiqueta de áudio da página/sistema"
+    "message": "Incluir áudio do sistema",
+    "description": "Etiqueta de áudio do sistema/guia"
   },
   "hideToolbarLabel": {
     "message": "Ocultar barra de ferramentas",
@@ -787,5 +788,29 @@
   "restoreRecording": {
     "message": "Restaurar a última gravação",
     "description": "Botão para restaurar a última gravação no popup"
+  },
+  "havingIssuesButton": {
+    "message": "A ter problemas?",
+    "description": "Botão de problemas no editor"
+  },
+  "havingIssuesModalTitle": {
+    "message": "Não consegue ver a sua gravação?",
+    "description": "Título do modal de problemas no editor"
+  },
+  "havingIssuesModalDescription": {
+    "message": "Se completou a sua gravação e se encontra nesta página sem conseguir ver o seu vídeo, pode tentar descarregar os dados brutos do vídeo, se estiverem disponíveis. Também pode entrar em contacto e enviar um relatório de erro.",
+    "description": "Descrição do modal de problemas no editor"
+  },
+  "havingIssuesModalButton": {
+    "message": "Descarregar dados brutos do vídeo",
+    "description": "Botão do modal de problemas no editor"
+  },
+  "havingIssuesModalButton2": {
+    "message": "Reportar erro",
+    "description": "Segundo botão do modal de problemas no editor"
+  },
+  "noRecordingFound": {
+    "message": "Não foi encontrada nenhuma gravação, lamento :(",
+    "description": "Alerta de não foi encontrada nenhuma gravação no editor"
   }
 }

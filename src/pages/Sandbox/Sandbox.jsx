@@ -1,10 +1,15 @@
 import "./styles/edit/_VideoPlayer.scss";
-import "./styles/globals/_app.scss";
+import "./styles/global/_app.scss";
 
 import React, { useState, useEffect, useRef, useContext } from "react";
 // Layout
 import Editor from "./layout/editor/Editor";
 import Player from "./layout/player/Player";
+import Modal from "./components/global/Modal";
+
+import fixWebmDuration from "fix-webm-duration";
+
+import HelpButton from "./components/player/HelpButton";
 
 // Context
 import { ContentStateContext } from "./context/ContentState"; // Import the ContentState context
@@ -28,6 +33,19 @@ const Sandbox = () => {
 
     return raw ? parseInt(raw[2], 10) : false;
   };
+
+  /*
+	 useEffect(() => {
+    if (!contentState) return;
+    if (typeof contentState.openModal === "function") {
+      setContentState((prevContentState) => ({
+        ...prevContentState,
+        tryRestartRecording: tryRestartRecording,
+        tryDismissRecording: tryDismissRecording,
+      }));
+    }
+  }, [contentState.openModal]);
+	*/
 
   useEffect(() => {
     const MIN_CHROME_VERSION = 110;
@@ -94,8 +112,32 @@ const Sandbox = () => {
     };
   }, [parentRef.current]);
 
+  const base64ToUint8Array = (base64) => {
+    const dataUrlRegex = /^data:(.*?);base64,/;
+    const matches = base64.match(dataUrlRegex);
+    if (matches !== null) {
+      // Base64 is a data URL
+      const mimeType = matches[1];
+      const binaryString = atob(base64.slice(matches[0].length));
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      return new Blob([bytes], { type: mimeType });
+    } else {
+      // Base64 is a regular string
+      const binaryString = atob(base64);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      return bytes;
+    }
+  };
+
   return (
     <div ref={parentRef}>
+      <Modal />
       <video></video>
       {/* Render the WaveformGenerator component and pass the ffmpeg instance as a prop */}
       {contentState.ffmpeg &&
@@ -113,7 +155,83 @@ const Sandbox = () => {
             <div className="subtitle">
               {chrome.i18n.getMessage("sandboxProgressDescription")}
             </div>
+            {typeof contentState.openModal === "function" && (
+              <div
+                className="button-stop"
+                onClick={() => {
+                  contentState.openModal(
+                    chrome.i18n.getMessage("havingIssuesModalTitle"),
+                    chrome.i18n.getMessage("havingIssuesModalDescription"),
+                    chrome.i18n.getMessage("havingIssuesModalButton"),
+                    chrome.i18n.getMessage("havingIssuesModalButton2"),
+                    () => {
+                      chrome.runtime.sendMessage(
+                        { type: "check-restore" },
+                        (response) => {
+                          if (response.restore) {
+                            // Make a video out of the db chunks, and download it
+                            const chunks = response.chunks;
+                            // Check if there's any chunks
+                            if (chunks.empty || chunks.length === 0) {
+                              return;
+                            }
+
+                            let videoChunks = [];
+
+                            chunks.forEach((chunk) => {
+                              videoChunks.push(base64ToUint8Array(chunk.chunk));
+                            });
+
+                            const blob = new Blob(videoChunks, {
+                              type: "video/webm; codecs=vp9",
+                            });
+
+                            chrome.storage.local
+                              .get("recordingDuration")
+                              .then(({ recordingDuration }) => {
+                                try {
+                                  fixWebmDuration(
+                                    blob,
+                                    recordingDuration,
+                                    async (fixedWebm) => {
+                                      const url =
+                                        URL.createObjectURL(fixedWebm);
+                                      const title =
+                                        "Screenity Recovered Recording.webm";
+                                      chrome.downloads.download({
+                                        url: url,
+                                        filename: title,
+                                      });
+                                    },
+                                    { logger: false }
+                                  );
+                                } catch (e) {
+                                  const url = URL.createObjectURL(blob);
+                                  const title =
+                                    "Screenity Recovered Recording.webm";
+                                  chrome.downloads.download({
+                                    url: url,
+                                    filename: title,
+                                  });
+                                }
+                              });
+                          } else {
+                            alert(chrome.i18n.getMessage("noRecordingFound"));
+                          }
+                        }
+                      );
+                    },
+                    () => {
+                      chrome.runtime.sendMessage({ type: "report-bug" });
+                    }
+                  );
+                }}
+              >
+                {chrome.i18n.getMessage("havingIssuesButton")}
+              </div>
+            )}
           </div>
+          <HelpButton />
           <div className="setupBackgroundSVG"></div>
         </div>
       )}
@@ -132,6 +250,20 @@ const Sandbox = () => {
 					background: url(/assets/helper/pattern-svg.svg) repeat;
 					background-size: 62px 23.5px;
 					animation: moveBackground 138s linear infinite;
+				}
+				.button-stop {
+					padding: 10px 20px;
+					background: #FFF;
+					border-radius: 30px;
+					color: #29292F;
+					font-size: 14px;
+					font-weight: 500;
+					cursor: pointer;
+					margin-top: 0px;
+					border: 1px solid #E8E8E8;
+					margin-left: auto;
+					margin-right: auto;
+					z-index: 999999;
 				}
 				
 				@keyframes moveBackground {
