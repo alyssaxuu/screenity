@@ -17,7 +17,6 @@ import toGIF from "./utils/toGIF";
 
 const Sandbox = () => {
   const iframeRef = useRef(null);
-  const scriptLoaded = useRef(false);
   const triggerLoad = useRef(false);
   const ffmpegInstance = useRef(null);
 
@@ -26,43 +25,8 @@ const Sandbox = () => {
   };
 
   const loadFfmpeg = async () => {
-    if (!scriptLoaded.current) return;
-    if (!triggerLoad.current) return;
-    if (ffmpegInstance.current) return;
-
-    try {
-      const { createFFmpeg } = FFmpeg;
-      // Initialize ffmpeg.js
-      ffmpegInstance.current = createFFmpeg({
-        log: false,
-        progress: (params) => {},
-        corePath: "assets/vendor/ffmpeg-core.js",
-      });
-      await ffmpegInstance.current.load();
-      sendMessage({ type: "ffmpeg-loaded" });
-    } catch (error) {
-      sendMessage({ type: "ffmpeg-load-error", error: JSON.stringify(error) });
-    }
+    sendMessage({ type: "ffmpeg-load-error" });
   };
-
-  useEffect(() => {
-    const script = document.createElement("script");
-
-    script.src = "assets/vendor/ffmpeg.min.js";
-    script.async = true;
-
-    // On load, set scriptLoaded to true
-    script.onload = () => {
-      scriptLoaded.current = true;
-      loadFfmpeg();
-    };
-
-    document.body.appendChild(script);
-
-    return () => {
-      document.body.removeChild(script);
-    };
-  }, []);
 
   const toBase64 = (blob) => {
     return new Promise((resolve, reject) => {

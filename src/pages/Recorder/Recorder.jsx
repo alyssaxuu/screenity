@@ -37,7 +37,15 @@ const Recorder = () => {
   async function startRecording() {
     // Clear chunks collection
     db.collection("chunks").delete();
-    recorder.current = new MediaRecorder(liveStream.current);
+    try {
+      recorder.current = new MediaRecorder(liveStream.current);
+    } catch (err) {
+      chrome.runtime.sendMessage({
+        type: "recording-error",
+        error: "stream-error",
+        why: JSON.stringify(err),
+      });
+    }
 
     isFinished.current = false;
     isLastChunk.current = false;
@@ -46,14 +54,22 @@ const Recorder = () => {
     isRestarting.current = false;
     index.current = 0;
 
-    chrome.storage.local.get(["quality"], (result) => {
-      // I don't know what the ideal chunk size should be here
-      recorder.current.start(3000, {
-        videoBitsPerSecond: result.quality === "max" ? 2000000 : 1000,
-        mimeType: "video/webm; codecs=vp9",
-        // vp8, opus ?
+    try {
+      chrome.storage.local.get(["quality"], (result) => {
+        // I don't know what the ideal chunk size should be here
+        recorder.current.start(3000, {
+          videoBitsPerSecond: result.quality === "max" ? 2000000 : 1000,
+          mimeType: "video/webm; codecs=vp9",
+          // vp8, opus ?
+        });
       });
-    });
+    } catch (err) {
+      chrome.runtime.sendMessage({
+        type: "recording-error",
+        error: "stream-error",
+        why: JSON.stringify(err),
+      });
+    }
 
     recorder.current.onstop = async (e) => {
       if (isRestarting.current) return;
@@ -191,7 +207,20 @@ const Recorder = () => {
         return stream;
       })
       .catch((err) => {
-        return null;
+        // Try again without the device ID
+        const audioStreamOptions = {
+          mimeType: "video/webm;codecs=vp8,opus",
+          audio: true,
+        };
+
+        return navigator.mediaDevices
+          .getUserMedia(audioStreamOptions)
+          .then((stream) => {
+            return stream;
+          })
+          .catch((err) => {
+            return null;
+          });
       });
 
     return result;

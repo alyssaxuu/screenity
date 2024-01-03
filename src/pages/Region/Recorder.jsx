@@ -73,7 +73,15 @@ const Recorder = () => {
   async function startRecording() {
     // Clear chunks collection
     db.collection("chunks").delete();
-    recorder.current = new MediaRecorder(liveStream.current);
+    try {
+      recorder.current = new MediaRecorder(liveStream.current);
+    } catch (err) {
+      chrome.runtime.sendMessage({
+        type: "recording-error",
+        error: "stream-error",
+        why: JSON.stringify(err),
+      });
+    }
 
     isFinished.current = false;
     isLastChunk.current = false;
@@ -84,14 +92,22 @@ const Recorder = () => {
     recordingRef.current = true;
 
     // I don't know what the ideal chunk size should be here
-    chrome.storage.local.get(["quality"], (result) => {
-      recorder.current.start(3000, {
-        videoBitsPerSecond: result.quality === "max" ? 2000000 : 1000,
-        mimeType: "video/webm; codecs=vp9",
+    try {
+      chrome.storage.local.get(["quality"], (result) => {
+        recorder.current.start(3000, {
+          videoBitsPerSecond: result.quality === "max" ? 2000000 : 1000,
+          mimeType: "video/webm; codecs=vp9",
 
-        // vp8, opus ?
+          // vp8, opus ?
+        });
       });
-    });
+    } catch (err) {
+      chrome.runtime.sendMessage({
+        type: "recording-error",
+        error: "stream-error",
+        why: JSON.stringify(err),
+      });
+    }
 
     recorder.current.onstop = async (e) => {
       recordingRef.current = false;
@@ -398,7 +414,9 @@ const Recorder = () => {
       }
     }
     if (request.type === "streaming-data") {
-      startStreaming(JSON.parse(request.data));
+      if (regionRef.current) {
+        startStreaming(JSON.parse(request.data));
+      }
     } else if (request.type === "start-recording-tab") {
       //chrome.storage.local.get(["customRegion"], (result) => {
       //if (result.customRegion) {

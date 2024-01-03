@@ -562,10 +562,47 @@ const ContentState = (props) => {
     const title =
       contentStateRef.current.title.replace(/[:?~<>|*]/g, " ") + ext;
 
-    chrome.downloads.download({
-      url: url,
-      filename: title,
-    });
+    // Check if user is on Brave browser
+    if ((navigator.brave && (await navigator.brave.isBrave())) || false) {
+      // Convert URL to base64
+      const response = await fetch(url);
+      const blob = await response.blob();
+      const reader = new FileReader();
+      reader.readAsDataURL(blob);
+      reader.onloadend = function () {
+        chrome.runtime.sendMessage({
+          type: "request-download",
+          base64: reader.result,
+          title: title,
+        });
+      };
+    } else {
+      chrome.downloads.download({
+        url: url,
+        filename: title,
+      });
+
+      // Check if download failed
+      chrome.downloads.onChanged.addListener(async (downloadDelta) => {
+        if (
+          downloadDelta.state &&
+          downloadDelta.state.current === "interrupted"
+        ) {
+          // Convert URL to base64
+          const response = await fetch(url);
+          const blob = await response.blob();
+          const reader = new FileReader();
+          reader.readAsDataURL(blob);
+          reader.onloadend = function () {
+            chrome.runtime.sendMessage({
+              type: "request-download",
+              base64: reader.result,
+              title: title,
+            });
+          };
+        }
+      });
+    }
   };
 
   const download = async () => {

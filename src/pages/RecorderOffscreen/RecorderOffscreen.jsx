@@ -32,11 +32,20 @@ const RecorderOffscreen = () => {
 
   const isTab = useRef(false);
   const tabID = useRef(null);
+  const quality = useRef("max");
 
   async function startRecording() {
     // Clear chunks collection
     db.collection("chunks").delete();
-    recorder.current = new MediaRecorder(liveStream.current);
+    try {
+      recorder.current = new MediaRecorder(liveStream.current);
+    } catch (err) {
+      chrome.runtime.sendMessage({
+        type: "recording-error",
+        error: "stream-error",
+        why: JSON.stringify(err),
+      });
+    }
 
     isFinished.current = false;
     isLastChunk.current = false;
@@ -46,14 +55,20 @@ const RecorderOffscreen = () => {
     index.current = 0;
 
     // I don't know what the ideal chunk size should be here
-    chrome.storage.local.get(["quality"], (result) => {
+    try {
       recorder.current.start(1000, {
-        videoBitsPerSecond: result.quality === "max" ? 2000000 : 1000,
+        videoBitsPerSecond: quality.current === "max" ? 2000000 : 1000,
         mimeType: "video/webm; codecs=vp9",
 
         // vp8, opus ?
       });
-    });
+    } catch (err) {
+      chrome.runtime.sendMessage({
+        type: "recording-error",
+        error: "stream-error",
+        why: JSON.stringify(err),
+      });
+    }
 
     recorder.current.onstop = async (e) => {
       if (isRestarting.current) return;
@@ -177,7 +192,20 @@ const RecorderOffscreen = () => {
         return stream;
       })
       .catch((err) => {
-        return null;
+        // Try again without the device ID
+        const audioStreamOptions = {
+          mimeType: "video/webm;codecs=vp8,opus",
+          audio: true,
+        };
+
+        return navigator.mediaDevices
+          .getUserMedia(audioStreamOptions)
+          .then((stream) => {
+            return stream;
+          })
+          .catch((err) => {
+            return null;
+          });
       });
 
     return result;
@@ -239,7 +267,7 @@ const RecorderOffscreen = () => {
         helperVideoStream.current = userStream;
       } else {
         let stream;
-        if (isTab.current) {
+        if (isTab.current === true) {
           stream = await navigator.mediaDevices.getUserMedia({
             audio: {
               mandatory: {
@@ -348,6 +376,7 @@ const RecorderOffscreen = () => {
   const onMessage = useCallback((request, sender, sendResponse) => {
     if (request.type === "loaded") {
       isTab.current = request.isTab;
+      quality.current = request.quality;
       if (request.isTab) {
         tabID.current = request.tabID;
       }

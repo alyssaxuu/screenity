@@ -805,8 +805,12 @@ const ContentState = (props) => {
         chrome.i18n.getMessage("streamErrorModalDescription"),
         chrome.i18n.getMessage("permissionsModalDismiss"),
         null,
-        () => {},
-        () => {}
+        () => {
+          contentStateRef.current.dismissRecording();
+        },
+        () => {
+          contentStateRef.current.dismissRecording();
+        }
       );
     } else if (request.type === "recording-check") {
       if (!contentStateRef.showExtension) {

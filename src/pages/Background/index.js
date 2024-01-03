@@ -12,7 +12,15 @@ const getCurrentTab = async () => {
 };
 
 const resetActiveTab = async () => {
-  let url = "editor.html";
+  let editor_url = "editor.html";
+
+  // Check if Chrome version is 109 or below
+  if (navigator.userAgent.includes("Chrome/")) {
+    const version = parseInt(navigator.userAgent.match(/Chrome\/([0-9]+)/)[1]);
+    if (version <= 109) {
+      editor_url = "editorfallback.html";
+    }
+  }
   const { activeTab } = await chrome.storage.local.get(["activeTab"]);
 
   // Check if activeTab exists
@@ -25,7 +33,7 @@ const resetActiveTab = async () => {
       });
       chrome.tabs.create(
         {
-          url: url,
+          url: editor_url,
           index: 1,
           pinned: true,
           active: false,
@@ -77,9 +85,14 @@ chrome.commands.onCommand.addListener(async (command) => {
     // get active tab
     const activeTab = await getCurrentTab();
 
+    // Check if page is offline
+
     // Check if it's possible to inject into content (not a chrome:// page, new tab, etc)
     if (
       !(
+        (navigator.onLine === false &&
+          !activeTab.url.includes("/playground.html") &&
+          !activeTab.url.includes("/setup.html")) ||
         activeTab.url.startsWith("chrome://") ||
         (activeTab.url.startsWith("chrome-extension://") &&
           !activeTab.url.includes("/playground.html") &&
@@ -314,6 +327,9 @@ chrome.action.onClicked.addListener(async (tab) => {
     // Check if it's possible to inject into content (not a chrome:// page, new tab, etc)
     if (
       !(
+        (navigator.onLine === false &&
+          !tab.url.includes("/playground.html") &&
+          !tab.url.includes("/setup.html")) ||
         tab.url.startsWith("chrome://") ||
         (tab.url.startsWith("chrome-extension://") &&
           !tab.url.includes("/playground.html") &&
@@ -402,6 +418,15 @@ const handleDismiss = async () => {
 };
 
 const handleRestart = async () => {
+  let editor_url = "editor.html";
+
+  // Check if Chrome version is 109 or below
+  if (navigator.userAgent.includes("Chrome/")) {
+    const version = parseInt(navigator.userAgent.match(/Chrome\/([0-9]+)/)[1]);
+    if (version <= 109) {
+      editor_url = "editorfallback.html";
+    }
+  }
   const { sandboxTab } = await chrome.storage.local.get(["sandboxTab"]);
   chrome.tabs.get(sandboxTab, (tab) => {
     if (tab) {
@@ -410,7 +435,7 @@ const handleRestart = async () => {
   });
   chrome.tabs.create(
     {
-      url: "editor.html",
+      url: editor_url,
       index: 1,
       pinned: true,
       active: false,
@@ -557,6 +582,8 @@ const offscreenDocument = async (request) => {
         throw new Error("Exit offscreen recording");
       }
 
+      const { quality } = await chrome.storage.local.get(["quality"]);
+
       // also add && !request.camera above if works
       const existingContexts = await chrome.runtime.getContexts({});
 
@@ -579,9 +606,14 @@ const offscreenDocument = async (request) => {
         recordingTab: null,
         offscreen: true,
         region: false,
-        wasRegion: true,
+        wasRegion: false,
       });
-      sendMessageRecord({ type: "loaded", request: request, isTab: false });
+      sendMessageRecord({
+        type: "loaded",
+        request: request,
+        isTab: false,
+        quality: quality,
+      });
     } catch (error) {
       // Open the recorder.html page as a normal tab.
       let switchTab = true;
@@ -600,7 +632,7 @@ const offscreenDocument = async (request) => {
             recordingTab: tab.id,
             offscreen: false,
             region: false,
-            wasRegion: true,
+            wasRegion: false,
           });
           chrome.tabs.onUpdated.addListener(function _(
             tabId,
@@ -692,12 +724,16 @@ chrome.runtime.onInstalled.addListener(async (details) => {
     // Check user locale, is it English, british, american...?
     const locale = chrome.i18n.getMessage("@@ui_locale");
     if (locale.includes("en")) {
-      chrome.runtime.setUninstallURL("https://tally.so/r/w8Zro5");
+      chrome.runtime.setUninstallURL(
+        "https://tally.so/r/w8Zro5?version=" +
+          chrome.runtime.getManifest().version
+      );
     } else {
       chrome.runtime.setUninstallURL(
         "http://translate.google.com/translate?js=n&sl=auto&tl=" +
           locale +
-          "&u=https://tally.so/r/w8Zro5"
+          "&u=https://tally.so/r/w8Zro5?version=" +
+          chrome.runtime.getManifest().version
       );
     }
     chrome.storage.local.set({ firstTime: true });
@@ -714,12 +750,16 @@ chrome.runtime.onInstalled.addListener(async (details) => {
     }
     const locale = chrome.i18n.getMessage("@@ui_locale");
     if (locale.includes("en")) {
-      chrome.runtime.setUninstallURL("https://tally.so/r/3Ex6kX");
+      chrome.runtime.setUninstallURL(
+        "https://tally.so/r/3Ex6kX?version=" +
+          chrome.runtime.getManifest().version
+      );
     } else {
       chrome.runtime.setUninstallURL(
         "http://translate.google.com/translate?js=n&sl=auto&tl=" +
           locale +
-          "&u=https://tally.so/r/3Ex6kX"
+          "&u=https://tally.so/r/3Ex6kX?version=" +
+          chrome.runtime.getManifest().version
       );
     }
   }
@@ -821,9 +861,18 @@ const removeSandbox = async () => {
 };
 
 const newSandboxPageRestart = async () => {
+  let editor_url = "editor.html";
+
+  // Check if Chrome version is 109 or below
+  if (navigator.userAgent.includes("Chrome/")) {
+    const version = parseInt(navigator.userAgent.match(/Chrome\/([0-9]+)/)[1]);
+    if (version <= 109) {
+      editor_url = "editorfallback.html";
+    }
+  }
   chrome.tabs.create(
     {
-      url: "editor.html",
+      url: editor_url,
       index: 1,
       pinned: true,
       active: false,
@@ -1132,9 +1181,47 @@ const isPinned = async (sendResponse) => {
   sendResponse({ pinned: userSettings.isOnToolbar });
 };
 
+const requestDownload = async (base64, title) => {
+  // Open a new tab to get URL
+  chrome.tabs.create(
+    {
+      url: "download.html",
+      active: false,
+    },
+    (tab) => {
+      chrome.tabs.onUpdated.addListener(function _(
+        tabId,
+        changeInfo,
+        updatedTab
+      ) {
+        if (tabId === tab.id && changeInfo.status === "complete") {
+          chrome.tabs.onUpdated.removeListener(_);
+          chrome.tabs.sendMessage(tab.id, {
+            type: "download-video",
+            base64: base64,
+            title: title,
+          });
+        }
+      });
+    }
+  );
+};
+
 // Listen for messages
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.type === "restore-recording") {
+    let editor_url = "editor.html";
+
+    // Check if Chrome version is 109 or below
+    if (navigator.userAgent.includes("Chrome/")) {
+      const version = parseInt(
+        navigator.userAgent.match(/Chrome\/([0-9]+)/)[1]
+      );
+      if (version <= 109) {
+        editor_url = "editorfallback.html";
+      }
+    }
+
     // Make a video out of the db chunks, and download it
     db.collection("chunks")
       .get()
@@ -1146,7 +1233,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
         chrome.tabs.create(
           {
-            url: "editor.html",
+            url: editor_url,
             active: true,
           },
           async (tab) => {
@@ -1229,6 +1316,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     });
 
     return true;
+  } else if (request.type === "request-download") {
+    requestDownload(request.base64, request.title);
   }
   handleMessage(request, sender, sendResponse);
 });

@@ -60,6 +60,14 @@ var options = {
     playground: path.join(__dirname, "src", "pages", "Playground", "index.jsx"),
     editor: path.join(__dirname, "src", "pages", "Editor", "index.jsx"),
     region: path.join(__dirname, "src", "pages", "Region", "index.jsx"),
+    download: path.join(__dirname, "src", "pages", "Download", "index.jsx"),
+    editorfallback: path.join(
+      __dirname,
+      "src",
+      "pages",
+      "EditorFallback",
+      "index.jsx"
+    ),
   },
 
   custom: {
@@ -267,6 +275,24 @@ var options = {
       template: path.join(__dirname, "src", "pages", "Region", "index.html"),
       filename: "region.html",
       chunks: ["region"],
+      cache: false,
+    }),
+    new HtmlWebpackPlugin({
+      template: path.join(__dirname, "src", "pages", "Download", "index.html"),
+      filename: "download.html",
+      chunks: ["download"],
+      cache: false,
+    }),
+    new HtmlWebpackPlugin({
+      template: path.join(
+        __dirname,
+        "src",
+        "pages",
+        "EditorFallback",
+        "index.html"
+      ),
+      filename: "editorfallback.html",
+      chunks: ["editorfallback"],
       cache: false,
     }),
   ],
