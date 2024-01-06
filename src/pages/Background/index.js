@@ -14,6 +14,18 @@ const getCurrentTab = async () => {
 const resetActiveTab = async () => {
   let editor_url = "editor.html";
 
+  // Check video duration (in miliseconds)
+  const { recordingDuration } = await chrome.storage.local.get([
+    "recordingDuration",
+  ]);
+
+  // Videos that are over 5 minutes long take too long to process on the local machine
+  const maxRecordingDuration = 300000;
+
+  if (recordingDuration > maxRecordingDuration) {
+    editor_url = "editorfallback.html";
+  }
+
   // Check if Chrome version is 109 or below
   if (navigator.userAgent.includes("Chrome/")) {
     const version = parseInt(navigator.userAgent.match(/Chrome\/([0-9]+)/)[1]);
@@ -26,33 +38,40 @@ const resetActiveTab = async () => {
   // Check if activeTab exists
   chrome.tabs.get(activeTab, (tab) => {
     if (tab) {
-      chrome.tabs.update(activeTab, {
-        active: true,
-        selected: true,
-        highlighted: true,
+      // Focus the window
+      chrome.windows.update(tab.windowId, { focused: true }, () => {
+        chrome.tabs.update(activeTab, {
+          active: true,
+          selected: true,
+          highlighted: true,
+        });
+        chrome.tabs.create(
+          {
+            url: editor_url,
+            index: 1,
+            pinned: true,
+            active: false,
+          },
+          async (tab) => {
+            chrome.windows.update(tab.windowId, { focused: true });
+            chrome.storage.local.set({ sandboxTab: tab.id });
+            chrome.tabs.sendMessage(activeTab, { type: "ready-to-record" });
+            chrome.tabs.highlight({ tabs: activeTab });
+          }
+        );
       });
-      chrome.tabs.create(
-        {
-          url: editor_url,
-          index: 1,
-          pinned: true,
-          active: false,
-        },
-        async (tab) => {
-          chrome.windows.update(tab.windowId, { focused: true });
-          chrome.storage.local.set({ sandboxTab: tab.id });
-          chrome.tabs.sendMessage(activeTab, { type: "ready-to-record" });
-          chrome.tabs.highlight({ tabs: activeTab });
-        }
-      );
     }
   });
 };
 
 const resetActiveTabRestart = async () => {
   const { activeTab } = await chrome.storage.local.get(["activeTab"]);
-  chrome.tabs.update(activeTab, { active: true });
-  chrome.tabs.sendMessage(activeTab, { type: "ready-to-record" });
+  chrome.tabs.get(activeTab, (tab) => {
+    chrome.windows.update(tab.windowId, { focused: true }, () => {
+      chrome.tabs.update(activeTab, { active: true });
+      chrome.tabs.sendMessage(activeTab, { type: "ready-to-record" });
+    });
+  });
 };
 
 const startRecording = async () => {
@@ -168,8 +187,7 @@ if (chrome.permissions) {
   });
 }
 
-// Check when a page is activated
-chrome.tabs.onActivated.addListener(async (activeInfo) => {
+const onActivated = async (activeInfo) => {
   const { recordingStartTime } = await chrome.storage.local.get([
     "recordingStartTime",
   ]);
@@ -219,6 +237,27 @@ chrome.tabs.onActivated.addListener(async (activeInfo) => {
       chrome.tabs.sendMessage(activeInfo.tabId, { type: "time", time: time });
     }
   }
+};
+
+chrome.windows.onFocusChanged.addListener(async (windowId) => {
+  if (windowId === chrome.windows.WINDOW_ID_NONE) {
+    return;
+  }
+
+  // Get the tab that is active in the focused window
+  const [activeTab] = await chrome.tabs.query({
+    active: true,
+    windowId: windowId,
+  });
+
+  if (activeTab) {
+    onActivated({ tabId: activeTab.id });
+  }
+});
+
+// Check when a page is activated
+chrome.tabs.onActivated.addListener(async (activeInfo) => {
+  onActivated(activeInfo);
 });
 
 // Check when a user navigates to a different domain in the same tab (chrome.tabs?)
@@ -270,24 +309,158 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
   }
 });
 
+function blobToBase64(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = function () {
+      resolve(reader.result);
+    };
+    reader.onerror = function (error) {
+      reject(error);
+    };
+    reader.readAsDataURL(blob);
+  });
+}
+
+const sendChunks = async (override = false) => {
+  const { sandboxTab } = await chrome.storage.local.get(["sandboxTab"]);
+
+  db.collection("chunks")
+    .get()
+    .then(async (chunks) => {
+      if (chunks.length === 0) {
+        chrome.tabs.sendMessage(sandboxTab, {
+          type: "make-video-tab",
+          override: override,
+        });
+        // Handle the case when there are no chunks to send (e.g., display a message)
+        return;
+      }
+
+      const batchSize = 10; // Number of chunks to send in each batch
+      const chunksCount = chunks.length;
+      let batch = [];
+      let currentIndex = 0;
+      const maxRetries = 3; // Maximum number of retry attempts per batch
+
+      chrome.tabs.sendMessage(sandboxTab, {
+        type: "chunk-count",
+        count: chunksCount,
+      });
+
+      const sendNextBatch = async (retryCount = 0) => {
+        // Determine the range of chunks for the current batch
+        const start = currentIndex;
+        const end = Math.min(currentIndex + batchSize, chunksCount);
+
+        // Collect the chunks for the batch
+        batch = [];
+        for (let i = start; i < end; i++) {
+          const chunk = chunks[i];
+          const chunkData = chunk.chunk;
+          const index = chunk.index;
+          const base64 = await blobToBase64(chunkData);
+          if (base64) {
+            batch.push({ chunk: base64, index: index });
+          } else {
+            console.error("Error converting a chunk to Base64:", chunk);
+            // Handle the error as needed (e.g., skip the chunk or retry)
+          }
+        }
+
+        if (batch.length > 0) {
+          // Send the batch to the sandboxed tab
+          chrome.tabs.sendMessage(
+            sandboxTab,
+            {
+              type: "new-chunk-tab",
+              chunks: batch,
+            },
+            (response) => {
+              if (response) {
+                // Increment the current index and send the next batch
+                currentIndex += batchSize;
+                if (currentIndex < chunksCount) {
+                  sendNextBatch();
+                } else {
+                  // Update the user interface or provide feedback as needed
+                  chrome.tabs.sendMessage(sandboxTab, {
+                    type: "make-video-tab",
+                    override: override,
+                  });
+                }
+              } else {
+                if (retryCount < maxRetries) {
+                  sendNextBatch(retryCount + 1);
+                } else {
+                  console.error(
+                    "Maximum retry attempts reached for this batch."
+                  );
+                  // Handle the case where the batch couldn't be sent after retries
+                }
+              }
+            }
+          );
+        }
+      };
+
+      // Start sending batches
+      sendNextBatch();
+    });
+};
+
 const stopRecording = async () => {
   const { recordingStartTime } = await chrome.storage.local.get([
     "recordingStartTime",
   ]);
-  const duration = Date.now() - recordingStartTime;
+  let duration = Date.now() - recordingStartTime;
+  if (recordingStartTime === 0) {
+    duration = 0;
+  }
   chrome.storage.local.set({
+    recording: false,
     recordingDuration: duration,
     tabRecordedID: null,
   });
 
   chrome.storage.local.set({ recordingStartTime: 0 });
   const { sandboxTab } = await chrome.storage.local.get(["sandboxTab"]);
-  // Move the tab to the last position
-  chrome.tabs.update(sandboxTab, { active: true, pinned: false });
-  chrome.tabs.move(sandboxTab, { index: -1 });
-  setTimeout(() => {
-    chrome.tabs.sendMessage(sandboxTab, { type: "make-video-tab" });
-  }, 100);
+
+  if (duration > 5 * 60 * 1000) {
+    // Close the sandbox tab, open a new one with fallback editor
+    chrome.tabs.create(
+      {
+        url: "editorfallback.html",
+        active: true,
+      },
+      (tab) => {
+        chrome.tabs.onUpdated.addListener(function _(
+          tabId,
+          changeInfo,
+          updatedTab
+        ) {
+          if (tabId === tab.id && changeInfo.status === "complete") {
+            chrome.tabs.onUpdated.removeListener(_);
+            // Close the existing sandbox tab
+            chrome.tabs.remove(sandboxTab);
+            chrome.storage.local.set({ sandboxTab: tab.id });
+            sendChunks();
+          }
+        });
+      }
+    );
+  } else {
+    // Move the tab to the last position
+    chrome.tabs.get(sandboxTab, (tab) => {
+      chrome.windows.update(tab.windowId, { focused: true }).then(() => {
+        chrome.tabs.update(sandboxTab, { active: true, pinned: false });
+        chrome.tabs.move(sandboxTab, { index: -1 });
+      });
+    });
+
+    sendChunks();
+  }
+
   chrome.action.setIcon({ path: "assets/icon-34.png" });
 
   // Check if wasRegion is set
@@ -300,6 +473,37 @@ const stopRecording = async () => {
   chrome.alarms.clear("recording-alarm");
 
   discardOffscreenDocuments();
+};
+
+const forceProcessing = async () => {
+  // Need to create a new sandbox tab
+  let editor_url = "editor.html";
+
+  // Get sandbox tab
+  const { sandboxTab } = await chrome.storage.local.get(["sandboxTab"]);
+
+  chrome.tabs.create(
+    {
+      url: editor_url,
+      active: true,
+    },
+    (tab) => {
+      chrome.tabs.onUpdated.addListener(function _(
+        tabId,
+        changeInfo,
+        updatedTab
+      ) {
+        if (tabId === tab.id && changeInfo.status === "complete") {
+          chrome.tabs.onUpdated.removeListener(_);
+          // Close the existing sandbox tab
+          chrome.tabs.remove(sandboxTab);
+          chrome.storage.local.set({ sandboxTab: tab.id });
+
+          sendChunks(true);
+        }
+      });
+    }
+  );
 };
 
 chrome.runtime.onStartup.addListener(() => {
@@ -785,7 +989,11 @@ chrome.tabs.onRemoved.addListener(async (tabId, removeInfo) => {
 
     try {
       if (recording) {
-        chrome.tabs.update(activeTab, { active: true });
+        chrome.windows
+          .update(activeTab.windowId, { focused: true })
+          .then(() => {
+            chrome.tabs.update(activeTab, { active: true });
+          });
       }
       chrome.tabs.sendMessage(activeTab, { type: "stop-recording-tab" });
     } catch (error) {
@@ -937,7 +1145,11 @@ const handleMessage = async (request, sender, sendResponse) => {
     // Check if actual tab
     chrome.tabs.get(activeTab, (t) => {
       if (t) {
-        chrome.tabs.update(activeTab, { active: true });
+        chrome.windows
+          .update(activeTab.windowId, { focused: true })
+          .then(() => {
+            chrome.tabs.update(activeTab, { active: true });
+          });
       }
     });
     discardOffscreenDocuments();
@@ -973,7 +1185,11 @@ const handleMessage = async (request, sender, sendResponse) => {
       if (tab) {
         chrome.tabs.sendMessage(activeTab, { type: "recording-error" });
         // Go to active tab
-        chrome.tabs.update(activeTab, { active: true });
+        chrome.windows
+          .update(activeTab.windowId, { focused: true })
+          .then(() => {
+            chrome.tabs.update(activeTab, { active: true });
+          });
         if (request.error === "stream-error") {
           chrome.tabs.sendMessage(activeTab, { type: "stream-error" });
         }
@@ -1163,6 +1379,21 @@ const handleMessage = async (request, sender, sendResponse) => {
       url: url,
       active: true,
     });
+  } else if (request.type === "memory-limit-help") {
+    const locale = chrome.i18n.getMessage("@@ui_locale");
+    let url =
+      "https://help.screenity.io/troubleshooting/9Jy5RGjNrBB42hqUdREQ7W/what-does-%E2%80%9Cmemory-limit-reached%E2%80%9D-mean-when-recording/8WkwHbt3puuXunYqQnyPcb";
+    if (!locale.includes("en")) {
+      url =
+        "http://translate.google.com/translate?js=n&sl=auto&tl=" +
+        locale +
+        "&u=" +
+        url;
+    }
+    chrome.tabs.create({
+      url: url,
+      active: true,
+    });
   } else if (request.type === "open-home") {
     chrome.tabs.create({
       url: "https://screenity.io/",
@@ -1170,9 +1401,16 @@ const handleMessage = async (request, sender, sendResponse) => {
     });
   } else if (request.type === "report-bug") {
     chrome.tabs.create({
-      url: "https://tally.so/r/3ElpXq",
+      url:
+        "https://tally.so/r/3ElpXq?version=" +
+        chrome.runtime.getManifest().version,
       active: true,
     });
+  } else if (request.type === "clear-recordings") {
+    // clear chunks
+    db.collection("chunks").delete();
+  } else if (request.type === "force-processing") {
+    forceProcessing();
   }
 };
 
@@ -1209,8 +1447,30 @@ const requestDownload = async (base64, title) => {
 
 // Listen for messages
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  if (request.type === "restore-recording") {
-    let editor_url = "editor.html";
+  if (request.type === "indexed-db-download") {
+    // Open a new tab to get URL
+    chrome.tabs.create(
+      {
+        url: "download.html",
+        active: false,
+      },
+      (tab) => {
+        chrome.tabs.onUpdated.addListener(function _(
+          tabId,
+          changeInfo,
+          updatedTab
+        ) {
+          if (tabId === tab.id && changeInfo.status === "complete") {
+            chrome.tabs.onUpdated.removeListener(_);
+            chrome.tabs.sendMessage(tab.id, {
+              type: "recover-indexed-db",
+            });
+          }
+        });
+      }
+    );
+  } else if (request.type === "restore-recording") {
+    let editor_url = "editorfallback.html";
 
     // Check if Chrome version is 109 or below
     if (navigator.userAgent.includes("Chrome/")) {
@@ -1237,25 +1497,13 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             active: true,
           },
           async (tab) => {
+            // Set URL as sandbox tab
+            chrome.storage.local.set({ sandboxTab: tab.id });
             // Wait for the tab to be loaded
             await new Promise((resolve) => {
               chrome.tabs.onUpdated.addListener(function listener(tabId, info) {
                 if (info.status === "complete" && tabId === tab.id) {
-                  // Send the blob to the tab
-                  chrome.tabs.sendMessage(
-                    tab.id,
-                    {
-                      type: "restore-recording",
-                      blob: chunks,
-                    },
-                    () => {
-                      // Remove the listener
-                      chrome.tabs.onUpdated.removeListener(listener);
-                      resolve();
-                    }
-                  );
-                  chrome.tabs.onUpdated.removeListener(listener);
-                  resolve();
+                  sendChunks();
                 }
               });
             });
@@ -1272,7 +1520,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           sendResponse({ restore: false, chunks: [] });
           return;
         }
-        sendResponse({ restore: true, chunks: chunks });
+        sendResponse({ restore: true });
       });
     return true;
   } else if (request.type === "check-capture-permissions") {
@@ -1318,6 +1566,14 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true;
   } else if (request.type === "request-download") {
     requestDownload(request.base64, request.title);
+  } else if (request.type === "stop-recording-tab-backup") {
+    chrome.storage.local.set({
+      recording: false,
+      restarting: false,
+      tabRecordedID: null,
+      memoryError: true,
+    });
+    sendMessageRecord({ type: "stop-recording-tab" });
   }
   handleMessage(request, sender, sendResponse);
 });

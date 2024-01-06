@@ -41,7 +41,11 @@ const Sandbox = () => {
       await ffmpegInstance.current.load();
       sendMessage({ type: "ffmpeg-loaded" });
     } catch (error) {
-      sendMessage({ type: "ffmpeg-load-error", error: JSON.stringify(error) });
+      sendMessage({
+        type: "ffmpeg-load-error",
+        error: JSON.stringify(error),
+        fallback: false,
+      });
     }
   };
 

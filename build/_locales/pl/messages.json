@@ -489,12 +489,12 @@
     "description": "Przycisk dowiedz się więcej"
   },
   "overLimitLabelTitle": {
-    "message": "Wideo przekracza limit edycji 5 minut",
-    "description": "Etykieta limitu 5 minut w edytorze"
+    "message": "Film jest zbyt długi, aby przetwarzać lokalnie",
+    "description": "Etykieta limitu powyżej 5 minut w edytorze"
   },
   "overLimitLabelDescription": {
-    "message": "Zaktualizuj, aby edytować dłuższe wideo",
-    "description": "Opis limitu 5 minut w edytorze"
+    "message": "Edycja i eksport do formatu MP4 są niedostępne",
+    "description": "Opis limitu powyżej 5 minut w edytorze"
   },
   "videoProcessingLabelTitle": {
     "message": "Wideo jest przetwarzane...",
@@ -811,5 +811,93 @@
   "noRecordingFound": {
     "message": "Nie znaleziono nagrania, przepraszamy :(",
     "description": "Komunikat o braku nagrania w edytorze"
+  },
+  "memoryLimitTitle": {
+    "message": "Osiągnięto limit pamięci",
+    "description": "Tytuł komunikatu o osiągniętym limicie pamięci"
+  },
+  "memoryLimitDescription": {
+    "message": "Twój urządzenie wyczerpało dostępną pamięć do nagrywania, co spowodowało automatyczne zakończenie nagrywania. Jeśli chcesz nagrywać dłużej, możesz spróbować zmniejszyć jakość nagrania lub zwolnić miejsce na urządzeniu.",
+    "description": "Opis komunikatu o osiągniętym limicie pamięci"
+  },
+  "understoodButton": {
+    "message": "Rozumiem",
+    "description": "Przycisk Rozumiem"
+  },
+  "notEnoughSpaceTitle": {
+    "message": "Za mało miejsca",
+    "description": "Tytuł komunikatu o braku miejsca"
+  },
+  "notEnoughSpaceDescription": {
+    "message": "Aby korzystać z Screenity, potrzebujesz co najmniej 1 GB wolnej przestrzeni. Proszę zwolnij miejsce na urządzeniu i spróbuj ponownie.",
+    "description": "Opis komunikatu o braku miejsca"
+  },
+  "clearSpaceButton": {
+    "message": "Usuń poprzednie nagrania",
+    "description": "Przycisk Usuń poprzednie nagrania"
+  },
+  "sandboxAdvancedTitle": {
+    "message": "Zaawansowane",
+    "description": "Sekcja zaawansowana na stronie edytora w trybie piaskownicy"
+  },
+  "rawRecordingButtonTitle": {
+    "message": "Pobierz surowy plik wideo",
+    "description": "Przycisk pobierania surowego nagrania"
+  },
+  "rawRecordingButtonDescription": {
+    "message": "Eksportuj oryginalne dane nagrania",
+    "description": "Etykieta pobierania surowego nagrania"
+  },
+  "troubleshootButtonTitle": {
+    "message": "Pomoc dotycząca nagrania",
+    "description": "Przycisk Rozwiązywania problemów"
+  },
+  "troubleShootButtonDescription": {
+    "message": "Przywróć nagranie wideo i rozwiąż inne problemy",
+    "description": "Etykieta Rozwiązywania problemów"
+  },
+  "rawRecordingModalTitle": {
+    "message": "Pobierz surowy plik wideo",
+    "description": "Tytuł okna modalnego surowego nagrania"
+  },
+  "rawRecordingModalDescription": {
+    "message": "Surowy plik wideo to oryginalny plik wideo nagrany przez Screenity. Ten film nie został przetworzony ani zedytowany, dlatego może być bardzo duży i niekoniecznie da się go odtworzyć na wszystkich urządzeniach. Jeśli masz problemy z przetworzonym filmem, możesz użyć tego pliku do odzyskania swojego nagrania.",
+    "description": "Opis okna modalnego surowego nagrania"
+  },
+  "rawRecordingModalButton": {
+    "message": "Pobierz",
+    "description": "Przycisk okna modalnego surowego nagrania"
+  },
+  "troubleshootModalTitle": {
+    "message": "Pobierz informacje o systemie i dane wideo do rozwiązywania problemów",
+    "description": "Tytuł okna modalnego Rozwiązywania problemów"
+  },
+  "troubleshootModalDescription": {
+    "message": "Po pobraniu prześlij ten plik na adres support@screenity.io wraz z wszelkimi istotnymi informacjami. Będziemy używać tych danych, aby pomóc ci rozwiązać problemy z rozszerzeniem i, jeśli to możliwe, odzyskać twoje nagranie wideo.",
+    "description": "Opis okna modalnego Rozwiązywania problemów"
+  },
+  "troubleshootModalButton": {
+    "message": "Pobierz",
+    "description": "Przycisk okna modalnego Rozwiązywania problemów"
+  },
+  "overLimitModalTitle": {
+    "message": "Film jest zbyt długi, aby przetworzyć na tym urządzeniu",
+    "description": "Tytuł okna modalnego z limitem ponad 5 minut"
+  },
+  "overLimitModalDescription": {
+    "message": "Ponieważ Screenity działa w sposób całkowicie prywatny i lokalnie, jest ograniczane przez sprzęt twojego urządzenia. Przetwarzanie filmu o tej długości zajęłoby zbyt dużo czasu i byłoby bardzo intensywne z punktu widzenia zasobów. Nie martw się, nadal możesz pobrać plik WEBM lub surowe nagranie, ale edycja i eksport do formatu MP4 nie są dostępne. Mimo to nadal możesz spróbować przetworzyć film, jeśli rozumiesz związane z tym ryzyko.",
+    "description": "Opis okna modalnego z limitem ponad 5 minut"
+  },
+  "overLimitModalButton": {
+    "message": "Rozumiem ryzyko, spróbuj mimo to",
+    "description": "Przycisk okna modalnego z limitem ponad 5 minut"
+  },
+  "overLimitModalLearnMore": {
+    "message": "Dowiedz się więcej na temat przetwarzania długich filmów.",
+    "description": "Link „Dowiedz się więcej” w oknie modalnym z limitem ponad 5 minut z kropką"
+  },
+  "recoveryModeTitle": {
+    "message": "Tryb odzyskiwania",
+    "description": "Tytuł trybu odzyskiwania"
   }
 }

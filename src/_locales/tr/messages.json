@@ -488,12 +488,12 @@
     "description": "Daha fazla bilgi düğmesi"
   },
   "overLimitLabelTitle": {
-    "message": "Video 5 dakikalık düzenleme sınırının üzerinde",
-    "description": "Editörde 5 dakikalık sınırlama etiketi"
+    "message": "Video yerel olarak işlemek için çok uzun",
+    "description": "Editörde 5 dakikadan fazla sınır etiketi"
   },
   "overLimitLabelDescription": {
-    "message": "Daha uzun videoları düzenlemek için yükseltme yapın",
-    "description": "Editörde 5 dakikalık sınırlama açıklaması"
+    "message": "Düzenleme ve MP4 biçiminde dışa aktarma mevcut değil",
+    "description": "Editörde 5 dakikadan fazla sınır açıklaması"
   },
   "videoProcessingLabelTitle": {
     "message": "Video işleniyor...",
@@ -810,5 +810,94 @@
   "noRecordingFound": {
     "message": "Kayıt bulunamadı, üzgünüz :(",
     "description": "Editörde kayıt bulunamadı uyarısı"
+  },
+  "memoryLimitTitle": {
+    "message": "Hafıza Sınırına Ulaşıldı",
+    "description": "Hafıza Sınırına Ulaşıldı Başlık"
+  },
+  "memoryLimitDescription": {
+    "message": "Cihazınız, kayıt için kullanılabilir belleği tüketti ve kayıt otomatik olarak durdu. Daha uzun süre kayıt yapmak istiyorsanız video kalitesini düşürmeyi veya cihazınızdaki alanı temizlemeyi deneyebilirsiniz.",
+    "description": "Hafıza Sınırına Ulaşıldı Açıklama"
+  },
+  "understoodButton": {
+    "message": "Anladım",
+    "description": "Anladım Düğmesi"
+  },
+  "notEnoughSpaceTitle": {
+    "message": "Yetersiz Alan",
+    "description": "Yetersiz Alan Başlık"
+  },
+  "notEnoughSpaceDescription": {
+    "message": "Screenity, kayıt için en az 1 GB boş alan gerektirir. Lütfen cihazınızda alan açın ve yeniden deneyin.",
+    "description": "Yetersiz Alan Açıklama"
+  },
+  "clearSpaceButton": {
+    "message": "Önceki Kayıtları Temizle",
+    "description": "Önceki Kayıtları Temizle Düğmesi"
+  },
+  "sandboxAdvancedTitle": {
+    "message": "Gelişmiş",
+    "description": "Güvenli düzenleyici sayfasındaki Gelişmiş bölüm"
+  },
+  "rawRecordingButtonTitle": {
+    "message": "Ham video dosyasını indir",
+    "description": "Ham kayıt düğmesi"
+  },
+  "rawRecordingButtonDescription": {
+    "message": "Orijinal kayıt verilerini dışa aktar",
+    "description": "Ham kayıt etiketi"
+  },
+  "troubleshootButtonTitle": {
+    "message": "Kaydınızla ilgili yardım alın",
+    "description": "Sorun giderme düğmesi"
+  },
+  "troubleShootButtonDescription": {
+    "message": "Videoyu kurtarın ve diğer sorunları çözün",
+    "description": "Sorun giderme etiketi"
+  },
+  "rawRecordingModalTitle": {
+    "message": "Ham video dosyasını indir",
+    "description": "Ham kayıt modal başlığı"
+  },
+  "rawRecordingModalDescription": {
+    "message": "Ham video dosyası, Screenity tarafından kaydedilen orijinal video dosyasıdır. Bu video işlenmemiş veya düzenlenmemiş olduğundan çok büyük olabilir ve tüm cihazlarda oynatılamayabilir. İşlenmiş video ile sorun yaşıyorsanız, bu dosyayı videoyu kurtarmak için kullanabilirsiniz.",
+    "description": "Ham kayıt modal açıklaması"
+  },
+  "rawRecordingModalButton": {
+    "message": "İndir",
+    "description": "Ham kayıt modal düğmesi"
+  },
+  "troubleshootModalTitle": {
+    "message": "Sistem bilgisi ve video verilerini indirip sorun giderme için gönderin",
+    "description": "Sorun giderme modal başlığı"
+  },
+  "troubleshootModalDescription": {
+    "message": "İndirdikten sonra dosyayı support@screenity.io adresine gönderin ve ilgili bilgileri ekleyin. Bu verileri, uzantı ile ilgili yaşadığınız sorunları çözmek ve mümkünse videonuzu kurtarmak için kullanacağız.",
+    "description": "Sorun giderme modal açıklaması"
+  },
+  "troubleshootModalButton": {
+    "message": "İndir",
+    "description": "Sorun giderme modal düğmesi"
+  },
+  "overLimitModalTitle": {
+    "message": "Videonuz cihazınızda işlemek için çok uzun",
+    "description": "5 dakika sınırlı modal başlığı"
+  },
+  "overLimitModalDescription": {
+    "message": "Screenity tamamen özel ve yerel olarak çalıştığı için cihazınızın donanımıyla sınırlıdır. Bu uzunluktaki bir videoyu işlemek çok uzun sürer ve çok fazla kaynak kullanır. Ancak, hala WEBM dosyasını veya ham kaydı indirebilirsiniz, ancak düzenleme ve MP4 dışa aktarma seçenekleri mevcut değildir. Yine de riskleri anlıyorsanız, videoyu işlemeyi deneyebilirsiniz.",
+    "description": "5 dakika sınırlı modal açıklaması"
+  },
+  "overLimitModalButton": {
+    "message": "Riski anladım, yine de dene",
+    "description": "5 dakika sınırlı modal düğmesi"
+  },
+  "overLimitModalLearnMore": {
+    "message": "Uzun videoları işleme hakkında daha fazla bilgi edinin.",
+    "description": "5 dakika sınırlı modal daha fazla bilgi öğrenme bağlantısı"
+  },
+
+  "recoveryModeTitle": {
+    "message": "Kurtarma Modu",
+    "description": "Kurtarma Modu Başlığı"
   }
 }

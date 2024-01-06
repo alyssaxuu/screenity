@@ -488,12 +488,12 @@
     "description": "Learn more button"
   },
   "overLimitLabelTitle": {
-    "message": "视频超过了5分钟的编辑限制",
-    "description": "Over 5 minutes limit label in editor"
+    "message": "视频过长，无法在本地处理",
+    "description": "编辑器中超过5分钟的限制标签"
   },
   "overLimitLabelDescription": {
-    "message": "升级以编辑更长的视频",
-    "description": "Over 5 minutes limit description in editor"
+    "message": "编辑和MP4格式导出不可用",
+    "description": "编辑器中超过5分钟的限制描述"
   },
   "videoProcessingLabelTitle": {
     "message": "视频正在处理中...",
@@ -806,5 +806,94 @@
   "noRecordingFound": {
     "message": "未找到录制，抱歉 :(",
     "description": "编辑器中的未找到录制警告"
+  },
+  "memoryLimitTitle": {
+    "message": "内存限制达到",
+    "description": "内存限制达到标题"
+  },
+  "memoryLimitDescription": {
+    "message": "您的设备已经用尽了可用内存进行录制，导致录制自动停止。如果您想要录制更长时间，可以尝试降低视频质量或清理设备上的一些空间。",
+    "description": "内存限制达到描述"
+  },
+  "understoodButton": {
+    "message": "知道了",
+    "description": "知道了按钮"
+  },
+  "notEnoughSpaceTitle": {
+    "message": "空间不足",
+    "description": "空间不足标题"
+  },
+  "notEnoughSpaceDescription": {
+    "message": "Screenity需要至少1GB的空闲空间进行录制。请释放设备上的空间并重试。",
+    "description": "空间不足描述"
+  },
+  "clearSpaceButton": {
+    "message": "清除之前的录制",
+    "description": "清除之前的录制按钮"
+  },
+  "sandboxAdvancedTitle": {
+    "message": "高级",
+    "description": "沙盒编辑器页面的高级部分"
+  },
+  "rawRecordingButtonTitle": {
+    "message": "下载原始视频文件",
+    "description": "下载原始录制按钮"
+  },
+  "rawRecordingButtonDescription": {
+    "message": "导出原始录制数据",
+    "description": "下载原始录制标签"
+  },
+  "troubleshootButtonTitle": {
+    "message": "获取有关您的录制的帮助",
+    "description": "故障排除按钮"
+  },
+  "troubleShootButtonDescription": {
+    "message": "恢复您的视频并解决其他问题",
+    "description": "故障排除标签"
+  },
+  "rawRecordingModalTitle": {
+    "message": "下载原始视频文件",
+    "description": "原始录制模态框标题"
+  },
+  "rawRecordingModalDescription": {
+    "message": "原始视频文件是由Screenity录制的原始视频文件。此视频未经处理或编辑，因此可能非常大且可能无法在所有设备上播放。如果您在处理后的视频方面遇到问题，可以使用此文件恢复您的视频。",
+    "description": "原始录制模态框描述"
+  },
+  "rawRecordingModalButton": {
+    "message": "下载",
+    "description": "原始录制模态框按钮"
+  },
+  "troubleshootModalTitle": {
+    "message": "下载系统信息和视频数据并发送进行故障排除",
+    "description": "故障排除模态框标题"
+  },
+  "troubleshootModalDescription": {
+    "message": "下载后，请将文件发送至support@screenity.io，附上任何相关信息。我们将使用此数据帮助您解决扩展程序的任何问题，并在可能的情况下恢复您的视频。",
+    "description": "故障排除模态框描述"
+  },
+  "troubleshootModalButton": {
+    "message": "下载",
+    "description": "故障排除模态框按钮"
+  },
+  "overLimitModalTitle": {
+    "message": "视频过长，无法在您的设备上处理",
+    "description": "超过5分钟限制的模态框标题"
+  },
+  "overLimitModalDescription": {
+    "message": "由于Screenity完全私密且在本地运行，它受到您设备硬件的限制。处理这样长度的视频需要很长时间，而且资源消耗很大。但您仍然可以下载WEBM文件或原始录制文件，但无法进行编辑和MP4导出。尽管如此，如果您了解风险，仍然可以尝试处理该视频。",
+    "description": "超过5分钟限制的模态框描述"
+  },
+  "overLimitModalButton": {
+    "message": "我理解风险，仍然尝试",
+    "description": "超过5分钟限制的模态框按钮"
+  },
+  "overLimitModalLearnMore": {
+    "message": "了解有关处理长视频的更多信息。",
+    "description": "超过5分钟限制的模态框了解更多链接（带有句号）"
+  },
+
+  "recoveryModeTitle": {
+    "message": "恢复模式",
+    "description": "恢复模式标题"
   }
 }

@@ -1,5 +1,9 @@
 import React, { useState, useCallback, useEffect } from "react";
 
+import Localbase from "localbase";
+
+const db = new Localbase("db");
+
 const Download = () => {
   const base64ToUint8Array = (base64) => {
     const dataUrlRegex = /^data:(.*?);base64,/;
@@ -40,6 +44,29 @@ const Download = () => {
           URL.revokeObjectURL(url);
           // Close this tab
           window.close();
+        });
+    } else if (message.type === "recover-indexed-db") {
+      // Download the whole chunks collection
+      db.collection("chunks")
+        .get()
+        .then((chunks) => {
+          const chunkArray = [];
+          for (const chunk of chunks) {
+            chunkArray.push(chunk.chunk);
+          }
+          const blob = new Blob(chunkArray, { type: "video/webm" });
+          const url = URL.createObjectURL(blob);
+          chrome.downloads
+            .download({
+              url: url,
+              filename: "recovered-video.webm",
+              saveAs: true,
+            })
+            .then(() => {
+              URL.revokeObjectURL(url);
+              // Close this tab
+              window.close();
+            });
         });
     }
   });

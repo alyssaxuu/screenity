@@ -488,11 +488,11 @@
     "description": "Learn more button"
   },
   "overLimitLabelTitle": {
-    "message": "Video is over the 5 minute edit limit",
+    "message": "Video too long to process in device",
     "description": "Over 5 minutes limit label in editor"
   },
   "overLimitLabelDescription": {
-    "message": "Upgrade to edit longer videos",
+    "message": "Editing and MP4 export are unavailable",
     "description": "Over 5 minutes limit description in editor"
   },
   "videoProcessingLabelTitle": {
@@ -810,5 +810,93 @@
   "noRecordingFound": {
     "message": "No recording found, sorry :(",
     "description": "No recording found alert in editor"
+  },
+  "memoryLimitTitle": {
+    "message": "Memory limit reached",
+    "description": "Memory limit reached title"
+  },
+  "memoryLimitDescription": {
+    "message": "Your device has run out of memory to record, so the recording has stopped automatically. If you'd like to record for longer, you can try lowering the quality of the video, or clearing up some space on your device.",
+    "description": "Memory limit reached description"
+  },
+  "understoodButton": {
+    "message": "Understood",
+    "description": "Understood button"
+  },
+  "notEnoughSpaceTitle": {
+    "message": "Not enough space",
+    "description": "Not enough space title"
+  },
+  "notEnoughSpaceDescription": {
+    "message": "Screenity needs at least 1GB of free space to record. Please free up some space and try again.",
+    "description": "Not enough space description"
+  },
+  "clearSpaceButton": {
+    "message": "Clear previous recordings",
+    "description": "Clear previous recordings button"
+  },
+  "sandboxAdvancedTitle": {
+    "message": "Advanced",
+    "description": "Advanced section in sandbox editor page"
+  },
+  "rawRecordingButtonTitle": {
+    "message": "Download raw video file",
+    "description": "Download raw recording button"
+  },
+  "rawRecordingButtonDescription": {
+    "message": "Export the original recording data",
+    "description": "Download raw recording label"
+  },
+  "troubleshootButtonTitle": {
+    "message": "Get help with your recording",
+    "description": "Troubleshoot button"
+  },
+  "troubleShootButtonDescription": {
+    "message": "Recover your video and solve other issues",
+    "description": "Troubleshoot label"
+  },
+  "rawRecordingModalTitle": {
+    "message": "Download raw video file",
+    "description": "Raw recording modal title"
+  },
+  "rawRecordingModalDescription": {
+    "message": "The raw video file is the original video file that was recorded by Screenity. This video is not processed or edited, so it may be very large and may not be playable on all devices. If you are having issues with the processed video, you can use this file to recover your video.",
+    "description": "Raw recording modal description"
+  },
+  "rawRecordingModalButton": {
+    "message": "Download",
+    "description": "Raw recording modal button"
+  },
+  "troubleshootModalTitle": {
+    "message": "Download system information and video data and send for troubleshooting",
+    "description": "Troubleshoot modal title"
+  },
+  "troubleshootModalDescription": {
+    "message": "After downloading, send the file to support@screenity.io with any relevant information. We will use this data to help you troubleshoot any issues you are having with the extension, and recover your video if possible.",
+    "description": "Troubleshoot modal description"
+  },
+  "troubleshootModalButton": {
+    "message": "Download",
+    "description": "Troubleshoot modal button"
+  },
+  "overLimitModalTitle": {
+    "message": "The video is too long to process in your device",
+    "description": "Over 5 minutes limit modal title"
+  },
+  "overLimitModalDescription": {
+    "message": "Since Screenity is completely private and runs locally, it's limited by your device's hardware. Processing a video of this length would take too long, and be very resource intensive. Don't worry, you can still download the WEBM file or the raw recording, but editing and MP4 export are not available. That said, you can still try to process the video anyway, if you understand the risks.",
+    "description": "Over 5 minutes limit modal description"
+  },
+  "overLimitModalButton": {
+    "message": "I understand the risk, try anyway",
+    "description": "Over 5 minutes limit modal button"
+  },
+  "overLimitModalLearnMore": {
+    "message": "Learn more about processing long videos.",
+    "description": "Over 5 minutes limit modal learn more link with a dot"
+  },
+  "recoveryModeTitle": {
+    "message": "Recovery mode",
+    "description": "Recovery mode title"
   }
 }

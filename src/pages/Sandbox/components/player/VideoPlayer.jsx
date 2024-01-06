@@ -126,7 +126,12 @@ const VideoPlayer = (props) => {
           !contentStateRef.current.mp4ready &&
           !contentStateRef.current.blob &&
           !bannerRef.current &&
-          !contentStateRef.current.noffmpeg
+          !contentStateRef.current.noffmpeg &&
+          !(
+            contentStateRef.current.duration >
+              contentStateRef.current.editLimit &&
+            !contentStateRef.current.override
+          )
         ) {
           bannerRef.current = document.createElement("div");
           bannerRef.current.classList.add("videoBanner");

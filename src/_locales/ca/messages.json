@@ -489,12 +489,12 @@
     "description": "Botó d'aprèn més"
   },
   "overLimitLabelTitle": {
-    "message": "El vídeo supera el límit d'edició de 5 minuts",
-    "description": "Etiqueta de límit superior a 5 minuts a l'editor"
+    "message": "Vídeo massa llarg per processar en el teu dispositiu",
+    "description": "Etiqueta de límit de més de 5 minuts a l'editor"
   },
   "overLimitLabelDescription": {
-    "message": "Actualitza per editar vídeos més llargs",
-    "description": "Descripció del límit superior a 5 minuts a l'editor"
+    "message": "L'edició i la descàrrega en format MP4 no estan disponibles",
+    "description": "Descripció de límit de més de 5 minuts a l'editor"
   },
   "videoProcessingLabelTitle": {
     "message": "El vídeo s'està processant...",
@@ -812,5 +812,93 @@
   "noRecordingFound": {
     "message": "No s'ha trobat cap gravació, ho sento :(",
     "description": "Alerta de no s'ha trobat cap gravació a l'editor"
+  },
+  "memoryLimitTitle": {
+    "message": "S'ha assolit el límit de memòria",
+    "description": "Títol de límit de memòria assolit"
+  },
+  "memoryLimitDescription": {
+    "message": "El teu dispositiu ha esgotat la memòria disponible per a la gravació, la qual cosa ha provocat una finalització automàtica de la gravació. Si desitges gravar durant més temps, considera la possibilitat de reduir la qualitat del vídeo o lliurar espai al teu dispositiu.",
+    "description": "Descripció de límit de memòria assolit"
+  },
+  "understoodButton": {
+    "message": "Entès",
+    "description": "Botó d'entès"
+  },
+  "notEnoughSpaceTitle": {
+    "message": "Espai insuficient",
+    "description": "Títol d'espai insuficient"
+  },
+  "notEnoughSpaceDescription": {
+    "message": "Screenity necessita almenys 1 GB d'espai lliure per a la gravació. Si us plau, allibera espai i torna-ho a intentar.",
+    "description": "Descripció d'espai insuficient"
+  },
+  "clearSpaceButton": {
+    "message": "Esborra gravacions anteriors",
+    "description": "Botó d'esborra gravacions anteriors"
+  },
+  "sandboxAdvancedTitle": {
+    "message": "Avançat",
+    "description": "Secció avançada a la pàgina de l'editor en l'entorn segur"
+  },
+  "rawRecordingButtonTitle": {
+    "message": "Descarrega l'arxiu de vídeo en brut",
+    "description": "Botó de descàrrega de gravació en brut"
+  },
+  "rawRecordingButtonDescription": {
+    "message": "Exporta les dades d'enregistrament originals",
+    "description": "Etiqueta de descàrrega de gravació en brut"
+  },
+  "troubleshootButtonTitle": {
+    "message": "Obtén ajuda amb la teva gravació",
+    "description": "Botó de solució de problemes"
+  },
+  "troubleShootButtonDescription": {
+    "message": "Recupera el teu vídeo i resol altres problemes",
+    "description": "Etiqueta de solució de problemes"
+  },
+  "rawRecordingModalTitle": {
+    "message": "Descarrega l'arxiu de vídeo en brut",
+    "description": "Títol del modal de gravació en brut"
+  },
+  "rawRecordingModalDescription": {
+    "message": "L'arxiu de vídeo en brut és l'arxiu original enregistrat per Screenity. Aquest vídeo no ha estat processat ni editat, per la qual cosa pot ser molt gran i potser no es pot reproduir en tots els dispositius. Si tens problemes amb el vídeo processat, pots fer servir aquest arxiu per recuperar el teu vídeo.",
+    "description": "Descripció del modal de gravació en brut"
+  },
+  "rawRecordingModalButton": {
+    "message": "Descarrega",
+    "description": "Botó del modal de gravació en brut"
+  },
+  "troubleshootModalTitle": {
+    "message": "Descarrega la informació del sistema i les dades de vídeo per a l'enviament i la solució de problemes",
+    "description": "Títol del modal de solució de problemes"
+  },
+  "troubleshootModalDescription": {
+    "message": "Després de la descàrrega, envia l'arxiu a support@screenity.io amb qualsevol informació rellevant. Farem servir aquestes dades per ajudar-te a solucionar qualsevol problema que tinguis amb l'extensió i, si és possible, recuperar el teu vídeo.",
+    "description": "Descripció del modal de solució de problemes"
+  },
+  "troubleshootModalButton": {
+    "message": "Descarrega",
+    "description": "Botó del modal de solució de problemes"
+  },
+  "overLimitModalTitle": {
+    "message": "El vídeo és massa llarg per processar-se al teu dispositiu",
+    "description": "Títol del modal de límit superior a 5 minuts"
+  },
+  "overLimitModalDescription": {
+    "message": "Com que Screenity és completament privat i s'executa localment, està limitat pel maquinari del teu dispositiu. Processar un vídeo d'aquesta longitud trigarà massa temps i serà molt intensiu en recursos. No et preocupis, encara pots descarregar l'arxiu WEBM o la gravació en brut, però l'edició i l'exportació a MP4 no estan disponibles. Dicho això, encara pots intentar processar el vídeo de tota manera si entens els riscos.",
+    "description": "Descripció del modal de límit superior a 5 minuts"
+  },
+  "overLimitModalButton": {
+    "message": "Entenc el risc, intenta-ho igualment",
+    "description": "Botó del modal de límit superior a 5 minuts"
+  },
+  "overLimitModalLearnMore": {
+    "message": "Obtén més informació sobre el processament de vídeos llargs.",
+    "description": "Enllaç 'Obtén més informació' del modal de límit superior a 5 minuts amb un punt"
+  },
+  "recoveryModeTitle": {
+    "message": "Mode de recuperació",
+    "description": "Títol del mode de recuperació"
   }
 }

@@ -488,12 +488,12 @@
     "description": "Schaltfläche 'Erfahren Sie mehr'"
   },
   "overLimitLabelTitle": {
-    "message": "Das Video überschreitet das 5-Minuten-Bearbeitungslimit",
-    "description": "Schriftzug 'Über 5 Minuten Limit' im Editor"
+    "message": "Video zu lang für lokale Verarbeitung",
+    "description": "Kennzeichnung für über 5 Minuten in der Bearbeitung"
   },
   "overLimitLabelDescription": {
-    "message": "Aktualisieren Sie, um längere Videos zu bearbeiten",
-    "description": "Beschreibung des 'Über 5 Minuten Limit'-Schriftzugs im Editor"
+    "message": "Bearbeitung und MP4-Export nicht verfügbar",
+    "description": "Beschreibung für über 5 Minuten in der Bearbeitung"
   },
   "videoProcessingLabelTitle": {
     "message": "Das Video wird verarbeitet...",
@@ -810,5 +810,94 @@
   "noRecordingFound": {
     "message": "Keine Aufzeichnung gefunden, tut uns leid :(",
     "description": "Meldung 'Keine Aufzeichnung gefunden' im Editor"
+  },
+  "memoryLimitTitle": {
+    "message": "Speichergrenze erreicht",
+    "description": "Titel für erreichte Speichergrenze"
+  },
+  "memoryLimitDescription": {
+    "message": "Ihr Gerät hat seinen verfügbaren Speicherplatz für die Aufnahme erschöpft, wodurch die Aufnahme automatisch gestoppt wurde. Wenn Sie länger aufnehmen möchten, können Sie versuchen, die Qualität des Videos zu reduzieren oder Speicherplatz auf Ihrem Gerät freizugeben.",
+    "description": "Beschreibung für erreichte Speichergrenze"
+  },
+  "understoodButton": {
+    "message": "Verstanden",
+    "description": "Verstanden-Button"
+  },
+  "notEnoughSpaceTitle": {
+    "message": "Nicht genügend Speicherplatz",
+    "description": "Titel für nicht genügend Speicherplatz"
+  },
+  "notEnoughSpaceDescription": {
+    "message": "Screenity benötigt mindestens 1 GB freien Speicherplatz für die Aufnahme. Bitte schaffen Sie Speicherplatz frei und versuchen Sie es erneut.",
+    "description": "Beschreibung für nicht genügend Speicherplatz"
+  },
+  "clearSpaceButton": {
+    "message": "Vorherige Aufnahmen löschen",
+    "description": "Button zum Löschen vorheriger Aufnahmen"
+  },
+  "sandboxAdvancedTitle": {
+    "message": "Erweitert",
+    "description": "Erweiterte Sektion auf der Sandbox-Editor-Seite"
+  },
+  "rawRecordingButtonTitle": {
+    "message": "Rohvideo herunterladen",
+    "description": "Schaltfläche zum Herunterladen des Rohvideos"
+  },
+  "rawRecordingButtonDescription": {
+    "message": "Exportieren Sie die originalen Aufnahmedaten",
+    "description": "Beschriftung der Schaltfläche zum Herunterladen des Rohvideos"
+  },
+  "troubleshootButtonTitle": {
+    "message": "Hilfe bei Ihrer Aufnahme erhalten",
+    "description": "Schaltfläche zur Problembehandlung"
+  },
+  "troubleShootButtonDescription": {
+    "message": "Stellen Sie Ihr Video wieder her und lösen Sie andere Probleme",
+    "description": "Beschriftung zur Problembehandlung"
+  },
+  "rawRecordingModalTitle": {
+    "message": "Rohvideo herunterladen",
+    "description": "Titel des Modals für das Rohvideo"
+  },
+  "rawRecordingModalDescription": {
+    "message": "Das Rohvideo ist das Originalvideo, das von Screenity aufgenommen wurde. Dieses Video wurde nicht bearbeitet oder verändert und kann daher sehr groß sein und auf allen Geräten möglicherweise nicht abspielbar sein. Wenn Sie Probleme mit dem bearbeiteten Video haben, können Sie diese Datei verwenden, um Ihr Video wiederherzustellen.",
+    "description": "Beschreibung des Modals für das Rohvideo"
+  },
+  "rawRecordingModalButton": {
+    "message": "Herunterladen",
+    "description": "Schaltfläche des Modals für das Rohvideo"
+  },
+  "troubleshootModalTitle": {
+    "message": "Systeminformationen und Videodaten herunterladen und zur Fehlerbehebung senden",
+    "description": "Titel des Modals zur Problembehandlung"
+  },
+  "troubleshootModalDescription": {
+    "message": "Nach dem Herunterladen senden Sie die Datei an support@screenity.io mit allen relevanten Informationen. Wir verwenden diese Daten, um Ihnen bei der Fehlerbehebung von Problemen mit der Erweiterung zu helfen und Ihr Video gegebenenfalls wiederherzustellen.",
+    "description": "Beschreibung des Modals zur Problembehandlung"
+  },
+  "troubleshootModalButton": {
+    "message": "Herunterladen",
+    "description": "Schaltfläche des Modals zur Problembehandlung"
+  },
+  "overLimitModalTitle": {
+    "message": "Das Video ist zu lang, um auf Ihrem Gerät verarbeitet zu werden",
+    "description": "Titel des Modals für die 5-Minuten-Limitierung"
+  },
+  "overLimitModalDescription": {
+    "message": "Da Screenity komplett privat ist und lokal ausgeführt wird, ist es von der Hardware Ihres Geräts begrenzt. Die Verarbeitung eines Videos dieser Länge würde zu lange dauern und sehr ressourcenintensiv sein. Keine Sorge, Sie können immer noch die WEBM-Datei oder die Rohaufnahme herunterladen, aber Bearbeitung und MP4-Export sind nicht verfügbar. Sie können das Video dennoch versuchen zu verarbeiten, wenn Sie die Risiken verstehen.",
+    "description": "Beschreibung des Modals für die 5-Minuten-Limitierung"
+  },
+  "overLimitModalButton": {
+    "message": "Ich verstehe das Risiko, trotzdem versuchen",
+    "description": "Schaltfläche des Modals für die 5-Minuten-Limitierung"
+  },
+  "overLimitModalLearnMore": {
+    "message": "Mehr über die Verarbeitung langer Videos erfahren.",
+    "description": "Link 'Erfahren Sie mehr' im Modal für die 5-Minuten-Limitierung mit einem Punkt"
+  },
+
+  "recoveryModeTitle": {
+    "message": "Wiederherstellungsmodus",
+    "description": "Titel des Wiederherstellungsmodus"
   }
 }

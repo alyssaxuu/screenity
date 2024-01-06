@@ -489,12 +489,12 @@
     "description": "Pulsante per saperne di più"
   },
   "overLimitLabelTitle": {
-    "message": "Il video supera il limite di 5 minuti di modifica",
-    "description": "Etichetta per il limite di oltre 5 minuti nell'editor"
+    "message": "Video troppo lungo per essere elaborato localmente",
+    "description": "Etichetta di limite superiore a 5 minuti nell'editor"
   },
   "overLimitLabelDescription": {
-    "message": "Aggiorna per modificare video più lunghi",
-    "description": "Descrizione del limite di oltre 5 minuti nell'editor"
+    "message": "Modifica ed esportazione in formato MP4 non disponibili",
+    "description": "Descrizione del limite superiore a 5 minuti nell'editor"
   },
   "videoProcessingLabelTitle": {
     "message": "Il video è in fase di elaborazione...",
@@ -812,5 +812,78 @@
   "noRecordingFound": {
     "message": "Nessuna registrazione trovata, mi dispiace :(",
     "description": "Avviso di nessuna registrazione trovata nell'editor"
+  },
+  "memoryLimitTitle": {
+    "message": "Limite di memoria raggiunto",
+    "description": "Titolo del limite di memoria raggiunto"
+  },
+  "memoryLimitDescription": {
+    "message": "Il tuo dispositivo ha esaurito la memoria disponibile per la registrazione, causando l'interruzione automatica della registrazione. Se desideri registrare per un periodo più lungo, puoi provare a ridurre la qualità del video o a liberare spazio sul tuo dispositivo.",
+    "description": "Descrizione del limite di memoria raggiunto"
+  },
+  "understoodButton": {
+    "message": "Capito",
+    "description": "Pulsante Capito"
+  },
+  "notEnoughSpaceTitle": {
+    "message": "Spazio insufficiente",
+    "description": "Titolo di spazio insufficiente"
+  },
+  "notEnoughSpaceDescription": {
+    "message": "Screenity richiede almeno 1 GB di spazio libero per la registrazione. Per favore, libera spazio e riprova.",
+    "description": "Descrizione di spazio insufficiente"
+  },
+  "clearSpaceButton": {
+    "message": "Cancella le registrazioni precedenti",
+    "description": "Pulsante Cancella le registrazioni precedenti"
+  },
+  "sandboxAdvancedTitle": {
+    "message": "Avanzato",
+    "description": "Sezione avanzata nella pagina dell'editor nell'ambiente protetto"
+  },
+  "rawRecordingButtonTitle": {
+    "message": "Scarica file video grezzo",
+    "description": "Pulsante di download registrazione grezza"
+  },
+  "rawRecordingButtonDescription": {
+    "message": "Esporta i dati di registrazione originali",
+    "description": "Etichetta del pulsante di download registrazione grezza"
+  },
+  "troubleshootButtonTitle": {
+    "message": "Ottieni assistenza per la tua registrazione",
+    "description": "Pulsante di risoluzione dei problemi"
+  },
+  "troubleShootButtonDescription": {
+    "message": "Recupera il tuo video e risolvi altri problemi",
+    "description": "Etichetta di risoluzione dei problemi"
+  },
+  "rawRecordingModalTitle": {
+    "message": "Scarica file video grezzo",
+    "description": "Titolo del modulo registrazione grezza"
+  },
+  "rawRecordingModalDescription": {
+    "message": "Il file video grezzo è il file originale registrato da Screenity. Questo video non è stato elaborato o modificato, quindi potrebbe essere molto grande e potrebbe non essere riproducibile su tutti i dispositivi. Se stai riscontrando problemi con il video elaborato, puoi utilizzare questo file per recuperare il tuo video.",
+    "description": "Descrizione del modulo registrazione grezza"
+  },
+  "rawRecordingModalButton": {
+    "message": "Scarica",
+    "description": "Pulsante del modulo registrazione grezza"
+  },
+  "troubleshootModalTitle": {
+    "message": "Scarica informazioni di sistema e dati video per la risoluzione dei problemi",
+    "description": "Titolo del modulo di risoluzione dei problemi"
+  },
+  "troubleshootModalDescription": {
+    "message": "Dopo il download, invia il file a support@screenity.io con qualsiasi informazione pertinente. Utilizzeremo questi dati per aiutarti a risolvere eventuali problemi che riscontri con l'estensione e, se possibile, recuperare il tuo video.",
+    "description": "Descrizione del modulo di risoluzione dei problemi"
+  },
+  "troubleshootModalButton": {
+    "message": "Scarica",
+    "description": "Pulsante del modulo di risoluzione dei problemi"
+  },
+
+  "recoveryModeTitle": {
+    "message": "Modalità di recupero",
+    "description": "Titolo della modalità di recupero"
   }
 }

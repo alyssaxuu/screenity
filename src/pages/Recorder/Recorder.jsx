@@ -4,11 +4,7 @@ import Localbase from "localbase";
 let db = new Localbase("db");
 
 const Recorder = () => {
-  const chunkQueue = useRef([]);
-  const isSending = useRef(false);
   const isRestarting = useRef(false);
-  const isLastChunk = useRef(false);
-  const isFinished = useRef(false);
   const index = useRef(0);
 
   const [started, setStarted] = useState(false);
@@ -35,8 +31,19 @@ const Recorder = () => {
   const tabPreferred = useRef(false);
 
   async function startRecording() {
+    // Check if the stream actually has data in it
+    if (helperVideoStream.current.getVideoTracks().length === 0) {
+      chrome.runtime.sendMessage({
+        type: "recording-error",
+        error: "stream-error",
+        why: "No video tracks available",
+      });
+      return;
+    }
+
     // Clear chunks collection
     db.collection("chunks").delete();
+
     try {
       recorder.current = new MediaRecorder(liveStream.current);
     } catch (err) {
@@ -47,21 +54,24 @@ const Recorder = () => {
       });
     }
 
-    isFinished.current = false;
-    isLastChunk.current = false;
-    isSending.current = false;
-    chunkQueue.current = [];
     isRestarting.current = false;
     index.current = 0;
 
     try {
       chrome.storage.local.get(["quality"], (result) => {
         // I don't know what the ideal chunk size should be here
-        recorder.current.start(3000, {
-          videoBitsPerSecond: result.quality === "max" ? 2000000 : 1000,
-          mimeType: "video/webm; codecs=vp9",
-          // vp8, opus ?
-        });
+        if (result.quality === "max") {
+          recorder.current.start(3000, {
+            mimeType: "video/webm; codecs=vp9",
+            // vp8, opus ?
+          });
+        } else {
+          recorder.current.start(3000, {
+            videoBitsPerSecond: 1000,
+            mimeType: "video/webm; codecs=vp8",
+            // vp8, opus ?
+          });
+        }
       });
     } catch (err) {
       chrome.runtime.sendMessage({
@@ -73,48 +83,56 @@ const Recorder = () => {
 
     recorder.current.onstop = async (e) => {
       if (isRestarting.current) return;
-      isLastChunk.current = true;
-      setTimeout(() => {
-        if (
-          chunkQueue.current.length === 0 &&
-          !isRestarting.current &&
-          !isSending.current &&
-          !isFinished.current
-        ) {
-          isFinished.current = true;
-          chrome.runtime.sendMessage({ type: "video-ready" });
-          chunkQueue.current = [];
-          isSending.current = false;
-        }
-      }, 1000);
-
-      setTimeout(() => {
-        isFinished.current = true;
-        chrome.runtime.sendMessage({ type: "video-ready" });
-        chunkQueue.current = [];
-        isSending.current = false;
-      }, 5000);
+      chrome.runtime.sendMessage({ type: "video-ready" });
+      isRestarting.current = false;
     };
 
-    recorder.current.ondataavailable = async (e) => {
-      // Convert blob to base64
-      const reader = new FileReader();
-      reader.readAsDataURL(e.data);
-
-      reader.onloadend = function () {
-        const base64data = reader.result;
-        // Save to localbase
-        db.collection("chunks").add({
-          index: index.current,
-          chunk: base64data,
+    const checkMaxMemory = () => {
+      try {
+        navigator.storage.estimate().then((data) => {
+          const minMemory = 800000000;
+          // Check if there's enough space to keep recording
+          if (data.quota < minMemory) {
+            chrome.storage.local.set({
+              recording: false,
+              restarting: false,
+              tabRecordedID: null,
+              memoryError: true,
+            });
+            chrome.runtime.sendMessage({ type: "stop-recording-tab" });
+          }
         });
-        chunkQueue.current.push(base64data);
+      } catch (err) {
+        chrome.runtime.sendMessage({
+          type: "recording-error",
+          error: "stream-error",
+          why: JSON.stringify(err),
+        });
+      }
+    };
 
-        // If no message is currently being sent, start sending chunks from the queue
-        if (!isSending.current) {
-          sendNextChunk();
+    const handleDataAvailable = (e) => {
+      checkMaxMemory();
+
+      if (e.data.size > 0) {
+        try {
+          db.collection("chunks").add({
+            index: index.current,
+            chunk: e.data,
+          });
+          index.current++;
+        } catch (err) {
+          chrome.runtime.sendMessage({
+            type: "recording-error",
+            error: "stream-error",
+            why: JSON.stringify(err),
+          });
         }
-      };
+      }
+    };
+
+    recorder.current.ondataavailable = (e) => {
+      handleDataAvailable(e);
     };
 
     liveStream.current.getVideoTracks()[0].onended = () => {
@@ -122,24 +140,6 @@ const Recorder = () => {
       recorder.current.stop();
     };
   }
-
-  const sendNextChunk = () => {
-    if (isFinished.current) return;
-    if (isRestarting.current) return;
-
-    if (chunkQueue.current.length > 0) {
-      isSending.current = true;
-      const chunk = chunkQueue.current.shift();
-      index.current += 1;
-      chrome.runtime.sendMessage({
-        type: "new-chunk",
-        chunk: chunk,
-        index: index.current,
-      });
-    } else {
-      isSending.current = false;
-    }
-  };
 
   async function stopRecording() {
     if (recorder.current !== null) {
@@ -171,7 +171,6 @@ const Recorder = () => {
 
   const dismissRecording = async () => {
     isRestarting.current = true;
-    isSending.current = false;
     if (recorder.current !== null) {
       recorder.current.stop();
       recorder.current = null;
@@ -184,10 +183,7 @@ const Recorder = () => {
     if (recorder.current !== null) {
       recorder.current.stop();
     }
-    isSending.current = false;
     recorder.current = null;
-    isLastChunk.current = false;
-    chunkQueue.current = [];
     chrome.runtime.sendMessage({ type: "new-sandbox-page-restart" });
   };
 
@@ -378,8 +374,6 @@ const Recorder = () => {
     // Send message to go back to the previously active tab
     setStarted(true);
     chrome.runtime.sendMessage({ type: "reset-active-tab" });
-
-    db.collection("blobs").set([]);
   }
 
   async function startStreaming(data) {
@@ -469,19 +463,6 @@ const Recorder = () => {
       setMic(request);
     } else if (request.type === "set-audio-output-volume") {
       setAudioOutputVolume(request.volume);
-    } else if (request.type === "next-chunk-tab") {
-      if (isRestarting.current) return;
-      isSending.current = false;
-      sendNextChunk(); // Send the next chunk in the queue
-      if (
-        isLastChunk.current &&
-        chunkQueue.current.length === 0 &&
-        !isFinished.current
-      ) {
-        isFinished.current = true;
-        chrome.runtime.sendMessage({ type: "video-ready" });
-        isLastChunk.current = false;
-      }
     } else if (request.type === "pause-recording-tab") {
       if (!recorder.current) return;
       recorder.current.pause();

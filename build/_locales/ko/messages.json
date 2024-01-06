@@ -488,12 +488,12 @@
     "description": "Learn more button"
   },
   "overLimitLabelTitle": {
-    "message": "비디오가 5분 편집 제한을 초과합니다",
-    "description": "Over 5 minutes limit label in editor"
+    "message": "로컬에서 처리하기에 비디오가 너무 길어요",
+    "description": "편집기 내에서 5분 이상 제한 레이블"
   },
   "overLimitLabelDescription": {
-    "message": "더 긴 비디오를 편집하려면 업그레이드하세요",
-    "description": "Over 5 minutes limit description in editor"
+    "message": "편집 및 MP4 형식으로 내보내기를 사용할 수 없어요",
+    "description": "편집기 내에서 5분 이상 제한 설명"
   },
   "videoProcessingLabelTitle": {
     "message": "비디오 처리 중...",
@@ -810,5 +810,94 @@
   "noRecordingFound": {
     "message": "녹화된 것을 찾을 수 없습니다, 죄송합니다 :(",
     "description": "에디터 내 녹화된 것을 찾을 수 없음 경고"
+  },
+  "memoryLimitTitle": {
+    "message": "메모리 한도 도달",
+    "description": "메모리 한도 도달 제목"
+  },
+  "memoryLimitDescription": {
+    "message": "귀하의 장치는 녹화를 위한 사용 가능한 메모리를 모두 소진하여 녹화가 자동으로 중지되었습니다. 더 긴 시간 동안 녹화하려면 비디오 품질을 낮추거나 장치의 저장 공간을 확보해보십시오.",
+    "description": "메모리 한도 도달 설명"
+  },
+  "understoodButton": {
+    "message": "이해함",
+    "description": "이해함 버튼"
+  },
+  "notEnoughSpaceTitle": {
+    "message": "공간 부족",
+    "description": "공간 부족 제목"
+  },
+  "notEnoughSpaceDescription": {
+    "message": "Screenity는 녹화를 위해 최소 1GB의 빈 공간이 필요합니다. 장치의 공간을 확보하고 다시 시도하십시오.",
+    "description": "공간 부족 설명"
+  },
+  "clearSpaceButton": {
+    "message": "이전 녹화 삭제",
+    "description": "이전 녹화 삭제 버튼"
+  },
+  "sandboxAdvancedTitle": {
+    "message": "고급 설정",
+    "description": "샌드박스 에디터 페이지의 고급 설정 섹션"
+  },
+  "rawRecordingButtonTitle": {
+    "message": "원시 비디오 파일 다운로드",
+    "description": "원시 녹화 파일 다운로드 버튼"
+  },
+  "rawRecordingButtonDescription": {
+    "message": "원본 녹화 데이터 내보내기",
+    "description": "원시 녹화 다운로드 레이블"
+  },
+  "troubleshootButtonTitle": {
+    "message": "녹화에 대한 도움말 받기",
+    "description": "문제 해결 버튼"
+  },
+  "troubleShootButtonDescription": {
+    "message": "비디오를 복구하고 다른 문제 해결하기",
+    "description": "문제 해결 레이블"
+  },
+  "rawRecordingModalTitle": {
+    "message": "원시 비디오 파일 다운로드",
+    "description": "원시 녹화 모달 제목"
+  },
+  "rawRecordingModalDescription": {
+    "message": "원시 비디오 파일은 Screenity에 의해 녹화된 원본 비디오 파일입니다. 이 비디오는 처리되거나 편집되지 않았으므로 매우 크며 모든 장치에서 재생되지 않을 수 있습니다. 처리된 비디오에 문제가 있는 경우이 파일을 사용하여 비디오를 복구할 수 있습니다.",
+    "description": "원시 녹화 모달 설명"
+  },
+  "rawRecordingModalButton": {
+    "message": "다운로드",
+    "description": "원시 녹화 모달 버튼"
+  },
+  "troubleshootModalTitle": {
+    "message": "시스템 정보 및 비디오 데이터 다운로드 및 문제 해결 전송",
+    "description": "문제 해결 모달 제목"
+  },
+  "troubleshootModalDescription": {
+    "message": "다운로드 후 해당 파일을 support@screenity.io로 보내 주십시오. 우리는 이 데이터를 사용하여 확장 프로그램과 관련된 문제를 해결하고 가능한 경우 비디오를 복구하는 데 도움을 드리겠습니다.",
+    "description": "문제 해결 모달 설명"
+  },
+  "troubleshootModalButton": {
+    "message": "다운로드",
+    "description": "문제 해결 모달 버튼"
+  },
+  "overLimitModalTitle": {
+    "message": "비디오가 디바이스에서 처리하기에 너무 길어요",
+    "description": "5분 이상 제한 모달 제목"
+  },
+  "overLimitModalDescription": {
+    "message": "Screenity는 완전히 개인적이며 로컬에서 실행되므로 디바이스의 하드웨어에 제한됩니다. 이 길이의 비디오를 처리하는 데 시간이 오래 걸리고 많은 리소스를 필요로 할 것입니다. 걱정하지 마세요. 여전히 WEBM 파일이나 원시 녹화를 다운로드할 수 있지만 편집 및 MP4 내보내기는 사용할 수 없습니다. 그럼에도 불구하고, 이 비디오를 처리해 보려고 할 수 있습니다. 단, 위험을 이해하는 경우에만 시도하십시오.",
+    "description": "5분 이상 제한 모달 설명"
+  },
+  "overLimitModalButton": {
+    "message": "위험을 이해하고 시도해 보겠습니다",
+    "description": "5분 이상 제한 모달 버튼"
+  },
+  "overLimitModalLearnMore": {
+    "message": "긴 비디오 처리에 대해 자세히 알아보기",
+    "description": "5분 이상 제한 모달에서 자세히 알아보기 링크와 점이 포함된 설명"
+  },
+
+  "recoveryModeTitle": {
+    "message": "복구 모드",
+    "description": "복구 모드 제목"
   }
 }

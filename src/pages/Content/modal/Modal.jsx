@@ -3,6 +3,9 @@ import * as AlertDialog from "@radix-ui/react-alert-dialog";
 
 // Context
 import { contentStateContext } from "../context/ContentState";
+import Localbase from "localbase";
+
+let db = new Localbase("db");
 
 const Modal = (props) => {
   const [contentState, setContentState] = useContext(contentStateContext);

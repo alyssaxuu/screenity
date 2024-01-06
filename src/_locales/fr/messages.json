@@ -489,11 +489,11 @@
     "description": "Bouton d'en savoir plus"
   },
   "overLimitLabelTitle": {
-    "message": "La vidéo dépasse la limite d'édition de 5 minutes",
+    "message": "Vidéo trop longue pour être traitée localement",
     "description": "Étiquette de limite de plus de 5 minutes dans l'éditeur"
   },
   "overLimitLabelDescription": {
-    "message": "Mettez à jour pour éditer des vidéos plus longues",
+    "message": "L'édition et l'exportation au format MP4 ne sont pas disponibles",
     "description": "Description de la limite de plus de 5 minutes dans l'éditeur"
   },
   "videoProcessingLabelTitle": {
@@ -811,5 +811,94 @@
   "noRecordingFound": {
     "message": "Aucun enregistrement trouvé, désolé :(",
     "description": "Message d'alerte en cas d'absence d'enregistrement dans l'éditeur"
+  },
+  "memoryLimitTitle": {
+    "message": "Limite de mémoire atteinte",
+    "description": "Titre de la limite de mémoire atteinte"
+  },
+  "memoryLimitDescription": {
+    "message": "Votre appareil a épuisé sa mémoire disponible pour l'enregistrement, ce qui a entraîné l'arrêt automatique de l'enregistrement. Si vous souhaitez enregistrer plus longtemps, vous pouvez essayer de réduire la qualité de la vidéo ou de libérer de l'espace sur votre appareil.",
+    "description": "Description de la limite de mémoire atteinte"
+  },
+  "understoodButton": {
+    "message": "Compris",
+    "description": "Bouton Compris"
+  },
+  "notEnoughSpaceTitle": {
+    "message": "Espace insuffisant",
+    "description": "Titre d'espace insuffisant"
+  },
+  "notEnoughSpaceDescription": {
+    "message": "Screenity nécessite au moins 1 Go d'espace libre pour l'enregistrement. Veuillez libérer de l'espace et réessayer.",
+    "description": "Description d'espace insuffisant"
+  },
+  "clearSpaceButton": {
+    "message": "Effacer les enregistrements précédents",
+    "description": "Bouton Effacer les enregistrements précédents"
+  },
+  "sandboxAdvancedTitle": {
+    "message": "Avancé",
+    "description": "Section avancée dans la page de l'éditeur en mode sécurisé"
+  },
+  "rawRecordingButtonTitle": {
+    "message": "Télécharger le fichier vidéo brut",
+    "description": "Bouton de téléchargement de l'enregistrement brut"
+  },
+  "rawRecordingButtonDescription": {
+    "message": "Exporter les données d'enregistrement originales",
+    "description": "Libellé du bouton de téléchargement de l'enregistrement brut"
+  },
+  "troubleshootButtonTitle": {
+    "message": "Obtenir de l'aide pour votre enregistrement",
+    "description": "Bouton de dépannage"
+  },
+  "troubleShootButtonDescription": {
+    "message": "Récupérez votre vidéo et résolvez d'autres problèmes",
+    "description": "Libellé de dépannage"
+  },
+  "rawRecordingModalTitle": {
+    "message": "Télécharger le fichier vidéo brut",
+    "description": "Titre de la fenêtre modale de l'enregistrement brut"
+  },
+  "rawRecordingModalDescription": {
+    "message": "Le fichier vidéo brut est le fichier original enregistré par Screenity. Cette vidéo n'a pas été traitée ni modifiée, elle peut donc être très volumineuse et peut ne pas être lisible sur tous les appareils. Si vous rencontrez des problèmes avec la vidéo traitée, vous pouvez utiliser ce fichier pour récupérer votre vidéo.",
+    "description": "Description de la fenêtre modale de l'enregistrement brut"
+  },
+  "rawRecordingModalButton": {
+    "message": "Télécharger",
+    "description": "Bouton de la fenêtre modale de l'enregistrement brut"
+  },
+  "troubleshootModalTitle": {
+    "message": "Télécharger les informations système et les données vidéo pour le dépannage",
+    "description": "Titre de la fenêtre modale de dépannage"
+  },
+  "troubleshootModalDescription": {
+    "message": "Après le téléchargement, envoyez le fichier à support@screenity.io avec toutes les informations pertinentes. Nous utiliserons ces données pour vous aider à résoudre tout problème que vous pourriez rencontrer avec l'extension, et si possible, récupérer votre vidéo.",
+    "description": "Description de la fenêtre modale de dépannage"
+  },
+  "troubleshootModalButton": {
+    "message": "Télécharger",
+    "description": "Bouton de la fenêtre modale de dépannage"
+  },
+  "overLimitModalTitle": {
+    "message": "La vidéo est trop longue pour être traitée sur votre appareil",
+    "description": "Titre de la fenêtre modale de limite de plus de 5 minutes"
+  },
+  "overLimitModalDescription": {
+    "message": "Comme Screenity est complètement privé et fonctionne en local, il est limité par le matériel de votre appareil. Le traitement d'une vidéo de cette longueur prendrait trop de temps et serait très intensif en ressources. Ne vous inquiétez pas, vous pouvez toujours télécharger le fichier WEBM ou l'enregistrement brut, mais l'édition et l'exportation en MP4 ne sont pas disponibles. Cela dit, vous pouvez toujours essayer de traiter la vidéo de toute façon, si vous comprenez les risques.",
+    "description": "Description de la fenêtre modale de limite de plus de 5 minutes"
+  },
+  "overLimitModalButton": {
+    "message": "Je comprends le risque, essayer quand même",
+    "description": "Bouton de la fenêtre modale de limite de plus de 5 minutes"
+  },
+  "overLimitModalLearnMore": {
+    "message": "En savoir plus sur le traitement des vidéos longues.",
+    "description": "Lien 'En savoir plus' de la fenêtre modale de limite de plus de 5 minutes avec un point"
+  },
+
+  "recoveryModeTitle": {
+    "message": "Mode de récupération",
+    "description": "Titre du mode de récupération"
   }
 }

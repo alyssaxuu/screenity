@@ -25,7 +25,7 @@ const Sandbox = () => {
   };
 
   const loadFfmpeg = async () => {
-    sendMessage({ type: "ffmpeg-load-error" });
+    sendMessage({ type: "ffmpeg-load-error", fallback: true });
   };
 
   const toBase64 = (blob) => {

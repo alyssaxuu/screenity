@@ -489,12 +489,12 @@
     "description": "Botón de aprender más"
   },
   "overLimitLabelTitle": {
-    "message": "El vídeo supera el límite de edición de 5 minutos",
+    "message": "Video demasiado largo para procesar en tu dispositivo",
     "description": "Etiqueta de límite de más de 5 minutos en el editor"
   },
   "overLimitLabelDescription": {
-    "message": "Actualiza para editar vídeos más largos",
-    "description": "Descripción del límite de más de 5 minutos en el editor"
+    "message": "La edición y descarga en formato MP4 no están disponibles",
+    "description": "Descripción de límite de más de 5 minutos en el editor"
   },
   "videoProcessingLabelTitle": {
     "message": "El vídeo se está procesando...",
@@ -812,5 +812,93 @@
   "noRecordingFound": {
     "message": "No se encontró ninguna grabación, lo siento :(",
     "description": "Alerta de no se encontró ninguna grabación en el editor"
+  },
+  "memoryLimitTitle": {
+    "message": "Límite de memoria alcanzado",
+    "description": "Título de límite de memoria alcanzado"
+  },
+  "memoryLimitDescription": {
+    "message": "Tu dispositivo se ha quedado sin memoria para grabar, por lo que la grabación se ha detenido automáticamente. Si deseas grabar durante más tiempo, puedes intentar reducir la calidad del vídeo o liberar espacio en tu dispositivo.",
+    "description": "Descripción de límite de memoria alcanzado"
+  },
+  "understoodButton": {
+    "message": "Entendido",
+    "description": "Botón de entendido"
+  },
+  "notEnoughSpaceTitle": {
+    "message": "Espacio insuficiente",
+    "description": "Título de espacio insuficiente"
+  },
+  "notEnoughSpaceDescription": {
+    "message": "Screenity necesita al menos 1 GB de espacio libre para grabar. Por favor, libera espacio y vuelve a intentarlo.",
+    "description": "Descripción de espacio insuficiente"
+  },
+  "clearSpaceButton": {
+    "message": "Eliminar grabaciones anteriores",
+    "description": "Botón de eliminar grabaciones anteriores"
+  },
+  "sandboxAdvancedTitle": {
+    "message": "Avanzado",
+    "description": "Sección avanzada en la página del editor en el entorno seguro"
+  },
+  "rawRecordingButtonTitle": {
+    "message": "Descargar archivo de video sin procesar",
+    "description": "Botón de descarga de grabación sin procesar"
+  },
+  "rawRecordingButtonDescription": {
+    "message": "Exporta los datos de grabación originales",
+    "description": "Etiqueta de descarga de grabación sin procesar"
+  },
+  "troubleshootButtonTitle": {
+    "message": "Obtener ayuda con tu grabación",
+    "description": "Botón de solución de problemas"
+  },
+  "troubleShootButtonDescription": {
+    "message": "Recupera tu video y resuelve otros problemas",
+    "description": "Etiqueta de solución de problemas"
+  },
+  "rawRecordingModalTitle": {
+    "message": "Descargar archivo de video sin procesar",
+    "description": "Título del modal de grabación sin procesar"
+  },
+  "rawRecordingModalDescription": {
+    "message": "El archivo de video sin procesar es el video original grabado por Screenity. Este video no ha sido procesado ni editado, por lo que puede ser muy grande y es posible que no se pueda reproducir en todos los dispositivos. Si tienes problemas con el video procesado, puedes usar este archivo para recuperar tu video.",
+    "description": "Descripción del modal de grabación sin procesar"
+  },
+  "rawRecordingModalButton": {
+    "message": "Descargar",
+    "description": "Botón del modal de grabación sin procesar"
+  },
+  "troubleshootModalTitle": {
+    "message": "Descargar información del sistema y datos de video para enviar y solucionar problemas",
+    "description": "Título del modal de solución de problemas"
+  },
+  "troubleshootModalDescription": {
+    "message": "Después de descargar, envía el archivo a support@screenity.io con cualquier información relevante. Utilizaremos estos datos para ayudarte a solucionar cualquier problema que tengas con la extensión y, si es posible, recuperar tu video.",
+    "description": "Descripción del modal de solución de problemas"
+  },
+  "troubleshootModalButton": {
+    "message": "Descargar",
+    "description": "Botón del modal de solución de problemas"
+  },
+  "overLimitModalTitle": {
+    "message": "El video es demasiado largo para procesarse en tu dispositivo",
+    "description": "Título del modal de límite de más de 5 minutos"
+  },
+  "overLimitModalDescription": {
+    "message": "Dado que Screenity es completamente privado y se ejecuta localmente, está limitado por el hardware de tu dispositivo. Procesar un video de esta longitud llevaría demasiado tiempo y sería muy intensivo en recursos. No te preocupes, aún puedes descargar el archivo WEBM o la grabación sin procesar, pero la edición y la exportación a MP4 no están disponibles. Dicho esto, aún puedes intentar procesar el video de todos modos si comprendes los riesgos.",
+    "description": "Descripción del modal de límite de más de 5 minutos"
+  },
+  "overLimitModalButton": {
+    "message": "Entiendo el riesgo, intentalo de todos modos",
+    "description": "Botón del modal de límite de más de 5 minutos"
+  },
+  "overLimitModalLearnMore": {
+    "message": "Obtén más información sobre el procesamiento de videos largos.",
+    "description": "Enlace 'Obtener más información' del modal de límite de más de 5 minutos con un punto"
+  },
+  "recoveryModeTitle": {
+    "message": "Modo de recuperación",
+    "description": "Título del modo de recuperación"
   }
 }

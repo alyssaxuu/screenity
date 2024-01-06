@@ -83,7 +83,15 @@ const Modal = (props) => {
             {description}
             {learnmore && " "}
             {learnmore && (
-              <a href={learnMoreLink} target="_blank">
+              <a
+                href="#"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  learnMoreLink();
+                }}
+                target="_blank"
+              >
                 {learnmore}
               </a>
             )}

@@ -1,5 +1,7 @@
-import React, { useContext, useEffect, useState } from "react";
+import React, { useContext, useEffect, useState, useRef } from "react";
 import styles from "../../styles/player/_RightPanel.module.scss";
+
+import JSZip from "jszip";
 
 import { ReactSVG } from "react-svg";
 
@@ -16,9 +18,22 @@ import { ContentStateContext } from "../../context/ContentState"; // Import the 
 const RightPanel = () => {
   const [contentState, setContentState] = useContext(ContentStateContext); // Access the ContentState context
   const [webmFallback, setWebmFallback] = useState(false);
+  const contentStateRef = useRef(contentState);
+  const consoleErrorRef = useRef([]);
+
+  // Override console.error to catch errors from ffmpeg.wasm
+  useEffect(() => {
+    console.error = (error) => {
+      consoleErrorRef.current.push(error);
+    };
+  }, []);
+
+  useEffect(() => {
+    contentStateRef.current = contentState;
+  }, [contentState]);
 
   const saveToDrive = () => {
-    if (!contentState.mp4ready || !contentState.noffmpeg) return;
+    //if (contentState.noffmpeg) return;
     setContentState((prevContentState) => ({
       ...prevContentState,
       saveDrive: true,
@@ -45,7 +60,7 @@ const RightPanel = () => {
           }
         });
     };
-    if (!contentState.noffmpeg) {
+    if (!contentState.noffmpeg && contentState.mp4ready && contentState.blob) {
       reader.readAsDataURL(contentState.blob);
     } else {
       reader.readAsDataURL(contentState.webm);
@@ -61,7 +76,11 @@ const RightPanel = () => {
   };
 
   const handleEdit = () => {
-    if (contentState.duration > contentState.editLimit) return;
+    if (
+      contentState.duration > contentState.editLimit &&
+      !contentState.override
+    )
+      return;
     if (!contentState.mp4ready) return;
     setContentState((prevContentState) => ({
       ...prevContentState,
@@ -78,7 +97,11 @@ const RightPanel = () => {
   };
 
   const handleCrop = () => {
-    if (contentState.duration > contentState.editLimit) return;
+    if (
+      contentState.duration > contentState.editLimit &&
+      !contentState.override
+    )
+      return;
     if (!contentState.mp4ready) return;
     setContentState((prevContentState) => ({
       ...prevContentState,
@@ -94,7 +117,11 @@ const RightPanel = () => {
   };
 
   const handleAddAudio = async () => {
-    if (contentState.duration > contentState.editLimit) return;
+    if (
+      contentState.duration > contentState.editLimit &&
+      !contentState.override
+    )
+      return;
     if (!contentState.mp4ready) return;
     setContentState((prevContentState) => ({
       ...prevContentState,
@@ -109,15 +136,66 @@ const RightPanel = () => {
     }
   };
 
-  // Wait for 8 seconds, if the video is still processing, show the webm fallback
-  useEffect(() => {
-    const timeout = setTimeout(() => {
-      if (!contentState.mp4ready) {
-        setWebmFallback(true);
-      }
-    }, 8000);
-    return () => clearTimeout(timeout);
-  }, [contentState.mp4ready]);
+  const handleRawRecording = () => {
+    if (typeof contentStateRef.current.openModal === "function") {
+      contentStateRef.current.openModal(
+        chrome.i18n.getMessage("rawRecordingModalTitle"),
+        chrome.i18n.getMessage("rawRecordingModalDescription"),
+        chrome.i18n.getMessage("rawRecordingModalButton"),
+        chrome.i18n.getMessage("sandboxEditorCancelButton"),
+        () => {
+          const blob = contentStateRef.current.rawBlob;
+          const url = window.URL.createObjectURL(blob);
+          chrome.downloads.download({
+            url: url,
+            filename: "raw-recording.webm",
+          });
+        },
+        () => {}
+      );
+    }
+  };
+
+  const handleTroubleshooting = () => {
+    if (typeof contentStateRef.current.openModal === "function") {
+      contentStateRef.current.openModal(
+        chrome.i18n.getMessage("troubleshootModalTitle"),
+        chrome.i18n.getMessage("troubleshootModalDescription"),
+        chrome.i18n.getMessage("troubleshootModalButton"),
+        chrome.i18n.getMessage("sandboxEditorCancelButton"),
+        () => {
+          // Need to create a file with the original data, any console logs, and system info
+          const userAgent = navigator.userAgent;
+          let platformInfo = {};
+          chrome.runtime.getPlatformInfo(function (info) {
+            platformInfo = info;
+            const manifestInfo = chrome.runtime.getManifest().version;
+            const blob = contentStateRef.current.rawBlob;
+
+            // Now we need to create a file with all of this data
+            const data = {
+              userAgent: userAgent,
+              platformInfo: platformInfo,
+              manifestInfo: manifestInfo,
+              contentState: contentStateRef.current,
+            };
+            // Create a zip file with the original recording and the data
+            const zip = new JSZip();
+            zip.file("recording.webm", blob);
+            zip.file("troubleshooting.json", JSON.stringify(data));
+            zip.generateAsync({ type: "blob" }).then(function (blob) {
+              const url = window.URL.createObjectURL(blob);
+              chrome.downloads.download({
+                url: url,
+                filename: "troubleshooting.zip",
+              });
+            });
+          });
+        },
+        () => {}
+      );
+    }
+  };
 
   return (
     <div className={styles.panel}>
@@ -143,8 +221,25 @@ const RightPanel = () => {
               </div>
             </div>
           )}
-          {(contentState.updateChrome || contentState.noffmpeg) &&
-            !contentState.offline && (
+          {contentState.fallback &&
+            contentState.duration <= contentState.editLimit && (
+              <div className={styles.alert}>
+                <div className={styles.buttonLeft}>
+                  <ReactSVG src={URL + "editor/icons/alert.svg"} />
+                </div>
+                <div className={styles.buttonMiddle}>
+                  <div className={styles.buttonTitle}>
+                    {chrome.i18n.getMessage("recoveryModeTitle")}
+                  </div>
+                  <div className={styles.buttonDescription}>
+                    {chrome.i18n.getMessage("overLimitLabelDescription")}
+                  </div>
+                </div>
+              </div>
+            )}
+          {contentState.updateChrome &&
+            !contentState.offline &&
+            contentState.duration <= contentState.editLimit && (
               <div className={styles.alert}>
                 <div className={styles.buttonLeft}>
                   <ReactSVG src={URL + "editor/icons/alert.svg"} />
@@ -168,6 +263,7 @@ const RightPanel = () => {
               </div>
             )}
           {contentState.duration > contentState.editLimit &&
+            !contentState.override &&
             !contentState.offline &&
             !contentState.updateChrome && (
               <div className={styles.alert}>
@@ -185,7 +281,30 @@ const RightPanel = () => {
                 <div
                   className={styles.buttonRight}
                   onClick={() => {
-                    chrome.runtime.sendMessage({ type: "upgrade-info" });
+                    //chrome.runtime.sendMessage({ type: "upgrade-info" });
+                    if (typeof contentState.openModal === "function") {
+                      contentState.openModal(
+                        chrome.i18n.getMessage("overLimitModalTitle"),
+                        chrome.i18n.getMessage("overLimitModalDescription"),
+                        chrome.i18n.getMessage("overLimitModalButton"),
+                        chrome.i18n.getMessage("sandboxEditorCancelButton"),
+                        () => {
+                          setContentState((prevContentState) => ({
+                            ...prevContentState,
+                            saved: true,
+                          }));
+                          chrome.runtime.sendMessage({
+                            type: "force-processing",
+                          });
+                        },
+                        () => {},
+                        null,
+                        chrome.i18n.getMessage("overLimitModalLearnMore"),
+                        () => {
+                          chrome.runtime.sendMessage({ type: "upgrade-info" });
+                        }
+                      );
+                    }
                   }}
                 >
                   {chrome.i18n.getMessage("learnMoreLabel")}
@@ -193,7 +312,8 @@ const RightPanel = () => {
               </div>
             )}
           {(!contentState.mp4ready || contentState.isFfmpegRunning) &&
-            contentState.duration <= contentState.editLimit &&
+            (contentState.duration <= contentState.editLimit ||
+              contentState.override) &&
             !contentState.offline &&
             !contentState.updateChrome &&
             !contentState.noffmpeg && (
@@ -232,7 +352,8 @@ const RightPanel = () => {
                 className={styles.button}
                 onClick={handleEdit}
                 disabled={
-                  contentState.duration > contentState.editLimit ||
+                  (contentState.duration > contentState.editLimit &&
+                    !contentState.override) ||
                   !contentState.mp4ready ||
                   contentState.noffmpeg
                 }
@@ -247,7 +368,10 @@ const RightPanel = () => {
                   <div className={styles.buttonDescription}>
                     {contentState.offline && !contentState.ffmpegLoaded
                       ? chrome.i18n.getMessage("noConnectionLabel")
-                      : contentState.updateChrome || contentState.noffmpeg
+                      : contentState.updateChrome ||
+                        contentState.noffmpeg ||
+                        (contentState.duration > contentState.editLimit &&
+                          !contentState.override)
                       ? chrome.i18n.getMessage("notAvailableLabel")
                       : contentState.mp4ready
                       ? chrome.i18n.getMessage("editButtonDescription")
@@ -263,7 +387,8 @@ const RightPanel = () => {
                 className={styles.button}
                 onClick={handleCrop}
                 disabled={
-                  contentState.duration > contentState.editLimit ||
+                  (contentState.duration > contentState.editLimit &&
+                    !contentState.override) ||
                   !contentState.mp4ready ||
                   contentState.noffmpeg
                 }
@@ -278,7 +403,10 @@ const RightPanel = () => {
                   <div className={styles.buttonDescription}>
                     {contentState.offline && !contentState.ffmpegLoaded
                       ? chrome.i18n.getMessage("noConnectionLabel")
-                      : contentState.updateChrome || contentState.noffmpeg
+                      : contentState.updateChrome ||
+                        contentState.noffmpeg ||
+                        (contentState.duration > contentState.editLimit &&
+                          !contentState.override)
                       ? chrome.i18n.getMessage("notAvailableLabel")
                       : contentState.mp4ready
                       ? chrome.i18n.getMessage("cropButtonDescription")
@@ -294,7 +422,8 @@ const RightPanel = () => {
                 className={styles.button}
                 onClick={handleAddAudio}
                 disabled={
-                  contentState.duration > contentState.editLimit ||
+                  (contentState.duration > contentState.editLimit &&
+                    !contentState.override) ||
                   !contentState.mp4ready ||
                   contentState.noffmpeg
                 }
@@ -309,7 +438,10 @@ const RightPanel = () => {
                   <div className={styles.buttonDescription}>
                     {contentState.offline && !contentState.ffmpegLoaded
                       ? chrome.i18n.getMessage("noConnectionLabel")
-                      : contentState.updateChrome || contentState.noffmpeg
+                      : contentState.updateChrome ||
+                        contentState.noffmpeg ||
+                        (contentState.duration > contentState.editLimit &&
+                          !contentState.override)
                       ? chrome.i18n.getMessage("notAvailableLabel")
                       : contentState.mp4ready
                       ? chrome.i18n.getMessage("addAudioButtonDescription")
@@ -341,10 +473,7 @@ const RightPanel = () => {
                 role="button"
                 className={styles.button}
                 onClick={saveToDrive}
-                disabled={
-                  contentState.saveDrive ||
-                  (!contentState.mp4ready && !contentState.noffmpeg)
-                }
+                disabled={contentState.saveDrive}
               >
                 <div className={styles.buttonLeft}>
                   <ReactSVG src={URL + "editor/icons/drive.svg"} />
@@ -362,9 +491,7 @@ const RightPanel = () => {
                       ? chrome.i18n.getMessage("noConnectionLabel")
                       : contentState.updateChrome
                       ? chrome.i18n.getMessage("notAvailableLabel")
-                      : contentState.mp4ready || contentState.noffmpeg
-                      ? chrome.i18n.getMessage("saveDriveButtonDescription")
-                      : chrome.i18n.getMessage("preparingLabel")}
+                      : chrome.i18n.getMessage("saveDriveButtonDescription")}
                   </div>
                 </div>
                 <div className={styles.buttonRight}>
@@ -378,6 +505,31 @@ const RightPanel = () => {
               {chrome.i18n.getMessage("sandboxExportTitle")}
             </div>
             <div className={styles.buttonWrap}>
+              {contentState.fallback && (
+                <div
+                  role="button"
+                  className={styles.button}
+                  onClick={() => contentState.downloadWEBM()}
+                  disabled={contentState.isFfmpegRunning}
+                >
+                  <div className={styles.buttonLeft}>
+                    <ReactSVG src={URL + "editor/icons/download.svg"} />
+                  </div>
+                  <div className={styles.buttonMiddle}>
+                    <div className={styles.buttonTitle}>
+                      {contentState.downloadingWEBM
+                        ? chrome.i18n.getMessage("downloadingLabel")
+                        : chrome.i18n.getMessage("downloadWEBMButtonTitle")}
+                    </div>
+                    <div className={styles.buttonDescription}>
+                      {chrome.i18n.getMessage("downloadWEBMButtonDescription")}
+                    </div>
+                  </div>
+                  <div className={styles.buttonRight}>
+                    <ReactSVG src={URL + "editor/icons/right-arrow.svg"} />
+                  </div>
+                </div>
+              )}
               <div
                 role="button"
                 className={styles.button}
@@ -404,9 +556,12 @@ const RightPanel = () => {
                   <div className={styles.buttonDescription}>
                     {contentState.offline && !contentState.ffmpegLoaded
                       ? chrome.i18n.getMessage("noConnectionLabel")
-                      : contentState.updateChrome || contentState.noffmpeg
+                      : contentState.updateChrome ||
+                        contentState.noffmpeg ||
+                        (contentState.duration > contentState.editLimit &&
+                          !contentState.override)
                       ? chrome.i18n.getMessage("notAvailableLabel")
-                      : contentState.mp4ready
+                      : contentState.mp4ready && !contentState.isFfmpegRunning
                       ? chrome.i18n.getMessage("downloadMP4ButtonDescription")
                       : chrome.i18n.getMessage("preparingLabel")}
                   </div>
@@ -415,10 +570,7 @@ const RightPanel = () => {
                   <ReactSVG src={URL + "editor/icons/right-arrow.svg"} />
                 </div>
               </div>
-              {(contentState.offline ||
-                !contentState.ffmpeg ||
-                contentState.ffmpeg === true ||
-                webmFallback) && (
+              {!contentState.fallback && (
                 <div
                   role="button"
                   className={styles.button}
@@ -435,7 +587,11 @@ const RightPanel = () => {
                         : chrome.i18n.getMessage("downloadWEBMButtonTitle")}
                     </div>
                     <div className={styles.buttonDescription}>
-                      {chrome.i18n.getMessage("downloadWEBMButtonDescription")}
+                      {!contentState.isFfmpegRunning
+                        ? chrome.i18n.getMessage(
+                            "downloadWEBMButtonDescription"
+                          )
+                        : chrome.i18n.getMessage("preparingLabel")}
                     </div>
                   </div>
                   <div className={styles.buttonRight}>
@@ -469,11 +625,66 @@ const RightPanel = () => {
                   <div className={styles.buttonDescription}>
                     {contentState.offline && !contentState.ffmpegLoaded
                       ? chrome.i18n.getMessage("noConnectionLabel")
-                      : contentState.updateChrome || contentState.noffmpeg
+                      : contentState.updateChrome ||
+                        contentState.noffmpeg ||
+                        (contentState.duration > contentState.editLimit &&
+                          !contentState.override)
                       ? chrome.i18n.getMessage("notAvailableLabel")
                       : contentState.mp4ready
                       ? chrome.i18n.getMessage("downloadGIFButtonDescription")
                       : chrome.i18n.getMessage("preparingLabel")}
+                  </div>
+                </div>
+                <div className={styles.buttonRight}>
+                  <ReactSVG src={URL + "editor/icons/right-arrow.svg"} />
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className={styles.section}>
+            {/* Create an advanced section with a button to send logs and to download raw video file as a backup */}
+            <div className={styles.sectionTitle}>
+              {chrome.i18n.getMessage("sandboxAdvancedTitle")}
+            </div>
+            <div className={styles.buttonWrap}>
+              <div
+                role="button"
+                className={styles.button}
+                onClick={() => {
+                  handleRawRecording();
+                }}
+              >
+                <div className={styles.buttonLeft}>
+                  <ReactSVG src={URL + "editor/icons/download.svg"} />
+                </div>
+                <div className={styles.buttonMiddle}>
+                  <div className={styles.buttonTitle}>
+                    {chrome.i18n.getMessage("rawRecordingButtonTitle")}
+                  </div>
+                  <div className={styles.buttonDescription}>
+                    {chrome.i18n.getMessage("rawRecordingButtonDescription")}
+                  </div>
+                </div>
+                <div className={styles.buttonRight}>
+                  <ReactSVG src={URL + "editor/icons/right-arrow.svg"} />
+                </div>
+              </div>
+              <div
+                role="button"
+                className={styles.button}
+                onClick={() => {
+                  handleTroubleshooting();
+                }}
+              >
+                <div className={styles.buttonLeft}>
+                  <ReactSVG src={URL + "editor/icons/flag.svg"} />
+                </div>
+                <div className={styles.buttonMiddle}>
+                  <div className={styles.buttonTitle}>
+                    {chrome.i18n.getMessage("troubleshootButtonTitle")}
+                  </div>
+                  <div className={styles.buttonDescription}>
+                    {chrome.i18n.getMessage("troubleshootButtonDescription")}
                   </div>
                 </div>
                 <div className={styles.buttonRight}>

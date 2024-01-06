@@ -87,12 +87,6 @@ const saveToDrive = async (videoBlob, fileName, sendResponse) => {
       );
 
       if (!uploadResponse.ok) {
-        const errorResponse = await uploadResponse.json();
-        console.error(
-          "Error uploading to Google Drive:",
-          uploadResponse.status,
-          errorResponse.error.message
-        );
         throw new Error(
           `Error uploading to Google Drive: ${uploadResponse.status}`
         );
@@ -102,7 +96,6 @@ const saveToDrive = async (videoBlob, fileName, sendResponse) => {
       const fileId = responseData.id;
 
       if (!fileId) {
-        console.error("File ID is undefined");
         throw new Error("File ID is undefined");
       }
 

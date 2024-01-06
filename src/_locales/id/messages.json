@@ -489,12 +489,12 @@
     "description": "Tombol Pelajari lebih lanjut"
   },
   "overLimitLabelTitle": {
-    "message": "Video melebihi batas edit 5 menit",
-    "description": "Label Batas lebih dari 5 menit di editor"
+    "message": "Video terlalu panjang untuk diproses secara lokal",
+    "description": "Label batas lebih dari 5 menit dalam editor"
   },
   "overLimitLabelDescription": {
-    "message": "Upgrade untuk mengedit video yang lebih panjang",
-    "description": "Deskripsi Batas lebih dari 5 menit di editor"
+    "message": "Pengeditan dan ekspor ke format MP4 tidak tersedia",
+    "description": "Deskripsi batas lebih dari 5 menit dalam editor"
   },
   "videoProcessingLabelTitle": {
     "message": "Video sedang diproses...",
@@ -811,5 +811,94 @@
   "noRecordingFound": {
     "message": "Tidak ada rekaman yang ditemukan, maaf :(",
     "description": "Peringatan tidak ada rekaman ditemukan di editor"
+  },
+  "memoryLimitTitle": {
+    "message": "Batas Memori Tercapai",
+    "description": "Judul Batas Memori Tercapai"
+  },
+  "memoryLimitDescription": {
+    "message": "Perangkat Anda telah kehabisan memori untuk merekam, sehingga perekaman telah berhenti secara otomatis. Jika Anda ingin merekam lebih lama, Anda dapat mencoba mengurangi kualitas video atau membersihkan beberapa ruang pada perangkat Anda.",
+    "description": "Deskripsi Batas Memori Tercapai"
+  },
+  "understoodButton": {
+    "message": "Dimengerti",
+    "description": "Tombol Dimengerti"
+  },
+  "notEnoughSpaceTitle": {
+    "message": "Ruang Tidak Cukup",
+    "description": "Judul Ruang Tidak Cukup"
+  },
+  "notEnoughSpaceDescription": {
+    "message": "Screenity memerlukan setidaknya 1 GB ruang kosong untuk merekam. Silakan mengosongkan beberapa ruang pada perangkat Anda dan coba lagi.",
+    "description": "Deskripsi Ruang Tidak Cukup"
+  },
+  "clearSpaceButton": {
+    "message": "Hapus Rekaman Sebelumnya",
+    "description": "Tombol Hapus Rekaman Sebelumnya"
+  },
+  "sandboxAdvancedTitle": {
+    "message": "Lanjutan",
+    "description": "Bagian Lanjutan pada halaman editor sandbox"
+  },
+  "rawRecordingButtonTitle": {
+    "message": "Unduh berkas video mentah",
+    "description": "Tombol Unduh berkas perekaman mentah"
+  },
+  "rawRecordingButtonDescription": {
+    "message": "Ekspor data perekaman asli",
+    "description": "Label Unduh berkas perekaman mentah"
+  },
+  "troubleshootButtonTitle": {
+    "message": "Dapatkan bantuan untuk perekaman Anda",
+    "description": "Tombol Penyelesaian Masalah"
+  },
+  "troubleShootButtonDescription": {
+    "message": "Pulihkan video Anda dan selesaikan masalah lainnya",
+    "description": "Label Penyelesaian Masalah"
+  },
+  "rawRecordingModalTitle": {
+    "message": "Unduh berkas video mentah",
+    "description": "Judul modal berkas perekaman mentah"
+  },
+  "rawRecordingModalDescription": {
+    "message": "Berkas video mentah adalah berkas video asli yang direkam oleh Screenity. Video ini tidak diproses atau diedit, sehingga mungkin sangat besar dan mungkin tidak dapat diputar di semua perangkat. Jika Anda mengalami masalah dengan video yang diproses, Anda dapat menggunakan berkas ini untuk memulihkan video Anda.",
+    "description": "Deskripsi modal berkas perekaman mentah"
+  },
+  "rawRecordingModalButton": {
+    "message": "Unduh",
+    "description": "Tombol modal berkas perekaman mentah"
+  },
+  "troubleshootModalTitle": {
+    "message": "Unduh informasi sistem dan data video untuk penyelesaian masalah",
+    "description": "Judul modal Penyelesaian Masalah"
+  },
+  "troubleshootModalDescription": {
+    "message": "Setelah mengunduh, kirim berkas ini ke support@screenity.io dengan informasi relevan. Kami akan menggunakan data ini untuk membantu Anda menyelesaikan masalah dengan ekstensi dan memulihkan video Anda jika memungkinkan.",
+    "description": "Deskripsi modal Penyelesaian Masalah"
+  },
+  "troubleshootModalButton": {
+    "message": "Unduh",
+    "description": "Tombol modal Penyelesaian Masalah"
+  },
+  "overLimitModalTitle": {
+    "message": "Video terlalu panjang untuk diproses di perangkat Anda",
+    "description": "Judul modal batas lebih dari 5 menit"
+  },
+  "overLimitModalDescription": {
+    "message": "Karena Screenity sepenuhnya privat dan berjalan secara lokal, ia dibatasi oleh perangkat keras perangkat Anda. Memproses video sepanjang ini akan memakan waktu terlalu lama dan sangat intensif dalam penggunaan sumber daya. Jangan khawatir, Anda masih dapat mengunduh file WEBM atau rekaman mentah, tetapi pengeditan dan ekspor ke MP4 tidak tersedia. Namun demikian, Anda masih dapat mencoba memproses video ini jika Anda memahami risikonya.",
+    "description": "Deskripsi modal batas lebih dari 5 menit"
+  },
+  "overLimitModalButton": {
+    "message": "Saya mengerti risikonya, coba saja",
+    "description": "Tombol modal batas lebih dari 5 menit"
+  },
+  "overLimitModalLearnMore": {
+    "message": "Pelajari lebih lanjut tentang pengolahan video panjang.",
+    "description": "Tautan 'Pelajari lebih lanjut' dalam modal batas lebih dari 5 menit dengan titik"
+  },
+
+  "recoveryModeTitle": {
+    "message": "Mode Pemulihan",
+    "description": "Judul Mode Pemulihan"
   }
 }

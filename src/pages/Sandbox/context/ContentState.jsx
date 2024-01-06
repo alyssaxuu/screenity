@@ -13,6 +13,7 @@ export const ContentStateContext = createContext();
 
 const ContentState = (props) => {
   const videoChunks = useRef([]);
+  const makeVideoCheck = useRef(false);
 
   const defaultState = {
     time: 0,
@@ -64,6 +65,11 @@ const ContentState = (props) => {
     dragInteracted: false,
     noffmpeg: false,
     openModal: null,
+    rawBlob: null,
+    override: false,
+    fallback: false,
+    chunkCount: 0,
+    chunkIndex: 0,
   };
 
   const [contentState, setContentState] = useState(defaultState);
@@ -203,36 +209,114 @@ const ContentState = (props) => {
       driveEnabled = true;
     }
 
-    fixWebmDuration(
-      blob,
-      recordingDuration,
-      async (fixedWebm) => {
-        const reader = new FileReader();
-        reader.readAsDataURL(fixedWebm);
-        reader.onloadend = function () {
-          const base64data = reader.result;
-          // Postmessage to parent (this is an iframe)
-          setContentState((prevContentState) => ({
-            ...prevContentState,
-            base64: base64data,
-            driveEnabled: driveEnabled,
-          }));
-        };
-      },
-      { logger: false }
-    );
+    setContentState((prevState) => ({
+      ...prevState,
+      rawBlob: blob,
+      duration: recordingDuration / 1000,
+    }));
+
+    try {
+      fixWebmDuration(
+        blob,
+        recordingDuration,
+        async (fixedWebm) => {
+          if (
+            contentStateRef.current.fallback ||
+            contentStateRef.current.noffmpeg ||
+            (contentStateRef.current.duration >
+              contentStateRef.current.editLimit &&
+              !contentStateRef.current.override)
+          ) {
+            setContentState((prevState) => ({
+              ...prevState,
+              webm: fixedWebm,
+              ready: true,
+            }));
+            chrome.runtime.sendMessage({ type: "recording-complete" });
+            return;
+          }
+
+          const reader = new FileReader();
+          reader.onloadend = function () {
+            const base64data = reader.result;
+            setContentState((prevContentState) => ({
+              ...prevContentState,
+              base64: base64data,
+              driveEnabled: driveEnabled,
+            }));
+          };
+          reader.onerror = function (error) {
+            console.log(error);
+          };
+          reader.readAsDataURL(fixedWebm);
+        },
+        { logger: false }
+      );
+    } catch (error) {
+      setContentState((prevState) => ({
+        ...prevState,
+        webm: blob,
+        ready: true,
+      }));
+      chrome.runtime.sendMessage({ type: "recording-complete" });
+    }
+  };
+
+  const checkMemory = () => {
+    if (typeof contentStateRef.current.openModal === "function") {
+      chrome.storage.local.get("memoryLimit", (result) => {
+        if (result.memoryLimit && result.memoryLimit !== null) {
+          chrome.storage.local.set({ memoryLimit: false });
+          contentStateRef.current.openModal(
+            chrome.i18n.getMessage("memoryLimitTitle"),
+            chrome.i18n.getMessage("memoryLimitDescription"),
+            chrome.i18n.getMessage("understoodButton"),
+            null,
+            () => {},
+            () => {},
+            null,
+            chrome.i18n.getMessage("learnMoreDot"),
+            () => {
+              chrome.runtime.sendMessage({ type: "memory-limit-help" });
+            }
+          );
+        }
+      });
+    }
+  };
+
+  const handleBatch = async (chunks, sendResponse) => {
+    for (const chunk of chunks) {
+      const chunkData = base64ToUint8Array(chunk.chunk);
+      videoChunks.current.push(chunkData);
+      setContentState((prevState) => ({
+        ...prevState,
+        chunkIndex: prevState.chunkIndex + 1,
+      }));
+    }
+    sendResponse({ status: "ok" });
   };
 
   const onChromeMessage = useCallback((request, sender, sendResponse) => {
     const message = request;
+    if (message.type === "chunk-count") {
+      setContentState((prevState) => ({
+        ...prevState,
+        chunkCount: message.count,
+      }));
+    } else if (message.type === "new-chunk-tab") {
+      handleBatch(message.chunks, sendResponse);
 
-    if (message.type === "new-chunk-tab") {
-      // Chunkdata is base64 encoded, needs to be a blob
-      const chunkData = base64ToUint8Array(message.chunk);
-      videoChunks.current.push(chunkData);
-      chrome.runtime.sendMessage({ type: "request-next-chunk" });
+      return true;
     } else if (message.type === "make-video-tab") {
+      if (makeVideoCheck.current) return;
+      makeVideoCheck.current = true;
+      setContentState((prevState) => ({
+        ...prevState,
+        override: message.override,
+      }));
       // All chunks received, reconstruct video
+      checkMemory();
       reconstructVideo();
       sendResponse({ status: "ok" });
     } else if (message.type === "saved-to-drive") {
@@ -356,6 +440,7 @@ const ContentState = (props) => {
         noffmpeg: true,
         ffmpegLoaded: true,
         isFfmpegRunning: false,
+        fallback: event.data.fallback,
       }));
 
       // if (!navigator.onLine) {
@@ -401,6 +486,12 @@ const ContentState = (props) => {
   };
 
   const getBlob = async () => {
+    if (
+      contentState.fallback ||
+      contentState.noffmpeg ||
+      (contentState.duration > contentState.editLimit && !contentState.override)
+    )
+      return;
     const webmVideo = new Blob([base64ToUint8Array(contentState.base64)], {
       type: "video/webm",
     });
@@ -413,7 +504,10 @@ const ContentState = (props) => {
 
     if (contentState.offline && contentState.ffmpeg === true) {
       console.log("Offline");
-    } else if (!contentState.updateChrome) {
+    } else if (
+      !contentState.updateChrome &&
+      (contentState.duration <= contentState.editLimit || contentState.override)
+    ) {
       sendMessage({ type: "base64-to-blob", base64: contentState.base64 });
     }
 
@@ -443,7 +537,11 @@ const ContentState = (props) => {
 
   const addAudio = async (videoBlob, audioBlob, volume) => {
     if (contentState.isFfmpegRunning) return;
-    if (contentState.duration > contentState.editLimit) return;
+    if (
+      contentState.duration > contentState.editLimit &&
+      !contentState.override
+    )
+      return;
 
     setContentState((prevState) => ({
       ...prevState,
@@ -462,7 +560,11 @@ const ContentState = (props) => {
 
   const handleTrim = async (cut) => {
     if (contentState.isFfmpegRunning) return;
-    if (contentState.duration > contentState.editLimit) return;
+    if (
+      contentState.duration > contentState.editLimit &&
+      !contentState.override
+    )
+      return;
 
     if (cut) {
       setContentState((prevState) => ({
@@ -496,7 +598,11 @@ const ContentState = (props) => {
     if (contentState.isFfmpegRunning || contentState.muting) {
       return;
     }
-    if (contentState.duration > contentState.editLimit) return;
+    if (
+      contentState.duration > contentState.editLimit &&
+      !contentState.override
+    )
+      return;
 
     setContentState((prevState) => ({
       ...prevState,
@@ -517,7 +623,11 @@ const ContentState = (props) => {
     if (contentState.isFfmpegRunning || contentState.cropping) {
       return;
     }
-    if (contentState.duration > contentState.editLimit) return;
+    if (
+      contentState.duration > contentState.editLimit &&
+      !contentState.override
+    )
+      return;
 
     setContentState((prevState) => ({
       ...prevState,
@@ -580,13 +690,15 @@ const ContentState = (props) => {
       chrome.downloads.download({
         url: url,
         filename: title,
+        saveAs: true,
       });
 
       // Check if download failed
       chrome.downloads.onChanged.addListener(async (downloadDelta) => {
         if (
           downloadDelta.state &&
-          downloadDelta.state.current === "interrupted"
+          downloadDelta.state.current === "interrupted" &&
+          downloadDelta.error.current != "USER_CANCELED"
         ) {
           // Convert URL to base64
           const response = await fetch(url);
