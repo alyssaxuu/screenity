@@ -899,5 +899,10 @@
   "recoveryModeTitle": {
     "message": "மீட்டமைப்பு முறை",
     "description": "மீட்டமைப்பு முறை தலைப்பு"
+  },
+
+  "downloadForTroubleshootingOption": {
+    "message": "பிரச்சனைகளை தீர்க்க தரவை பதிவிறக்கவும்",
+    "description": "பிரச்சனைகளை தீர்க்க விருப்ப பதிவிறக்க விருப்பம்"
   }
 }

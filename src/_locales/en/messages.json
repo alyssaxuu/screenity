@@ -898,5 +898,9 @@
   "recoveryModeTitle": {
     "message": "Recovery mode",
     "description": "Recovery mode title"
+  },
+  "downloadForTroubleshootingOption": {
+    "message": "Download data for troubleshooting",
+    "description": "Download for troubleshooting option"
   }
 }

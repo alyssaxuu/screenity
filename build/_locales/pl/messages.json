@@ -899,5 +899,10 @@
   "recoveryModeTitle": {
     "message": "Tryb odzyskiwania",
     "description": "Tytuł trybu odzyskiwania"
+  },
+
+  "downloadForTroubleshootingOption": {
+    "message": "Pobierz dane do rozwiązywania problemów",
+    "description": "Opcja pobierania do rozwiązywania problemów"
   }
 }

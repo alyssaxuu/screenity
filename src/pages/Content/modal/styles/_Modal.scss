@@ -1,4 +1,4 @@
-@use '../../styles/_variables' as *;
+@use "../../styles/_variables" as *;
 
 /* reset */
 button {
@@ -6,17 +6,19 @@ button {
 }
 
 .AlertDialogOverlay {
-  background-color: rgba(0,0,0,.5);
+  background-color: rgba(0, 0, 0, 0.5);
   position: fixed;
   inset: 0;
   animation: overlayShow 150ms cubic-bezier(0.16, 1, 0.3, 1);
-	z-index: 99999999999;
+  z-index: 99999999999;
 }
 
 .AlertDialogContent {
+  overflow: auto !important;
   background-color: white;
   border-radius: 30px;
-  box-shadow: hsl(206 22% 7% / 35%) 0px 10px 38px -10px, hsl(206 22% 7% / 20%) 0px 10px 20px -15px;
+  box-shadow: hsl(206 22% 7% / 35%) 0px 10px 38px -10px,
+    hsl(206 22% 7% / 20%) 0px 10px 20px -15px;
   position: fixed;
   top: 50%;
   left: 50%;
@@ -26,7 +28,7 @@ button {
   max-height: 85vh;
   padding: 35px 25px;
   animation: contentShow 150ms cubic-bezier(0.16, 1, 0.3, 1);
-	z-index: $z-index-max;
+  z-index: $z-index-max;
 }
 .AlertDialogContent:focus {
   outline: none;
@@ -36,7 +38,7 @@ button {
   margin: 0;
   color: $color-text-primary;
   font-size: $font-size-normal;
-	font-family: $font-bold;
+  font-family: $font-bold;
   font-weight: 700;
 }
 
@@ -46,13 +48,13 @@ button {
   font-size: $font-size-normal;
   line-height: 1.5;
 
-	a {
-		color: $color-primary!important;
-		font-weight: 600!important;
-		text-decoration: none!important;
-		display: inline-block;
-		cursor: pointer;
-	}
+  a {
+    color: $color-primary !important;
+    font-weight: 600 !important;
+    text-decoration: none !important;
+    display: inline-block;
+    cursor: pointer;
+  }
 }
 
 .Button {
@@ -67,35 +69,35 @@ button {
   height: 35px;
 }
 .Button.blue {
-	background-color: rgba(48, 128, 248, 0.10);;
-	color: $color-primary;
+  background-color: rgba(48, 128, 248, 0.1);
+  color: $color-primary;
 
-	&:hover {
-		background-color: rgba(48, 128, 248, 0.15);
-		cursor: pointer;
-	}
-	&:focus {
-		box-shadow: $focus-border;
-	}
+  &:hover {
+    background-color: rgba(48, 128, 248, 0.15);
+    cursor: pointer;
+  }
+  &:focus {
+    box-shadow: $focus-border;
+  }
 }
 .Button.red {
-  background-color: rgba(247, 56, 90, .1);
+  background-color: rgba(247, 56, 90, 0.1);
   color: rgba(247, 56, 90, 1);
 }
 .Button.red:hover {
-  background-color: rgba(247, 56, 90, .15);
-	cursor: pointer;
+  background-color: rgba(247, 56, 90, 0.15);
+  cursor: pointer;
 }
 .Button.red:focus {
   box-shadow: $focus-border;
 }
 .Button.grey {
-  background: rgba(110, 118, 132, 0.10);
+  background: rgba(110, 118, 132, 0.1);
   color: $color-text-secondary;
 }
 .Button.grey:hover {
   background: rgba(110, 118, 132, 0.15);
-	cursor: pointer;
+  cursor: pointer;
 }
 .Button.grey:focus {
   box-shadow: $focus-border;
@@ -122,7 +124,7 @@ button {
 }
 
 .SideButtonModal {
-	display: inline-flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
   border-radius: 30px;
@@ -131,11 +133,11 @@ button {
   line-height: 1;
   font-weight: 500;
   height: 35px;
-	color: $color-text-secondary;
-	font-family: $font-medium;
+  color: $color-text-secondary;
+  font-family: $font-medium;
 
-	&:hover {
-		cursor: pointer;
-		background: rgba(110, 118, 132, 0.05);
-	}
+  &:hover {
+    cursor: pointer;
+    background: rgba(110, 118, 132, 0.05);
+  }
 }

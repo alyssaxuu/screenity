@@ -900,5 +900,9 @@
   "recoveryModeTitle": {
     "message": "Modo de recuperación",
     "description": "Título del modo de recuperación"
+  },
+  "downloadForTroubleshootingOption": {
+    "message": "Descargar datos para solucionar problemas",
+    "description": "Opción de descarga para solución de problemas"
   }
 }

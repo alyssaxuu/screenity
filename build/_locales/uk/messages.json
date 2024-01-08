@@ -899,5 +899,10 @@
   "recoveryModeTitle": {
     "message": "Режим відновлення",
     "description": "Заголовок режиму відновлення"
+  },
+
+  "downloadForTroubleshootingOption": {
+    "message": "Завантажити дані для усунення проблем",
+    "description": "Опція завантаження для усунення проблем"
   }
 }

@@ -895,5 +895,10 @@
   "recoveryModeTitle": {
     "message": "恢复模式",
     "description": "恢复模式标题"
+  },
+
+  "downloadForTroubleshootingOption": {
+    "message": "下载故障排除数据",
+    "description": "故障排除选项"
   }
 }

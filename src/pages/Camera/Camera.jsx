@@ -146,7 +146,17 @@ const Camera = () => {
         }
       } else if (request.type === "set-surface") {
         if (request.surface === "monitor") {
-          videoRef.current.requestPictureInPicture().catch(console.error);
+          try {
+            videoRef.current.requestPictureInPicture().catch(() => {
+              // Cancel pip mode if it fails
+              setPipMode(false);
+              chrome.runtime.sendMessage({ type: "pip-ended" });
+            });
+          } catch (error) {
+            // Cancel pip mode if it fails
+            setPipMode(false);
+            chrome.runtime.sendMessage({ type: "pip-ended" });
+          }
         }
       } else if (request.type === "camera-toggled-toolbar") {
         if (request.active) {

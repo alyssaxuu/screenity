@@ -900,5 +900,10 @@
   "recoveryModeTitle": {
     "message": "पुनर्प्राप्ति मोड",
     "description": "पुनर्प्राप्ति मोड का शीर्षक"
+  },
+
+  "downloadForTroubleshootingOption": {
+    "message": "समस्या समाधान के लिए डेटा डाउनलोड करें",
+    "description": "समस्या समाधान के लिए डाउनलोड करने का विकल्प"
   }
 }

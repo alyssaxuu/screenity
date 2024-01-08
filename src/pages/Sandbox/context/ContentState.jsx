@@ -222,6 +222,7 @@ const ContentState = (props) => {
         async (fixedWebm) => {
           if (
             contentStateRef.current.fallback ||
+            contentStateRef.current.updateChrome ||
             contentStateRef.current.noffmpeg ||
             (contentStateRef.current.duration >
               contentStateRef.current.editLimit &&
@@ -296,6 +297,21 @@ const ContentState = (props) => {
     }
     sendResponse({ status: "ok" });
   };
+
+  // Check Chrome version
+  useEffect(() => {
+    const version = navigator.userAgent.match(/Chrom(e|ium)\/([0-9]+)\./);
+
+    const MIN_CHROME_VERSION = 109;
+
+    if (version && parseInt(version[2], 10) < MIN_CHROME_VERSION) {
+      setContentState((prevContentState) => ({
+        ...prevContentState,
+        updateChrome: true,
+        noffmpeg: true,
+      }));
+    }
+  }, []);
 
   const onChromeMessage = useCallback((request, sender, sendResponse) => {
     const message = request;

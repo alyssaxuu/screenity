@@ -900,5 +900,10 @@
   "recoveryModeTitle": {
     "message": "復原模式",
     "description": "復原模式標題"
+  },
+
+  "downloadForTroubleshootingOption": {
+    "message": "下載故障排除資料",
+    "description": "故障排除選項"
   }
 }

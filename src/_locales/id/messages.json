@@ -900,5 +900,10 @@
   "recoveryModeTitle": {
     "message": "Mode Pemulihan",
     "description": "Judul Mode Pemulihan"
+  },
+
+  "downloadForTroubleshootingOption": {
+    "message": "Unduh data untuk perbaikan masalah",
+    "description": "Pilihan unduhan untuk perbaikan masalah"
   }
 }

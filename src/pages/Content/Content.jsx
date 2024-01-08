@@ -16,7 +16,7 @@ const Content = () => {
 			.screenity-shadow-dom * {
 				transition: unset;
 			}
-.TooltipContent {
+			.screenity-shadow-dom .TooltipContent {
   border-radius: 30px;
 	background-color: #29292F;
   padding: 10px 15px;
@@ -36,28 +36,28 @@ const Content = () => {
   will-change: transform, opacity;
 }
 
-.hide-tooltip {
+.screenity-shadow-dom .hide-tooltip {
 	display: none!important;
 }
 
-.tooltip-tall {
+.screenity-shadow-dom .tooltip-tall {
 	margin-bottom: 20px;
 }
 
-.tooltip-small {
+.screenity-shadow-dom .tooltip-small {
 	margin-bottom: 5px;
 }
 
-.TooltipContent[data-state='delayed-open'][data-side='top'] {
+.screenity-shadow-dom .TooltipContent[data-state='delayed-open'][data-side='top'] {
 	animation-name: slideDownAndFade;
 }
-.TooltipContent[data-state='delayed-open'][data-side='right'] {
+.screenity-shadow-dom .TooltipContent[data-state='delayed-open'][data-side='right'] {
   animation-name: slideLeftAndFade;
 }
-.TooltipContent[data-state='delayed-open'][data-side='bottom'] {
+.screenity-shadow-dom.TooltipContent[data-state='delayed-open'][data-side='bottom'] {
   animation-name: slideUpAndFade;
 }
-.TooltipContent[data-state='delayed-open'][data-side='left'] {
+.screenity-shadow-dom.TooltipContent[data-state='delayed-open'][data-side='left'] {
   animation-name: slideRightAndFade;
 }
 
@@ -119,12 +119,14 @@ const Content = () => {
 	top: 0px!important;
 	left: 0px!important;
 	z-index: 99999999999!important;
+	background: transparent!important;
 }
 .screenity-shadow-dom .canvas-container {
 	top: 0px!important;
 	left: 0px!important;
 	z-index: 99999999999;
 	position: fixed!important;
+	background: transparent!important;
 }
 
 `}</style>

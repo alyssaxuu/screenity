@@ -71,6 +71,7 @@ const Modal = (props) => {
   return (
     <AlertDialog.Root
       open={showModal}
+      modal={false}
       onOpenChange={(open) => {
         setShowModal(open);
       }}
@@ -81,7 +82,7 @@ const Modal = (props) => {
           ".container"
         )}
       >
-        <AlertDialog.Overlay className="AlertDialogOverlay" />
+        <div className="AlertDialogOverlay"></div>
         <AlertDialog.Content className="AlertDialogContent">
           <AlertDialog.Title className="AlertDialogTitle">
             {title}

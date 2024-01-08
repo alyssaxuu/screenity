@@ -899,5 +899,10 @@
   "recoveryModeTitle": {
     "message": "복구 모드",
     "description": "복구 모드 제목"
+  },
+
+  "downloadForTroubleshootingOption": {
+    "message": "문제 해결을 위한 데이터 다운로드",
+    "description": "문제 해결을 위한 다운로드 옵션"
   }
 }

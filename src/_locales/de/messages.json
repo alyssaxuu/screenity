@@ -899,5 +899,10 @@
   "recoveryModeTitle": {
     "message": "Wiederherstellungsmodus",
     "description": "Titel des Wiederherstellungsmodus"
+  },
+
+  "downloadForTroubleshootingOption": {
+    "message": "Daten zum Beheben von Problemen herunterladen",
+    "description": "Option zum Herunterladen zur Fehlerbehebung"
   }
 }

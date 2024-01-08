@@ -899,5 +899,10 @@
   "recoveryModeTitle": {
     "message": "Kurtarma Modu",
     "description": "Kurtarma Modu Başlığı"
+  },
+
+  "downloadForTroubleshootingOption": {
+    "message": "Sorunları Gidermek için Verileri İndir",
+    "description": "Sorunları Giderme Seçeneği"
   }
 }

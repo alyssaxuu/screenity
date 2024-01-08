@@ -14,18 +14,6 @@ const getCurrentTab = async () => {
 const resetActiveTab = async () => {
   let editor_url = "editor.html";
 
-  // Check video duration (in miliseconds)
-  const { recordingDuration } = await chrome.storage.local.get([
-    "recordingDuration",
-  ]);
-
-  // Videos that are over 5 minutes long take too long to process on the local machine
-  const maxRecordingDuration = 300000;
-
-  if (recordingDuration > maxRecordingDuration) {
-    editor_url = "editorfallback.html";
-  }
-
   // Check if Chrome version is 109 or below
   if (navigator.userAgent.includes("Chrome/")) {
     const version = parseInt(navigator.userAgent.match(/Chrome\/([0-9]+)/)[1]);
@@ -1185,11 +1173,9 @@ const handleMessage = async (request, sender, sendResponse) => {
       if (tab) {
         chrome.tabs.sendMessage(activeTab, { type: "recording-error" });
         // Go to active tab
-        chrome.windows
-          .update(activeTab.windowId, { focused: true })
-          .then(() => {
-            chrome.tabs.update(activeTab, { active: true });
-          });
+        chrome.windows.update(tab.windowId, { focused: true }).then(() => {
+          chrome.tabs.update(activeTab, { active: true });
+        });
         if (request.error === "stream-error") {
           chrome.tabs.sendMessage(activeTab, { type: "stream-error" });
         }
@@ -1469,6 +1455,11 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         });
       }
     );
+  } else if (request.type === "get-platform-info") {
+    chrome.runtime.getPlatformInfo((info) => {
+      sendResponse(info);
+    });
+    return true;
   } else if (request.type === "restore-recording") {
     let editor_url = "editorfallback.html";
 
