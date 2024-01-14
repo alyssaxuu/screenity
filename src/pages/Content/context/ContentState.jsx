@@ -68,12 +68,15 @@ const ContentState = (props) => {
       recording: true,
       restarting: false,
     });
-    chrome.runtime.sendMessage({ type: "start-recording" });
+
+    // This cannot be triggered from here because the user might not have the page focused
+    //chrome.runtime.sendMessage({ type: "start-recording" });
   });
 
   const restartRecording = useCallback(() => {
     chrome.storage.local.set({ recording: false, restarting: true });
     setTimeout(() => {
+      chrome.runtime.sendMessage({ type: "discard-backup-restart" });
       chrome.runtime.sendMessage({ type: "restart-recording-tab" });
       // Check if custom region is set
       if (
@@ -423,13 +426,15 @@ const ContentState = (props) => {
       // I need to convert to a regular array of objects
       const audioInput = data.audioinput;
       const videoInput = data.videoinput;
+      const cameraPermission = data.cameraPermission;
+      const microphonePermission = data.microphonePermission;
 
       setContentState((prevContentState) => ({
         ...prevContentState,
         audioInput: audioInput,
         videoInput: videoInput,
-        cameraPermission: true,
-        microphonePermission: true,
+        cameraPermission: cameraPermission,
+        microphonePermission: microphonePermission,
       }));
 
       chrome.runtime.sendMessage({
@@ -586,7 +591,7 @@ const ContentState = (props) => {
     showPopup: false,
     blurMode: false,
     recordingType: "screen",
-    customRegion: true,
+    customRegion: false,
     regionWidth: 800,
     surface: "default",
     regionHeight: 500,
@@ -629,6 +634,9 @@ const ContentState = (props) => {
     askDismiss: true,
     quality: "max",
     systemAudio: true,
+    backup: true,
+    backupSetup: false,
+    openWarning: false,
   });
   contentStateRef.current = contentState;
 
@@ -645,6 +653,57 @@ const ContentState = (props) => {
       }));
     }
   }, []);
+
+  useEffect(() => {
+    if (typeof contentState.openWarning === "function") {
+      const isMac = navigator.platform.toUpperCase().indexOf("MAC") >= 0;
+      const warningList = [
+        "youtube.com",
+        "meet.google.com",
+        "zoom.us",
+        "hangouts.google.com",
+        "teams.microsoft.com",
+        "web.whatsapp.com",
+        "web.skype.com",
+        "discord.com",
+        "vimeo.com",
+      ];
+
+      if (
+        !contentState.recording &&
+        isMac &&
+        warningList.some((el) => window.location.href.includes(el)) &&
+        contentState.recordingType != "region" &&
+        contentState.recordingType != "camera"
+      ) {
+        contentState.openWarning(
+          chrome.i18n.getMessage("audioWarningTitle"),
+          chrome.i18n.getMessage(
+            "audioWarningDescription",
+            chrome.i18n.getMessage("tabType")
+          ),
+          "AudioIcon",
+          10000
+        );
+        // Check if url contains "playground.html" and "chrome-extension://"
+      } else if (
+        window.location.href.includes("playground.html") &&
+        window.location.href.includes("chrome-extension://") &&
+        !contentState.recording
+      ) {
+        contentState.openWarning(
+          chrome.i18n.getMessage("extensionNotSupportedTitle"),
+          chrome.i18n.getMessage("extensionNotSupportedDescription"),
+          "NotSupportedIcon",
+          10000
+        );
+      }
+    }
+  }, [
+    contentState.openWarning,
+    contentState.recording,
+    contentState.recordingType,
+  ]);
 
   // Check if offline or online (event)
   // useEffect(() => {
@@ -746,6 +805,7 @@ const ContentState = (props) => {
         showPopup: true,
       }));
       setTimer(0);
+      updateFromStorage();
     } else if (request.type === "ready-to-record") {
       setContentState((prevContentState) => ({
         ...prevContentState,
@@ -869,8 +929,21 @@ const ContentState = (props) => {
           contentStateRef.current.dismissRecording();
         }
       );
+    } else if (request.type === "backup-error") {
+      contentStateRef.current.openModal(
+        chrome.i18n.getMessage("backupPermissionFailTitle"),
+        chrome.i18n.getMessage("backupPermissionFailDescription"),
+        chrome.i18n.getMessage("permissionsModalDismiss"),
+        null,
+        () => {
+          contentStateRef.current.dismissRecording();
+        },
+        () => {
+          contentStateRef.current.dismissRecording();
+        }
+      );
     } else if (request.type === "recording-check") {
-      if (!contentStateRef.showExtension) {
+      if (!contentStateRef.showExtension && !contentStateRef.recording) {
         updateFromStorage();
       }
     }
@@ -1091,6 +1164,8 @@ const ContentState = (props) => {
         "strokeWidth",
         "quality",
         "systemAudio",
+        "backup",
+        "backupSetup",
       ],
       (result) => {
         setContentState((prevContentState) => ({
@@ -1272,13 +1347,37 @@ const ContentState = (props) => {
             result.systemAudio !== undefined && result.systemAudio !== null
               ? result.systemAudio
               : prevContentState.systemAudio,
+          backup:
+            result.backup !== undefined && result.backup !== null
+              ? result.backup
+              : prevContentState.backup,
+          backupSetup:
+            result.backupSetup !== undefined && result.backupSetup !== null
+              ? result.backupSetup
+              : prevContentState.backupSetup,
         }));
+
+        if (result.systemAudio === undefined || result.systemAudio === null) {
+          chrome.storage.local.set({ systemAudio: true });
+        }
 
         if (
           result.backgroundEffect === undefined ||
           result.backgroundEffect === null
         ) {
           chrome.storage.local.set({ backgroundEffect: "blur" });
+        }
+
+        if (result.backup === undefined || result.backup === null) {
+          chrome.storage.local.set({ backup: true });
+        }
+
+        if (result.countdown === undefined || result.countdown === null) {
+          chrome.storage.local.set({ countdown: true });
+        }
+
+        if (result.backupSetup === undefined || result.backupSetup === null) {
+          chrome.storage.local.set({ backupSetup: false });
         }
 
         if (result.backgroundEffectsActive) {

@@ -902,5 +902,107 @@
   "downloadForTroubleshootingOption": {
     "message": "Download data for troubleshooting",
     "description": "Download for troubleshooting option"
+  },
+  "getHelpNav": {
+    "message": "Help center",
+    "description": "Get help nav item"
+  },
+  "audioWarningTitle": {
+    "message": "Record computer audio",
+    "description": "Audio warning title"
+  },
+  "audioWarningDescription": {
+    "message": "To record audio from this page, you need to switch to ‘$tab$’.",
+    "description": "Audio warning description",
+    "placeholders": {
+      "tab": {
+        "content": "$1",
+        "example": "Tab area"
+      }
+    }
+  },
+  "extensionNotSupportedTitle": {
+    "message": "Extension not supported on tab",
+    "description": "Extension not supported on tab"
+  },
+  "extensionNotSupportedDescription": {
+    "message": "Screenity wasn't supported in your previous tab. You can still start your recording here and switch back to the tab, but your camera and toolbar won't be visible.",
+    "description": "Extension not supported on tab description"
+  },
+  "backupsTitle": {
+    "message": "Set up a local backup for your Screenity recordings",
+    "description": "Backups title"
+  },
+  "backupsDescription1": {
+    "message": "Keep a copy of all the recordings you make. If you don’t set up backups, your recordings will only be saved when you choose to download them.",
+    "description": "Backups description"
+  },
+  "backupsDescription2": {
+    "message": "You might need to create a new folder first if you're trying to save to Downloads or other system folders.",
+    "description": "Backups description"
+  },
+  "backupsSelectFolder": {
+    "message": "Select a folder",
+    "description": "Select a folder button"
+  },
+  "backupsNotNow": {
+    "message": "Not now",
+    "description": "Not now button"
+  },
+  "backupsOnTitle": {
+    "message": " Your recordings are being backed up locally",
+    "description": "Backups on title"
+  },
+  "backupsOnDescription": {
+    "message": "To prevent being asked for permissions every time you record, we recommend leaving this tab open.",
+    "description": "Backups on description"
+  },
+  "backupsClose": {
+    "message": "Close tab anyway",
+    "description": "Close tab anyway button"
+  },
+  "backupsStop": {
+    "message": "Stop backing up all recordings",
+    "description": "Stop backups button"
+  },
+  "backupsConfirmTitle": {
+    "message": "Please reconfirm access to your local Screenity backup folder",
+    "description": "Backups confirm title"
+  },
+  "backupsConfirmDescription": {
+    "message": "We’re sorry, but we need your permission once more to keep backing up your recordings. Unfortunately we will need to ask every time this tab is closed, which can happen if you close the browser or restart your computer.",
+    "description": "Backups confirm description"
+  },
+  "backupsConfirmAllow": {
+    "message": "Allow Screenity to keep backing up recordings",
+    "description": "Backups confirm allow button"
+  },
+  "backupsToggle": {
+    "message": "Back up recordings",
+    "description": "Backups toggle label"
+  },
+  "backupPermissionFailTitle": {
+    "message": "Permission not granted to back up the recording",
+    "description": "Backup permission fail title"
+  },
+  "backupPermissionFailDescription": {
+    "message": "You didn't select a folder to backup your recordings. Depending on your browser version or operating system you might be asked to select the folder every time you start recording. You can try again, or disable backups entirely if you'd rather not give permissions repeatedly.",
+    "description": "Backup permission fail description"
+  },
+  "recordAudioWarningMacTitle": {
+    "message": "Record computer audio",
+    "description": "Record audio warning title"
+  },
+  "recordAudioWarningMacDescription": {
+    "message": "In macOS, you can only record Tab audio. Select the Chrome Tab option and make sure 'Also share tab audio' is enabled.",
+    "description": "macOS audio warning description"
+  },
+  "recordAudioWarningOtherTitle": {
+    "message": "Record computer audio",
+    "description": "Record audio warning title"
+  },
+  "recordAudioWarningOtherDescription": {
+    "message": "Make sure to toggle the option to 'Share system audio' if you want to record computer audio. If you don't see this option, try updating Chrome, or switch to Tab recording.",
+    "description": "Other audio warning description"
   }
 }

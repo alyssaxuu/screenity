@@ -5,6 +5,8 @@ let db = new Localbase("db");
 
 const RecorderOffscreen = () => {
   const isRestarting = useRef(false);
+  const isFinishing = useRef(false);
+  const sentLast = useRef(false);
   const index = useRef(0);
 
   const [started, setStarted] = useState(false);
@@ -29,6 +31,7 @@ const RecorderOffscreen = () => {
   const isTab = useRef(false);
   const tabID = useRef(null);
   const quality = useRef("max");
+  const backupRef = useRef(false);
 
   async function startRecording() {
     // Check if the stream actually has data in it
@@ -83,7 +86,12 @@ const RecorderOffscreen = () => {
     recorder.current.onstop = async (e) => {
       if (isRestarting.current) return;
 
-      chrome.runtime.sendMessage({ type: "video-ready" });
+      setTimeout(() => {
+        if (!sentLast.current) {
+          chrome.runtime.sendMessage({ type: "video-ready" });
+          isFinishing.current = false;
+        }
+      }, 3000);
 
       isRestarting.current = false;
     };
@@ -91,16 +99,13 @@ const RecorderOffscreen = () => {
     const checkMaxMemory = () => {
       try {
         navigator.storage.estimate().then((data) => {
-          const minMemory = 800000000;
+          const minMemory = 26214400;
           // Check if there's enough space to keep recording
           if (data.quota < minMemory) {
-            chrome.storage.local.set({
-              recording: false,
-              restarting: false,
-              tabRecordedID: null,
+            chrome.runtime.sendMessage({
+              type: "stop-recording-tab",
               memoryError: true,
             });
-            chrome.runtime.sendMessage({ type: "stop-recording-tab" });
           }
         });
       } catch (err) {
@@ -121,14 +126,24 @@ const RecorderOffscreen = () => {
             index: index.current,
             chunk: e.data,
           });
+          if (backupRef.current) {
+            chrome.runtime.sendMessage({
+              type: "write-file",
+              index: index.current,
+            });
+          }
           index.current++;
         } catch (err) {
           chrome.runtime.sendMessage({
-            type: "recording-error",
-            error: "stream-error",
-            why: JSON.stringify(err),
+            type: "stop-recording-tab",
+            memoryError: true,
           });
         }
+      }
+
+      if (isFinishing.current) {
+        sentLast.current = true;
+        chrome.runtime.sendMessage({ type: "video-ready" });
       }
     };
 
@@ -143,6 +158,7 @@ const RecorderOffscreen = () => {
   }
 
   async function stopRecording() {
+    isFinishing.current = true;
     if (recorder.current !== null) {
       recorder.current.stop();
       recorder.current = null;
@@ -385,6 +401,7 @@ const RecorderOffscreen = () => {
 
   const onMessage = useCallback((request, sender, sendResponse) => {
     if (request.type === "loaded") {
+      backupRef.current = request.backup;
       isTab.current = request.isTab;
       quality.current = request.quality;
       if (request.isTab) {

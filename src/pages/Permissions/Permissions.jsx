@@ -1,6 +1,10 @@
 import { check } from "prettier";
 import React, { useEffect, useState, useRef, useCallback } from "react";
 
+import Localbase from "localbase";
+
+let db = new Localbase("db");
+
 const Recorder = () => {
   useEffect(() => {
     window.parent.postMessage(
@@ -31,10 +35,13 @@ const Recorder = () => {
 
       // If the permissions are granted, enumerate devices
       if (
-        cameraPermission.state === "granted" &&
+        cameraPermission.state === "granted" ||
         microphonePermission.state === "granted"
       ) {
-        enumerateDevices();
+        enumerateDevices(
+          cameraPermission.state === "granted",
+          microphonePermission.state === "granted"
+        );
       } else {
         // Post message to parent window
         window.parent.postMessage(
@@ -53,45 +60,55 @@ const Recorder = () => {
   };
 
   // Enumerate devices
-  const enumerateDevices = async () => {
+  const enumerateDevices = async (camGranted = true, micGranted = true) => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        audio: true,
-        video: true,
+        audio: micGranted,
+        video: camGranted,
       });
 
       const devicesInfo = await navigator.mediaDevices.enumerateDevices();
 
-      // Filter by audio input
-      const audioinput = devicesInfo
-        .filter((device) => device.kind === "audioinput")
-        .map((device) => ({
-          deviceId: device.deviceId,
-          label: device.label,
-        }));
+      let audioinput = [];
+      let audiooutput = [];
+      let videoinput = [];
 
-      // Filter by audio output and extract relevant properties
-      const audiooutput = devicesInfo
-        .filter((device) => device.kind === "audiooutput")
-        .map((device) => ({
-          deviceId: device.deviceId,
-          label: device.label,
-        }));
+      if (micGranted) {
+        // Filter by audio input
+        audioinput = devicesInfo
+          .filter((device) => device.kind === "audioinput")
+          .map((device) => ({
+            deviceId: device.deviceId,
+            label: device.label,
+          }));
 
-      // Filter by video input and extract relevant properties
-      const videoinput = devicesInfo
-        .filter((device) => device.kind === "videoinput")
-        .map((device) => ({
-          deviceId: device.deviceId,
-          label: device.label,
-        }));
+        // Filter by audio output and extract relevant properties
+        audiooutput = devicesInfo
+          .filter((device) => device.kind === "audiooutput")
+          .map((device) => ({
+            deviceId: device.deviceId,
+            label: device.label,
+          }));
+      }
+
+      if (camGranted) {
+        // Filter by video input and extract relevant properties
+        videoinput = devicesInfo
+          .filter((device) => device.kind === "videoinput")
+          .map((device) => ({
+            deviceId: device.deviceId,
+            label: device.label,
+          }));
+      }
 
       // Save in Chrome local storage
       chrome.storage.local.set({
         // Set available devices
-        audioInput: audioinput,
-        audioOutput: audiooutput,
-        videoInput: videoinput,
+        audioinput: audioinput,
+        audiooutput: audiooutput,
+        videoinput: videoinput,
+        cameraPermission: camGranted,
+        microphonePermission: micGranted,
       });
 
       // Post message to parent window
@@ -99,9 +116,11 @@ const Recorder = () => {
         {
           type: "screenity-permissions",
           success: true,
-          audioinput,
-          audiooutput,
-          videoinput,
+          audioinput: audioinput,
+          audiooutput: audiooutput,
+          videoinput: videoinput,
+          cameraPermission: camGranted,
+          microphonePermission: micGranted,
         },
         "*"
       );

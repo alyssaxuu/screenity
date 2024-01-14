@@ -904,5 +904,107 @@
   "downloadForTroubleshootingOption": {
     "message": "Descargar datos para solucionar problemas",
     "description": "Opción de descarga para solución de problemas"
+  },
+  "getHelpNav": {
+    "message": "Centro de ayuda",
+    "description": "Elemento de navegación de ayuda"
+  },
+  "audioWarningTitle": {
+    "message": "Grabar audio de la página",
+    "description": "Título de advertencia de audio"
+  },
+  "audioWarningDescription": {
+    "message": "Para grabar audio de esta página, debes utilizar la opción de '$tab$'.",
+    "description": "Descripción de advertencia de audio",
+    "placeholders": {
+      "tab": {
+        "content": "$1",
+        "example": "Área de la pestaña"
+      }
+    }
+  },
+  "extensionNotSupportedTitle": {
+    "message": "Extensión no compatible en la página",
+    "description": "Título de extensión no compatible en la pestaña"
+  },
+  "extensionNotSupportedDescription": {
+    "message": "Screenity no fue compatible en tu pestaña anterior. Aún así, puedes comenzar tu grabación aquí y luego cambiar a la pestaña, pero tu cámara y barra de herramientas no serán visibles.",
+    "description": "Descripción de extensión no compatible en la pestaña"
+  },
+  "backupsTitle": {
+    "message": "Configurar una copia de seguridad local para tus grabaciones de Screenity",
+    "description": "Título de copias de seguridad"
+  },
+  "backupsDescription1": {
+    "message": "Mantén una copia de todas las grabaciones que hagas. Si no configuras copias de seguridad, tus grabaciones solo se guardarán cuando decidas descargarlas.",
+    "description": "Descripción de copias de seguridad"
+  },
+  "backupsDescription2": {
+    "message": "Es posible que necesites crear una nueva carpeta primero si estás intentando guardar en Descargas u otras carpetas del sistema.",
+    "description": "Descripción de copias de seguridad"
+  },
+  "backupsSelectFolder": {
+    "message": "Seleccionar una carpeta",
+    "description": "Botón Seleccionar carpeta"
+  },
+  "backupsNotNow": {
+    "message": "Ahora no",
+    "description": "Botón Ahora no"
+  },
+  "backupsOnTitle": {
+    "message": "Tus grabaciones se están sincronizadas localmente",
+    "description": "Título de copias de seguridad activadas"
+  },
+  "backupsOnDescription": {
+    "message": "Para evitar solicitar permisos cada vez que grabas, te recomendamos dejar esta pestaña abierta.",
+    "description": "Descripción de copias de seguridad activadas"
+  },
+  "backupsClose": {
+    "message": "Cerrar pestaña de todos modos",
+    "description": "Botón Cerrar pestaña de todos modos"
+  },
+  "backupsStop": {
+    "message": "Detener las copias de seguridad de todas las grabaciones",
+    "description": "Botón Detener copias de seguridad"
+  },
+  "backupsConfirmTitle": {
+    "message": "Por favor, vuelve a confirmar el acceso a tu carpeta de copias de seguridad local de Screenity",
+    "description": "Título de confirmación de copias de seguridad"
+  },
+  "backupsConfirmDescription": {
+    "message": "Lo lamentamos, pero necesitamos tu permiso una vez más para seguir haciendo copias locales de tus grabaciones. Desafortunadamente, necesitaremos preguntar cada vez que cierres esta pestaña, lo que puede suceder si cierras el navegador o reinicias tu computadora.",
+    "description": "Descripción de confirmación de copias de seguridad"
+  },
+  "backupsConfirmAllow": {
+    "message": "Permitir a Screenity seguir respaldando grabaciones",
+    "description": "Botón Permitir en la confirmación de copias de seguridad"
+  },
+  "backupsToggle": {
+    "message": "Hacer copias de seguridad de las grabaciones",
+    "description": "Etiqueta de alternar copias de seguridad"
+  },
+  "backupPermissionFailTitle": {
+    "message": "Permiso no otorgado para hacer una copia de seguridad la grabación",
+    "description": "Título de falla de permiso de respaldo"
+  },
+  "backupPermissionFailDescription": {
+    "message": "No seleccionaste una carpeta para hacer una copia local de tus grabaciones. Dependiendo de la versión de tu navegador o sistema operativo, es posible que se te solicite seleccionar la carpeta cada vez que comiences a grabar. Puedes intentarlo de nuevo o desactivar las copias de seguridad por completo si prefieres no dar permisos repetidamente.",
+    "description": "Descripción de falla de permiso de respaldo"
+  },
+  "recordAudioWarningMacTitle": {
+    "message": "Grabar audio de la computadora",
+    "description": "Título de advertencia de audio para macOS"
+  },
+  "recordAudioWarningMacDescription": {
+    "message": "En macOS, solo puedes grabar audio de pestañas. Selecciona la opción 'Pestaña de Chrome' y asegúrate de que 'Compartir también el audio de la pestaña' esté habilitado.",
+    "description": "Descripción de advertencia de audio para macOS"
+  },
+  "recordAudioWarningOtherTitle": {
+    "message": "Grabar audio de la computadora",
+    "description": "Título de advertencia de audio para otros sistemas"
+  },
+  "recordAudioWarningOtherDescription": {
+    "message": "Asegúrate de activar la opción 'Compartir audio del sistema' si deseas grabar audio de la computadora. Si no ves esta opción, intenta actualizar Chrome o cambia a la opción de grabación de pestañas.",
+    "description": "Descripción de advertencia de audio para otros sistemas"
   }
 }

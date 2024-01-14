@@ -7,7 +7,7 @@ import { ReactSVG } from "react-svg";
 
 const URL = "/assets/";
 
-const StarIcon = URL + "editor/icons/star.svg";
+const StarIcon = URL + "editor/icons/help-nav.svg";
 const HeartIcon = URL + "editor/icons/heart.svg";
 
 const PlayerNav = () => {
@@ -34,11 +34,11 @@ const PlayerNav = () => {
           <button
             className="button simpleButton blueButton"
             onClick={() => {
-              chrome.runtime.sendMessage({ type: "review-screenity" });
+              chrome.runtime.sendMessage({ type: "open-help" });
             }}
           >
             <ReactSVG src={StarIcon} />
-            {chrome.i18n.getMessage("leaveReview")}
+            {chrome.i18n.getMessage("getHelpNav")}
           </button>
           <button
             className="button primaryButton"

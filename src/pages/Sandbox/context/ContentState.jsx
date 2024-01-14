@@ -265,9 +265,9 @@ const ContentState = (props) => {
 
   const checkMemory = () => {
     if (typeof contentStateRef.current.openModal === "function") {
-      chrome.storage.local.get("memoryLimit", (result) => {
-        if (result.memoryLimit && result.memoryLimit !== null) {
-          chrome.storage.local.set({ memoryLimit: false });
+      chrome.storage.local.get("memoryError", (result) => {
+        if (result.memoryError && result.memoryError !== null) {
+          chrome.storage.local.set({ memoryError: false });
           contentStateRef.current.openModal(
             chrome.i18n.getMessage("memoryLimitTitle"),
             chrome.i18n.getMessage("memoryLimitDescription"),

@@ -904,5 +904,107 @@
   "downloadForTroubleshootingOption": {
     "message": "Pobierz dane do rozwiązywania problemów",
     "description": "Opcja pobierania do rozwiązywania problemów"
+  },
+  "getHelpNav": {
+    "message": "Centrum Pomocy",
+    "description": "Element nawigacyjny pomocy"
+  },
+  "audioWarningTitle": {
+    "message": "Nagrywanie dźwięku z strony",
+    "description": "Tytuł ostrzeżenia dźwiękowego"
+  },
+  "audioWarningDescription": {
+    "message": "Aby nagrać dźwięk z tej strony, musisz użyć opcji '$tab$'.",
+    "description": "Opis ostrzeżenia dźwiękowego",
+    "placeholders": {
+      "tab": {
+        "content": "$1",
+        "example": "Obszar karty"
+      }
+    }
+  },
+  "extensionNotSupportedTitle": {
+    "message": "Rozszerzenie nieobsługiwane na tej stronie",
+    "description": "Tytuł ostrzeżenia o nieobsługiwanym rozszerzeniu na karcie"
+  },
+  "extensionNotSupportedDescription": {
+    "message": "Screenity nie był obsługiwany na twojej poprzedniej karcie. Mimo to, możesz rozpocząć nagrywanie tutaj, a następnie przejść na inną kartę, ale kamera i pasek narzędzi nie będą widoczne.",
+    "description": "Opis ostrzeżenia o nieobsługiwanym rozszerzeniu na karcie"
+  },
+  "backupsTitle": {
+    "message": "Skonfiguruj lokalne kopie zapasowe dla swoich nagranek w Screenity",
+    "description": "Tytuł kopii zapasowych"
+  },
+  "backupsDescription1": {
+    "message": "Zachowaj kopię wszystkich nagranych materiałów. Jeśli nie skonfigurujesz kopii zapasowej, twoje nagrania zostaną zapisane tylko wtedy, gdy zdecydujesz się je pobrać.",
+    "description": "Opis kopii zapasowych"
+  },
+  "backupsDescription2": {
+    "message": "Możesz potrzebować utworzyć nowy folder najpierw, jeśli próbujesz zapisać nagrania w folderach takich jak 'Pobrane' lub inne foldery systemowe.",
+    "description": "Opis kopii zapasowych"
+  },
+  "backupsSelectFolder": {
+    "message": "Wybierz folder",
+    "description": "Przycisk Wybierz folder"
+  },
+  "backupsNotNow": {
+    "message": "Nie teraz",
+    "description": "Przycisk Nie teraz"
+  },
+  "backupsOnTitle": {
+    "message": "Twoje nagrania są lokalnie synchronizowane",
+    "description": "Tytuł aktywowanych kopii zapasowych"
+  },
+  "backupsOnDescription": {
+    "message": "Aby uniknąć prośby o uprawnienia za każdym razem, gdy nagrywasz, zalecamy pozostawienie tej karty otwartej.",
+    "description": "Opis aktywowanych kopii zapasowych"
+  },
+  "backupsClose": {
+    "message": "Zamknij kartę mimo wszystko",
+    "description": "Przycisk Zamknij kartę mimo wszystko"
+  },
+  "backupsStop": {
+    "message": "Zatrzymaj wszystkie kopie zapasowe nagrań",
+    "description": "Przycisk Zatrzymaj kopie zapasowe"
+  },
+  "backupsConfirmTitle": {
+    "message": "Proszę potwierdź dostęp do lokalnego folderu kopii zapasowych Screenity",
+    "description": "Tytuł potwierdzenia kopii zapasowych"
+  },
+  "backupsConfirmDescription": {
+    "message": "Przykro nam, ale potrzebujemy Twojej zgody jeszcze raz, aby kontynuować tworzenie lokalnych kopii zapasowych Twoich nagrań. Niestety będziemy musieli pytać za każdym razem, gdy zamkniesz tę kartę, co może się zdarzyć, jeśli zamkniesz przeglądarkę lub zrestartujesz komputer.",
+    "description": "Opis potwierdzenia kopii zapasowych"
+  },
+  "backupsConfirmAllow": {
+    "message": "Zezwól Screenity na kontynuowanie tworzenia kopii zapasowych nagrań",
+    "description": "Przycisk Zezwól w potwierdzeniu kopii zapasowych"
+  },
+  "backupsToggle": {
+    "message": "Tworzenie kopii zapasowych nagrań",
+    "description": "Etykieta Przełącz kopie zapasowe"
+  },
+  "backupPermissionFailTitle": {
+    "message": "Odmowa uprawnień do tworzenia kopii zapasowych nagrania",
+    "description": "Tytuł niepowodzenia uprawnień kopii zapasowych"
+  },
+  "backupPermissionFailDescription": {
+    "message": "Nie wybrałeś folderu do tworzenia lokalnych kopii zapasowych nagrań. W zależności od wersji przeglądarki lub systemu operacyjnego, możesz być proszony o wybranie folderu za każdym razem, gdy rozpoczniesz nagrywanie. Możesz spróbować ponownie lub całkowicie wyłączyć kopie zapasowe, jeśli wolisz nie udzielać uprawnień wielokrotnie.",
+    "description": "Opis niepowodzenia uprawnień kopii zapasowych"
+  },
+  "recordAudioWarningMacTitle": {
+    "message": "Nagrywanie dźwięku z komputera",
+    "description": "Tytuł ostrzeżenia dźwiękowego dla macOS"
+  },
+  "recordAudioWarningMacDescription": {
+    "message": "W systemie macOS możesz nagrywać dźwięk tylko z zakładek. Wybierz opcję 'Zakładka Chrome' i upewnij się, że opcja 'Udostępnij także dźwięk zakładki' jest włączona.",
+    "description": "Opis ostrzeżenia dźwiękowego dla macOS"
+  },
+  "recordAudioWarningOtherTitle": {
+    "message": "Nagrywanie dźwięku z komputera",
+    "description": "Tytuł ostrzeżenia dźwiękowego dla innych systemów"
+  },
+  "recordAudioWarningOtherDescription": {
+    "message": "Aby nagrać dźwięk z komputera, upewnij się, że opcja 'Udostępnij dźwięk systemowy' jest włączona. Jeśli nie widzisz tej opcji, spróbuj zaktualizować Chrome lub przełączyć się na opcję nagrywania zakładek.",
+    "description": "Opis ostrzeżenia dźwiękowego dla innych systemów"
   }
 }

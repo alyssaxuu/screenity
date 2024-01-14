@@ -12,6 +12,8 @@ let db = new Localbase("db");
 const Recorder = () => {
   const isRestarting = useRef(false);
   const isDismissing = useRef(false);
+  const isFinishing = useRef(false);
+  const sentLast = useRef(false);
   const index = useRef(0);
 
   // Main stream (recording)
@@ -37,6 +39,7 @@ const Recorder = () => {
   // Recording ref
   const recordingRef = useRef();
   const regionRef = useRef();
+  const backupRef = useRef(false);
 
   useEffect(() => {
     window.parent.postMessage(
@@ -67,6 +70,8 @@ const Recorder = () => {
   }, []);
 
   async function startRecording() {
+    isFinishing.current = false;
+    sentLast.current = false;
     // Check if the stream actually has data in it
     if (helperVideoStream.current.getVideoTracks().length === 0) {
       chrome.runtime.sendMessage({
@@ -90,9 +95,15 @@ const Recorder = () => {
       });
     }
 
+    chrome.storage.local.set({
+      recording: true,
+      restarting: false,
+    });
+
     isRestarting.current = false;
     index.current = 0;
     recordingRef.current = true;
+    isDismissing.current = false;
 
     // I don't know what the ideal chunk size should be here
     try {
@@ -112,18 +123,25 @@ const Recorder = () => {
         }
       });
     } catch (err) {
-      chrome.runtime.sendMessage({
-        type: "recording-error",
-        error: "stream-error",
-        why: JSON.stringify(err),
+      chrome.storage.local.set({
+        recording: false,
+        restarting: false,
+        tabRecordedID: null,
+        memoryError: true,
       });
+      chrome.runtime.sendMessage({ type: "stop-recording-tab" });
     }
 
     recorder.current.onstop = async (e) => {
       recordingRef.current = false;
       if (isRestarting.current) return;
       if (!isDismissing.current) {
-        chrome.runtime.sendMessage({ type: "video-ready" });
+        setTimeout(() => {
+          if (!sentLast.current) {
+            chrome.runtime.sendMessage({ type: "video-ready" });
+            isFinishing.current = false;
+          }
+        }, 3000);
       } else {
         isDismissing.current = false;
       }
@@ -132,7 +150,7 @@ const Recorder = () => {
     const checkMaxMemory = () => {
       try {
         navigator.storage.estimate().then((data) => {
-          const minMemory = 800000000;
+          const minMemory = 26214400;
           // Check if there's enough space to keep recording
           if (data.quota < minMemory) {
             chrome.storage.local.set({
@@ -163,6 +181,12 @@ const Recorder = () => {
             index: index.current,
             chunk: e.data,
           });
+          if (backupRef.current) {
+            chrome.runtime.sendMessage({
+              type: "write-file",
+              index: index.current,
+            });
+          }
           index.current++;
         } catch (err) {
           chrome.runtime.sendMessage({
@@ -171,6 +195,11 @@ const Recorder = () => {
             why: JSON.stringify(err),
           });
         }
+      }
+
+      if (isFinishing.current) {
+        sentLast.current = true;
+        chrome.runtime.sendMessage({ type: "video-ready" });
       }
     };
 
@@ -185,6 +214,7 @@ const Recorder = () => {
   }
 
   async function stopRecording() {
+    isFinishing.current = true;
     regionRef.current = false;
 
     if (recorder.current !== null) {
@@ -247,6 +277,7 @@ const Recorder = () => {
 
   const restartRecording = async () => {
     isRestarting.current = true;
+    isDismissing.current = false;
     if (recorder.current) {
       recorder.current.stop();
     }
@@ -416,6 +447,7 @@ const Recorder = () => {
 
   const onMessage = useCallback((request, sender, sendResponse) => {
     if (request.type === "loaded") {
+      backupRef.current = request.backup;
       if (request.region) {
         chrome.runtime.sendMessage({ type: "get-streaming-data" });
       }

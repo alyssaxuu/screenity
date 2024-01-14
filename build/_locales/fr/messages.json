@@ -905,5 +905,107 @@
   "downloadForTroubleshootingOption": {
     "message": "Télécharger des données pour résoudre les problèmes",
     "description": "Option de téléchargement pour résoudre les problèmes"
+  },
+  "getHelpNav": {
+    "message": "Centre d'aide",
+    "description": "Élément de navigation pour obtenir de l'aide"
+  },
+  "audioWarningTitle": {
+    "message": "Enregistrement audio de l'ordinateur",
+    "description": "Titre de l'avertissement audio"
+  },
+  "audioWarningDescription": {
+    "message": "Pour enregistrer l'audio de cette page, vous devez basculer vers '$tab$'.",
+    "description": "Description de l'avertissement audio",
+    "placeholders": {
+      "tab": {
+        "content": "$1",
+        "example": "Zone de l'onglet"
+      }
+    }
+  },
+  "extensionNotSupportedTitle": {
+    "message": "Extension non prise en charge sur l'onglet",
+    "description": "Titre de l'extension non prise en charge sur l'onglet"
+  },
+  "extensionNotSupportedDescription": {
+    "message": "Screenity n'était pas pris en charge dans votre onglet précédent. Vous pouvez toujours commencer votre enregistrement ici et basculer vers l'onglet, mais votre caméra et votre barre d'outils ne seront pas visibles.",
+    "description": "Description de l'extension non prise en charge sur l'onglet"
+  },
+  "backupsTitle": {
+    "message": "Configurer une sauvegarde locale de vos enregistrements Screenity",
+    "description": "Titre des sauvegardes"
+  },
+  "backupsDescription1": {
+    "message": "Conservez une copie de tous les enregistrements que vous effectuez. Si vous ne configurez pas de sauvegardes, vos enregistrements ne seront enregistrés que lorsque vous choisirez de les télécharger.",
+    "description": "Description des sauvegardes"
+  },
+  "backupsDescription2": {
+    "message": "Vous devrez peut-être créer un nouveau dossier d'abord si vous essayez de sauvegarder dans Téléchargements ou d'autres dossiers système.",
+    "description": "Description des sauvegardes"
+  },
+  "backupsSelectFolder": {
+    "message": "Sélectionner un dossier",
+    "description": "Bouton Sélectionner un dossier"
+  },
+  "backupsNotNow": {
+    "message": "Pas maintenant",
+    "description": "Bouton Pas maintenant"
+  },
+  "backupsOnTitle": {
+    "message": "Vos enregistrements sont sauvegardés localement",
+    "description": "Titre de l'activation des sauvegardes"
+  },
+  "backupsOnDescription": {
+    "message": "Pour éviter de demander des autorisations à chaque enregistrement, nous vous recommandons de laisser cette page ouverte.",
+    "description": "Description de l'activation des sauvegardes"
+  },
+  "backupsClose": {
+    "message": "Fermer l'onglet de toute façon",
+    "description": "Bouton Fermer l'onglet de toute façon"
+  },
+  "backupsStop": {
+    "message": "Arrêter toutes les sauvegardes des enregistrements",
+    "description": "Bouton Arrêter les sauvegardes"
+  },
+  "backupsConfirmTitle": {
+    "message": "Veuillez confirmer à nouveau l'accès à votre dossier de sauvegarde local Screenity",
+    "description": "Titre de confirmation des sauvegardes"
+  },
+  "backupsConfirmDescription": {
+    "message": "Nous sommes désolés, mais nous avons besoin de votre permission une fois de plus pour continuer à effectuer des sauvegardes locales de vos enregistrements. Malheureusement, nous devrons demander à chaque fois que vous fermerez cet onglet, ce qui peut arriver si vous fermez le navigateur ou redémarrez votre ordinateur.",
+    "description": "Description de la confirmation des sauvegardes"
+  },
+  "backupsConfirmAllow": {
+    "message": "Autoriser Screenity à continuer à effectuer des sauvegardes des enregistrements",
+    "description": "Bouton Autoriser dans la confirmation des sauvegardes"
+  },
+  "backupsToggle": {
+    "message": "Activer les sauvegardes des enregistrements",
+    "description": "Libellé de l'activation des sauvegardes"
+  },
+  "backupPermissionFailTitle": {
+    "message": "Autorisation non accordée pour sauvegarder l'enregistrement",
+    "description": "Titre de l'échec de l'autorisation de sauvegarde"
+  },
+  "backupPermissionFailDescription": {
+    "message": "Vous n'avez pas sélectionné de dossier pour sauvegarder localement vos enregistrements. Selon la version de votre navigateur ou de votre système d'exploitation, il se peut que l'on vous demande de sélectionner le dossier à chaque début d'enregistrement. Vous pouvez réessayer ou désactiver complètement les sauvegardes si vous préférez ne pas donner des autorisations de manière répétée.",
+    "description": "Description de l'échec de l'autorisation de sauvegarde"
+  },
+  "recordAudioWarningMacTitle": {
+    "message": "Enregistrement audio de l'ordinateur",
+    "description": "Titre de l'avertissement audio pour macOS"
+  },
+  "recordAudioWarningMacDescription": {
+    "message": "Sous macOS, vous ne pouvez enregistrer que l'audio de l'onglet. Sélectionnez l'option 'Onglet Chrome' et assurez-vous que 'Partager également l'audio de l'onglet' est activé.",
+    "description": "Description de l'avertissement audio pour macOS"
+  },
+  "recordAudioWarningOtherTitle": {
+    "message": "Enregistrement audio de l'ordinateur",
+    "description": "Titre de l'avertissement audio pour d'autres systèmes"
+  },
+  "recordAudioWarningOtherDescription": {
+    "message": "Assurez-vous d'activer l'option 'Partager l'audio du système' si vous souhaitez enregistrer l'audio de l'ordinateur. Si vous ne voyez pas cette option, essayez de mettre à jour Chrome ou basculez vers l'enregistrement de l'onglet.",
+    "description": "Description de l'avertissement audio pour d'autres systèmes"
   }
 }

@@ -900,9 +900,110 @@
     "message": "Modo de recuperação",
     "description": "Título do modo de recuperação"
   },
-
   "downloadForTroubleshootingOption": {
     "message": "Baixar dados para solucionar problemas",
     "description": "Opção de download para solucionar problemas"
+  },
+  "getHelpNav": {
+    "message": "Central de Ajuda",
+    "description": "Item de Navegação para Obter Ajuda"
+  },
+  "audioWarningTitle": {
+    "message": "Gravar Áudio do Computador",
+    "description": "Título do Aviso de Áudio"
+  },
+  "audioWarningDescription": {
+    "message": "Para gravar áudio desta página, você precisa alternar para '$tab$'.",
+    "description": "Descrição do Aviso de Áudio",
+    "placeholders": {
+      "tab": {
+        "content": "$1",
+        "example": "Área da Guia"
+      }
+    }
+  },
+  "extensionNotSupportedTitle": {
+    "message": "Extensão não suportada na guia",
+    "description": "Título de Extensão não Suportada na Guia"
+  },
+  "extensionNotSupportedDescription": {
+    "message": "O Screenity não foi suportado na sua guia anterior. Ainda é possível iniciar a sua gravação aqui e alternar para a guia, mas a sua câmera e barra de ferramentas não serão visíveis.",
+    "description": "Descrição de Extensão não Suportada na Guia"
+  },
+  "backupsTitle": {
+    "message": "Configurar um Backup Local para as suas Gravações no Screenity",
+    "description": "Título de Backups"
+  },
+  "backupsDescription1": {
+    "message": "Mantenha uma cópia de todas as gravações que você fizer. Se você não configurar backups, suas gravações só serão salvas quando você escolher baixá-las.",
+    "description": "Descrição de Backups"
+  },
+  "backupsDescription2": {
+    "message": "Você pode precisar criar uma nova pasta primeiro se estiver tentando salvar em 'Downloads' ou outras pastas do sistema.",
+    "description": "Descrição de Backups"
+  },
+  "backupsSelectFolder": {
+    "message": "Selecionar uma Pasta",
+    "description": "Botão Selecionar Pasta"
+  },
+  "backupsNotNow": {
+    "message": "Agora Não",
+    "description": "Botão Agora Não"
+  },
+  "backupsOnTitle": {
+    "message": "Suas Gravações estão sendo salvas localmente",
+    "description": "Título de Backups Ativados"
+  },
+  "backupsOnDescription": {
+    "message": "Para evitar solicitar permissões toda vez que você gravar, recomendamos deixar esta guia aberta.",
+    "description": "Descrição de Backups Ativados"
+  },
+  "backupsClose": {
+    "message": "Fechar guia mesmo assim",
+    "description": "Botão Fechar guia mesmo assim"
+  },
+  "backupsStop": {
+    "message": "Parar todos os backups de gravações",
+    "description": "Botão Parar Backups"
+  },
+  "backupsConfirmTitle": {
+    "message": "Por favor, confirme novamente o acesso à sua pasta local de backup do Screenity",
+    "description": "Título de Confirmação de Backups"
+  },
+  "backupsConfirmDescription": {
+    "message": "Lamentamos, mas precisamos da sua permissão mais uma vez para continuar fazendo backups locais das suas gravações. Infelizmente, teremos que perguntar toda vez que você fechar esta guia, o que pode acontecer se você fechar o navegador ou reiniciar o computador.",
+    "description": "Descrição de Confirmação de Backups"
+  },
+  "backupsConfirmAllow": {
+    "message": "Permitir que o Screenity continue fazendo backups das gravações",
+    "description": "Botão Permitir na Confirmação de Backups"
+  },
+  "backupsToggle": {
+    "message": "Ativar Backups das Gravações",
+    "description": "Rótulo de Alternar Backups"
+  },
+  "backupPermissionFailTitle": {
+    "message": "Permissão não concedida para fazer backup da gravação",
+    "description": "Título de Falha de Permissão de Backup"
+  },
+  "backupPermissionFailDescription": {
+    "message": "Você não selecionou uma pasta para fazer backup local das suas gravações. Dependendo da versão do seu navegador ou sistema operacional, você pode ser solicitado a selecionar a pasta toda vez que iniciar uma gravação. Você pode tentar novamente ou desativar completamente os backups se preferir não conceder permissões repetidamente.",
+    "description": "Descrição de Falha de Permissão de Backup"
+  },
+  "recordAudioWarningMacTitle": {
+    "message": "Gravar Áudio do Computador",
+    "description": "Título de Aviso de Áudio para macOS"
+  },
+  "recordAudioWarningMacDescription": {
+    "message": "No macOS, você só pode gravar o áudio da guia. Selecione a opção 'Guia do Chrome' e certifique-se de que 'Também compartilhar áudio da guia' está ativado.",
+    "description": "Descrição de Aviso de Áudio para macOS"
+  },
+  "recordAudioWarningOtherTitle": {
+    "message": "Gravar Áudio do Computador",
+    "description": "Título de Aviso de Áudio para Outros Sistemas"
+  },
+  "recordAudioWarningOtherDescription": {
+    "message": "Certifique-se de ativar a opção 'Compartilhar áudio do sistema' se desejar gravar áudio do computador. Se você não vir essa opção, tente atualizar o Chrome ou alternar para a gravação da guia.",
+    "description": "Descrição de Aviso de Áudio para Outros Sistemas"
   }
 }

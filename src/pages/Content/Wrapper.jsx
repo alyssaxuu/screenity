@@ -8,6 +8,7 @@ import CameraOnly from "./camera-only/CameraOnly";
 import Canvas from "./canvas/Canvas";
 import Countdown from "./countdown/Countdown";
 import Modal from "./modal/Modal";
+import Warning from "./warning/Warning";
 
 import Region from "./region/Region";
 
@@ -163,6 +164,7 @@ const Wrapper = () => {
             ref={shadowRef}
           >
             <div className="container">
+              <Warning />
               {contentState.recordingType === "region" &&
                 contentState.customRegion && <Region />}
               {shadowRef.current && <Modal shadowRef={shadowRef} />}

@@ -905,5 +905,107 @@
   "downloadForTroubleshootingOption": {
     "message": "Unduh data untuk perbaikan masalah",
     "description": "Pilihan unduhan untuk perbaikan masalah"
+  },
+  "getHelpNav": {
+    "message": "Pusat Bantuan",
+    "description": "Elemen Navigasi Bantuan"
+  },
+  "audioWarningTitle": {
+    "message": "Merekam Audio dari Halaman",
+    "description": "Judul Peringatan Audio"
+  },
+  "audioWarningDescription": {
+    "message": "Untuk merekam audio dari halaman ini, Anda harus menggunakan opsi '$tab$'.",
+    "description": "Deskripsi Peringatan Audio",
+    "placeholders": {
+      "tab": {
+        "content": "$1",
+        "example": "Area Tab"
+      }
+    }
+  },
+  "extensionNotSupportedTitle": {
+    "message": "Ekstensi Tidak Didukung di Halaman",
+    "description": "Judul Ekstensi Tidak Didukung di Tab"
+  },
+  "extensionNotSupportedDescription": {
+    "message": "Screenity tidak mendukung di tab sebelumnya Anda. Meskipun begitu, Anda masih bisa memulai perekaman di sini dan kemudian beralih ke tab lain, tetapi kamera dan toolbar Anda tidak akan terlihat.",
+    "description": "Deskripsi Ekstensi Tidak Didukung di Tab"
+  },
+  "backupsTitle": {
+    "message": "Konfigurasi Cadangan Lokal untuk Rekaman Screenity Anda",
+    "description": "Judul Cadangan"
+  },
+  "backupsDescription1": {
+    "message": "Simpan salinan dari semua rekaman yang Anda buat. Jika Anda tidak mengatur cadangan, rekaman Anda hanya akan disimpan saat Anda memutuskan untuk mengunduhnya.",
+    "description": "Deskripsi Cadangan"
+  },
+  "backupsDescription2": {
+    "message": "Anda mungkin perlu membuat folder baru terlebih dahulu jika Anda mencoba menyimpannya di folder seperti 'Unduhan' atau folder sistem lainnya.",
+    "description": "Deskripsi Cadangan"
+  },
+  "backupsSelectFolder": {
+    "message": "Pilih Folder",
+    "description": "Tombol Pilih Folder"
+  },
+  "backupsNotNow": {
+    "message": "Tidak Sekarang",
+    "description": "Tombol Tidak Sekarang"
+  },
+  "backupsOnTitle": {
+    "message": "Rekaman Anda Sedang Disinkronkan Secara Lokal",
+    "description": "Judul Cadangan Aktif"
+  },
+  "backupsOnDescription": {
+    "message": "Untuk menghindari permintaan izin setiap kali Anda merekam, kami sarankan Anda menjaga tab ini tetap terbuka.",
+    "description": "Deskripsi Cadangan Aktif"
+  },
+  "backupsClose": {
+    "message": "Tutup Tab Anyway",
+    "description": "Tombol Tutup Tab Anyway"
+  },
+  "backupsStop": {
+    "message": "Hentikan Semua Cadangan Rekaman",
+    "description": "Tombol Hentikan Cadangan"
+  },
+  "backupsConfirmTitle": {
+    "message": "Mohon Konfirmasi Kembali Akses ke Folder Cadangan Lokal Screenity Anda",
+    "description": "Judul Konfirmasi Cadangan"
+  },
+  "backupsConfirmDescription": {
+    "message": "Maaf, tetapi kami perlu izin Anda sekali lagi untuk terus membuat salinan lokal dari rekaman Anda. Sayangnya, kami akan perlu bertanya setiap kali Anda menutup tab ini, yang bisa terjadi jika Anda menutup browser atau me-restart komputer Anda.",
+    "description": "Deskripsi Konfirmasi Cadangan"
+  },
+  "backupsConfirmAllow": {
+    "message": "Izinkan Screenity untuk Terus Membuat Cadangan Rekaman",
+    "description": "Tombol Izinkan dalam Konfirmasi Cadangan"
+  },
+  "backupsToggle": {
+    "message": "Membuat Cadangan Rekaman",
+    "description": "Label Aktifkan/Nonaktifkan Cadangan"
+  },
+  "backupPermissionFailTitle": {
+    "message": "Izin Tidak Diberikan untuk Membuat Cadangan Rekaman",
+    "description": "Judul Gagal Izin Cadangan"
+  },
+  "backupPermissionFailDescription": {
+    "message": "Anda tidak memilih folder untuk membuat salinan lokal dari rekaman Anda. Bergantung pada versi browser atau sistem operasi Anda, Anda mungkin diminta untuk memilih folder setiap kali Anda mulai merekam. Anda dapat mencoba lagi atau menonaktifkan cadangan sepenuhnya jika Anda tidak ingin memberikan izin berkali-kali.",
+    "description": "Deskripsi Gagal Izin Cadangan"
+  },
+  "recordAudioWarningMacTitle": {
+    "message": "Merekam Audio dari Komputer",
+    "description": "Judul Peringatan Audio untuk macOS"
+  },
+  "recordAudioWarningMacDescription": {
+    "message": "Di macOS, Anda hanya dapat merekam audio dari tab. Pilih opsi 'Tab Chrome' dan pastikan 'Bagikan juga audio tab' diaktifkan.",
+    "description": "Deskripsi Peringatan Audio untuk macOS"
+  },
+  "recordAudioWarningOtherTitle": {
+    "message": "Merekam Audio dari Komputer",
+    "description": "Judul Peringatan Audio untuk Sistem Lainnya"
+  },
+  "recordAudioWarningOtherDescription": {
+    "message": "Pastikan Anda mengaktifkan opsi 'Bagikan audio sistem' jika Anda ingin merekam audio dari komputer. Jika Anda tidak melihat opsi ini, coba perbarui Chrome atau beralih ke opsi merekam tab.",
+    "description": "Deskripsi Peringatan Audio untuk Sistem Lainnya"
   }
 }

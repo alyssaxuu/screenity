@@ -905,5 +905,107 @@
   "downloadForTroubleshootingOption": {
     "message": "下載故障排除資料",
     "description": "故障排除選項"
+  },
+  "getHelpNav": {
+    "message": "幫助中心",
+    "description": "幫助導航元素"
+  },
+  "audioWarningTitle": {
+    "message": "錄製網頁音訊",
+    "description": "音訊警告標題"
+  },
+  "audioWarningDescription": {
+    "message": "要錄製此網頁的音訊，請使用'$tab$'選項。",
+    "description": "音訊警告說明",
+    "placeholders": {
+      "tab": {
+        "content": "$1",
+        "example": "選項卡區域"
+      }
+    }
+  },
+  "extensionNotSupportedTitle": {
+    "message": "頁面不支援擴展功能",
+    "description": "選項卡上不支援擴展功能的標題"
+  },
+  "extensionNotSupportedDescription": {
+    "message": "Screenity在您之前的選項卡上不受支援。儘管如此，您可以在此開始錄製，然後切換到選項卡，但您的攝像頭和工具欄將不可見。",
+    "description": "選項卡上不支援擴展功能的說明"
+  },
+  "backupsTitle": {
+    "message": "為Screenity錄製設定本地備份",
+    "description": "備份標題"
+  },
+  "backupsDescription1": {
+    "message": "保留您進行的所有錄製的備份。如果您不設定備份，只有在決定下載它們時才會保存您的錄製。",
+    "description": "備份說明"
+  },
+  "backupsDescription2": {
+    "message": "如果您試圖保存到下載或其他系統文件夾，則可能需要首先創建一個新文件夾。",
+    "description": "備份說明"
+  },
+  "backupsSelectFolder": {
+    "message": "選擇文件夾",
+    "description": "選擇文件夾按鈕"
+  },
+  "backupsNotNow": {
+    "message": "現在不",
+    "description": "現在不按鈕"
+  },
+  "backupsOnTitle": {
+    "message": "您的錄製已本地同步",
+    "description": "已啟用的備份標題"
+  },
+  "backupsOnDescription": {
+    "message": "為了避免每次錄製時都請求權限，我們建議保持此選項卡打開。",
+    "description": "已啟用的備份說明"
+  },
+  "backupsClose": {
+    "message": "仍然關閉選項卡",
+    "description": "仍然關閉選項卡按鈕"
+  },
+  "backupsStop": {
+    "message": "停止所有錄製的備份",
+    "description": "停止備份按鈕"
+  },
+  "backupsConfirmTitle": {
+    "message": "請重新確認對Screenity本地備份文件夾的訪問權限",
+    "description": "備份確認標題"
+  },
+  "backupsConfirmDescription": {
+    "message": "很抱歉，我們需要再次獲得您的許可，以繼續創建您的錄製的本地副本。不幸的是，每次關閉此選項卡時，我們都需要詢問，這可能會在您關閉瀏覽器或重新啟動計算機時發生。",
+    "description": "備份確認說明"
+  },
+  "backupsConfirmAllow": {
+    "message": "允許Screenity繼續備份錄製",
+    "description": "備份確認中的允許按鈕"
+  },
+  "backupsToggle": {
+    "message": "備份錄製",
+    "description": "備份切換標籤"
+  },
+  "backupPermissionFailTitle": {
+    "message": "未授予備份錄製的權限",
+    "description": "備份權限失敗標題"
+  },
+  "backupPermissionFailDescription": {
+    "message": "您未選擇要創建您的錄製的本地副本的文件夾。根據瀏覽器或操作系統的版本，每次開始錄製時可能會要求您選擇文件夾。您可以再次嘗試或完全禁用備份，如果您不想重複授予權限。",
+    "description": "備份權限失敗說明"
+  },
+  "recordAudioWarningMacTitle": {
+    "message": "錄製計算機音訊",
+    "description": "macOS音訊警告標題"
+  },
+  "recordAudioWarningMacDescription": {
+    "message": "在macOS上，您只能錄製選項卡的音訊。請選擇'Chrome選項卡'選項，並確保啟用'同時共享選項卡音訊'選項。",
+    "description": "macOS音訊警告說明"
+  },
+  "recordAudioWarningOtherTitle": {
+    "message": "錄製計算機音訊",
+    "description": "其他系統音訊警告標題"
+  },
+  "recordAudioWarningOtherDescription": {
+    "message": "如果您想錄製計算機音訊，請確保啟用'共享系統音訊'選項。如果您看不到此選項，請嘗試更新Chrome或切換到選項卡錄製選項。",
+    "description": "其他系統音訊警告說明"
   }
 }

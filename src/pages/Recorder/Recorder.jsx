@@ -1,10 +1,15 @@
 import React, { useEffect, useState, useRef, useCallback } from "react";
 import Localbase from "localbase";
 
+import Warning from "./warning/Warning";
+
 let db = new Localbase("db");
 
 const Recorder = () => {
   const isRestarting = useRef(false);
+  const isFinishing = useRef(false);
+  const sentLast = useRef(false);
+
   const index = useRef(0);
 
   const [started, setStarted] = useState(false);
@@ -30,6 +35,18 @@ const Recorder = () => {
   const tabID = useRef(null);
   const tabPreferred = useRef(false);
 
+  const backupRef = useRef(false);
+
+  useEffect(() => {
+    chrome.storage.local.get(["backup"], (result) => {
+      if (result.backup) {
+        backupRef.current = true;
+      } else {
+        backupRef.current = false;
+      }
+    });
+  }, []);
+
   async function startRecording() {
     // Check if the stream actually has data in it
     if (helperVideoStream.current.getVideoTracks().length === 0) {
@@ -53,6 +70,11 @@ const Recorder = () => {
         why: JSON.stringify(err),
       });
     }
+
+    chrome.storage.local.set({
+      recording: true,
+      restarting: false,
+    });
 
     isRestarting.current = false;
     index.current = 0;
@@ -81,16 +103,21 @@ const Recorder = () => {
       });
     }
 
-    recorder.current.onstop = async (e) => {
+    recorder.current.onstop = (e) => {
       if (isRestarting.current) return;
-      chrome.runtime.sendMessage({ type: "video-ready" });
+      setTimeout(() => {
+        if (!sentLast.current) {
+          chrome.runtime.sendMessage({ type: "video-ready" });
+          isFinishing.current = false;
+        }
+      }, 3000);
       isRestarting.current = false;
     };
 
     const checkMaxMemory = () => {
       try {
         navigator.storage.estimate().then((data) => {
-          const minMemory = 800000000;
+          const minMemory = 26214400;
           // Check if there's enough space to keep recording
           if (data.quota < minMemory) {
             chrome.storage.local.set({
@@ -120,14 +147,27 @@ const Recorder = () => {
             index: index.current,
             chunk: e.data,
           });
+          if (backupRef.current) {
+            chrome.runtime.sendMessage({
+              type: "write-file",
+              index: index.current,
+            });
+          }
           index.current++;
         } catch (err) {
-          chrome.runtime.sendMessage({
-            type: "recording-error",
-            error: "stream-error",
-            why: JSON.stringify(err),
+          chrome.storage.local.set({
+            recording: false,
+            restarting: false,
+            tabRecordedID: null,
+            memoryError: true,
           });
+          chrome.runtime.sendMessage({ type: "stop-recording-tab" });
         }
+      }
+
+      if (isFinishing.current) {
+        sentLast.current = true;
+        chrome.runtime.sendMessage({ type: "video-ready" });
       }
     };
 
@@ -142,6 +182,7 @@ const Recorder = () => {
   }
 
   async function stopRecording() {
+    isFinishing.current = true;
     if (recorder.current !== null) {
       recorder.current.stop();
       recorder.current = null;
@@ -373,6 +414,7 @@ const Recorder = () => {
 
     // Send message to go back to the previously active tab
     setStarted(true);
+
     chrome.runtime.sendMessage({ type: "reset-active-tab" });
   }
 
@@ -441,6 +483,7 @@ const Recorder = () => {
 
   const onMessage = useCallback((request, sender, sendResponse) => {
     if (request.type === "loaded") {
+      backupRef.current = request.backup;
       if (!tabPreferred.current) {
         isTab.current = request.isTab;
         if (request.isTab) {
@@ -510,6 +553,7 @@ const Recorder = () => {
           </div>
 					)*/}
       </div>
+      {!isTab.current && !started && <Warning />}
       <div className="setupBackgroundSVG"></div>
       <style>
         {`

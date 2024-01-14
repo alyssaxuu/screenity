@@ -38,17 +38,12 @@ const RightPanel = () => {
       ...prevContentState,
       saveDrive: true,
     }));
-    // Blob to base64
-    const reader = new FileReader();
-    reader.onload = () => {
-      const dataUrl = reader.result;
-      const base64 = dataUrl.split(",")[1];
 
+    if (contentState.noffmpeg || !contentState.mp4ready || !contentState.blob) {
       chrome.runtime
         .sendMessage({
-          type: "save-to-drive",
-          base64: base64,
-          title: contentState.titletitle,
+          type: "save-to-drive-fallback",
+          title: contentState.title,
         })
         .then((response) => {
           if (response.status === "ew") {
@@ -59,11 +54,38 @@ const RightPanel = () => {
             }));
           }
         });
-    };
-    if (!contentState.noffmpeg && contentState.mp4ready && contentState.blob) {
-      reader.readAsDataURL(contentState.blob);
     } else {
-      reader.readAsDataURL(contentState.webm);
+      // Blob to base64
+      const reader = new FileReader();
+      reader.onload = () => {
+        const dataUrl = reader.result;
+        const base64 = dataUrl.split(",")[1];
+
+        chrome.runtime
+          .sendMessage({
+            type: "save-to-drive",
+            base64: base64,
+            title: contentState.title,
+          })
+          .then((response) => {
+            if (response.status === "ew") {
+              // Cancel saving to drive
+              setContentState((prevContentState) => ({
+                ...prevContentState,
+                saveDrive: false,
+              }));
+            }
+          });
+      };
+      if (
+        !contentState.noffmpeg &&
+        contentState.mp4ready &&
+        contentState.blob
+      ) {
+        reader.readAsDataURL(contentState.blob);
+      } else {
+        reader.readAsDataURL(contentState.webm);
+      }
     }
   };
 

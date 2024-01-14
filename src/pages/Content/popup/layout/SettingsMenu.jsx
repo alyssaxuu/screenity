@@ -15,6 +15,17 @@ import { contentStateContext } from "../../context/ContentState";
 const SettingsMenu = (props) => {
   const [contentState, setContentState] = useContext(contentStateContext);
   const [restore, setRestore] = useState(false);
+  const [oldChrome, setOldChrome] = useState(false);
+
+  useEffect(() => {
+    // Check chrome version
+    const chromeVersion = navigator.userAgent.match(/Chrom(e|ium)\/([0-9]+)\./);
+    const MIN_CHROME_VERSION = 110;
+
+    if (chromeVersion && parseInt(chromeVersion[2], 10) < MIN_CHROME_VERSION) {
+      setOldChrome(true);
+    }
+  }, []);
 
   const handleTroubleshooting = () => {
     if (typeof contentState.openModal === "function") {
@@ -158,6 +169,34 @@ const SettingsMenu = (props) => {
               <img src={CheckWhiteIcon} />
             </DropdownMenu.ItemIndicator>
           </DropdownMenu.CheckboxItem>
+          {!oldChrome && (
+            <DropdownMenu.CheckboxItem
+              className="DropdownMenuItem"
+              onSelect={(e) => {
+                e.preventDefault();
+              }}
+              onCheckedChange={(checked) => {
+                if (!checked) {
+                  chrome.runtime.sendMessage({ type: "close-backup-tab" });
+                }
+                setContentState((prevContentState) => ({
+                  ...prevContentState,
+                  backup: checked,
+                  backupSetup: false,
+                }));
+                chrome.storage.local.set({
+                  backup: checked,
+                  backupSetup: false,
+                });
+              }}
+              checked={contentState.backup}
+            >
+              {chrome.i18n.getMessage("backupsToggle")}
+              <DropdownMenu.ItemIndicator className="ItemIndicator">
+                <img src={CheckWhiteIcon} />
+              </DropdownMenu.ItemIndicator>
+            </DropdownMenu.CheckboxItem>
+          )}
           <DropdownMenu.Item
             className="DropdownMenuItem"
             onSelect={(e) => {

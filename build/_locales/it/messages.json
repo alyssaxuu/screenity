@@ -890,5 +890,107 @@
   "downloadForTroubleshootingOption": {
     "message": "Scarica dati per risolvere problemi",
     "description": "Opzione di scaricamento per risolvere problemi"
+  },
+  "getHelpNav": {
+    "message": "Centro assistenza",
+    "description": "Elemento di navigazione per il centro assistenza"
+  },
+  "audioWarningTitle": {
+    "message": "Registra l'audio del computer",
+    "description": "Titolo dell'avviso audio"
+  },
+  "audioWarningDescription": {
+    "message": "Per registrare l'audio da questa pagina, devi passare a '$tab$'.",
+    "description": "Descrizione dell'avviso audio",
+    "placeholders": {
+      "tab": {
+        "content": "$1",
+        "example": "Area della scheda"
+      }
+    }
+  },
+  "extensionNotSupportedTitle": {
+    "message": "Estensione non supportata sulla scheda",
+    "description": "Titolo dell'estensione non supportata sulla scheda"
+  },
+  "extensionNotSupportedDescription": {
+    "message": "Screenity non è stato supportato nella tua scheda precedente. Puoi comunque iniziare la registrazione qui e passare alla scheda, ma la tua fotocamera e la barra degli strumenti non saranno visibili.",
+    "description": "Descrizione dell'estensione non supportata sulla scheda"
+  },
+  "backupsTitle": {
+    "message": "Configura un backup locale per le registrazioni di Screenity",
+    "description": "Titolo dei backup"
+  },
+  "backupsDescription1": {
+    "message": "Tieni una copia di tutte le registrazioni che fai. Se non configuri i backup, le tue registrazioni verranno salvate solo quando decidi di scaricarle.",
+    "description": "Descrizione dei backup"
+  },
+  "backupsDescription2": {
+    "message": "Potresti dover creare una nuova cartella prima se stai cercando di salvare in Download o in altre cartelle di sistema.",
+    "description": "Descrizione dei backup"
+  },
+  "backupsSelectFolder": {
+    "message": "Seleziona una cartella",
+    "description": "Pulsante Seleziona una cartella"
+  },
+  "backupsNotNow": {
+    "message": "Non ora",
+    "description": "Pulsante Non ora"
+  },
+  "backupsOnTitle": {
+    "message": "Le tue registrazioni sono salvate localmente",
+    "description": "Titolo dei backup attivi"
+  },
+  "backupsOnDescription": {
+    "message": "Per evitare di richiedere autorizzazioni ogni volta che registri, ti consigliamo di lasciare aperta questa scheda.",
+    "description": "Descrizione dei backup attivi"
+  },
+  "backupsClose": {
+    "message": "Chiudi comunque la scheda",
+    "description": "Pulsante Chiudi comunque la scheda"
+  },
+  "backupsStop": {
+    "message": "Arresta tutti i backup delle registrazioni",
+    "description": "Pulsante Arresta i backup"
+  },
+  "backupsConfirmTitle": {
+    "message": "Conferma nuovamente l'accesso alla cartella di backup locale di Screenity",
+    "description": "Titolo della conferma dei backup"
+  },
+  "backupsConfirmDescription": {
+    "message": "Ci dispiace, ma abbiamo bisogno della tua autorizzazione ancora una volta per continuare a fare backup locali delle tue registrazioni. Sfortunatamente, dovremo chiedere ogni volta che chiudi questa scheda, il che può accadere se chiudi il browser o riavvii il computer.",
+    "description": "Descrizione della conferma dei backup"
+  },
+  "backupsConfirmAllow": {
+    "message": "Consenti a Screenity di continuare a fare backup delle registrazioni",
+    "description": "Pulsante Consenti nella conferma dei backup"
+  },
+  "backupsToggle": {
+    "message": "Attiva i backup delle registrazioni",
+    "description": "Etichetta Attiva i backup"
+  },
+  "backupPermissionFailTitle": {
+    "message": "Permesso non concesso per il backup della registrazione",
+    "description": "Titolo del fallimento del permesso di backup"
+  },
+  "backupPermissionFailDescription": {
+    "message": "Non hai selezionato una cartella per il backup locale delle registrazioni. A seconda della versione del tuo browser o del sistema operativo, potrebbe essere richiesto di selezionare la cartella ogni volta che inizi a registrare. Puoi riprovare o disabilitare completamente i backup se preferisci non concedere autorizzazioni ripetutamente.",
+    "description": "Descrizione del fallimento del permesso di backup"
+  },
+  "recordAudioWarningMacTitle": {
+    "message": "Registra l'audio del computer",
+    "description": "Titolo dell'avviso audio per macOS"
+  },
+  "recordAudioWarningMacDescription": {
+    "message": "Su macOS, puoi registrare solo l'audio della scheda. Seleziona l'opzione 'Scheda Chrome' e assicurati che 'Condividi anche l'audio della scheda' sia abilitato.",
+    "description": "Descrizione dell'avviso audio per macOS"
+  },
+  "recordAudioWarningOtherTitle": {
+    "message": "Registra l'audio del computer",
+    "description": "Titolo dell'avviso audio per altri sistemi"
+  },
+  "recordAudioWarningOtherDescription": {
+    "message": "Assicurati di attivare l'opzione 'Condividi l'audio del sistema' se desideri registrare l'audio del computer. Se non vedi questa opzione, prova a aggiornare Chrome o passa alla registrazione della scheda.",
+    "description": "Descrizione dell'avviso audio per altri sistemi"
   }
 }

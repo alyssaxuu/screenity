@@ -562,6 +562,26 @@ const HelpIconPopup = (props) => {
   );
 };
 
+const AudioIcon = (props) => {
+  return (
+    <ReactSVG
+      src={URL + "/tool-icons/audio-icon.svg"}
+      width={props.width}
+      height={props.height}
+    />
+  );
+};
+
+const NotSupportedIcon = (props) => {
+  return (
+    <ReactSVG
+      src={URL + "/tool-icons/not-supported-icon.svg"}
+      width={props.width}
+      height={props.height}
+    />
+  );
+};
+
 export {
   GrabIcon,
   StopIcon,
@@ -616,4 +636,6 @@ export {
   CloseButtonToolbar,
   HelpIconPopup,
   MoreIconPopup,
+  AudioIcon,
+  NotSupportedIcon,
 };

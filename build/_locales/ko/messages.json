@@ -904,5 +904,107 @@
   "downloadForTroubleshootingOption": {
     "message": "문제 해결을 위한 데이터 다운로드",
     "description": "문제 해결을 위한 다운로드 옵션"
+  },
+  "getHelpNav": {
+    "message": "도움말 센터",
+    "description": "도움말 탐색 항목"
+  },
+  "audioWarningTitle": {
+    "message": "페이지 오디오 녹음",
+    "description": "오디오 경고 제목"
+  },
+  "audioWarningDescription": {
+    "message": "이 페이지의 오디오를 녹음하려면 '$tab$' 옵션을 사용해야 합니다.",
+    "description": "오디오 경고 설명",
+    "placeholders": {
+      "tab": {
+        "content": "$1",
+        "example": "탭 영역"
+      }
+    }
+  },
+  "extensionNotSupportedTitle": {
+    "message": "페이지에서 지원되지 않는 확장 프로그램",
+    "description": "탭에서 지원되지 않는 확장 프로그램 제목"
+  },
+  "extensionNotSupportedDescription": {
+    "message": "Screenity는 이전 탭에서 지원되지 않았습니다. 그럼에도 불구하고 여기에서 녹음을 시작한 다음 다른 탭으로 전환할 수 있지만 카메라와 도구 모음은 표시되지 않습니다.",
+    "description": "탭에서 지원되지 않는 확장 프로그램 설명"
+  },
+  "backupsTitle": {
+    "message": "Screenity 녹음을 위한 로컬 백업 설정",
+    "description": "백업 제목"
+  },
+  "backupsDescription1": {
+    "message": "생성한 모든 녹음의 사본을 유지하세요. 백업을 설정하지 않으면 녹음은 다운로드하기로 결정할 때만 저장됩니다.",
+    "description": "백업 설명"
+  },
+  "backupsDescription2": {
+    "message": "시스템 다운로드 폴더와 같은 폴더에 저장하려면 먼저 새 폴더를 만들어야 할 수 있습니다.",
+    "description": "백업 설명"
+  },
+  "backupsSelectFolder": {
+    "message": "폴더 선택",
+    "description": "폴더 선택 버튼"
+  },
+  "backupsNotNow": {
+    "message": "지금은 아님",
+    "description": "지금 아님 버튼"
+  },
+  "backupsOnTitle": {
+    "message": "녹음이 로컬로 동기화됨",
+    "description": "활성화된 백업 제목"
+  },
+  "backupsOnDescription": {
+    "message": "녹음할 때마다 권한을 요청하지 않으려면 이 탭을 열어두는 것을 권장합니다.",
+    "description": "활성화된 백업 설명"
+  },
+  "backupsClose": {
+    "message": "그래도 탭 닫기",
+    "description": "그래도 탭 닫기 버튼"
+  },
+  "backupsStop": {
+    "message": "모든 녹음의 백업 중지",
+    "description": "백업 중지 버튼"
+  },
+  "backupsConfirmTitle": {
+    "message": "Screenity 로컬 백업 폴더에 다시 액세스 권한을 확인하세요.",
+    "description": "백업 확인 제목"
+  },
+  "backupsConfirmDescription": {
+    "message": "죄송하지만 녹음의 로컬 사본을 계속 만들기 위해 다시 권한이 필요합니다. 불행하게도 이 탭을 닫을 때마다 묻게 될 것이며, 이는 브라우저를 닫거나 컴퓨터를 다시 시작하는 경우에 발생할 수 있습니다.",
+    "description": "백업 확인 설명"
+  },
+  "backupsConfirmAllow": {
+    "message": "Screenity에게 녹음 백업 권한 부여",
+    "description": "백업 확인에서 허용 버튼"
+  },
+  "backupsToggle": {
+    "message": "녹음 백업 생성",
+    "description": "녹음 백업 전환 레이블"
+  },
+  "backupPermissionFailTitle": {
+    "message": "녹음 백업 권한 부여 실패",
+    "description": "녹음 백업 권한 부여 실패 제목"
+  },
+  "backupPermissionFailDescription": {
+    "message": "녹음의 로컬 사본을 만들기 위한 폴더를 선택하지 않았습니다. 브라우저 또는 운영 체제 버전에 따라 녹음을 시작할 때마다 폴더를 선택하라는 메시지가 나올 수 있습니다. 다시 시도하거나 권한을 반복적으로 부여하지 않으려면 백업을 완전히 비활성화할 수 있습니다.",
+    "description": "녹음 백업 권한 부여 실패 설명"
+  },
+  "recordAudioWarningMacTitle": {
+    "message": "컴퓨터 오디오 녹음",
+    "description": "macOS용 오디오 경고 제목"
+  },
+  "recordAudioWarningMacDescription": {
+    "message": "macOS에서는 탭에서만 오디오를 녹음할 수 있습니다. 'Chrome 탭' 옵션을 선택하고 '탭 오디오도 공유'가 활성화되어 있는지 확인하세요.",
+    "description": "macOS용 오디오 경고 설명"
+  },
+  "recordAudioWarningOtherTitle": {
+    "message": "컴퓨터 오디오 녹음",
+    "description": "기타 시스템용 오디오 경고 제목"
+  },
+  "recordAudioWarningOtherDescription": {
+    "message": "컴퓨터 오디오를 녹음하려면 '시스템 오디오 공유' 옵션을 활성화하세요. 이 옵션을 보지 못하는 경우 Chrome을 업데이트하거나 탭 녹음 옵션으로 전환해 보세요.",
+    "description": "기타 시스템용 오디오 경고 설명"
   }
 }

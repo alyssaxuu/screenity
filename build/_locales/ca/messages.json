@@ -901,9 +901,110 @@
     "message": "Mode de recuperació",
     "description": "Títol del mode de recuperació"
   },
-
   "downloadForTroubleshootingOption": {
     "message": "Descarregar dades per solucionar problemes",
     "description": "Opció de descàrrega per solucionar problemes"
+  },
+  "getHelpNav": {
+    "message": "Centre d'ajuda",
+    "description": "Element de navegació d'ajuda"
+  },
+  "audioWarningTitle": {
+    "message": "Enregistra l'àudio de la pàgina",
+    "description": "Títol d'avís d'àudio"
+  },
+  "audioWarningDescription": {
+    "message": "Per enregistrar l'àudio d'aquesta pàgina, has de canviar a '$tab$'.",
+    "description": "Descripció d'avís d'àudio",
+    "placeholders": {
+      "tab": {
+        "content": "$1",
+        "example": "Àrea de la pestanya"
+      }
+    }
+  },
+  "extensionNotSupportedTitle": {
+    "message": "Extensió no compatible a la pestanya",
+    "description": "Títol d'extensió no compatible a la pestanya"
+  },
+  "extensionNotSupportedDescription": {
+    "message": "Screenity no era compatible a la teva pestanya anterior. No obstant això, pots començar la gravació aquí i després canviar a la pestanya, però la teva càmera i la barra de ferramentes no seran visibles.",
+    "description": "Descripció d'extensió no compatible a la pestanya"
+  },
+  "backupsTitle": {
+    "message": "Configura una còpia de seguretat local per a les teves gravacions de Screenity",
+    "description": "Títol de còpies de seguretat"
+  },
+  "backupsDescription1": {
+    "message": "Mantingues una còpia de totes les gravacions que facis. Si no configures còpies de seguretat, les teves gravacions només es guardaran quan decideixis descarregar-les.",
+    "description": "Descripció de còpies de seguretat"
+  },
+  "backupsDescription2": {
+    "message": "Potser necessitaràs crear una nova carpeta primer si intents guardar-ho a Descàrregues o altres carpetes del sistema.",
+    "description": "Descripció de còpies de seguretat"
+  },
+  "backupsSelectFolder": {
+    "message": "Selecciona una carpeta",
+    "description": "Botó Selecciona carpeta"
+  },
+  "backupsNotNow": {
+    "message": "Ara no",
+    "description": "Botó Ara no"
+  },
+  "backupsOnTitle": {
+    "message": "Les teves gravacions s'estan sincronitzant localment",
+    "description": "Títol de còpies de seguretat actives"
+  },
+  "backupsOnDescription": {
+    "message": "Per evitar sol·licitar permisos cada vegada que gravis, et recomanem deixar aquesta pestanya oberta.",
+    "description": "Descripció de còpies de seguretat actives"
+  },
+  "backupsClose": {
+    "message": "Tanca la pestanya de tota manera",
+    "description": "Botó Tanca la pestanya de tota manera"
+  },
+  "backupsStop": {
+    "message": "Atura les còpies de seguretat de totes les gravacions",
+    "description": "Botó Atura còpies de seguretat"
+  },
+  "backupsConfirmTitle": {
+    "message": "Per favor, torna a confirmar l'accés a la teva carpeta de còpies de seguretat local de Screenity",
+    "description": "Títol de confirmació de còpies de seguretat"
+  },
+  "backupsConfirmDescription": {
+    "message": "Ho sentim, però necessitem el teu permís una vegada més per continuar fent còpies locals de les teves gravacions. Desafortunadament, haurem de preguntar cada vegada que tanquis aquesta pestanya, el que pot passar si tanques el navegador o reinicies el teu ordinador.",
+    "description": "Descripció de confirmació de còpies de seguretat"
+  },
+  "backupsConfirmAllow": {
+    "message": "Permet a Screenity continuar fent còpies de seguretat de les gravacions",
+    "description": "Botó Permet en la confirmació de còpies de seguretat"
+  },
+  "backupsToggle": {
+    "message": "Fes còpies de seguretat de les gravacions",
+    "description": "Etiqueta d'alternar còpies de seguretat"
+  },
+  "backupPermissionFailTitle": {
+    "message": "Permís no atorgat per fer una còpia de seguretat de la gravació",
+    "description": "Títol de fallada de permís de còpia de seguretat"
+  },
+  "backupPermissionFailDescription": {
+    "message": "No has seleccionat cap carpeta per fer una còpia local de les gravacions. Depenent de la versió del teu navegador o sistema operatiu, potser se't demanarà seleccionar la carpeta cada vegada que comencis a gravar. Pots intentar-ho de nou o desactivar les còpies de seguretat per complet si prefereixes no atorgar permisos repetidament.",
+    "description": "Descripció de fallada de permís de còpia de seguretat"
+  },
+  "recordAudioWarningMacTitle": {
+    "message": "Enregistra l'audio de l'ordinador",
+    "description": "Títol d'avís d'àudio per a macOS"
+  },
+  "recordAudioWarningMacDescription": {
+    "message": "A macOS, només pots enregistrar l'àudio de les pestanyes. Seleccioneu l'opció 'Pestanya de Chrome' i assegureu-vos que 'Comparteix també l'audio de la pestanya' estigui habilitat.",
+    "description": "Descripció d'avís d'àudio per a macOS"
+  },
+  "recordAudioWarningOtherTitle": {
+    "message": "Enregistra l'audio de l'ordinador",
+    "description": "Títol d'avís d'àudio per a altres sistemes"
+  },
+  "recordAudioWarningOtherDescription": {
+    "message": "Assegureu-vos d'activar l'opció 'Comparteix l'audio del sistema' si voleu enregistrar l'audio de l'ordinador. Si no veieu aquesta opció, proveu d'actualitzar Chrome o canviar a l'opció d'enregistrament de pestanyes.",
+    "description": "Descripció d'avís d'àudio per a altres sistemes"
   }
 }
