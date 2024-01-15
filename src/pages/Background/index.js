@@ -788,7 +788,11 @@ const offscreenDocument = async (request, tabId = null) => {
   if (tabId !== null) {
     activeTab = await chrome.tabs.get(tabId);
   }
-  chrome.storage.local.set({ activeTab: activeTab.id, tabRecordedID: null });
+  chrome.storage.local.set({
+    activeTab: activeTab.id,
+    tabRecordedID: null,
+    memoryError: false,
+  });
 
   // Check activeTab URL
   if (activeTab.url.includes(chrome.runtime.getURL("playground.html"))) {
@@ -1125,6 +1129,16 @@ chrome.runtime.onInstalled.addListener(async (details) => {
     if (version <= 109) {
       chrome.storage.local.set({ backup: false });
     }
+  }
+
+  // Check if the backup tab is open, if so close it
+  const { backupTab } = await chrome.storage.local.get(["backupTab"]);
+  if (backupTab) {
+    chrome.tabs.get(backupTab, (tab) => {
+      if (tab) {
+        chrome.tabs.remove(tab.id);
+      }
+    });
   }
 
   executeScripts();
@@ -1629,7 +1643,28 @@ const handleMessage = async (request, sender, sendResponse) => {
   } else if (request.type === "force-processing") {
     forceProcessing();
   } else if (request.type === "focus-this-tab") {
-    chrome.tabs.update(sender.tab.id, { active: true });
+    chrome.windows.update(sender.tab.windowId, { focused: true }).then(() => {
+      chrome.tabs.update(sender.tab.id, { active: true });
+    });
+  } else if (request.type === "stop-recording-tab-backup") {
+    chrome.storage.local.set({
+      recording: false,
+      restarting: false,
+      tabRecordedID: null,
+      memoryError: true,
+    });
+    sendMessageRecord({ type: "stop-recording-tab" });
+
+    // Get active tab
+    const { activeTab } = await chrome.storage.local.get(["activeTab"]);
+    // Check if actual tab
+    chrome.tabs.get(activeTab, (t) => {
+      if (t) {
+        chrome.tabs.sendMessage(activeTab, { type: "stop-pending" });
+        // Focus tab
+        chrome.tabs.update(activeTab, { active: true });
+      }
+    });
   }
 };
 
@@ -1809,14 +1844,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true;
   } else if (request.type === "request-download") {
     requestDownload(request.base64, request.title);
-  } else if (request.type === "stop-recording-tab-backup") {
-    chrome.storage.local.set({
-      recording: false,
-      restarting: false,
-      tabRecordedID: null,
-      memoryError: true,
-    });
-    sendMessageRecord({ type: "stop-recording-tab" });
   }
   handleMessage(request, sender, sendResponse);
 });

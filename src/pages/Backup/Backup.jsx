@@ -15,6 +15,8 @@ const Backup = () => {
   const writingFile = useRef(false);
   const titleRef = useRef(null);
   const [override, setOverride] = useState(false);
+  const waitWrite = useRef(false);
+  const closeRequest = useRef(false);
 
   useEffect(() => {
     backupRef.current = backupAgain;
@@ -24,8 +26,12 @@ const Backup = () => {
     const opts = {
       mode: "readwrite",
     };
-    if ((await fileHandle.queryPermission(opts)) === "granted") {
+    const permission = await fileHandle.queryPermission(opts);
+    if (permission === "granted") {
       return true;
+    } else if (permission === "prompt") {
+      chrome.runtime.sendMessage({ type: "focus-this-tab" });
+      return false;
     } else if ((await fileHandle.requestPermission(opts)) === "granted") {
       chrome.runtime.sendMessage({ type: "focus-this-tab" });
       return true;
@@ -69,6 +75,7 @@ const Backup = () => {
       }
       writingFile.current = true;
     } else if (repeatRef.current < 3) {
+      chrome.runtime.sendMessage({ type: "focus-this-tab" });
       repeatRef.current = repeatRef.current + 1;
       db.collection("localDirectory").delete();
       localSaving(prompt);
@@ -139,8 +146,11 @@ const Backup = () => {
   };
 
   const localSaving = async (prompt = true) => {
+    waitWrite.current = false;
+    closeRequest.current = false;
     // Check if user gesture has happened with UserActivation API
     if (!navigator.userActivation.isActive) {
+      chrome.runtime.sendMessage({ type: "focus-this-tab" });
       return;
     }
 
@@ -191,19 +201,36 @@ const Backup = () => {
   const writeFile = async (index) => {
     if (!writable.current) return;
     if (!writingFile.current) return;
+    waitWrite.current = true;
     try {
       db.collection("chunks")
         .get()
-        .then((chunks) => {
+        .then(async (chunks) => {
           if (chunks && chunks.length > 0) {
             const chunk = chunks.find((chunk) => chunk.index === index);
 
             if (chunk) {
-              writable.current.write(chunk.chunk);
+              await writable.current.write(chunk.chunk);
+              waitWrite.current = false;
+              if (closeRequest.current) {
+                closeRequest.current = false;
+                writable.current.close();
+              }
+            } else {
+              waitWrite.current = false;
+              if (closeRequest.current) {
+                closeRequest.current = false;
+                writable.current.close();
+              }
             }
           }
         });
     } catch {
+      waitWrite.current = false;
+      if (closeRequest.current) {
+        closeRequest.current = false;
+        writable.current.close();
+      }
       chrome.storage.local.set({
         recording: false,
         restarting: false,
@@ -248,6 +275,8 @@ const Backup = () => {
       request: request.current,
       tabId: tabId.current,
     });
+    setOverride(true);
+    window.close();
   };
 
   const stopBackup = () => {
@@ -278,7 +307,11 @@ const Backup = () => {
     } else if (message.type === "write-file") {
       writeFile(message.index);
     } else if (message.type === "close-writable") {
-      writable.current.close();
+      if (!waitWrite.current) {
+        writable.current.close();
+      } else {
+        closeRequest.current = true;
+      }
     } else if (
       message.type === "discard-backup" ||
       message.type === "recording-error"
@@ -291,13 +324,6 @@ const Backup = () => {
       window.close();
     }
   };
-
-  const beforeUnload = (e) => {
-    if (setupComplete) return;
-    e.preventDefault();
-    e.returnValue = "";
-  };
-
   const closeTab = () => {
     chrome.runtime.sendMessage({
       type: "stop-recording-tab-backup",
@@ -305,22 +331,6 @@ const Backup = () => {
     setOverride(true);
     window.close();
   };
-
-  useEffect(() => {
-    // Prevent closing the tab if the backup is in progress
-    if (!override) {
-      window.addEventListener("beforeunload", (e) => {
-        if (override) return;
-        beforeUnload(e);
-      });
-    }
-
-    return () => {
-      window.removeEventListener("beforeunload", (e) => {
-        beforeUnload(e);
-      });
-    };
-  }, [setupComplete, override]);
 
   useEffect(() => {
     chrome.runtime.onMessage.addListener(onMessage);

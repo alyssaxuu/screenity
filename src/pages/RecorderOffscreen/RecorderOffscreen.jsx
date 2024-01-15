@@ -152,8 +152,11 @@ const RecorderOffscreen = () => {
     };
 
     liveStream.current.getVideoTracks()[0].onended = () => {
-      chrome.storage.local.set({ recording: false });
-      recorder.current.stop();
+      chrome.runtime.sendMessage({ type: "stop-recording-tab" });
+    };
+
+    helperVideoStream.current.getVideoTracks()[0].onended = () => {
+      chrome.runtime.sendMessage({ type: "stop-recording-tab" });
     };
   }
 

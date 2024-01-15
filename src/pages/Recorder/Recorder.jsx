@@ -176,8 +176,21 @@ const Recorder = () => {
     };
 
     liveStream.current.getVideoTracks()[0].onended = () => {
-      chrome.storage.local.set({ recording: false });
-      recorder.current.stop();
+      chrome.storage.local.set({
+        recording: false,
+        restarting: false,
+        tabRecordedID: null,
+      });
+      chrome.runtime.sendMessage({ type: "stop-recording-tab" });
+    };
+
+    helperVideoStream.current.getVideoTracks()[0].onended = () => {
+      chrome.storage.local.set({
+        recording: false,
+        restarting: false,
+        tabRecordedID: null,
+      });
+      chrome.runtime.sendMessage({ type: "stop-recording-tab" });
     };
   }
 

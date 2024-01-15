@@ -946,6 +946,11 @@ const ContentState = (props) => {
       if (!contentStateRef.showExtension && !contentStateRef.recording) {
         updateFromStorage();
       }
+    } else if (request.type === "stop-pending") {
+      setContentState((prevContentState) => ({
+        ...prevContentState,
+        pendingRecording: false,
+      }));
     }
   });
 
