@@ -11,4 +11,6 @@ if (existingRoot) {
 const root = document.createElement("div");
 root.id = "screenity-ui";
 document.body.appendChild(root);
+// Set style as unset for it and any divs within
+root.style.all = "unset";
 render(<Content />, root);

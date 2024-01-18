@@ -1,4 +1,10 @@
-import React, { useEffect, useContext, useRef, useState } from "react";
+import React, {
+  useEffect,
+  useContext,
+  useRef,
+  useState,
+  useLayoutEffect,
+} from "react";
 
 import { Rnd } from "react-rnd";
 
@@ -82,6 +88,46 @@ const CameraWrap = (props) => {
 
     updateUIPosition();
   }, [cameraRef.current]);
+
+  // I need to make sure the camera is never offscreen (if the user resizes the window)
+  useLayoutEffect(() => {
+    const updateCameraPosition = () => {
+      if (
+        !props.shadowRef.current.shadowRoot.querySelector(".camera-draggable")
+      )
+        return;
+      const ref =
+        props.shadowRef.current.shadowRoot.querySelector(".camera-draggable");
+      let xpos = cameraRef.current.getDraggablePosition().x;
+      let ypos = cameraRef.current.getDraggablePosition().y;
+
+      // Width and height of camera
+      const width = ref.getBoundingClientRect().width;
+      const height = ref.getBoundingClientRect().height;
+
+      const { innerWidth, innerHeight } = window;
+
+      // Keep camera positioned relative to the bottom and right of the screen, proportionally
+      if (xpos + width > innerWidth) {
+        xpos = innerWidth - width;
+      }
+      if (ypos + height > innerHeight) {
+        ypos = innerHeight - height;
+      }
+
+      cameraRef.current.updatePosition({ x: xpos, y: ypos });
+
+      saveDimensions();
+    };
+
+    updateCameraPosition();
+
+    window.addEventListener("resize", updateCameraPosition);
+
+    return () => {
+      window.removeEventListener("resize", updateCameraPosition);
+    };
+  }, []);
 
   return (
     <div

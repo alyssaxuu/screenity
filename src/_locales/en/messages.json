@@ -1002,7 +1002,7 @@
     "description": "Record audio warning title"
   },
   "recordAudioWarningOtherDescription": {
-    "message": "Make sure to toggle the option to 'Share system audio' if you want to record computer audio. If you don't see this option, try updating Chrome, or switch to Tab recording.",
+    "message": "Make sure to enable the option to 'Share system audio' if you want to record computer audio. If you don't see this option, try updating Chrome, or switch to Tab recording.",
     "description": "Other audio warning description"
   }
 }

@@ -8,11 +8,12 @@ import ContentState from "./context/ContentState";
 
 const Content = () => {
   return (
-    <div className="screenity-shadow-dom">
+    <div className="screenity-shadow-dom" style={{ all: "unset" }}>
       <ContentState>
         <Wrapper />
       </ContentState>
-      <style>{`
+      <style type="text/css">{`
+				
 			.screenity-shadow-dom * {
 				transition: unset;
 			}

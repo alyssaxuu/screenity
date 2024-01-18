@@ -70,6 +70,9 @@ const Recorder = () => {
   }, []);
 
   async function startRecording() {
+    // Check that a recording is not already in progress
+    if (recorder.current !== null) return;
+    navigator.storage.persist();
     isFinishing.current = false;
     sentLast.current = false;
     // Check if the stream actually has data in it
@@ -83,7 +86,7 @@ const Recorder = () => {
     }
 
     // Clear chunks collection
-    db.collection("chunks").delete();
+    await db.collection("chunks").delete();
 
     try {
       recorder.current = new MediaRecorder(liveStream.current);
@@ -93,6 +96,7 @@ const Recorder = () => {
         error: "stream-error",
         why: JSON.stringify(err),
       });
+      return;
     }
 
     chrome.storage.local.set({
@@ -111,13 +115,13 @@ const Recorder = () => {
         // I don't know what the ideal chunk size should be here
         if (result.quality === "max") {
           recorder.current.start(3000, {
-            mimeType: "video/webm; codecs=vp9",
+            mimeType: "video/webm; codecs=vp8,opus",
             // vp8, opus ?
           });
         } else {
           recorder.current.start(3000, {
             videoBitsPerSecond: 1000,
-            mimeType: "video/webm; codecs=vp8",
+            mimeType: "video/webm; codecs=vp8,opus",
             // vp8, opus ?
           });
         }
@@ -130,6 +134,7 @@ const Recorder = () => {
         memoryError: true,
       });
       chrome.runtime.sendMessage({ type: "stop-recording-tab" });
+      return;
     }
 
     recorder.current.onstop = async (e) => {
@@ -177,10 +182,22 @@ const Recorder = () => {
 
       if (e.data.size > 0) {
         try {
-          db.collection("chunks").add({
-            index: index.current,
-            chunk: e.data,
-          });
+          const timestamp = Date.now();
+          db.collection("chunks")
+            .add({
+              index: index.current,
+              chunk: e.data,
+              timestamp: timestamp,
+            })
+            .catch((err) => {
+              chrome.storage.local.set({
+                recording: false,
+                restarting: false,
+                tabRecordedID: null,
+                memoryError: true,
+              });
+              chrome.runtime.sendMessage({ type: "stop-recording-tab" });
+            });
           if (backupRef.current) {
             chrome.runtime.sendMessage({
               type: "write-file",
@@ -189,11 +206,24 @@ const Recorder = () => {
           }
           index.current++;
         } catch (err) {
-          chrome.runtime.sendMessage({
-            type: "recording-error",
-            error: "stream-error",
-            why: JSON.stringify(err),
+          chrome.storage.local.set({
+            recording: false,
+            restarting: false,
+            tabRecordedID: null,
+            memoryError: true,
           });
+          chrome.runtime.sendMessage({ type: "stop-recording-tab" });
+        }
+      } else {
+        // Check media recorder state
+        if (recorder.current.state === "inactive") {
+          chrome.storage.local.set({
+            recording: false,
+            restarting: false,
+            tabRecordedID: null,
+            memoryError: true,
+          });
+          chrome.runtime.sendMessage({ type: "stop-recording-tab" });
         }
       }
 
@@ -255,6 +285,8 @@ const Recorder = () => {
       });
       helperAudioStream.current = null;
     }
+
+    await db.collection("chunks").orderBy("timestamp").get();
   }
 
   const dismissRecording = async () => {
@@ -470,13 +502,9 @@ const Recorder = () => {
         startStreaming(JSON.parse(request.data));
       }
     } else if (request.type === "start-recording-tab") {
-      //chrome.storage.local.get(["customRegion"], (result) => {
-      //if (result.customRegion) {
       if (regionRef.current) {
         startRecording();
       }
-      //}
-      //});
     } else if (request.type === "stop-recording-tab") {
       stopRecording();
     } else if (request.type === "set-mic-active-tab") {

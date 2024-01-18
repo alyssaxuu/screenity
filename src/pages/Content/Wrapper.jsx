@@ -81,10 +81,12 @@ const Wrapper = () => {
   ]);
 
   return (
-    <div ref={parentRef}>
+    <div ref={parentRef} style={{ all: "unset" }}>
       <iframe
         style={{
+          all: "unset",
           display: "none",
+          visibility: "hidden",
         }}
         ref={permissionsRef}
         src={chrome.runtime.getURL("permissions.html")}
@@ -92,7 +94,9 @@ const Wrapper = () => {
       ></iframe>
       <iframe
         style={{
+          all: "unset",
           display: "none",
+          visibility: "hidden",
         }}
         ref={regionCaptureRef}
         src={chrome.runtime.getURL("region.html")}
@@ -101,12 +105,13 @@ const Wrapper = () => {
       {contentState.zoomEnabled && <ZoomContainer />}
       <BlurTool />
       {contentState.showExtension || contentState.recording ? (
-        <div>
+        <div style={{ all: "unset" }}>
           {!contentState.recording &&
             !contentState.drawingMode &&
             !contentState.blurMode && (
               <div
                 style={{
+                  all: "unset",
                   width: "100%",
                   height: "100%",
                   zIndex: 999999999,
@@ -186,7 +191,7 @@ const Wrapper = () => {
           </root.div>
         </div>
       ) : (
-        <div></div>
+        <div style={{ all: "unset" }}></div>
       )}
     </div>
   );

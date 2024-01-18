@@ -49,7 +49,8 @@
     "react-svg": "^16.1.18",
     "sass": "^1.60.0",
     "ssestream": "^1.1.0",
-    "wavesurfer.js": "^7.4.2"
+    "wavesurfer.js": "^7.4.2",
+    "webm-duration-fix": "^1.0.4"
   },
   "devDependencies": {
     "@babel/core": "^7.20.2",

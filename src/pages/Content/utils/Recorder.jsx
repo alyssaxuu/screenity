@@ -70,7 +70,7 @@ const Recorder = () => {
     // I don't know what the ideal chunk size should be here
     recorder.current.start(3000, {
       videoBitsPerSecond: 2000000,
-      mimeType: "video/webm; codecs=vp9",
+      mimeType: "video/webm; codecs=vp8, opus",
 
       // vp8, opus ?
     });

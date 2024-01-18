@@ -34,6 +34,9 @@ const RecorderOffscreen = () => {
   const backupRef = useRef(false);
 
   async function startRecording() {
+    // Check that a recording is not already in progress
+    if (recorder.current !== null) return;
+    navigator.storage.persist();
     // Check if the stream actually has data in it
     if (helperVideoStream.current.getVideoTracks().length === 0) {
       chrome.runtime.sendMessage({
@@ -45,7 +48,7 @@ const RecorderOffscreen = () => {
     }
 
     // Clear chunks collection
-    db.collection("chunks").delete();
+    await db.collection("chunks").delete();
 
     try {
       recorder.current = new MediaRecorder(liveStream.current);
@@ -55,6 +58,7 @@ const RecorderOffscreen = () => {
         error: "stream-error",
         why: JSON.stringify(err),
       });
+      return;
     }
 
     isRestarting.current = false;
@@ -65,14 +69,12 @@ const RecorderOffscreen = () => {
       // I don't know what the ideal chunk size should be here
       if (quality.current === "max") {
         recorder.current.start(3000, {
-          mimeType: "video/webm; codecs=vp9",
-          // vp8, opus ?
+          mimeType: "video/webm; codecs=vp8,opus",
         });
       } else {
         recorder.current.start(3000, {
           videoBitsPerSecond: 1000,
-          mimeType: "video/webm; codecs=vp8",
-          // vp8, opus ?
+          mimeType: "video/webm; codecs=vp8,opus",
         });
       }
     } catch (err) {
@@ -81,6 +83,7 @@ const RecorderOffscreen = () => {
         error: "stream-error",
         why: JSON.stringify(err),
       });
+      return;
     }
 
     recorder.current.onstop = async (e) => {
@@ -122,10 +125,20 @@ const RecorderOffscreen = () => {
 
       if (e.data.size > 0) {
         try {
-          db.collection("chunks").add({
-            index: index.current,
-            chunk: e.data,
-          });
+          const timestamp = Date.now();
+          db.collection("chunks")
+            .add({
+              index: index.current,
+              chunk: e.data,
+              timestamp: timestamp,
+            })
+            .catch((err) => {
+              chrome.runtime.sendMessage({
+                type: "stop-recording-tab",
+                memoryError: true,
+              });
+            });
+
           if (backupRef.current) {
             chrome.runtime.sendMessage({
               type: "write-file",
@@ -134,6 +147,14 @@ const RecorderOffscreen = () => {
           }
           index.current++;
         } catch (err) {
+          chrome.runtime.sendMessage({
+            type: "stop-recording-tab",
+            memoryError: true,
+          });
+        }
+      } else {
+        // Check MediaRecorder state
+        if (recorder.current.state === "inactive") {
           chrome.runtime.sendMessage({
             type: "stop-recording-tab",
             memoryError: true,
@@ -187,6 +208,8 @@ const RecorderOffscreen = () => {
       });
       helperAudioStream.current = null;
     }
+
+    db.collection("chunks").orderBy("timestamp").get();
   }
 
   const dismissRecording = async () => {

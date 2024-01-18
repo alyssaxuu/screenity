@@ -80,7 +80,7 @@ const BlurTool = () => {
   }, []);
 
   return (
-    <div>
+    <div style={{ all: "unset" }}>
       {showOutline && (
         <div
           className="screenity-outline"

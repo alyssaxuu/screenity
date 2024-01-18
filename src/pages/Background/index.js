@@ -14,8 +14,9 @@ const getCurrentTab = async () => {
 const startAfterCountdown = async () => {
   // Check that the recording didn't get dismissed
   const { recordingTab } = await chrome.storage.local.get(["recordingTab"]);
+  const { offscreen } = await chrome.storage.local.get(["offscreen"]);
 
-  if (recordingTab != null) {
+  if (recordingTab != null || offscreen) {
     chrome.storage.local.set({ recording: true });
     startRecording();
   }
@@ -352,21 +353,24 @@ function blobToBase64(blob) {
 }
 
 const handleChunks = async (chunks, override = false) => {
+  // Order chunks by timestamp
+  chunks.sort((a, b) => {
+    return a.timestamp - b.timestamp;
+  });
   const { sandboxTab } = await chrome.storage.local.get(["sandboxTab"]);
   if (chunks.length === 0) {
     chrome.tabs.sendMessage(sandboxTab, {
       type: "make-video-tab",
       override: override,
     });
-    // Handle the case when there are no chunks to send (e.g., display a message)
     return;
   }
 
   const batchSize = 10; // Number of chunks to send in each batch
   const chunksCount = chunks.length;
-  let batch = [];
   let currentIndex = 0;
-  const maxRetries = 3; // Maximum number of retry attempts per batch
+  const maxRetries = 5; // Maximum number of retry attempts per batch
+  const retryDelay = 1000; // Delay in milliseconds between retry attempts
 
   chrome.tabs.sendMessage(sandboxTab, {
     type: "chunk-count",
@@ -379,17 +383,42 @@ const handleChunks = async (chunks, override = false) => {
     const end = Math.min(currentIndex + batchSize, chunksCount);
 
     // Collect the chunks for the batch
-    batch = [];
+    const batch = [];
     for (let i = start; i < end; i++) {
       const chunk = chunks[i];
       const chunkData = chunk.chunk;
       const index = chunk.index;
-      const base64 = await blobToBase64(chunkData);
-      if (base64) {
-        batch.push({ chunk: base64, index: index });
-      } else {
-        console.error("Error converting a chunk to Base64:", chunk);
-        // Handle the error as needed (e.g., skip the chunk or retry)
+      try {
+        const base64 = await blobToBase64(chunkData);
+        if (base64) {
+          batch.push({ chunk: base64, index: index });
+        } else {
+          console.error("Error converting a chunk to Base64:", chunk);
+
+          // Handle the error by trying again
+          if (retryCount < maxRetries) {
+            setTimeout(() => {
+              sendNextBatch(retryCount + 1);
+            }, retryDelay);
+          } else {
+            console.error("Maximum retry attempts reached for this batch.");
+          }
+
+          return;
+        }
+      } catch (error) {
+        console.error("Error converting a chunk to Base64:", error);
+
+        // Handle the error by trying again
+        if (retryCount < maxRetries) {
+          setTimeout(() => {
+            sendNextBatch(retryCount + 1);
+          }, retryDelay);
+        } else {
+          console.error("Maximum retry attempts reached for this batch.");
+        }
+
+        return;
       }
     }
 
@@ -403,12 +432,10 @@ const handleChunks = async (chunks, override = false) => {
         },
         (response) => {
           if (response) {
-            // Increment the current index and send the next batch
             currentIndex += batchSize;
             if (currentIndex < chunksCount) {
               sendNextBatch();
             } else {
-              // Update the user interface or provide feedback as needed
               chrome.tabs.sendMessage(sandboxTab, {
                 type: "make-video-tab",
                 override: override,
@@ -416,10 +443,11 @@ const handleChunks = async (chunks, override = false) => {
             }
           } else {
             if (retryCount < maxRetries) {
-              sendNextBatch(retryCount + 1);
+              setTimeout(() => {
+                sendNextBatch(retryCount + 1);
+              }, retryDelay);
             } else {
               console.error("Maximum retry attempts reached for this batch.");
-              // Handle the case where the batch couldn't be sent after retries
             }
           }
         }
@@ -453,6 +481,8 @@ const stopRecording = async () => {
     "recordingStartTime",
   ]);
   let duration = Date.now() - recordingStartTime;
+  const maxDuration = 5 * 60 * 1000;
+
   if (recordingStartTime === 0) {
     duration = 0;
   }
@@ -465,7 +495,7 @@ const stopRecording = async () => {
   chrome.storage.local.set({ recordingStartTime: 0 });
   const { sandboxTab } = await chrome.storage.local.get(["sandboxTab"]);
 
-  if (duration > 5 * 60 * 1000) {
+  if (duration > maxDuration) {
     // Close the sandbox tab, open a new one with fallback editor
     chrome.tabs.create(
       {
@@ -1112,14 +1142,14 @@ chrome.runtime.onInstalled.addListener(async (details) => {
     db.collection("chunks")
       .get()
       .then(() => {
-        console.log("IndexedDB initialized");
+        // Indexed DB is accessible
       })
       .catch(() => {
-        // Try reloading extension
+        // Try reloading extension to get IndexedDB to work
         chrome.runtime.reload();
       });
   } catch (error) {
-    // Try reloading extension
+    // Try reloading extension to get IndexedDB to work
     chrome.runtime.reload();
   }
 
@@ -1130,6 +1160,8 @@ chrome.runtime.onInstalled.addListener(async (details) => {
       chrome.storage.local.set({ backup: false });
     }
   }
+
+  chrome.storage.local.set({ systemAudio: true });
 
   // Check if the backup tab is open, if so close it
   const { backupTab } = await chrome.storage.local.get(["backupTab"]);
@@ -1762,6 +1794,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             await new Promise((resolve) => {
               chrome.tabs.onUpdated.addListener(function listener(tabId, info) {
                 if (info.status === "complete" && tabId === tab.id) {
+                  chrome.tabs.sendMessage(tab.id, {
+                    type: "fallback-recording",
+                  });
                   sendChunks();
                 }
               });

@@ -225,7 +225,7 @@ const RightPanel = () => {
       {contentState.mode === "crop" && <CropUI />}
       {contentState.mode === "player" && (
         <div>
-          {contentState.offline && (
+          {!contentState.fallback && contentState.offline && (
             <div className={styles.alert}>
               <div className={styles.buttonLeft}>
                 <ReactSVG src={URL + "editor/icons/no-internet.svg"} />
@@ -243,23 +243,23 @@ const RightPanel = () => {
               </div>
             </div>
           )}
-          {contentState.fallback &&
-            contentState.duration <= contentState.editLimit && (
-              <div className={styles.alert}>
-                <div className={styles.buttonLeft}>
-                  <ReactSVG src={URL + "editor/icons/alert.svg"} />
+          {contentState.fallback && (
+            <div className={styles.alert}>
+              <div className={styles.buttonLeft}>
+                <ReactSVG src={URL + "editor/icons/alert.svg"} />
+              </div>
+              <div className={styles.buttonMiddle}>
+                <div className={styles.buttonTitle}>
+                  {chrome.i18n.getMessage("recoveryModeTitle")}
                 </div>
-                <div className={styles.buttonMiddle}>
-                  <div className={styles.buttonTitle}>
-                    {chrome.i18n.getMessage("recoveryModeTitle")}
-                  </div>
-                  <div className={styles.buttonDescription}>
-                    {chrome.i18n.getMessage("overLimitLabelDescription")}
-                  </div>
+                <div className={styles.buttonDescription}>
+                  {chrome.i18n.getMessage("overLimitLabelDescription")}
                 </div>
               </div>
-            )}
-          {contentState.updateChrome &&
+            </div>
+          )}
+          {!contentState.fallback &&
+            contentState.updateChrome &&
             !contentState.offline &&
             contentState.duration <= contentState.editLimit && (
               <div className={styles.alert}>
@@ -284,7 +284,8 @@ const RightPanel = () => {
                 </div>
               </div>
             )}
-          {contentState.duration > contentState.editLimit &&
+          {!contentState.fallback &&
+            contentState.duration > contentState.editLimit &&
             !contentState.override &&
             !contentState.offline &&
             !contentState.updateChrome && (

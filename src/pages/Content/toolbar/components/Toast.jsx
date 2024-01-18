@@ -58,27 +58,17 @@ const Toast = () => {
     };
   }, [trigger]);
 
-  // Detect when Esc is pressed
-  useEffect(() => {
-    const handleEsc = (event) => {
-      if (!openRef.current) return;
-
-      if (event.keyCode === 27) {
-        triggerRef.current();
-        setOpen(false);
-      }
-    };
-
-    window.addEventListener("keydown", handleEsc);
-
-    return () => {
-      window.removeEventListener("keydown", handleEsc);
-    };
-  }, []);
-
   return (
     <ToastEl.Provider swipeDirection="down" duration={2000}>
-      <ToastEl.Root className="ToastRoot" open={open} onOpenChange={setOpen}>
+      <ToastEl.Root
+        className="ToastRoot"
+        open={open}
+        onOpenChange={setOpen}
+        onEscapeKeyDown={() => {
+          triggerRef.current();
+          setOpen(false);
+        }}
+      >
         <ToastEl.Title className="ToastTitle">{title}</ToastEl.Title>
         <ToastEl.Action
           className="ToastAction"

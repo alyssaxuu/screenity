@@ -8,6 +8,7 @@ import React, {
 import { useEffect } from "react";
 
 import fixWebmDuration from "fix-webm-duration";
+import { default as fixWebmDurationFallback } from "webm-duration-fix";
 
 export const ContentStateContext = createContext();
 
@@ -193,7 +194,7 @@ const ContentState = (props) => {
 
   const reconstructVideo = async () => {
     const blob = new Blob(videoChunks.current, {
-      type: "video/webm; codecs=vp9",
+      type: "video/webm; codecs=vp8, opus",
     });
 
     const { recordingDuration } = await chrome.storage.local.get(
@@ -215,11 +216,54 @@ const ContentState = (props) => {
       duration: recordingDuration / 1000,
     }));
 
+    // Check if user is in Windows 10
+    const isWindows10 = navigator.userAgent.match(/Windows NT 10.0/);
+
     try {
-      fixWebmDuration(
-        blob,
-        recordingDuration,
-        async (fixedWebm) => {
+      if (recordingDuration > 0 && recordingDuration !== null) {
+        if (!isWindows10) {
+          fixWebmDuration(
+            blob,
+            recordingDuration,
+            async (fixedWebm) => {
+              if (
+                contentStateRef.current.fallback ||
+                contentStateRef.current.updateChrome ||
+                contentStateRef.current.noffmpeg ||
+                (contentStateRef.current.duration >
+                  contentStateRef.current.editLimit &&
+                  !contentStateRef.current.override)
+              ) {
+                setContentState((prevState) => ({
+                  ...prevState,
+                  webm: fixedWebm,
+                  ready: true,
+                }));
+                chrome.runtime.sendMessage({ type: "recording-complete" });
+                return;
+              }
+
+              const reader = new FileReader();
+              reader.onloadend = function () {
+                const base64data = reader.result;
+                setContentState((prevContentState) => ({
+                  ...prevContentState,
+                  base64: base64data,
+                  driveEnabled: driveEnabled,
+                }));
+              };
+              reader.onerror = function (error) {
+                console.log(error);
+              };
+              reader.readAsDataURL(fixedWebm);
+            },
+            { logger: false }
+          );
+        } else {
+          const fixedWebm = await fixWebmDurationFallback(blob, {
+            type: "video/webm; codecs=vp8, opus",
+          });
+
           if (
             contentStateRef.current.fallback ||
             contentStateRef.current.updateChrome ||
@@ -250,9 +294,40 @@ const ContentState = (props) => {
             console.log(error);
           };
           reader.readAsDataURL(fixedWebm);
-        },
-        { logger: false }
-      );
+        }
+      } else {
+        /// Skip fixing duration
+        if (
+          contentStateRef.current.fallback ||
+          contentStateRef.current.updateChrome ||
+          contentStateRef.current.noffmpeg ||
+          (contentStateRef.current.duration >
+            contentStateRef.current.editLimit &&
+            !contentStateRef.current.override)
+        ) {
+          setContentState((prevState) => ({
+            ...prevState,
+            webm: blob,
+            ready: true,
+          }));
+          chrome.runtime.sendMessage({ type: "recording-complete" });
+          return;
+        }
+
+        const reader = new FileReader();
+        reader.onloadend = function () {
+          const base64data = reader.result;
+          setContentState((prevContentState) => ({
+            ...prevContentState,
+            base64: base64data,
+            driveEnabled: driveEnabled,
+          }));
+        };
+        reader.onerror = function (error) {
+          console.log(error);
+        };
+        reader.readAsDataURL(blob);
+      }
     } catch (error) {
       setContentState((prevState) => ({
         ...prevState,
@@ -350,6 +425,15 @@ const ContentState = (props) => {
         videoChunks.current.push(chunkData);
       });
       reconstructVideo();
+    } else if (message.type === "fallback-recording") {
+      setContentState((prevContentState) => ({
+        ...prevContentState,
+        fallback: true,
+        isFfmpegRunning: false,
+        noffmpeg: true,
+        ffmpegLoaded: true,
+        ffmpeg: true,
+      }));
     }
   });
 
@@ -456,7 +540,6 @@ const ContentState = (props) => {
         noffmpeg: true,
         ffmpegLoaded: true,
         isFfmpegRunning: false,
-        fallback: event.data.fallback,
       }));
 
       // if (!navigator.onLine) {
