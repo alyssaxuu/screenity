@@ -292,6 +292,17 @@ chrome.tabs.onActivated.addListener(async (activeInfo) => {
 // Check when a user navigates to a different domain in the same tab (chrome.tabs?)
 chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
   if (changeInfo.status === "complete") {
+    // Check if not recording (needs to hide the extension)
+    const { recording } = await chrome.storage.local.get(["recording"]);
+    const { restarting } = await chrome.storage.local.get(["restarting"]);
+    const { tabRecordedID } = await chrome.storage.local.get(["tabRecordedID"]);
+
+    if (!recording && !restarting) {
+      chrome.tabs.sendMessage(tab.id, { type: "recording-ended" });
+    } else if (recording && tabRecordedID && tabRecordedID == tabId) {
+      chrome.tabs.sendMessage(tab.id, { type: "recording-check", force: true });
+    }
+
     const { recordingStartTime } = await chrome.storage.local.get([
       "recordingStartTime",
     ]);
@@ -317,12 +328,6 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
       }
     }
 
-    // Check if not recording (needs to hide the extension)
-    const { recording } = await chrome.storage.local.get(["recording"]);
-    const { restarting } = await chrome.storage.local.get(["restarting"]);
-    if (!recording && !restarting) {
-      chrome.tabs.sendMessage(tab.id, { type: "recording-ended" });
-    }
     const commands = await chrome.commands.getAll();
     chrome.tabs.sendMessage(tab.id, {
       type: "commands",

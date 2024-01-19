@@ -496,11 +496,11 @@
     "description": "Over 5 minutes limit description in editor"
   },
   "videoProcessingLabelTitle": {
-    "message": "The video is processing...",
+    "message": "The video is processing locally...",
     "description": "Video processing label in editor"
   },
   "videoProcessingLabelDescription": {
-    "message": "Upgrade for faster editing",
+    "message": "Learn about the faster cloud version",
     "description": "Video processing description in editor"
   },
   "sandboxEditTitle": {

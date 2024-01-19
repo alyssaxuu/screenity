@@ -634,7 +634,7 @@ const ContentState = (props) => {
     askDismiss: true,
     quality: "max",
     systemAudio: true,
-    backup: true,
+    backup: false,
     backupSetup: false,
     openWarning: false,
   });
@@ -943,8 +943,17 @@ const ContentState = (props) => {
         }
       );
     } else if (request.type === "recording-check") {
-      if (!contentStateRef.showExtension && !contentStateRef.recording) {
-        updateFromStorage();
+      if (!request.force) {
+        if (!contentStateRef.showExtension && !contentStateRef.recording) {
+          updateFromStorage(true, sender.tab.id);
+        }
+      } else if (request.force) {
+        setContentState((prevContentState) => ({
+          ...prevContentState,
+          showExtension: true,
+          recording: true,
+        }));
+        updateFromStorage(false, sender.tab.id);
       }
     } else if (request.type === "stop-pending") {
       setContentState((prevContentState) => ({
@@ -1124,7 +1133,25 @@ const ContentState = (props) => {
     }
   }, [contentState.hideUI]);
 
-  const updateFromStorage = (check = false) => {
+  const checkRecording = async (id) => {
+    const { recording } = await chrome.storage.local.get("recording");
+    const { tabRecordedID } = await chrome.storage.local.get("tabRecordedID");
+    if (id == null && tabRecordedID) {
+      setContentState((prevContentState) => ({
+        ...prevContentState,
+        recording: false,
+      }));
+    } else if (recording && tabRecordedID) {
+      if (id != tabRecordedID) {
+        setContentState((prevContentState) => ({
+          ...prevContentState,
+          recording: false,
+        }));
+      }
+    }
+  };
+
+  const updateFromStorage = (check = true, id = null) => {
     chrome.storage.local.get(
       [
         "audioInput",
@@ -1374,7 +1401,7 @@ const ContentState = (props) => {
         }
 
         if (result.backup === undefined || result.backup === null) {
-          chrome.storage.local.set({ backup: true });
+          chrome.storage.local.set({ backup: false });
         }
 
         if (result.countdown === undefined || result.countdown === null) {
@@ -1389,13 +1416,8 @@ const ContentState = (props) => {
           chrome.runtime.sendMessage({ type: "backgroundEffectsActive" });
         }
 
-        if (result.recording && result.recordingType === "region") {
-          setContentState((prevContentState) => ({
-            ...prevContentState,
-            recording: false,
-          }));
-        } else if (result.recording) {
-          chrome.runtime.sendMessage({ type: "check-recording" });
+        if (check) {
+          checkRecording(id);
         }
 
         if (result.alarm) {
