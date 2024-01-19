@@ -80,7 +80,7 @@ const BlurTool = () => {
   }, []);
 
   return (
-    <div style={{ all: "unset" }}>
+    <div>
       {showOutline && (
         <div
           className="screenity-outline"
@@ -98,22 +98,6 @@ const BlurTool = () => {
           }}
         ></div>
       )}
-      <style>
-        {`
-            .screenity-outline {
-              position: absolute;
-              z-index: 99999999999;
-              border: 2px solid #3080F8;
-              outline-offset: -2px;
-							pointer-events: none;
-							border-radius: 5px;
-            }
-
-          .screenity-blur {
-            filter: blur(10px)!important;
-          }
-        `}
-      </style>
     </div>
   );
 };

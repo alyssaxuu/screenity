@@ -319,6 +319,7 @@ const ToolbarWrap = () => {
       setContentState((prevContentState) => ({
         ...prevContentState,
         blurMode: true,
+        drawingMode: false,
       }));
     } else {
       setContentState((prevContentState) => ({

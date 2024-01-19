@@ -8,27 +8,46 @@ import ContentState from "./context/ContentState";
 
 const Content = () => {
   return (
-    <div className="screenity-shadow-dom" style={{ all: "unset" }}>
+    <div className="screenity-shadow-dom">
       <ContentState>
         <Wrapper />
       </ContentState>
       <style type="text/css">{`
-				
+			#screenity-ui, #screenity-ui div {
+				background-color: unset;
+				padding: unset;
+				width: unset;
+				box-shadow: unset;
+				display: unset;
+				margin: unset;
+				border-radius: unset;
+			}
+			.screenity-outline {
+				position: absolute;
+				z-index: 99999999999;
+				border: 2px solid #3080F8;
+				outline-offset: -2px;
+				pointer-events: none;
+				border-radius: 5px!important;
+			}
+		.screenity-blur {
+			filter: blur(10px)!important;
+		}
 			.screenity-shadow-dom * {
 				transition: unset;
 			}
 			.screenity-shadow-dom .TooltipContent {
-  border-radius: 30px;
-	background-color: #29292F;
-  padding: 10px 15px;
+  border-radius: 30px!important;
+	background-color: #29292F!important;
+  padding: 10px 15px!important;
   font-size: 12px;
-	margin-bottom: 10px;
+	margin-bottom: 10px!important;
 	bottom: 100px;
   line-height: 1;
 	font-family: 'Satoshi-Medium', sans-serif;
 	z-index: 99999999!important;
   color: #FFF;
-  box-shadow: hsl(206 22% 7% / 35%) 0px 10px 38px -10px, hsl(206 22% 7% / 20%) 0px 10px 20px -15px;
+  box-shadow: hsl(206 22% 7% / 35%) 0px 10px 38px -10px, hsl(206 22% 7% / 20%) 0px 10px 20px -15px!important;
   user-select: none;
 	transition: opacity 0.3 ease-in-out;
   will-change: transform, opacity;

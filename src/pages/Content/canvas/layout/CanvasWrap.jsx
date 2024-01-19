@@ -246,8 +246,8 @@ const CanvasWrap = (props) => {
       style={
         !contentState.drawingMode ||
         (contentState.hideToolbar && contentState.hideUI)
-          ? { pointerEvents: "none", all: "unset" }
-          : { pointerEvents: "all", all: "unset" }
+          ? { all: "unset", pointerEvents: "none" }
+          : { all: "unset", pointerEvents: "all" }
       }
     >
       <div

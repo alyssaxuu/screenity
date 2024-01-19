@@ -64,7 +64,9 @@ const Toast = () => {
         className="ToastRoot"
         open={open}
         onOpenChange={setOpen}
-        onEscapeKeyDown={() => {
+        onEscapeKeyDown={(e) => {
+          e.stopPropagation();
+          e.preventDefault();
           triggerRef.current();
           setOpen(false);
         }}

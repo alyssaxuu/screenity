@@ -82,7 +82,7 @@ const CursorModes = () => {
   }, []);
 
   return (
-    <div style={{ all: "unset" }}>
+    <div>
       <div
         className="cursor-highlight"
         style={{

@@ -81,10 +81,10 @@ const Wrapper = () => {
   ]);
 
   return (
-    <div ref={parentRef} style={{ all: "unset" }}>
+    <div ref={parentRef}>
       <iframe
         style={{
-          all: "unset",
+          // all: "unset",
           display: "none",
           visibility: "hidden",
         }}
@@ -94,7 +94,7 @@ const Wrapper = () => {
       ></iframe>
       <iframe
         style={{
-          all: "unset",
+          // all: "unset",
           display: "none",
           visibility: "hidden",
         }}
@@ -105,13 +105,13 @@ const Wrapper = () => {
       {contentState.zoomEnabled && <ZoomContainer />}
       <BlurTool />
       {contentState.showExtension || contentState.recording ? (
-        <div style={{ all: "unset" }}>
+        <div>
           {!contentState.recording &&
             !contentState.drawingMode &&
             !contentState.blurMode && (
               <div
                 style={{
-                  all: "unset",
+                  // all: "unset",
                   width: "100%",
                   height: "100%",
                   zIndex: 999999999,
@@ -156,7 +156,7 @@ const Wrapper = () => {
             className="root-container"
             id="screenity-root-container"
             style={{
-              all: "initial",
+              // all: "initial",
               display: "block",
               width: "100%",
               height: "100%",
@@ -191,7 +191,7 @@ const Wrapper = () => {
           </root.div>
         </div>
       ) : (
-        <div style={{ all: "unset" }}></div>
+        <div></div>
       )}
     </div>
   );
