@@ -47,6 +47,9 @@ const CanvasWrap = (props) => {
     });
     fabricRef.current = canvas;
 
+    // Get context
+    canvas.getContext("2d", { willReadFrequently: true });
+
     // Set width and height of canvas to full size of document
     canvas.setWidth(window.document.body.offsetWidth);
 

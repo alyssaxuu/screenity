@@ -13,6 +13,7 @@ import Shortcuts from "../shortcuts/Shortcuts";
 import Localbase from "localbase";
 
 let db = new Localbase("db");
+db.config.debug = false;
 
 //create a context, with createContext api
 export const contentStateContext = createContext();

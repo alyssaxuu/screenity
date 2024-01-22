@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef, useCallback } from "react";
 import Localbase from "localbase";
 
 let db = new Localbase("db");
+db.config.debug = false;
 
 const RecorderOffscreen = () => {
   const isRestarting = useRef(false);
@@ -367,7 +368,7 @@ const RecorderOffscreen = () => {
           .connect(audioInputGain.current)
           .connect(destination.current);
       } else {
-        console.log("No microphone available");
+        // No microphone available
       }
 
       if (helperAudioStream.current != null && !data.micActive) {
@@ -384,7 +385,7 @@ const RecorderOffscreen = () => {
           .connect(audioOutputGain.current)
           .connect(destination.current);
       } else {
-        console.log("No system audio available");
+        // No system audio available
       }
 
       // Add the tracks to the stream
@@ -421,7 +422,7 @@ const RecorderOffscreen = () => {
         setAudioInputVolume(0);
       }
     } else {
-      console.log("No microphone available");
+      // No microphone available
     }
   };
 

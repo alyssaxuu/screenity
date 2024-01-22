@@ -8,6 +8,7 @@ import React, {
 import Localbase from "localbase";
 
 let db = new Localbase("db");
+db.config.debug = false;
 
 const Recorder = () => {
   const isRestarting = useRef(false);
@@ -415,7 +416,7 @@ const Recorder = () => {
           .connect(audioInputGain.current)
           .connect(destination.current);
       } else {
-        console.log("No microphone available");
+        // No microphone available
       }
 
       if (helperAudioStream.current != null && !data.micActive) {
@@ -432,7 +433,7 @@ const Recorder = () => {
           .connect(audioOutputGain.current)
           .connect(destination.current);
       } else {
-        console.log("No system audio available");
+        // No system audio available
       }
 
       // Add the tracks to the stream
@@ -486,7 +487,7 @@ const Recorder = () => {
         setAudioInputVolume(0);
       }
     } else {
-      console.log("No microphone available");
+      // No microphone available
     }
   };
 

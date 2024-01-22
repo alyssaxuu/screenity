@@ -18,7 +18,7 @@ const ContentState = (props) => {
 
   const defaultState = {
     time: 0,
-    editLimit: 300,
+    editLimit: 420,
     blob: null,
     webm: null,
     originalBlob: null,
@@ -252,9 +252,6 @@ const ContentState = (props) => {
                   driveEnabled: driveEnabled,
                 }));
               };
-              reader.onerror = function (error) {
-                console.log(error);
-              };
               reader.readAsDataURL(fixedWebm);
             },
             { logger: false }
@@ -290,9 +287,6 @@ const ContentState = (props) => {
               driveEnabled: driveEnabled,
             }));
           };
-          reader.onerror = function (error) {
-            console.log(error);
-          };
           reader.readAsDataURL(fixedWebm);
         }
       } else {
@@ -322,9 +316,6 @@ const ContentState = (props) => {
             base64: base64data,
             driveEnabled: driveEnabled,
           }));
-        };
-        reader.onerror = function (error) {
-          console.log(error);
         };
         reader.readAsDataURL(blob);
       }
@@ -418,13 +409,14 @@ const ContentState = (props) => {
         saved: true,
       }));
     } else if (message.type === "restore-recording") {
-      // Restore recording
-      const chunks = message.blob;
-      chunks.forEach((chunk) => {
-        const chunkData = base64ToUint8Array(chunk.chunk);
-        videoChunks.current.push(chunkData);
-      });
-      reconstructVideo();
+      setContentState((prevContentState) => ({
+        ...prevContentState,
+        fallback: true,
+        isFfmpegRunning: false,
+        noffmpeg: true,
+        ffmpegLoaded: true,
+        ffmpeg: true,
+      }));
     } else if (message.type === "fallback-recording") {
       setContentState((prevContentState) => ({
         ...prevContentState,
@@ -602,7 +594,7 @@ const ContentState = (props) => {
     }));
 
     if (contentState.offline && contentState.ffmpeg === true) {
-      console.log("Offline");
+      // Offline (if I need to do anything differently)
     } else if (
       !contentState.updateChrome &&
       (contentState.duration <= contentState.editLimit || contentState.override)

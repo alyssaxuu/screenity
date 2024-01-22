@@ -6,7 +6,8 @@
     "build": "node utils/build.js",
     "start": "node utils/server.js",
     "dev": "concurrently \"npm run start\" \"npm run build:watch\"",
-    "prettier": "prettier --write '**/*.{js,jsx,ts,tsx,json,css,scss,md}'"
+    "prettier": "prettier --write '**/*.{js,jsx,ts,tsx,json,css,scss,md}'",
+    "postinstall": "patch-package"
   },
   "dependencies": {
     "@hot-loader/react-dom": "^17.0.2",
@@ -24,6 +25,7 @@
     "@radix-ui/react-toggle-group": "^1.0.4",
     "@radix-ui/react-toolbar": "^1.0.3",
     "@radix-ui/react-tooltip": "^1.0.5",
+    "@sentry/browser": "^7.94.1",
     "@tensorflow-models/body-segmentation": "^1.0.2",
     "@tensorflow/tfjs-backend-webgl": "^4.9.0",
     "@tensorflow/tfjs-converter": "^4.9.0",
@@ -36,6 +38,7 @@
     "fix-webm-duration": "^1.0.5",
     "jszip": "^3.10.1",
     "localbase": "^0.7.5",
+    "patch-package": "^8.0.0",
     "plyr": "^3.7.8",
     "plyr-react": "^5.3.0",
     "querystring": "^0.2.1",

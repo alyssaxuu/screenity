@@ -46,7 +46,9 @@ const Camera = () => {
           requestAnimationFrame(captureFrame);
         };
       })
-      .catch((err) => console.log(err));
+      .catch((err) => {
+        // Error getting camera stream
+      });
   };
 
   const stopCameraStream = () => {

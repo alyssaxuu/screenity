@@ -6,6 +6,7 @@ import { contentStateContext } from "../context/ContentState";
 import Localbase from "localbase";
 
 let db = new Localbase("db");
+db.config.debug = false;
 
 const Modal = (props) => {
   const [contentState, setContentState] = useContext(contentStateContext);

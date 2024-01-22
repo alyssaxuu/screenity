@@ -1,9 +1,4 @@
-import { check } from "prettier";
 import React, { useEffect, useState, useRef, useCallback } from "react";
-
-import Localbase from "localbase";
-
-let db = new Localbase("db");
 
 const Recorder = () => {
   useEffect(() => {
@@ -155,23 +150,18 @@ const Recorder = () => {
   //   }
   // });
 
+  const onMessage = (message) => {
+    if (message.type === "screenity-get-permissions") {
+      checkPermissions();
+    }
+  };
+
   // Post message listener
   useEffect(() => {
     window.addEventListener("message", (event) => {
-      if (event.data.type === "screenity-get-permissions") {
-        checkPermissions();
-      }
+      onMessage(event.data);
     });
   }, []);
-
-  // useEffect(() => {
-  //   // Event listener (extension messaging)
-  //   chrome.runtime.onMessage.addListener(onMessage);
-
-  //   return () => {
-  //     chrome.runtime.onMessage.removeListener(onMessage);
-  //   };
-  // }, []);
 
   return <div></div>;
 };

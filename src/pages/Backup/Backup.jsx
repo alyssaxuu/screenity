@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef } from "react";
 import Localbase from "localbase";
 
 let db = new Localbase("db");
+db.config.debug = false;
 
 const Backup = () => {
   const [setupComplete, setSetupComplete] = useState(false);

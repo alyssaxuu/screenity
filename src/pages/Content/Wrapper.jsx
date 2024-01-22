@@ -66,7 +66,9 @@ const Wrapper = () => {
     if (!contentState.permissionsLoaded) return;
 
     permissionsRef.current.contentWindow.postMessage(
-      { type: "screenity-get-permissions" },
+      {
+        type: "screenity-get-permissions",
+      },
       "*"
     );
 

@@ -53,28 +53,62 @@ const BlurTool = () => {
       setShowOutline(false);
     };
 
-    const handleElementClick = (event) => {
+    const handleMouseDown = (event) => {
       if (!blurModeRef.current) {
         setShowOutline(false);
         return;
       }
-      event.preventDefault();
-      event.stopPropagation();
 
       const target = event.target;
       if (target.closest("#screenity-ui, #screenity-ui *")) {
         return;
       }
+
+      event.preventDefault();
+      event.stopPropagation();
+    };
+
+    const handleElementClick = (event) => {
+      if (!blurModeRef.current) {
+        setShowOutline(false);
+        return;
+      }
+
+      const target = event.target;
+      if (target.closest("#screenity-ui, #screenity-ui *")) {
+        return;
+      }
+
+      event.preventDefault();
+      event.stopPropagation();
       target.classList.toggle("screenity-blur");
     };
 
-    document.body.addEventListener("mouseover", handleMouseMove);
-    document.body.addEventListener("mouseout", handleMouseOut);
-    document.body.addEventListener("click", handleElementClick);
+    const handleMouseUp = (event) => {
+      if (!blurModeRef.current) {
+        setShowOutline(false);
+        return;
+      }
+
+      const target = event.target;
+      if (target.closest("#screenity-ui, #screenity-ui *")) {
+        return;
+      }
+      event.preventDefault();
+      event.stopPropagation();
+    };
+
+    document.body.addEventListener("mouseover", handleMouseMove, true);
+    document.body.addEventListener("mousedown", handleMouseDown, true);
+    document.body.addEventListener("mouseout", handleMouseOut, true);
+    document.body.addEventListener("mouseup", handleMouseUp, true);
+    document.body.addEventListener("click", handleElementClick, true);
 
     return () => {
       document.body.removeEventListener("mouseover", handleMouseMove);
+      document.body.removeEventListener("mousedown", handleMouseDown);
       document.body.removeEventListener("mouseout", handleMouseOut);
+      document.body.removeEventListener("mouseup", handleMouseUp);
       document.body.removeEventListener("click", handleElementClick);
     };
   }, []);

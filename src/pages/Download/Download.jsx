@@ -3,6 +3,7 @@ import React, { useState, useCallback, useEffect } from "react";
 import Localbase from "localbase";
 
 const db = new Localbase("db");
+db.config.debug = false;
 
 const Download = () => {
   const base64ToUint8Array = (base64) => {

@@ -1,0 +1,22 @@
+diff --git a/node_modules/fabric/dist/fabric.js b/node_modules/fabric/dist/fabric.js
+index faee7fc..02e5ae3 100644
+--- a/node_modules/fabric/dist/fabric.js
++++ b/node_modules/fabric/dist/fabric.js
+@@ -12591,7 +12591,7 @@ fabric.PatternBrush = fabric.util.createClass(fabric.PencilBrush, /** @lends fab
+       this.cacheCanvasEl = this._createCanvasElement();
+       this.cacheCanvasEl.setAttribute('width', this.width);
+       this.cacheCanvasEl.setAttribute('height', this.height);
+-      this.contextCache = this.cacheCanvasEl.getContext('2d');
++      this.contextCache = this.cacheCanvasEl.getContext('2d', {willReadFrequently: true});
+     },
+ 
+     /**
+@@ -15103,7 +15103,7 @@ fabric.util.object.extend(fabric.StaticCanvas.prototype, /** @lends fabric.Stati
+     _createCacheCanvas: function() {
+       this._cacheProperties = {};
+       this._cacheCanvas = fabric.util.createCanvasElement();
+-      this._cacheContext = this._cacheCanvas.getContext('2d');
++      this._cacheContext = this._cacheCanvas.getContext('2d', {willReadFrequently: true});
+       this._updateCacheCanvas();
+       // if canvas gets created, is empty, so dirty.
+       this.dirty = true;

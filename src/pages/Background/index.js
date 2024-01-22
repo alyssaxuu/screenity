@@ -1,15 +1,17 @@
 import saveToDrive from "./modules/saveToDrive";
 
+import {
+  sendMessageTab,
+  focusTab,
+  removeTab,
+  getCurrentTab,
+  createTab,
+} from "./modules/tabHelper";
+
 import Localbase from "localbase";
 
 const db = new Localbase("db");
-
-// Get current tab (requires activeTab permission)
-const getCurrentTab = async () => {
-  const queryOptions = { active: true, lastFocusedWindow: true };
-  const [tab] = await chrome.tabs.query(queryOptions);
-  return tab;
-};
+db.config.debug = false;
 
 const startAfterCountdown = async () => {
   // Check that the recording didn't get dismissed
@@ -52,10 +54,9 @@ const resetActiveTab = async () => {
             active: false,
           },
           async (tab) => {
-            chrome.windows.update(tab.windowId, { focused: true });
+            focusTab(activeTab);
             chrome.storage.local.set({ sandboxTab: tab.id });
-            chrome.tabs.sendMessage(activeTab, { type: "ready-to-record" });
-            chrome.tabs.highlight({ tabs: activeTab });
+            sendMessageTab(activeTab, { type: "ready-to-record" });
 
             // Check if countdown is set, if so start recording after 3 seconds
             const { countdown } = await chrome.storage.local.get(["countdown"]);
@@ -77,21 +78,18 @@ const resetActiveTab = async () => {
 
 const resetActiveTabRestart = async () => {
   const { activeTab } = await chrome.storage.local.get(["activeTab"]);
-  chrome.tabs.get(activeTab, async (tab) => {
-    chrome.windows.update(tab.windowId, { focused: true }, async () => {
-      chrome.tabs.update(activeTab, { active: true });
-      chrome.tabs.sendMessage(activeTab, { type: "ready-to-record" });
+  focusTab(activeTab).then(async () => {
+    sendMessageTab(activeTab, { type: "ready-to-record" });
 
-      // Check if countdown is set, if so start recording after 3 seconds
-      const { countdown } = await chrome.storage.local.get(["countdown"]);
-      if (countdown) {
-        setTimeout(() => {
-          startAfterCountdown();
-        }, 3000);
-      } else {
-        startRecording();
-      }
-    });
+    // Check if countdown is set, if so start recording after 3 seconds
+    const { countdown } = await chrome.storage.local.get(["countdown"]);
+    if (countdown) {
+      setTimeout(() => {
+        startAfterCountdown();
+      }, 3000);
+    } else {
+      startRecording();
+    }
   });
 };
 
@@ -126,8 +124,6 @@ chrome.commands.onCommand.addListener(async (command) => {
     // get active tab
     const activeTab = await getCurrentTab();
 
-    // Check if page is offline
-
     // Check if it's possible to inject into content (not a chrome:// page, new tab, etc)
     if (
       !(
@@ -143,7 +139,7 @@ chrome.commands.onCommand.addListener(async (command) => {
       !activeTab.url.includes("chrome.google.com/webstore") &&
       !activeTab.url.includes("chromewebstore.google.com")
     ) {
-      chrome.tabs.sendMessage(activeTab.id, { type: "start-stream" });
+      sendMessageTab(activeTab.id, { type: "start-stream" });
     } else {
       chrome.tabs
         .create({
@@ -156,7 +152,7 @@ chrome.commands.onCommand.addListener(async (command) => {
           chrome.tabs.onUpdated.addListener(function _(tabId, changeInfo, tab) {
             if (tabId === tab.id && changeInfo.status === "complete") {
               setTimeout(() => {
-                chrome.tabs.sendMessage(tab.id, { type: "start-stream" });
+                sendMessageTab(tab.id, { type: "start-stream" });
               }, 500);
               chrome.tabs.onUpdated.removeListener(_);
             }
@@ -166,10 +162,10 @@ chrome.commands.onCommand.addListener(async (command) => {
   } else if (command === "cancel-recording") {
     // get active tab
     const activeTab = await getCurrentTab();
-    chrome.tabs.sendMessage(activeTab.id, { type: "cancel-recording" });
+    sendMessageTab(activeTab.id, { type: "cancel-recording" });
   } else if (command == "pause-recording") {
     const activeTab = await getCurrentTab();
-    chrome.tabs.sendMessage(activeTab.id, { type: "pause-recording" });
+    sendMessageTab(activeTab.id, { type: "pause-recording" });
   }
 });
 
@@ -180,11 +176,11 @@ const handleAlarm = async (alarm) => {
     if (recording) {
       stopRecording();
       const { recordingTab } = await chrome.storage.local.get(["recordingTab"]);
-      chrome.tabs.sendMessage(recordingTab, { type: "stop-recording-tab" });
+      sendMessageTab(recordingTab, { type: "stop-recording-tab" });
       const { activeTab } = await chrome.storage.local.get(["activeTab"]);
-      chrome.tabs.sendMessage(activeTab, { type: "stop-recording-tab" });
+      sendMessageTab(activeTab, { type: "stop-recording-tab" });
       const currentTab = await getCurrentTab();
-      chrome.tabs.sendMessage(currentTab.id, { type: "stop-recording-tab" });
+      sendMessageTab(currentTab.id, { type: "stop-recording-tab" });
     }
     chrome.alarms.clear("recording-alarm");
   }
@@ -225,9 +221,7 @@ const onActivated = async (activeInfo) => {
     // Check if region recording, and if the recording tab is the same as the current tab
     const { tabRecordedID } = await chrome.storage.local.get(["tabRecordedID"]);
     if (tabRecordedID && tabRecordedID != activeInfo.tabId) {
-      chrome.tabs.sendMessage(activeInfo.tabId, {
-        type: "hide-popup-recording",
-      });
+      sendMessageTab(activeInfo.tabId, { type: "hide-popup-recording" });
       // Check if active tab is not backup.html + chrome-extension://
     } else if (
       !(
@@ -242,10 +236,10 @@ const onActivated = async (activeInfo) => {
     const { region } = await chrome.storage.local.get(["region"]);
     const { customRegion } = await chrome.storage.local.get(["customRegion"]);
     if (!region && !customRegion) {
-      chrome.tabs.sendMessage(activeInfo.tabId, { type: "recording-check" });
+      sendMessageTab(activeInfo.tabId, { type: "recording-check" });
     }
   } else if (!recording && !restarting) {
-    chrome.tabs.sendMessage(activeInfo.tabId, { type: "recording-ended" });
+    sendMessageTab(activeInfo.tabId, { type: "recording-ended" });
   }
 
   if (recordingStartTime) {
@@ -257,13 +251,13 @@ const onActivated = async (activeInfo) => {
       const seconds = parseFloat(alarmTime);
       const time = Math.floor((Date.now() - recordingStartTime) / 1000);
       const remaining = seconds - time;
-      chrome.tabs.sendMessage(activeInfo.tabId, {
+      sendMessageTab(activeInfo.tabId, {
         type: "time",
         time: remaining,
       });
     } else {
       const time = Math.floor((Date.now() - recordingStartTime) / 1000);
-      chrome.tabs.sendMessage(activeInfo.tabId, { type: "time", time: time });
+      sendMessageTab(activeInfo.tabId, { type: "time", time: time });
     }
   }
 };
@@ -298,9 +292,9 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
     const { tabRecordedID } = await chrome.storage.local.get(["tabRecordedID"]);
 
     if (!recording && !restarting) {
-      chrome.tabs.sendMessage(tab.id, { type: "recording-ended" });
+      sendMessageTab(tabId, { type: "recording-ended" });
     } else if (recording && tabRecordedID && tabRecordedID == tabId) {
-      chrome.tabs.sendMessage(tab.id, { type: "recording-check", force: true });
+      sendMessageTab(tabId, { type: "recording-check", force: true });
     }
 
     const { recordingStartTime } = await chrome.storage.local.get([
@@ -318,18 +312,18 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
         const seconds = parseFloat(alarmTime);
         const time = Math.floor((Date.now() - recordingStartTime) / 1000);
         const remaining = seconds - time;
-        chrome.tabs.sendMessage(tabId, {
+        sendMessageTab(tabId, {
           type: "time",
           time: remaining,
         });
       } else {
         const time = Math.floor((Date.now() - recordingStartTime) / 1000);
-        chrome.tabs.sendMessage(tabId, { type: "time", time: time });
+        sendMessageTab(tabId, { type: "time", time: time });
       }
     }
 
     const commands = await chrome.commands.getAll();
-    chrome.tabs.sendMessage(tab.id, {
+    sendMessageTab(tabId, {
       type: "commands",
       commands: commands,
     });
@@ -339,7 +333,7 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
       tab.url.includes(chrome.runtime.getURL("playground.html")) &&
       changeInfo.status === "complete"
     ) {
-      chrome.tabs.sendMessage(tab.id, { type: "toggle-popup" });
+      sendMessageTab(tab.id, { type: "toggle-popup" });
     }
   }
 });
@@ -364,10 +358,7 @@ const handleChunks = async (chunks, override = false) => {
   });
   const { sandboxTab } = await chrome.storage.local.get(["sandboxTab"]);
   if (chunks.length === 0) {
-    chrome.tabs.sendMessage(sandboxTab, {
-      type: "make-video-tab",
-      override: override,
-    });
+    sendMessageTab(sandboxTab, { type: "make-video-tab", override: override });
     return;
   }
 
@@ -377,10 +368,7 @@ const handleChunks = async (chunks, override = false) => {
   const maxRetries = 5; // Maximum number of retry attempts per batch
   const retryDelay = 1000; // Delay in milliseconds between retry attempts
 
-  chrome.tabs.sendMessage(sandboxTab, {
-    type: "chunk-count",
-    count: chunksCount,
-  });
+  sendMessageTab(sandboxTab, { type: "chunk-count", count: chunksCount });
 
   const sendNextBatch = async (retryCount = 0) => {
     // Determine the range of chunks for the current batch
@@ -428,8 +416,7 @@ const handleChunks = async (chunks, override = false) => {
     }
 
     if (batch.length > 0) {
-      // Send the batch to the sandboxed tab
-      chrome.tabs.sendMessage(
+      sendMessageTab(
         sandboxTab,
         {
           type: "new-chunk-tab",
@@ -486,7 +473,7 @@ const stopRecording = async () => {
     "recordingStartTime",
   ]);
   let duration = Date.now() - recordingStartTime;
-  const maxDuration = 5 * 60 * 1000;
+  const maxDuration = 7 * 60 * 1000;
 
   if (recordingStartTime === 0) {
     duration = 0;
@@ -516,7 +503,7 @@ const stopRecording = async () => {
           if (tabId === tab.id && changeInfo.status === "complete") {
             chrome.tabs.onUpdated.removeListener(_);
             // Close the existing sandbox tab
-            chrome.tabs.remove(sandboxTab);
+            removeTab(sandboxTab);
             chrome.storage.local.set({ sandboxTab: tab.id });
             sendChunks();
           }
@@ -570,7 +557,7 @@ const forceProcessing = async () => {
         if (tabId === tab.id && changeInfo.status === "complete") {
           chrome.tabs.onUpdated.removeListener(_);
           // Close the existing sandbox tab
-          chrome.tabs.remove(sandboxTab);
+          removeTab(sandboxTab);
           chrome.storage.local.set({ sandboxTab: tab.id });
 
           sendChunks(true);
@@ -580,6 +567,7 @@ const forceProcessing = async () => {
   );
 };
 
+// For some reason without this the service worker doesn't always work
 chrome.runtime.onStartup.addListener(() => {
   console.log(`Starting...`);
 });
@@ -592,12 +580,13 @@ chrome.action.onClicked.addListener(async (tab) => {
     stopRecording();
     sendMessageRecord({ type: "stop-recording-tab" });
     const { activeTab } = await chrome.storage.local.get(["activeTab"]);
+
     // Check if actual tab
     chrome.tabs.get(activeTab, (t) => {
       if (t) {
-        chrome.tabs.sendMessage(activeTab, { type: "stop-recording-tab" });
+        sendMessageTab(activeTab, { type: "stop-recording-tab" });
       } else {
-        chrome.tabs.sendMessage(tab.id, { type: "stop-recording-tab" });
+        sendMessageTab(tab.id, { type: "stop-recording-tab" });
         chrome.storage.local.set({ activeTab: tab.id });
       }
     });
@@ -617,7 +606,7 @@ chrome.action.onClicked.addListener(async (tab) => {
       !tab.url.includes("chrome.google.com/webstore") &&
       !tab.url.includes("chromewebstore.google.com")
     ) {
-      chrome.tabs.sendMessage(tab.id, { type: "toggle-popup" });
+      sendMessageTab(tab.id, { type: "toggle-popup" });
       chrome.storage.local.set({ activeTab: tab.id });
     } else {
       chrome.tabs
@@ -637,17 +626,13 @@ chrome.action.onClicked.addListener(async (tab) => {
     chrome.storage.local.set({ firstTime: false });
     // Send message to active tab
     const activeTab = await getCurrentTab();
-    chrome.tabs.sendMessage(activeTab.id, { type: "setup-complete" });
+    sendMessageTab(activeTab.id, { type: "setup-complete" });
   }
 });
 
-const nextChunk = async (request) => {
-  sendMessageRecord({ type: "next-chunk-tab" });
-};
-
 const restartActiveTab = async () => {
   const activeTab = await getCurrentTab();
-  chrome.tabs.sendMessage(activeTab.id, { type: "ready-to-record" });
+  sendMessageTab(activeTab.id, { type: "ready-to-record" });
 };
 
 const getStreamingData = async () => {
@@ -682,11 +667,7 @@ const handleDismiss = async () => {
   const { region } = await chrome.storage.local.get(["region"]);
   if (!region) {
     const { sandboxTab } = await chrome.storage.local.get(["sandboxTab"]);
-    chrome.tabs.get(sandboxTab, (tab) => {
-      if (tab) {
-        chrome.tabs.remove(tab.id);
-      }
-    });
+    removeTab(sandboxTab);
   }
   // Check if wasRegion is set
   const { wasRegion } = await chrome.storage.local.get(["wasRegion"]);
@@ -708,11 +689,7 @@ const handleRestart = async () => {
     }
   }
   const { sandboxTab } = await chrome.storage.local.get(["sandboxTab"]);
-  chrome.tabs.get(sandboxTab, (tab) => {
-    if (tab) {
-      chrome.tabs.remove(tab.id);
-    }
-  });
+  removeTab(sandboxTab);
   chrome.tabs.create(
     {
       url: editor_url,
@@ -739,9 +716,7 @@ const sendMessageRecord = async (message) => {
       chrome.runtime.sendMessage(message);
     } else {
       // Get the recording tab first before sending the message
-      chrome.tabs.get(result.recordingTab, (tab) => {
-        chrome.tabs.sendMessage(tab.id, message);
-      });
+      sendMessageTab(result.recordingTab, message);
     }
   });
 };
@@ -753,7 +728,7 @@ const initBackup = async (request, id) => {
   if (backupTab) {
     chrome.tabs.get(backupTab, (tab) => {
       if (tab) {
-        chrome.tabs.sendMessage(backupTab, {
+        sendMessageTab(tab.id, {
           type: "init-backup",
           request: request,
           tabId: id,
@@ -775,7 +750,7 @@ const initBackup = async (request, id) => {
             ) {
               // Check if recorder tab has finished loading
               if (tabId === tab.id && changeInfo.status === "complete") {
-                chrome.tabs.sendMessage(tab.id, {
+                sendMessageTab(tab.id, {
                   type: "init-backup",
                   request: request,
                   tabId: id,
@@ -804,7 +779,7 @@ const initBackup = async (request, id) => {
         ) {
           // Check if recorder tab has finished loading
           if (tabId === tab.id && changeInfo.status === "complete") {
-            chrome.tabs.sendMessage(tab.id, {
+            sendMessageTab(tab.id, {
               type: "init-backup",
               request: request,
               tabId: id,
@@ -1029,32 +1004,9 @@ const offscreenDocument = async (request, tabId = null) => {
   }
 };
 
-const base64ToUint8Array = (base64) => {
-  const dataUrlRegex = /^data:(.*?);base64,/;
-  const matches = base64.match(dataUrlRegex);
-  if (matches !== null) {
-    // Base64 is a data URL
-    const mimeType = matches[1];
-    const binaryString = atob(base64.slice(matches[0].length));
-    const bytes = new Uint8Array(binaryString.length);
-    for (let i = 0; i < binaryString.length; i++) {
-      bytes[i] = binaryString.charCodeAt(i);
-    }
-    return new Blob([bytes], { type: mimeType });
-  } else {
-    // Base64 is a regular string
-    const binaryString = atob(base64);
-    const bytes = new Uint8Array(binaryString.length);
-    for (let i = 0; i < binaryString.length; i++) {
-      bytes[i] = binaryString.charCodeAt(i);
-    }
-    return new Blob([bytes], { type: "video/webm" });
-  }
-};
-
 const savedToDrive = async () => {
   const { sandboxTab } = await chrome.storage.local.get(["sandboxTab"]);
-  chrome.tabs.sendMessage(sandboxTab, { type: "saved-to-drive" });
+  sendMessageTab(sandboxTab, { type: "saved-to-drive" });
 };
 
 const discardOffscreenDocuments = async () => {
@@ -1083,10 +1035,13 @@ const executeScripts = async () => {
     const cs = contentScripts[i];
 
     for (const tab of tabs) {
-      const executeScriptPromise = chrome.scripting.executeScript({
-        target: { tabId: tab.id },
-        files: cs.js,
-      });
+      const executeScriptPromise = chrome.scripting.executeScript(
+        {
+          target: { tabId: tab.id },
+          files: cs.js,
+        },
+        () => chrome.runtime.lastError
+      );
       executeScriptPromises.push(executeScriptPromise);
     }
   }
@@ -1171,11 +1126,7 @@ chrome.runtime.onInstalled.addListener(async (details) => {
   // Check if the backup tab is open, if so close it
   const { backupTab } = await chrome.storage.local.get(["backupTab"]);
   if (backupTab) {
-    chrome.tabs.get(backupTab, (tab) => {
-      if (tab) {
-        chrome.tabs.remove(tab.id);
-      }
-    });
+    removeTab(backupTab);
   }
 
   executeScripts();
@@ -1191,7 +1142,6 @@ chrome.tabs.onRemoved.addListener(async (tabId, removeInfo) => {
   const { sandboxTab } = await chrome.storage.local.get(["sandboxTab"]);
   const { recording } = await chrome.storage.local.get(["recording"]);
   const { restarting } = await chrome.storage.local.get(["restarting"]);
-  const { activeTab } = await chrome.storage.local.get(["activeTab"]);
 
   if ((tabId === recordingTab || tabId === sandboxTab) && !restarting) {
     chrome.storage.local.set({ recordingTab: null });
@@ -1200,15 +1150,15 @@ chrome.tabs.onRemoved.addListener(async (tabId, removeInfo) => {
 
     try {
       if (recording) {
-        chrome.windows
-          .update(activeTab.windowId, { focused: true })
-          .then(() => {
-            chrome.tabs.update(activeTab, { active: true });
-          });
+        focusTab(activeTab);
       }
-      chrome.tabs.sendMessage(activeTab, { type: "stop-recording-tab" });
+      sendMessageTab(activeTab, { type: "stop-recording-tab" }, null, () => {
+        // Tab doesn't exist, so just set activeTab to null
+        sendMessageTab(tabId, { type: "stop-recording-tab" });
+        chrome.storage.local.set({ activeTab: tabId });
+      });
     } catch (error) {
-      chrome.tabs.sendMessage(tabId, { type: "stop-recording-tab" });
+      sendMessageTab(tabId, { type: "stop-recording-tab" });
       chrome.storage.local.set({ activeTab: tabId });
     }
 
@@ -1216,24 +1166,16 @@ chrome.tabs.onRemoved.addListener(async (tabId, removeInfo) => {
     chrome.action.setIcon({ path: "assets/icon-34.png" });
   }
   if (tabId === sandboxTab && !restarting) {
-    try {
-      chrome.tabs.remove(recordingTab);
-    } catch (error) {}
+    removeTab(recordingTab);
   } else if (tabId === recordingTab && recording) {
-    try {
-      chrome.tabs.remove(sandboxTab);
-    } catch (error) {}
+    removeTab(sandboxTab);
   }
 });
 
 const discardRecording = async () => {
   const { sandboxTab } = await chrome.storage.local.get(["sandboxTab"]);
   // Get actual sandbox tab
-  chrome.tabs.get(sandboxTab, (tab) => {
-    if (tab) {
-      chrome.tabs.remove(tab.id);
-    }
-  });
+  removeTab(sandboxTab);
   sendMessageRecord({ type: "dismiss-recording" });
   chrome.action.setIcon({ path: "assets/icon-34.png" });
   discardOffscreenDocuments();
@@ -1272,12 +1214,7 @@ const checkRecording = async () => {
 
 const removeSandbox = async () => {
   const { sandboxTab } = await chrome.storage.local.get(["sandboxTab"]);
-
-  chrome.tabs.get(sandboxTab, (tab) => {
-    if (tab) {
-      chrome.tabs.remove(sandboxTab);
-    }
-  });
+  removeTab(sandboxTab);
 };
 
 const newSandboxPageRestart = async () => {
@@ -1314,400 +1251,10 @@ const newSandboxPageRestart = async () => {
   );
 };
 
-const handleMessage = async (request, sender, sendResponse) => {
-  if (request.type === "desktop-capture") {
-    const { backup } = await chrome.storage.local.get(["backup"]);
-    const { backupSetup } = await chrome.storage.local.get(["backupSetup"]);
-    if (backup) {
-      if (!backupSetup) {
-        // This will prompt the user with the file picker
-        db.collection("localDirectory").delete();
-      }
-
-      let activeTab = await getCurrentTab();
-      initBackup(request, activeTab.id);
-    } else {
-      offscreenDocument(request);
-    }
-  } else if (request.type === "backup-created") {
-    offscreenDocument(request.request, request.tabId);
-  } else if (request.type === "write-file") {
-    // Need to add safety check here to make sure the tab is still open
-    const { backupTab } = await chrome.storage.local.get(["backupTab"]);
-
-    if (backupTab) {
-      chrome.tabs.get(backupTab, (tab) => {
-        if (tab) {
-          chrome.tabs.get(backupTab, (tab) => {
-            if (tab) {
-              chrome.tabs.sendMessage(backupTab, {
-                type: "write-file",
-                index: request.index,
-              });
-            }
-          });
-        } else {
-          sendMessageRecord({ type: "stop-recording-tab" });
-        }
-      });
-    } else {
-      sendMessageRecord({ type: "stop-recording-tab" });
-    }
-  } else if (request.type === "handle-restart") {
-    handleRestart();
-  } else if (request.type === "handle-dismiss") {
-    handleDismiss();
-  } else if (request.type === "offscreen") {
-    getStreamId(sender.tab, sendResponse);
-    return true;
-  } else if (request.type === "reset-active-tab") {
-    resetActiveTab();
-  } else if (request.type === "reset-active-tab-restart") {
-    resetActiveTabRestart();
-  } else if (request.type === "start-rec") {
-    startRecording();
-  } else if (request.type === "video-ready") {
-    // Need to add to stop recording code properly
-    const { backupTab } = await chrome.storage.local.get(["backupTab"]);
-    if (backupTab) {
-      chrome.tabs.get(backupTab, (tab) => {
-        if (tab) {
-          chrome.tabs.sendMessage(backupTab, {
-            type: "close-writable",
-          });
-        }
-      });
-    }
-    stopRecording();
-  } else if (request.type === "request-next-chunk") {
-    nextChunk(request);
-  } else if (request.type === "start-recording") {
-    startRecording();
-  } else if (request.type === "restarted") {
-    restartActiveTab();
-  } else if (request.type === "new-chunk") {
-    const { sandboxTab } = await chrome.storage.local.get(["sandboxTab"]);
-    chrome.tabs.sendMessage(sandboxTab, {
-      type: "new-chunk-tab",
-      chunk: request.chunk,
-      index: request.index,
-    });
-    sendResponse({ status: "ok" });
-    return true;
-  } else if (request.type === "get-streaming-data") {
-    const data = await getStreamingData();
-    sendMessageRecord({ type: "streaming-data", data: JSON.stringify(data) });
-    return true;
-  } else if (request.type === "cancel-recording") {
-    chrome.action.setIcon({ path: "assets/icon-34.png" });
-    const { activeTab } = await chrome.storage.local.get(["activeTab"]);
-    // Check if actual tab
-    chrome.tabs.get(activeTab, (t) => {
-      if (t) {
-        chrome.windows
-          .update(activeTab.windowId, { focused: true })
-          .then(() => {
-            chrome.tabs.update(activeTab, { active: true });
-          });
-      }
-    });
-    discardOffscreenDocuments();
-  } else if (request.type === "stop-recording-tab") {
-    if (request.memoryError) {
-      chrome.storage.local.set({
-        recording: false,
-        restarting: false,
-        tabRecordedID: null,
-        memoryError: true,
-      });
-    }
-    sendMessageRecord({ type: "stop-recording-tab" });
-  } else if (request.type === "restart-recording-tab") {
-    removeSandbox();
-    chrome.storage.local.get(["region"], (result) => {
-      if (result.region) {
-        //sendMessageRecord({ type: "restart-recording-tab" });
-      }
-    });
-  } else if (request.type === "dismiss-recording-tab") {
-    chrome.runtime.sendMessage({ type: "discard-backup" });
-    discardRecording();
-  } else if (request.type === "pause-recording-tab") {
-    sendMessageRecord({ type: "pause-recording-tab" });
-  } else if (request.type === "resume-recording-tab") {
-    sendMessageRecord({ type: "resume-recording-tab" });
-  } else if (request.type === "set-mic-active-tab") {
-    chrome.storage.local.get(["region"], (result) => {
-      if (result.region) {
-        sendMessageRecord({
-          type: "set-mic-active-tab",
-          active: request.active,
-          defaultAudioInput: request.defaultAudioInput,
-        });
-      }
-    });
-  } else if (request.type === "recording-error") {
-    // get actual active tab
-    const { activeTab } = await chrome.storage.local.get(["activeTab"]);
-    chrome.tabs.get(activeTab, (tab) => {
-      if (tab) {
-        chrome.tabs.sendMessage(activeTab, { type: "recording-error" });
-        // Go to active tab
-        chrome.windows.update(tab.windowId, { focused: true }).then(() => {
-          chrome.tabs.update(activeTab, { active: true });
-        });
-        if (request.error === "stream-error") {
-          chrome.tabs.sendMessage(activeTab, { type: "stream-error" });
-        } else if (request.error === "backup-error") {
-          chrome.tabs.sendMessage(activeTab, { type: "backup-error" });
-        }
-      }
-    });
-
-    // Close recording tab
-    const { recordingTab } = await chrome.storage.local.get(["recordingTab"]);
-    const { region } = await chrome.storage.local.get(["region"]);
-    // Check if tab exists (with tab api)
-    if (recordingTab && !region) {
-      chrome.tabs.get(recordingTab, (tab) => {
-        if (tab) {
-          chrome.tabs.remove(recordingTab);
-        }
-      });
-    }
-    chrome.storage.local.set({ recordingTab: null });
-    discardOffscreenDocuments();
-  } else if (request.type === "on-get-permissions") {
-    // Send a message to (actual) active tab
-    const activeTab = await getCurrentTab();
-    if (activeTab) {
-      chrome.tabs.sendMessage(activeTab.id, {
-        type: "on-get-permissions",
-        data: request,
-      });
-    }
-  } else if (request.type === "recording-complete") {
-    // Close the recording tab
-    const { recordingTab } = await chrome.storage.local.get(["recordingTab"]);
-    const { region } = await chrome.storage.local.get(["region"]);
-
-    // Check if tab exists (with tab api)
-    if (recordingTab) {
-      chrome.tabs.get(recordingTab, (tab) => {
-        if (tab) {
-          // Check if tab url contains chrome-extension and recorder.html
-          if (
-            tab.url.includes("chrome-extension") &&
-            tab.url.includes("recorder.html")
-          ) {
-            chrome.tabs.remove(recordingTab);
-          }
-        }
-      });
-    }
-  } else if (request.type === "check-recording") {
-    checkRecording();
-  } else if (request.type === "review-screenity") {
-    chrome.tabs.create({
-      url: "https://chromewebstore.google.com/detail/screenity-screen-recorder/kbbdabhdfibnancpjfhlkhafgdilcnji/reviews",
-      active: true,
-    });
-  } else if (request.type === "follow-twitter") {
-    chrome.tabs.create({
-      url: "https://alyssax.substack.com/",
-      active: true,
-    });
-  } else if (request.type === "open-processing-info") {
-    const locale = chrome.i18n.getMessage("@@ui_locale");
-    let url =
-      "https://help.screenity.io/editing-and-exporting/dJRFpGq56JFKC7k8zEvsqb/why-is-there-a-5-minute-limit-for-editing/ddy4e4TpbnrFJ8VoRT37tQ";
-    if (!locale.includes("en")) {
-      url =
-        "http://translate.google.com/translate?js=n&sl=auto&tl=" +
-        locale +
-        "&u=" +
-        url;
-    }
-    chrome.tabs.create({
-      url: url,
-      active: true,
-    });
-  } else if (request.type === "upgrade-info") {
-    const locale = chrome.i18n.getMessage("@@ui_locale");
-    let url =
-      "https://help.screenity.io/getting-started/77KizPC8MHVGfpKpqdux9D/what-are-the-technical-requirements-for-using-screenity/6kdB6qru6naVD8ZLFvX3m9";
-    if (!locale.includes("en")) {
-      url =
-        "http://translate.google.com/translate?js=n&sl=auto&tl=" +
-        locale +
-        "&u=" +
-        url;
-    }
-    chrome.tabs.create({
-      url: url,
-      active: true,
-    });
-  } else if (request.type === "trim-info") {
-    const locale = chrome.i18n.getMessage("@@ui_locale");
-    let url =
-      "https://help.screenity.io/editing-and-exporting/dJRFpGq56JFKC7k8zEvsqb/how-to-cut-trim-or-mute-parts-of-your-video/svNbM7YHYY717MuSWXrKXH";
-    if (!locale.includes("en")) {
-      url =
-        "http://translate.google.com/translate?js=n&sl=auto&tl=" +
-        locale +
-        "&u=" +
-        url;
-    }
-    chrome.tabs.create({
-      url: url,
-      active: true,
-    });
-  } else if (request.type === "join-waitlist") {
-    const locale = chrome.i18n.getMessage("@@ui_locale");
-    let url = "https://tally.so/r/npojNV";
-    if (!locale.includes("en")) {
-      url =
-        "http://translate.google.com/translate?js=n&sl=auto&tl=" +
-        locale +
-        "&u=" +
-        url;
-    }
-    chrome.tabs.create({
-      url: url,
-      active: true,
-    });
-  } else if (request.type === "chrome-update-info") {
-    // Check locale
-    const locale = chrome.i18n.getMessage("@@ui_locale");
-    let url =
-      "https://help.screenity.io/getting-started/77KizPC8MHVGfpKpqdux9D/what-are-the-technical-requirements-for-using-screenity/6kdB6qru6naVD8ZLFvX3m9";
-    if (!locale.includes("en")) {
-      url =
-        "http://translate.google.com/translate?js=n&sl=auto&tl=" +
-        locale +
-        "&u=" +
-        url;
-    }
-    chrome.tabs.create({
-      url: url,
-      active: true,
-    });
-  } else if (request.type === "set-surface") {
-    chrome.storage.local.set({
-      surface: request.surface,
-    });
-
-    const { activeTab } = await chrome.storage.local.get(["activeTab"]);
-
-    chrome.tabs.get(activeTab, (tab) => {
-      if (tab) {
-        chrome.tabs.sendMessage(activeTab, {
-          type: "set-surface",
-          surface: request.surface,
-        });
-      }
-    });
-  } else if (request.type === "pip-ended") {
-    const { activeTab } = await chrome.storage.local.get(["activeTab"]);
-
-    chrome.tabs.get(activeTab, (tab) => {
-      if (tab) {
-        chrome.tabs.sendMessage(activeTab, { type: "pip-ended" });
-      }
-    });
-  } else if (request.type === "pip-started") {
-    const { activeTab } = await chrome.storage.local.get(["activeTab"]);
-
-    chrome.tabs.get(activeTab, (tab) => {
-      if (tab) {
-        chrome.tabs.sendMessage(activeTab, { type: "pip-started" });
-      }
-    });
-  } else if (request.type === "new-sandbox-page-restart") {
-    newSandboxPageRestart();
-  } else if (request.type === "sign-out-drive") {
-    // Get token
-    const { token } = await chrome.storage.local.get(["token"]);
-    var url = "https://accounts.google.com/o/oauth2/revoke?token=" + token;
-    fetch(url);
-
-    chrome.identity.removeCachedAuthToken({ token: token });
-    chrome.storage.local.set({ token: false });
-  } else if (request.type === "open-help") {
-    const locale = chrome.i18n.getMessage("@@ui_locale");
-    let url = "https://help.screenity.io/";
-    if (!locale.includes("en")) {
-      url =
-        "http://translate.google.com/translate?js=n&sl=auto&tl=" +
-        locale +
-        "&u=" +
-        url;
-    }
-    chrome.tabs.create({
-      url: url,
-      active: true,
-    });
-  } else if (request.type === "memory-limit-help") {
-    const locale = chrome.i18n.getMessage("@@ui_locale");
-    let url =
-      "https://help.screenity.io/troubleshooting/9Jy5RGjNrBB42hqUdREQ7W/what-does-%E2%80%9Cmemory-limit-reached%E2%80%9D-mean-when-recording/8WkwHbt3puuXunYqQnyPcb";
-    if (!locale.includes("en")) {
-      url =
-        "http://translate.google.com/translate?js=n&sl=auto&tl=" +
-        locale +
-        "&u=" +
-        url;
-    }
-    chrome.tabs.create({
-      url: url,
-      active: true,
-    });
-  } else if (request.type === "open-home") {
-    chrome.tabs.create({
-      url: "https://screenity.io/",
-      active: true,
-    });
-  } else if (request.type === "report-bug") {
-    chrome.tabs.create({
-      url:
-        "https://tally.so/r/3ElpXq?version=" +
-        chrome.runtime.getManifest().version,
-      active: true,
-    });
-  } else if (request.type === "clear-recordings") {
-    // clear chunks
-    db.collection("chunks").delete();
-  } else if (request.type === "force-processing") {
-    forceProcessing();
-  } else if (request.type === "focus-this-tab") {
-    chrome.windows.update(sender.tab.windowId, { focused: true }).then(() => {
-      chrome.tabs.update(sender.tab.id, { active: true });
-    });
-  } else if (request.type === "stop-recording-tab-backup") {
-    chrome.storage.local.set({
-      recording: false,
-      restarting: false,
-      tabRecordedID: null,
-      memoryError: true,
-    });
-    sendMessageRecord({ type: "stop-recording-tab" });
-
-    // Get active tab
-    const { activeTab } = await chrome.storage.local.get(["activeTab"]);
-    // Check if actual tab
-    chrome.tabs.get(activeTab, (t) => {
-      if (t) {
-        chrome.tabs.sendMessage(activeTab, { type: "stop-pending" });
-        // Focus tab
-        chrome.tabs.update(activeTab, { active: true });
-      }
-    });
-  }
-};
-
-const isPinned = async (sendResponse) => {
-  const userSettings = await chrome.action.getUserSettings();
-  sendResponse({ pinned: userSettings.isOnToolbar });
+const isPinned = (sendResponse) => {
+  chrome.action.getUserSettings().then((userSettings) => {
+    sendResponse({ pinned: userSettings.isOnToolbar });
+  });
 };
 
 const requestDownload = async (base64, title) => {
@@ -1725,7 +1272,7 @@ const requestDownload = async (base64, title) => {
       ) {
         if (tabId === tab.id && changeInfo.status === "complete") {
           chrome.tabs.onUpdated.removeListener(_);
-          chrome.tabs.sendMessage(tab.id, {
+          sendMessageTab(tab.id, {
             type: "download-video",
             base64: base64,
             title: title,
@@ -1736,122 +1283,147 @@ const requestDownload = async (base64, title) => {
   );
 };
 
-// Listen for messages
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  if (request.type === "indexed-db-download") {
-    // Open a new tab to get URL
-    chrome.tabs.create(
-      {
-        url: "download.html",
-        active: false,
-      },
-      (tab) => {
-        chrome.tabs.onUpdated.addListener(function _(
-          tabId,
-          changeInfo,
-          updatedTab
-        ) {
-          if (tabId === tab.id && changeInfo.status === "complete") {
-            chrome.tabs.onUpdated.removeListener(_);
-            chrome.tabs.sendMessage(tab.id, {
-              type: "recover-indexed-db",
-            });
-          }
-        });
-      }
-    );
-  } else if (request.type === "get-platform-info") {
-    chrome.runtime.getPlatformInfo((info) => {
-      sendResponse(info);
-    });
-    return true;
-  } else if (request.type === "restore-recording") {
-    let editor_url = "editorfallback.html";
-
-    // Check if Chrome version is 109 or below
-    if (navigator.userAgent.includes("Chrome/")) {
-      const version = parseInt(
-        navigator.userAgent.match(/Chrome\/([0-9]+)/)[1]
-      );
-      if (version <= 109) {
-        editor_url = "editorfallback.html";
-      }
-    }
-
-    // Make a video out of the db chunks, and download it
-    db.collection("chunks")
-      .get()
-      .then((chunks) => {
-        // Check if there's any chunks
-        if (chunks.empty || chunks.length === 0) {
-          return;
+const downloadIndexedDB = async () => {
+  // Open a new tab to get URL
+  chrome.tabs.create(
+    {
+      url: "download.html",
+      active: false,
+    },
+    (tab) => {
+      chrome.tabs.onUpdated.addListener(function _(
+        tabId,
+        changeInfo,
+        updatedTab
+      ) {
+        if (tabId === tab.id && changeInfo.status === "complete") {
+          chrome.tabs.onUpdated.removeListener(_);
+          sendMessageTab(tab.id, {
+            type: "download-indexed-db",
+          });
         }
+      });
+    }
+  );
+};
 
-        chrome.tabs.create(
-          {
-            url: editor_url,
-            active: true,
-          },
-          async (tab) => {
-            // Set URL as sandbox tab
-            chrome.storage.local.set({ sandboxTab: tab.id });
-            // Wait for the tab to be loaded
-            await new Promise((resolve) => {
-              chrome.tabs.onUpdated.addListener(function listener(tabId, info) {
-                if (info.status === "complete" && tabId === tab.id) {
-                  chrome.tabs.sendMessage(tab.id, {
-                    type: "fallback-recording",
-                  });
-                  sendChunks();
-                }
-              });
+const getPlatformInfo = (sendResponse) => {
+  chrome.runtime.getPlatformInfo((info) => {
+    sendResponse(info);
+  });
+};
+
+const restoreRecording = async () => {
+  let editor_url = "editorfallback.html";
+
+  // Check if Chrome version is 109 or below
+  if (navigator.userAgent.includes("Chrome/")) {
+    const version = parseInt(navigator.userAgent.match(/Chrome\/([0-9]+)/)[1]);
+    if (version <= 109) {
+      editor_url = "editorfallback.html";
+    }
+  }
+
+  // Make a video out of the db chunks, and download it
+  db.collection("chunks")
+    .get()
+    .then((chunks) => {
+      // Check if there's any chunks
+      if (chunks.empty || chunks.length === 0) {
+        return;
+      }
+
+      chrome.tabs.create(
+        {
+          url: editor_url,
+          active: true,
+        },
+        async (tab) => {
+          // Set URL as sandbox tab
+          chrome.storage.local.set({ sandboxTab: tab.id });
+          // Wait for the tab to be loaded
+          await new Promise((resolve) => {
+            chrome.tabs.onUpdated.addListener(function listener(tabId, info) {
+              if (info.status === "complete" && tabId === tab.id) {
+                sendMessageTab(tab.id, {
+                  type: "restore-recording",
+                });
+
+                sendChunks();
+              }
             });
+          });
+        }
+      );
+    });
+};
+
+const checkRestore = (sendResponse) => {
+  // Check if there's any chunks
+  db.collection("chunks")
+    .get()
+    .then((chunks) => {
+      // Check if there's any chunks
+      if (chunks.empty || chunks.length === 0) {
+        sendResponse({ restore: false, chunks: [] });
+        return;
+      }
+      sendResponse({ restore: true });
+    });
+};
+
+const checkCapturePermissions = (sendResponse) => {
+  chrome.permissions.contains(
+    {
+      permissions: ["desktopCapture", "alarms", "offscreen"],
+    },
+    (result) => {
+      if (!result) {
+        chrome.permissions.request(
+          {
+            permissions: ["desktopCapture", "alarms", "offscreen"],
+          },
+          (granted) => {
+            if (!granted) {
+              sendResponse({ status: "error" });
+            } else {
+              addAlarmListener();
+              sendResponse({ status: "ok" });
+            }
           }
         );
-      });
-  } else if (request.type === "check-restore") {
-    // Check if there's any chunks
-    db.collection("chunks")
-      .get()
-      .then((chunks) => {
-        // Check if there's any chunks
-        if (chunks.empty || chunks.length === 0) {
-          sendResponse({ restore: false, chunks: [] });
-          return;
-        }
-        sendResponse({ restore: true });
-      });
-    return true;
-  } else if (request.type === "check-capture-permissions") {
-    chrome.permissions.contains(
-      {
-        permissions: ["desktopCapture", "alarms", "offscreen"],
-      },
-      (result) => {
-        if (!result) {
-          chrome.permissions.request(
-            {
-              permissions: ["desktopCapture", "alarms", "offscreen"],
-            },
-            (granted) => {
-              if (!granted) {
-                sendResponse({ status: "error" });
-              } else {
-                addAlarmListener();
-                sendResponse({ status: "ok" });
-              }
-            }
-          );
-        } else {
-          sendResponse({ status: "ok" });
-        }
+      } else {
+        sendResponse({ status: "ok" });
       }
-    );
-    return true;
-  } else if (request.type === "is-pinned") {
-    isPinned(sendResponse);
-    return true;
-  } else if (request.type === "save-to-drive") {
+    }
+  );
+};
+
+const base64ToUint8Array = (base64) => {
+  const dataUrlRegex = /^data:(.*?);base64,/;
+  const matches = base64.match(dataUrlRegex);
+  if (matches !== null) {
+    // Base64 is a data URL
+    const mimeType = matches[1];
+    const binaryString = atob(base64.slice(matches[0].length));
+    const bytes = new Uint8Array(binaryString.length);
+    for (let i = 0; i < binaryString.length; i++) {
+      bytes[i] = binaryString.charCodeAt(i);
+    }
+    return new Blob([bytes], { type: mimeType });
+  } else {
+    // Base64 is a regular string
+    const binaryString = atob(base64);
+    const bytes = new Uint8Array(binaryString.length);
+    for (let i = 0; i < binaryString.length; i++) {
+      bytes[i] = binaryString.charCodeAt(i);
+    }
+    return new Blob([bytes], { type: "video/webm" });
+  }
+};
+
+const handleSaveToDrive = (sendResponse, request, fallback = false) => {
+  if (!fallback) {
     const blob = base64ToUint8Array(request.base64);
 
     // Specify the desired file name
@@ -1861,9 +1433,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     saveToDrive(blob, fileName, sendResponse).then(() => {
       savedToDrive();
     });
-
-    return true;
-  } else if (request.type === "save-to-drive-fallback") {
+  } else {
     db.collection("chunks")
       .get()
       .then((chunks) => {
@@ -1880,14 +1450,360 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           savedToDrive();
         });
       });
+  }
+};
 
+const desktopCapture = async (request) => {
+  const { backup } = await chrome.storage.local.get(["backup"]);
+  const { backupSetup } = await chrome.storage.local.get(["backupSetup"]);
+  if (backup) {
+    if (!backupSetup) {
+      // This will prompt the user with the file picker
+      db.collection("localDirectory").delete();
+    }
+
+    let activeTab = await getCurrentTab();
+    initBackup(request, activeTab.id);
+  } else {
+    offscreenDocument(request);
+  }
+};
+
+const writeFile = async (request) => {
+  // Need to add safety check here to make sure the tab is still open
+  const { backupTab } = await chrome.storage.local.get(["backupTab"]);
+
+  if (backupTab) {
+    sendMessageTab(
+      backupTab,
+      {
+        type: "write-file",
+        index: request.index,
+      },
+      null,
+      () => {
+        sendMessageRecord({ type: "stop-recording-tab" });
+      }
+    );
+  } else {
+    sendMessageRecord({ type: "stop-recording-tab" });
+  }
+};
+
+const videoReady = async () => {
+  // Need to add to stop recording code properly
+  const { backupTab } = await chrome.storage.local.get(["backupTab"]);
+  if (backupTab) {
+    sendMessageTab(backupTab, { type: "video-ready" });
+  }
+  stopRecording();
+};
+
+const newChunk = async (request) => {
+  const { sandboxTab } = await chrome.storage.local.get(["sandboxTab"]);
+  sendMessageTab(sandboxTab, {
+    type: "new-chunk-tab",
+    chunk: request.chunk,
+    index: request.index,
+  });
+
+  sendResponse({ status: "ok" });
+};
+
+const handleGetStreamingData = async () => {
+  const data = await getStreamingData();
+  sendMessageRecord({ type: "streaming-data", data: JSON.stringify(data) });
+};
+
+const cancelRecording = async () => {
+  chrome.action.setIcon({ path: "assets/icon-34.png" });
+  const { activeTab } = await chrome.storage.local.get(["activeTab"]);
+  focusTab(activeTab);
+  discardOffscreenDocuments();
+};
+
+const handleStopRecordingTab = async (request) => {
+  if (request.memoryError) {
+    chrome.storage.local.set({
+      recording: false,
+      restarting: false,
+      tabRecordedID: null,
+      memoryError: true,
+    });
+  }
+  sendMessageRecord({ type: "stop-recording-tab" });
+};
+
+const handleRestartRecordingTab = async () => {
+  removeSandbox();
+};
+
+const handleDismissRecordingTab = async () => {
+  chrome.runtime.sendMessage({ type: "discard-backup" });
+  discardRecording();
+};
+
+const setMicActiveTab = async (request) => {
+  chrome.storage.local.get(["region"], (result) => {
+    if (result.region) {
+      sendMessageRecord({
+        type: "set-mic-active-tab",
+        active: request.active,
+        defaultAudioInput: request.defaultAudioInput,
+      });
+    }
+  });
+};
+
+const handleRecordingError = async (request) => {
+  // get actual active tab
+  const { activeTab } = await chrome.storage.local.get(["activeTab"]);
+
+  sendMessageRecord({ type: "recording-error" }).then(() => {
+    focusTab(activeTab);
+    if (request.error === "stream-error") {
+      sendMessageTab(activeTab, { type: "stream-error" });
+    } else if (request.error === "backup-error") {
+      sendMessageTab(activeTab, { type: "backup-error" });
+    }
+  });
+
+  // Close recording tab
+  const { recordingTab } = await chrome.storage.local.get(["recordingTab"]);
+  const { region } = await chrome.storage.local.get(["region"]);
+  // Check if tab exists (with tab api)
+  if (recordingTab && !region) {
+    removeTab(recordingTab);
+  }
+  chrome.storage.local.set({ recordingTab: null });
+  discardOffscreenDocuments();
+};
+
+const handleOnGetPermissions = async (request) => {
+  // Send a message to (actual) active tab
+  const activeTab = await getCurrentTab();
+  if (activeTab) {
+    sendMessageTab(activeTab.id, {
+      type: "on-get-permissions",
+      data: request,
+    });
+  }
+};
+
+const handleRecordingComplete = async () => {
+  // Close the recording tab
+  const { recordingTab } = await chrome.storage.local.get(["recordingTab"]);
+
+  // Check if tab exists (with tab api)
+  if (recordingTab) {
+    chrome.tabs.get(recordingTab, (tab) => {
+      if (tab) {
+        // Check if tab url contains chrome-extension and recorder.html
+        if (
+          tab.url.includes("chrome-extension") &&
+          tab.url.includes("recorder.html")
+        ) {
+          removeTab(recordingTab);
+        }
+      }
+    });
+  }
+};
+
+const setSurface = async (request) => {
+  chrome.storage.local.set({
+    surface: request.surface,
+  });
+
+  const { activeTab } = await chrome.storage.local.get(["activeTab"]);
+  sendMessageTab(activeTab, {
+    type: "set-surface",
+    surface: request.surface,
+  });
+};
+
+const handlePip = async (started = false) => {
+  const { activeTab } = await chrome.storage.local.get(["activeTab"]);
+  if (started) {
+    sendMessageTab(activeTab, { type: "pip-started" });
+  } else {
+    sendMessageTab(activeTab, { type: "pip-ended" });
+  }
+};
+
+const handleSignOutDrive = async () => {
+  // Get token
+  const { token } = await chrome.storage.local.get(["token"]);
+  var url = "https://accounts.google.com/o/oauth2/revoke?token=" + token;
+  fetch(url);
+
+  chrome.identity.removeCachedAuthToken({ token: token });
+  chrome.storage.local.set({ token: false });
+};
+
+const handleStopRecordingTabBackup = async (request) => {
+  chrome.storage.local.set({
+    recording: false,
+    restarting: false,
+    tabRecordedID: null,
+    memoryError: true,
+  });
+  sendMessageRecord({ type: "stop-recording-tab" });
+
+  // Get active tab
+  const { activeTab } = await chrome.storage.local.get(["activeTab"]);
+  // Check if actual tab
+  sendMessageTab(activeTab, { type: "stop-pending" });
+  focusTab(activeTab);
+};
+
+// Listen for messages
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  if (request.type === "desktop-capture") {
+    desktopCapture(request);
+  } else if (request.type === "backup-created") {
+    offscreenDocument(request.request, request.tabId);
+  } else if (request.type === "write-file") {
+    writeFile(request);
+  } else if (request.type === "handle-restart") {
+    handleRestart();
+  } else if (request.type === "handle-dismiss") {
+    handleDismiss();
+  } else if (request.type === "reset-active-tab") {
+    resetActiveTab();
+  } else if (request.type === "reset-active-tab-restart") {
+    resetActiveTabRestart();
+  } else if (request.type === "start-rec") {
+    startRecording();
+  } else if (request.type === "video-ready") {
+    videoReady();
+  } else if (request.type === "start-recording") {
+    startRecording();
+  } else if (request.type === "restarted") {
+    restartActiveTab();
+  } else if (request.type === "new-chunk") {
+    newChunk(request);
+    return true;
+  } else if (request.type === "get-streaming-data") {
+    handleGetStreamingData();
+  } else if (request.type === "cancel-recording") {
+    cancelRecording();
+  } else if (request.type === "stop-recording-tab") {
+    handleStopRecordingTab(request);
+  } else if (request.type === "restart-recording-tab") {
+    handleRestartRecordingTab();
+  } else if (request.type === "dismiss-recording-tab") {
+    handleDismissRecordingTab();
+  } else if (request.type === "pause-recording-tab") {
+    sendMessageRecord({ type: "pause-recording-tab" });
+  } else if (request.type === "resume-recording-tab") {
+    sendMessageRecord({ type: "resume-recording-tab" });
+  } else if (request.type === "set-mic-active-tab") {
+    setMicActiveTab(request);
+  } else if (request.type === "recording-error") {
+    handleRecordingError(request);
+  } else if (request.type === "on-get-permissions") {
+    handleOnGetPermissions(request);
+  } else if (request.type === "recording-complete") {
+    handleRecordingComplete();
+  } else if (request.type === "check-recording") {
+    checkRecording();
+  } else if (request.type === "review-screenity") {
+    createTab(
+      "https://chrome.google.com/webstore/detail/screenity-screen-recorder/kbbdabhdfibnancpjfhlkhafgdilcnji/reviews",
+      false,
+      true
+    );
+  } else if (request.type === "follow-twitter") {
+    createTab("https://alyssax.substack.com/", false, true);
+  } else if (request.type === "open-processing-info") {
+    createTab(
+      "https://help.screenity.io/editing-and-exporting/dJRFpGq56JFKC7k8zEvsqb/why-is-there-a-5-minute-limit-for-editing/ddy4e4TpbnrFJ8VoRT37tQ",
+      true,
+      true
+    );
+  } else if (request.type === "upgrade-info") {
+    createTab(
+      "https://help.screenity.io/getting-started/77KizPC8MHVGfpKpqdux9D/what-are-the-technical-requirements-for-using-screenity/6kdB6qru6naVD8ZLFvX3m9",
+      true,
+      true
+    );
+  } else if (request.type === "trim-info") {
+    createTab(
+      "https://help.screenity.io/editing-and-exporting/dJRFpGq56JFKC7k8zEvsqb/how-to-cut-trim-or-mute-parts-of-your-video/svNbM7YHYY717MuSWXrKXH",
+      true,
+      true
+    );
+  } else if (request.type === "join-waitlist") {
+    createTab("https://tally.so/r/npojNV", true, true);
+  } else if (request.type === "chrome-update-info") {
+    createTab(
+      "https://help.screenity.io/getting-started/77KizPC8MHVGfpKpqdux9D/what-are-the-technical-requirements-for-using-screenity/6kdB6qru6naVD8ZLFvX3m9",
+      true,
+      true
+    );
+  } else if (request.type === "set-surface") {
+    setSurface(request);
+  } else if (request.type === "pip-ended") {
+    handlePip(false);
+  } else if (request.type === "pip-started") {
+    handlePip(true);
+  } else if (request.type === "new-sandbox-page-restart") {
+    newSandboxPageRestart();
+  } else if (request.type === "sign-out-drive") {
+    handleSignOutDrive();
+  } else if (request.type === "open-help") {
+    createTab("https://help.screenity.io/", true, true);
+  } else if (request.type === "memory-limit-help") {
+    createTab(
+      "https://help.screenity.io/troubleshooting/9Jy5RGjNrBB42hqUdREQ7W/what-does-%E2%80%9Cmemory-limit-reached%E2%80%9D-mean-when-recording/8WkwHbt3puuXunYqQnyPcb",
+      true,
+      true
+    );
+  } else if (request.type === "open-home") {
+    createTab("https://screenity.io/", false, true);
+  } else if (request.type === "report-bug") {
+    createTab(
+      "https://tally.so/r/3ElpXq?version=" +
+        chrome.runtime.getManifest().version,
+      false,
+      true
+    );
+  } else if (request.type === "clear-recordings") {
+    db.collection("chunks").delete();
+  } else if (request.type === "force-processing") {
+    forceProcessing();
+  } else if (request.type === "focus-this-tab") {
+    focusTab(sender.tab.id);
+  } else if (request.type === "stop-recording-tab-backup") {
+    handleStopRecordingTabBackup(request);
+  } else if (request.type === "indexed-db-download") {
+    downloadIndexedDB();
+  } else if (request.type === "get-platform-info") {
+    getPlatformInfo(sendResponse);
+    return true;
+  } else if (request.type === "restore-recording") {
+    restoreRecording();
+  } else if (request.type === "check-restore") {
+    checkRestore(sendResponse);
+    return true;
+  } else if (request.type === "check-capture-permissions") {
+    checkCapturePermissions(sendResponse);
+    return true;
+  } else if (request.type === "is-pinned") {
+    isPinned(sendResponse);
+    return true;
+  } else if (request.type === "save-to-drive") {
+    handleSaveToDrive(sendResponse, request, false);
+    return true;
+  } else if (request.type === "save-to-drive-fallback") {
+    handleSaveToDrive(sendResponse, request, true);
     return true;
   } else if (request.type === "request-download") {
     requestDownload(request.base64, request.title);
   }
-  handleMessage(request, sender, sendResponse);
 });
 
-self.addEventListener("message", (event) => {
-  handleMessage(event.data);
-});
+// self.addEventListener("message", (event) => {
+//   handleMessage(event.data);
+// });

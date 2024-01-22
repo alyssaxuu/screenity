@@ -21,6 +21,7 @@ const ZoomContainer = () => {
   const oldTop = useRef(null);
   const oldLeft = useRef(null);
   const contentStateRef = useRef(contentState);
+  const observer = useRef(null);
 
   useEffect(() => {
     oldPosition.current = document.body.style.position;
@@ -196,21 +197,21 @@ const ZoomContainer = () => {
       document.body.appendChild(document.getElementById("screenity-ui"));
       zoomSelector.current = document.querySelector("#screenity-zoom-wrap");
 
-      const observer = new MutationObserver((mutations) => {
+      observer.current = new MutationObserver((mutations) => {
         if (!contentState.showExtension) {
           mutations.forEach((mutation) => {
             if (mutation.addedNodes.length > 0) {
               const screenityUi = document.querySelector("#screenity-ui");
               if (screenityUi) {
                 // Disconnect the observer
-                observer.disconnect();
+                observer.current.disconnect();
               }
             }
           });
         }
       });
 
-      observer.observe(document.body, {
+      observer.current.observe(document.body, {
         childList: true,
         subtree: true,
       });
@@ -218,7 +219,9 @@ const ZoomContainer = () => {
 
     return () => {
       setTimeout(() => {
-        observer.disconnect();
+        if (observer.current && typeof observer.current === "object") {
+          observer.current.disconnect();
+        }
         const zoomWrap = document.querySelector("#screenity-zoom-wrap");
         if (zoomWrap) {
           while (zoomWrap.firstChild) {
