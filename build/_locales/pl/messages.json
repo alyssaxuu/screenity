@@ -1006,5 +1006,19 @@
   "recordAudioWarningOtherDescription": {
     "message": "Aby nagrać dźwięk z komputera, upewnij się, że opcja 'Udostępnij dźwięk systemowy' jest włączona. Jeśli nie widzisz tej opcji, spróbuj zaktualizować Chrome lub przełączyć się na opcję nagrywania zakładek.",
     "description": "Opis ostrzeżenia dźwiękowego dla innych systemów"
+  },
+
+  "maxResolutionLabel": {
+    "message": "Maksymalna rozdzielczość",
+    "description": "Etykieta maksymalnej rozdzielczości w menu ustawień"
+  },
+  "maxFPSLabel": {
+    "message": "Maksymalna ilość kl./s",
+    "description": "Etykieta maksymalnej ilości kl./s w menu ustawień"
+  },
+
+  "notEnoughRAM": {
+    "message": "Za mało pamięci RAM",
+    "description": "Etykieta 'Za mało pamięci RAM' w menu ustawień"
   }
 }

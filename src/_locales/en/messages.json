@@ -1004,5 +1004,17 @@
   "recordAudioWarningOtherDescription": {
     "message": "Make sure to enable the option to 'Share system audio' if you want to record computer audio. If you don't see this option, try updating Chrome, or switch to Tab recording.",
     "description": "Other audio warning description"
+  },
+  "maxResolutionLabel": {
+    "message": "Max resolution",
+    "description": "Max resolution label in settings menu"
+  },
+  "maxFPSLabel": {
+    "message": "Max FPS",
+    "description": "Max FPS label in settings menu"
+  },
+  "notEnoughRAM": {
+    "message": "Not enough RAM",
+    "description": "Not enough RAM label in settings menu"
   }
 }

@@ -1007,5 +1007,19 @@
   "recordAudioWarningOtherDescription": {
     "message": "Pastikan Anda mengaktifkan opsi 'Bagikan audio sistem' jika Anda ingin merekam audio dari komputer. Jika Anda tidak melihat opsi ini, coba perbarui Chrome atau beralih ke opsi merekam tab.",
     "description": "Deskripsi Peringatan Audio untuk Sistem Lainnya"
+  },
+
+  "maxResolutionLabel": {
+    "message": "Resolusi Maksimum",
+    "description": "Label resolusi maksimum dalam menu pengaturan"
+  },
+  "maxFPSLabel": {
+    "message": "FPS Maksimum",
+    "description": "Label FPS maksimum dalam menu pengaturan"
+  },
+
+  "notEnoughRAM": {
+    "message": "Tidak cukup RAM",
+    "description": "Label 'Tidak cukup RAM' dalam menu pengaturan"
   }
 }

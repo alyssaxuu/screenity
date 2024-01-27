@@ -5,7 +5,9 @@ import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 
 import { MoreIconPopup } from "../../toolbar/components/SVG";
 
-import { CheckWhiteIcon } from "../../images/popup/images";
+import TooltipWrap from "../components/TooltipWrap";
+
+import { CheckWhiteIcon, DropdownGroup } from "../../images/popup/images";
 
 import JSZip from "jszip";
 
@@ -16,6 +18,9 @@ const SettingsMenu = (props) => {
   const [contentState, setContentState] = useContext(contentStateContext);
   const [restore, setRestore] = useState(false);
   const [oldChrome, setOldChrome] = useState(false);
+  const [openQuality, setOpenQuality] = useState(false);
+  const [openFPS, setOpenFPS] = useState(false);
+  const [RAM, setRAM] = useState(0);
 
   useEffect(() => {
     // Check chrome version
@@ -26,6 +31,42 @@ const SettingsMenu = (props) => {
       setOldChrome(true);
     }
   }, []);
+
+  // Check if user has enough RAM to record for each quality option
+  useEffect(() => {
+    const checkRAM = () => {
+      const ram = navigator.deviceMemory;
+
+      // Check if ramValue needs to be updated
+      if (
+        (ram < 2 && contentState.qualityValue === "720p") ||
+        contentState.qualityValue === "4k" ||
+        contentState.qualityValue === "1080p"
+      ) {
+        setContentState((prevContentState) => ({
+          ...prevContentState,
+          qualityValue: "480p",
+        }));
+        chrome.storage.local.set({
+          qualityValue: "480p",
+        });
+      } else if (
+        (ram < 8 && contentState.qualityValue === "4k") ||
+        contentState.qualityValue === "1080p"
+      ) {
+        setContentState((prevContentState) => ({
+          ...prevContentState,
+          qualityValue: "720p",
+        }));
+        chrome.storage.local.set({
+          qualityValue: "720p",
+        });
+      }
+
+      setRAM(ram);
+    };
+    checkRAM();
+  }, [contentState.qualityValue]);
 
   const handleTroubleshooting = () => {
     if (typeof contentState.openModal === "function") {
@@ -127,27 +168,220 @@ const SettingsMenu = (props) => {
         )}
       >
         <DropdownMenu.Content className="DropdownMenuContent" sideOffset={5}>
-          <DropdownMenu.CheckboxItem
-            className="DropdownMenuItem"
-            onSelect={(e) => {
-              e.preventDefault();
+          <DropdownMenu.Sub
+            open={openQuality}
+            onOpenChange={(open) => {
+              if (open) {
+                setOpenFPS(false);
+              }
+              setOpenQuality(open);
             }}
-            onCheckedChange={(checked) => {
-              setContentState((prevContentState) => ({
-                ...prevContentState,
-                quality: checked ? "max" : "min",
-              }));
-              chrome.storage.local.set({
-                quality: checked ? "max" : "min",
-              });
-            }}
-            checked={contentState.quality === "max"}
           >
-            {chrome.i18n.getMessage("highestQuality")}
-            <DropdownMenu.ItemIndicator className="ItemIndicator">
-              <img src={CheckWhiteIcon} />
-            </DropdownMenu.ItemIndicator>
-          </DropdownMenu.CheckboxItem>
+            <DropdownMenu.SubTrigger className="DropdownMenuItem">
+              {chrome.i18n.getMessage("maxResolutionLabel") +
+                " (" +
+                contentState.qualityValue +
+                ")"}
+              <div className="ItemIndicatorArrow">
+                <img src={DropdownGroup} />
+              </div>
+            </DropdownMenu.SubTrigger>
+            <DropdownMenu.Portal>
+              <DropdownMenu.SubContent
+                className="ScreenityDropdownMenuContent"
+                sideOffset={0}
+                alignOffset={-3}
+              >
+                <DropdownMenu.RadioGroup
+                  value={contentState.qualityValue}
+                  onValueChange={(value) => {
+                    setContentState((prevContentState) => ({
+                      ...prevContentState,
+                      qualityValue: value,
+                    }));
+                    chrome.storage.local.set({
+                      qualityValue: value,
+                    });
+                  }}
+                >
+                  <TooltipWrap
+                    content={
+                      RAM < 8 ? chrome.i18n.getMessage("notEnoughRAM") : ""
+                    }
+                  >
+                    <DropdownMenu.RadioItem
+                      className="ScreenityDropdownMenuItem"
+                      value="4k"
+                      disabled={RAM < 8}
+                    >
+                      4k
+                      <DropdownMenu.ItemIndicator className="ScreenityItemIndicator">
+                        <img src={CheckWhiteIcon} />
+                      </DropdownMenu.ItemIndicator>
+                    </DropdownMenu.RadioItem>
+                  </TooltipWrap>
+                  <TooltipWrap
+                    content={
+                      RAM < 4 ? chrome.i18n.getMessage("notEnoughRAM") : ""
+                    }
+                  >
+                    <DropdownMenu.RadioItem
+                      className="ScreenityDropdownMenuItem"
+                      value="1080p"
+                      disabled={RAM < 4}
+                    >
+                      1080p
+                      <DropdownMenu.ItemIndicator className="ScreenityItemIndicator">
+                        <img src={CheckWhiteIcon} />
+                      </DropdownMenu.ItemIndicator>
+                    </DropdownMenu.RadioItem>
+                  </TooltipWrap>
+                  <TooltipWrap
+                    content={
+                      RAM < 2 ? chrome.i18n.getMessage("notEnoughRAM") : ""
+                    }
+                  >
+                    <DropdownMenu.RadioItem
+                      className="ScreenityDropdownMenuItem"
+                      value="720p"
+                      disabled={RAM < 2}
+                    >
+                      720p
+                      <DropdownMenu.ItemIndicator className="ScreenityItemIndicator">
+                        <img src={CheckWhiteIcon} />
+                      </DropdownMenu.ItemIndicator>
+                    </DropdownMenu.RadioItem>
+                  </TooltipWrap>
+                  <DropdownMenu.RadioItem
+                    className="ScreenityDropdownMenuItem"
+                    value="480p"
+                  >
+                    480p
+                    <DropdownMenu.ItemIndicator className="ScreenityItemIndicator">
+                      <img src={CheckWhiteIcon} />
+                    </DropdownMenu.ItemIndicator>
+                  </DropdownMenu.RadioItem>
+                  <DropdownMenu.RadioItem
+                    className="ScreenityDropdownMenuItem"
+                    value="360p"
+                  >
+                    360p
+                    <DropdownMenu.ItemIndicator className="ScreenityItemIndicator">
+                      <img src={CheckWhiteIcon} />
+                    </DropdownMenu.ItemIndicator>
+                  </DropdownMenu.RadioItem>
+                  <DropdownMenu.RadioItem
+                    className="ScreenityDropdownMenuItem"
+                    value="240p"
+                  >
+                    240p
+                    <DropdownMenu.ItemIndicator className="ScreenityItemIndicator">
+                      <img src={CheckWhiteIcon} />
+                    </DropdownMenu.ItemIndicator>
+                  </DropdownMenu.RadioItem>
+                </DropdownMenu.RadioGroup>
+              </DropdownMenu.SubContent>
+            </DropdownMenu.Portal>
+          </DropdownMenu.Sub>
+          {/*
+          <DropdownMenu.Sub
+            open={openFPS}
+            onOpenChange={(open) => {
+              if (open) {
+                setOpenQuality(false);
+              }
+              setOpenFPS(open);
+            }}
+          >
+            <DropdownMenu.SubTrigger className="DropdownMenuItem">
+              {chrome.i18n.getMessage("maxFPSLabel") +
+                " (" +
+                contentState.fpsValue +
+                ")"}
+              <div className="ItemIndicatorArrow">
+                <img src={DropdownGroup} />
+              </div>
+            </DropdownMenu.SubTrigger>
+            <DropdownMenu.Portal>
+              <DropdownMenu.SubContent
+                className="ScreenityDropdownMenuContent"
+                sideOffset={0}
+                alignOffset={-3}
+              >
+                <DropdownMenu.RadioGroup
+                  value={contentState.fpsValue}
+                  onValueChange={(value) => {
+                    setContentState((prevContentState) => ({
+                      ...prevContentState,
+                      fpsValue: value,
+                    }));
+                    chrome.storage.local.set({
+                      fpsValue: value,
+                    });
+                  }}
+                >
+                  <DropdownMenu.RadioItem
+                    className="ScreenityDropdownMenuItem"
+                    value="60"
+                  >
+                    60
+                    <DropdownMenu.ItemIndicator className="ScreenityItemIndicator">
+                      <img src={CheckWhiteIcon} />
+                    </DropdownMenu.ItemIndicator>
+                  </DropdownMenu.RadioItem>
+                  <DropdownMenu.RadioItem
+                    className="ScreenityDropdownMenuItem"
+                    value="30"
+                  >
+                    30
+                    <DropdownMenu.ItemIndicator className="ScreenityItemIndicator">
+                      <img src={CheckWhiteIcon} />
+                    </DropdownMenu.ItemIndicator>
+                  </DropdownMenu.RadioItem>
+                  <DropdownMenu.RadioItem
+                    className="ScreenityDropdownMenuItem"
+                    value="24"
+                  >
+                    24
+                    <DropdownMenu.ItemIndicator className="ScreenityItemIndicator">
+                      <img src={CheckWhiteIcon} />
+                    </DropdownMenu.ItemIndicator>
+                  </DropdownMenu.RadioItem>
+                  <DropdownMenu.RadioItem
+                    className="ScreenityDropdownMenuItem"
+                    value="10"
+                  >
+                    10
+                    <DropdownMenu.ItemIndicator className="ScreenityItemIndicator">
+                      <img src={CheckWhiteIcon} />
+                    </DropdownMenu.ItemIndicator>
+                  </DropdownMenu.RadioItem>
+                  <DropdownMenu.RadioItem
+                    className="ScreenityDropdownMenuItem"
+                    value="5"
+                  >
+                    5
+                    <DropdownMenu.ItemIndicator className="ScreenityItemIndicator">
+                      <img src={CheckWhiteIcon} />
+                    </DropdownMenu.ItemIndicator>
+                  </DropdownMenu.RadioItem>
+                  <DropdownMenu.RadioItem
+                    className="ScreenityDropdownMenuItem"
+                    value="1"
+                  >
+                    <DropdownMenu.ItemIndicator className="ScreenityItemIndicator">
+                      <img src={CheckWhiteIcon} />
+                    </DropdownMenu.ItemIndicator>
+                    1
+                    <DropdownMenu.ItemIndicator className="ScreenityItemIndicator">
+                      <img src={CheckWhiteIcon} />
+                    </DropdownMenu.ItemIndicator>
+                  </DropdownMenu.RadioItem>
+                </DropdownMenu.RadioGroup>
+              </DropdownMenu.SubContent>
+            </DropdownMenu.Portal>
+          </DropdownMenu.Sub>
+					*/}
           <DropdownMenu.CheckboxItem
             className="DropdownMenuItem"
             onSelect={(e) => {

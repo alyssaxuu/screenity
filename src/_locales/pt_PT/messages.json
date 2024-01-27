@@ -1006,5 +1006,19 @@
   "recordAudioWarningOtherDescription": {
     "message": "Certifique-se de ativar a opção 'Partilhar áudio do sistema' se desejar gravar áudio do computador. Se não visualizar esta opção, tente atualizar o Chrome ou alternar para a gravação de guias.",
     "description": "Descrição do Aviso de Áudio para Outros Sistemas"
+  },
+
+  "maxResolutionLabel": {
+    "message": "Resolução máxima",
+    "description": "Etiqueta de resolução máxima no menu de configurações"
+  },
+  "maxFPSLabel": {
+    "message": "Máximo de FPS",
+    "description": "Etiqueta de máximo de FPS no menu de configurações"
+  },
+
+  "notEnoughRAM": {
+    "message": "Memória RAM insuficiente",
+    "description": "Etiqueta de memória RAM insuficiente no menu de configurações"
   }
 }

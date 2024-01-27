@@ -1006,5 +1006,19 @@
   "recordAudioWarningOtherDescription": {
     "message": "컴퓨터 오디오를 녹음하려면 '시스템 오디오 공유' 옵션을 활성화하세요. 이 옵션을 보지 못하는 경우 Chrome을 업데이트하거나 탭 녹음 옵션으로 전환해 보세요.",
     "description": "기타 시스템용 오디오 경고 설명"
+  },
+
+  "maxResolutionLabel": {
+    "message": "최대 해상도",
+    "description": "설정 메뉴에서 최대 해상도 레이블"
+  },
+  "maxFPSLabel": {
+    "message": "최대 FPS",
+    "description": "설정 메뉴에서 최대 FPS 레이블"
+  },
+
+  "notEnoughRAM": {
+    "message": "RAM 부족",
+    "description": "설정 메뉴에서 'RAM 부족' 라벨"
   }
 }

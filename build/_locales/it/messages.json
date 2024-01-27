@@ -992,5 +992,19 @@
   "recordAudioWarningOtherDescription": {
     "message": "Assicurati di attivare l'opzione 'Condividi l'audio del sistema' se desideri registrare l'audio del computer. Se non vedi questa opzione, prova a aggiornare Chrome o passa alla registrazione della scheda.",
     "description": "Descrizione dell'avviso audio per altri sistemi"
+  },
+
+  "maxResolutionLabel": {
+    "message": "Risoluzione massima",
+    "description": "Etichetta risoluzione massima nel menu delle impostazioni"
+  },
+  "maxFPSLabel": {
+    "message": "FPS massimi",
+    "description": "Etichetta FPS massimi nel menu delle impostazioni"
+  },
+
+  "notEnoughRAM": {
+    "message": "RAM insufficiente",
+    "description": "Etichetta 'RAM insufficiente' nel menu delle impostazioni"
   }
 }

@@ -5,9 +5,9 @@
   min-width: 200px;
   background-color: white;
   margin-top: 4px;
-  margin-right: 18px;
-  padding-top: 8px;
-  padding-bottom: 8px;
+  margin-right: 8px;
+  padding-top: 12px;
+  padding-bottom: 12px;
   border-radius: 15px;
   z-index: 99999;
   font-family: $font-medium;
@@ -34,7 +34,8 @@
 .DropdownMenuSubContent[data-side="left"] {
   animation-name: slideRightAndFade;
 }
-.ItemIndicator {
+.ItemIndicator,
+.ItemIndicatorArrow {
   position: absolute;
   right: $spacing-04;
   width: 18px;
@@ -44,6 +45,9 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
+}
+.ItemIndicatorArrow {
+  background: transparent !important;
 }
 
 .DropdownMenuItem,

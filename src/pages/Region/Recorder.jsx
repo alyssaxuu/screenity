@@ -14,8 +14,11 @@ const Recorder = () => {
   const isRestarting = useRef(false);
   const isDismissing = useRef(false);
   const isFinishing = useRef(false);
+  const isFinished = useRef(false);
   const sentLast = useRef(false);
   const index = useRef(0);
+  const lastTimecode = useRef(0);
+  const hasChunks = useRef(false);
 
   // Main stream (recording)
   const liveStream = useRef(null);
@@ -76,13 +79,31 @@ const Recorder = () => {
     navigator.storage.persist();
     isFinishing.current = false;
     sentLast.current = false;
+    lastTimecode.current = 0;
+    hasChunks.current = 0;
+    isFinished.current = false;
     // Check if the stream actually has data in it
-    if (helperVideoStream.current.getVideoTracks().length === 0) {
+    try {
+      if (helperVideoStream.current.getVideoTracks().length === 0) {
+        chrome.runtime.sendMessage({
+          type: "recording-error",
+          error: "stream-error",
+          why: "No video tracks available",
+        });
+
+        // Reload this iframe
+        window.location.reload();
+        return;
+      }
+    } catch (err) {
       chrome.runtime.sendMessage({
         type: "recording-error",
         error: "stream-error",
-        why: "No video tracks available",
+        why: JSON.stringify(err),
       });
+
+      // Reload this iframe
+      window.location.reload();
       return;
     }
 
@@ -90,13 +111,74 @@ const Recorder = () => {
     await db.collection("chunks").delete();
 
     try {
-      recorder.current = new MediaRecorder(liveStream.current);
+      const { qualityValue } = await chrome.storage.local.get(["qualityValue"]);
+
+      let audioBitsPerSecond = 128000;
+      let videoBitsPerSecond = 5000000;
+
+      if (qualityValue === "4k") {
+        audioBitsPerSecond = 192000;
+        videoBitsPerSecond = 40000000;
+      } else if (qualityValue === "1080p") {
+        audioBitsPerSecond = 192000;
+        videoBitsPerSecond = 8000000;
+      } else if (qualityValue === "720p") {
+        audioBitsPerSecond = 128000;
+        videoBitsPerSecond = 5000000;
+      } else if (qualityValue === "480p") {
+        audioBitsPerSecond = 96000;
+        videoBitsPerSecond = 2500000;
+      } else if (qualityValue === "360p") {
+        audioBitsPerSecond = 96000;
+        videoBitsPerSecond = 1000000;
+      } else if (qualityValue === "240p") {
+        audioBitsPerSecond = 64000;
+        videoBitsPerSecond = 500000;
+      }
+
+      // List all mimeTypes
+      const mimeTypes = [
+        "video/webm;codecs=avc1",
+        "video/webm;codecs=vp8,opus",
+        "video/webm;codecs=vp9,opus",
+        "video/webm;codecs=vp9",
+        "video/webm;codecs=vp8",
+        "video/webm;codecs=h264",
+        "video/webm",
+      ];
+
+      // Check if the browser supports any of the mimeTypes, make sure to select the first one that is supported from the list
+      let mimeType = mimeTypes.find((mimeType) =>
+        MediaRecorder.isTypeSupported(mimeType)
+      );
+
+      // If no mimeType is supported, throw an error
+      if (!mimeType) {
+        chrome.runtime.sendMessage({
+          type: "recording-error",
+          error: "stream-error",
+          why: "No supported mimeTypes available",
+        });
+
+        // Reload this iframe
+        window.location.reload();
+        return;
+      }
+
+      recorder.current = new MediaRecorder(liveStream.current, {
+        mimeType: mimeType,
+        audioBitsPerSecond: audioBitsPerSecond,
+        videoBitsPerSecond: videoBitsPerSecond,
+      });
     } catch (err) {
       chrome.runtime.sendMessage({
         type: "recording-error",
         error: "stream-error",
         why: JSON.stringify(err),
       });
+
+      // Reload this iframe
+      window.location.reload();
       return;
     }
 
@@ -112,21 +194,7 @@ const Recorder = () => {
 
     // I don't know what the ideal chunk size should be here
     try {
-      chrome.storage.local.get(["quality"], (result) => {
-        // I don't know what the ideal chunk size should be here
-        if (result.quality === "max") {
-          recorder.current.start(3000, {
-            mimeType: "video/webm; codecs=vp8,opus",
-            // vp8, opus ?
-          });
-        } else {
-          recorder.current.start(3000, {
-            videoBitsPerSecond: 1000,
-            mimeType: "video/webm; codecs=vp8,opus",
-            // vp8, opus ?
-          });
-        }
-      });
+      recorder.current.start(3000);
     } catch (err) {
       chrome.storage.local.set({
         recording: false,
@@ -135,6 +203,9 @@ const Recorder = () => {
         memoryError: true,
       });
       chrome.runtime.sendMessage({ type: "stop-recording-tab" });
+
+      // Reload this iframe
+      window.location.reload();
       return;
     }
 
@@ -144,8 +215,14 @@ const Recorder = () => {
       if (!isDismissing.current) {
         setTimeout(() => {
           if (!sentLast.current) {
+            isFinished.current = true;
             chrome.runtime.sendMessage({ type: "video-ready" });
             isFinishing.current = false;
+            lastTimecode.current = 0;
+            hasChunks.current = 0;
+
+            // Reload this iframe
+            window.location.reload();
           }
         }, 3000);
       } else {
@@ -166,6 +243,9 @@ const Recorder = () => {
               memoryError: true,
             });
             chrome.runtime.sendMessage({ type: "stop-recording-tab" });
+
+            // Reload this iframe
+            window.location.reload();
           }
         });
       } catch (err) {
@@ -174,31 +254,35 @@ const Recorder = () => {
           error: "stream-error",
           why: JSON.stringify(err),
         });
+
+        // Reload this iframe
+        window.location.reload();
       }
     };
 
-    const handleDataAvailable = (e) => {
+    const handleDataAvailable = async (e) => {
       if (isRestarting.current) return;
+      if (isDismissing.current) return;
+      if (isFinished.current) return;
       checkMaxMemory();
 
       if (e.data.size > 0) {
         try {
-          const timestamp = Date.now();
-          db.collection("chunks")
-            .add({
-              index: index.current,
-              chunk: e.data,
-              timestamp: timestamp,
-            })
-            .catch((err) => {
-              chrome.storage.local.set({
-                recording: false,
-                restarting: false,
-                tabRecordedID: null,
-                memoryError: true,
-              });
-              chrome.runtime.sendMessage({ type: "stop-recording-tab" });
-            });
+          const timestamp = e.timecode;
+          if (hasChunks.current === false) {
+            hasChunks.current = true;
+            lastTimecode.current = timestamp;
+          } else if (timestamp < lastTimecode.current) {
+            // This is a duplicate chunk, ignore it
+            return;
+          } else {
+            lastTimecode.current = timestamp;
+          }
+          await db.collection("chunks").add({
+            index: index.current,
+            chunk: e.data,
+            timestamp: timestamp,
+          });
           if (backupRef.current) {
             chrome.runtime.sendMessage({
               type: "write-file",
@@ -214,10 +298,26 @@ const Recorder = () => {
             memoryError: true,
           });
           chrome.runtime.sendMessage({ type: "stop-recording-tab" });
+
+          // Reload this iframe
+          window.location.reload();
         }
       } else {
         // Check media recorder state
-        if (recorder.current.state === "inactive") {
+        try {
+          if (recorder.current.state === "inactive") {
+            chrome.storage.local.set({
+              recording: false,
+              restarting: false,
+              tabRecordedID: null,
+              memoryError: true,
+            });
+            chrome.runtime.sendMessage({ type: "stop-recording-tab" });
+
+            // Reload this iframe
+            window.location.reload();
+          }
+        } catch (err) {
           chrome.storage.local.set({
             recording: false,
             restarting: false,
@@ -225,17 +325,26 @@ const Recorder = () => {
             memoryError: true,
           });
           chrome.runtime.sendMessage({ type: "stop-recording-tab" });
+
+          // Reload this iframe
+          window.location.reload();
         }
       }
 
       if (isFinishing.current) {
+        isFinished.current = true;
         sentLast.current = true;
         chrome.runtime.sendMessage({ type: "video-ready" });
+        lastTimecode.current = 0;
+        hasChunks.current = 0;
+
+        // Reload this iframe
+        window.location.reload();
       }
     };
 
     recorder.current.ondataavailable = async (e) => {
-      handleDataAvailable(e);
+      await handleDataAvailable(e);
     };
 
     liveStream.current.getVideoTracks()[0].onended = () => {
@@ -286,8 +395,6 @@ const Recorder = () => {
       });
       helperAudioStream.current = null;
     }
-
-    await db.collection("chunks").orderBy("timestamp").get();
   }
 
   const dismissRecording = async () => {
@@ -381,13 +488,53 @@ const Recorder = () => {
 
   async function startStreaming(data) {
     try {
+      // Get quality value
+      const { qualityValue } = await chrome.storage.local.get(["qualityValue"]);
+
+      let width = 1920;
+      let height = 1080;
+
+      if (qualityValue === "4k") {
+        width = 4096;
+        height = 2160;
+      } else if (qualityValue === "1080p") {
+        width = 1920;
+        height = 1080;
+      } else if (qualityValue === "720p") {
+        width = 1280;
+        height = 720;
+      } else if (qualityValue === "480p") {
+        width = 854;
+        height = 480;
+      } else if (qualityValue === "360p") {
+        width = 640;
+        height = 360;
+      } else if (qualityValue === "240p") {
+        width = 426;
+        height = 240;
+      }
+
+      const { fpsValue } = await chrome.storage.local.get(["fpsValue"]);
+      let fps = parseInt(fpsValue);
+
+      // Check if fps is a number
+      if (isNaN(fps)) {
+        fps = 30;
+      }
+
       let stream;
 
       const constraints = {
         preferCurrentTab: true,
         audio: data.systemAudio,
         video: {
-          frameRate: 30,
+          frameRate: fps,
+          width: {
+            ideal: width,
+          },
+          height: {
+            ideal: height,
+          },
         },
       };
       stream = await navigator.mediaDevices.getDisplayMedia(constraints);
@@ -451,9 +598,30 @@ const Recorder = () => {
         );
       }
 
-      if (target.current) {
-        const track = liveStream.current.getVideoTracks()[0];
-        await track.cropTo(target.current);
+      try {
+        if (target.current) {
+          const track = liveStream.current.getVideoTracks()[0];
+          await track.cropTo(target.current);
+        } else {
+          // No target
+          chrome.runtime.sendMessage({
+            type: "recording-error",
+            error: "cancel-modal",
+            why: "No target",
+          });
+
+          // Reload this iframe
+          window.location.reload();
+        }
+      } catch (err) {
+        chrome.runtime.sendMessage({
+          type: "recording-error",
+          error: "cancel-modal",
+          why: JSON.stringify(err),
+        });
+
+        // Reload this iframe
+        window.location.reload();
       }
 
       // Send message to go back to the previously active tab
@@ -464,6 +632,9 @@ const Recorder = () => {
         error: "cancel-modal",
         why: JSON.stringify(err),
       });
+
+      // Reload this iframe
+      window.location.reload();
     }
   }
 
@@ -507,6 +678,7 @@ const Recorder = () => {
         startRecording();
       }
     } else if (request.type === "stop-recording-tab") {
+      if (isFinishing.current) return;
       stopRecording();
     } else if (request.type === "set-mic-active-tab") {
       setMic(request);

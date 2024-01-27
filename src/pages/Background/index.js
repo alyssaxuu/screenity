@@ -361,7 +361,7 @@ const handleChunks = async (chunks, override = false) => {
     sendMessageTab(sandboxTab, { type: "make-video-tab", override: override });
     return;
   }
-
+  let lastTimestamp = 0;
   const batchSize = 10; // Number of chunks to send in each batch
   const chunksCount = chunks.length;
   let currentIndex = 0;
@@ -381,6 +381,12 @@ const handleChunks = async (chunks, override = false) => {
       const chunk = chunks[i];
       const chunkData = chunk.chunk;
       const index = chunk.index;
+
+      // Check if timestamp is higher than lastTimestamp
+      if (chunk.timestamp < lastTimestamp) {
+        continue;
+      }
+      lastTimestamp = chunk.timestamp;
       try {
         const base64 = await blobToBase64(chunkData);
         if (base64) {
@@ -444,6 +450,16 @@ const handleChunks = async (chunks, override = false) => {
           }
         }
       );
+    } else {
+      currentIndex += batchSize;
+      if (currentIndex < chunksCount) {
+        sendNextBatch();
+      } else {
+        chrome.tabs.sendMessage(sandboxTab, {
+          type: "make-video-tab",
+          override: override,
+        });
+      }
     }
   };
 
@@ -931,7 +947,8 @@ const offscreenDocument = async (request, tabId = null) => {
         chrome.tabs.update(tabId, { active: true });
       }
 
-      const { quality } = await chrome.storage.local.get(["quality"]);
+      const { qualityValue } = await chrome.storage.local.get(["qualityValue"]);
+      const { fpsValue } = await chrome.storage.local.get(["fpsValue"]);
 
       // also add && !request.camera above if works
       const existingContexts = await chrome.runtime.getContexts({});
@@ -961,7 +978,8 @@ const offscreenDocument = async (request, tabId = null) => {
         type: "loaded",
         request: request,
         isTab: false,
-        quality: quality,
+        quality: qualityValue,
+        fps: fpsValue,
         backup: backup,
       });
     } catch (error) {
@@ -1439,7 +1457,13 @@ const handleSaveToDrive = (sendResponse, request, fallback = false) => {
       .then((chunks) => {
         // Build the video from chunks
         let array = [];
+        let lastTimestamp = 0;
         for (const chunk of chunks) {
+          // Check if chunk timestamp is smaller than last timestamp, if so, skip
+          if (chunk.timestamp < lastTimestamp) {
+            continue;
+          }
+          lastTimestamp = chunk.timestamp;
           array.push(chunk.chunk);
         }
         const blob = new Blob(array, { type: "video/webm" });
@@ -1491,10 +1515,9 @@ const writeFile = async (request) => {
 };
 
 const videoReady = async () => {
-  // Need to add to stop recording code properly
   const { backupTab } = await chrome.storage.local.get(["backupTab"]);
   if (backupTab) {
-    sendMessageTab(backupTab, { type: "video-ready" });
+    sendMessageTab(backupTab, { type: "close-writable" });
   }
   stopRecording();
 };
@@ -1518,6 +1541,7 @@ const handleGetStreamingData = async () => {
 const cancelRecording = async () => {
   chrome.action.setIcon({ path: "assets/icon-34.png" });
   const { activeTab } = await chrome.storage.local.get(["activeTab"]);
+  sendMessageTab(activeTab, { type: "stop-pending" });
   focusTab(activeTab);
   discardOffscreenDocuments();
 };
@@ -1560,6 +1584,7 @@ const handleRecordingError = async (request) => {
   const { activeTab } = await chrome.storage.local.get(["activeTab"]);
 
   sendMessageRecord({ type: "recording-error" }).then(() => {
+    sendMessageTab(activeTab, { type: "stop-pending" });
     focusTab(activeTab);
     if (request.error === "stream-error") {
       sendMessageTab(activeTab, { type: "stream-error" });
@@ -1659,6 +1684,7 @@ const handleStopRecordingTabBackup = async (request) => {
 
 // Listen for messages
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  console.log(request);
   if (request.type === "desktop-capture") {
     desktopCapture(request);
   } else if (request.type === "backup-created") {

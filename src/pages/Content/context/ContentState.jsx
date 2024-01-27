@@ -638,6 +638,8 @@ const ContentState = (props) => {
     backup: false,
     backupSetup: false,
     openWarning: false,
+    qualityValue: "720p",
+    fpsValue: "30",
   });
   contentStateRef.current = contentState;
 
@@ -970,6 +972,40 @@ const ContentState = (props) => {
     });
   }, [contentState.pendingRecording]);
 
+  // Check if user has enough RAM to record for each quality option
+  useEffect(() => {
+    const checkRAM = () => {
+      const ram = navigator.deviceMemory;
+
+      // Check if ramValue needs to be updated
+      if (
+        (ram < 2 && contentState.qualityValue === "720p") ||
+        contentState.qualityValue === "4k" ||
+        contentState.qualityValue === "1080p"
+      ) {
+        setContentState((prevContentState) => ({
+          ...prevContentState,
+          qualityValue: "480p",
+        }));
+        chrome.storage.local.set({
+          qualityValue: "480p",
+        });
+      } else if (
+        (ram < 8 && contentState.qualityValue === "4k") ||
+        contentState.qualityValue === "1080p"
+      ) {
+        setContentState((prevContentState) => ({
+          ...prevContentState,
+          qualityValue: "720p",
+        }));
+        chrome.storage.local.set({
+          qualityValue: "720p",
+        });
+      }
+    };
+    checkRAM();
+  }, [contentState.qualityValue]);
+
   // Check recording start time
   useEffect(() => {
     chrome.storage.local.get(["recordingStartTime"], (result) => {
@@ -1199,6 +1235,8 @@ const ContentState = (props) => {
         "systemAudio",
         "backup",
         "backupSetup",
+        "qualityValue",
+        "fpsValue",
       ],
       (result) => {
         setContentState((prevContentState) => ({
@@ -1388,6 +1426,14 @@ const ContentState = (props) => {
             result.backupSetup !== undefined && result.backupSetup !== null
               ? result.backupSetup
               : prevContentState.backupSetup,
+          qualityValue:
+            result.qualityValue !== undefined && result.qualityValue !== null
+              ? result.qualityValue
+              : prevContentState.qualityValue,
+          fpsValue:
+            result.fpsValue !== undefined && result.fpsValue !== null
+              ? result.fpsValue
+              : prevContentState.fpsValue,
         }));
 
         if (result.systemAudio === undefined || result.systemAudio === null) {

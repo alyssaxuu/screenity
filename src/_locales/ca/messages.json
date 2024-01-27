@@ -1006,5 +1006,19 @@
   "recordAudioWarningOtherDescription": {
     "message": "Assegureu-vos d'activar l'opció 'Comparteix l'audio del sistema' si voleu enregistrar l'audio de l'ordinador. Si no veieu aquesta opció, proveu d'actualitzar Chrome o canviar a l'opció d'enregistrament de pestanyes.",
     "description": "Descripció d'avís d'àudio per a altres sistemes"
+  },
+
+  "maxResolutionLabel": {
+    "message": "Resolució màxima",
+    "description": "Etiqueta de resolució màxima al menú de configuració"
+  },
+  "maxFPSLabel": {
+    "message": "FPS màxims",
+    "description": "Etiqueta de FPS màxims al menú de configuració"
+  },
+
+  "notEnoughRAM": {
+    "message": "No hi ha prou RAM",
+    "description": "Etiqueta 'No hi ha prou RAM' al menú de configuració"
   }
 }

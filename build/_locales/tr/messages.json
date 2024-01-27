@@ -1006,5 +1006,19 @@
   "recordAudioWarningOtherDescription": {
     "message": "Bilgisayar sesini kaydetmek istiyorsanız, 'Sistem Sesini Paylaş' seçeneğinin etkin olduğundan emin olun. Bu seçeneği görmüyorsanız, Chrome'u güncellemeyi deneyin veya sekme kaydı seçeneğine geçin.",
     "description": "Diğer Sistemler İçin Ses Uyarı Açıklaması"
+  },
+
+  "maxResolutionLabel": {
+    "message": "Maksimum çözünürlük",
+    "description": "Ayarlar menüsündeki maksimum çözünürlük etiketi"
+  },
+  "maxFPSLabel": {
+    "message": "Maksimum FPS",
+    "description": "Ayarlar menüsündeki maksimum FPS etiketi"
+  },
+
+  "notEnoughRAM": {
+    "message": "Yetersiz RAM",
+    "description": "Ayarlar menüsünde yetersiz RAM etiketi"
   }
 }

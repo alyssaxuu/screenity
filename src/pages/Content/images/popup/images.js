@@ -39,6 +39,7 @@ const CameraTabIconOn = `${URL}/camera-tab-icon-on.svg`;
 const CameraTabIconOff = `${URL}/camera-tab-icon-off.svg`;
 const CameraOffBlue = `${URL}/camera-off-blue.svg`;
 const MicOffBlue = `${URL}/mic-off-blue.svg`;
+const DropdownGroup = `${URL}/dropdown-group.svg`;
 
 export {
   DropdownIcon,
@@ -78,4 +79,5 @@ export {
   CameraTabIconOff,
   CameraOffBlue,
   MicOffBlue,
+  DropdownGroup,
 };

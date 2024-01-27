@@ -1007,5 +1007,19 @@
   "recordAudioWarningOtherDescription": {
     "message": "Assurez-vous d'activer l'option 'Partager l'audio du système' si vous souhaitez enregistrer l'audio de l'ordinateur. Si vous ne voyez pas cette option, essayez de mettre à jour Chrome ou basculez vers l'enregistrement de l'onglet.",
     "description": "Description de l'avertissement audio pour d'autres systèmes"
+  },
+
+  "maxResolutionLabel": {
+    "message": "Résolution maximale",
+    "description": "Étiquette de résolution maximale dans le menu des paramètres"
+  },
+  "maxFPSLabel": {
+    "message": "FPS maximum",
+    "description": "Étiquette de FPS maximum dans le menu des paramètres"
+  },
+
+  "notEnoughRAM": {
+    "message": "Pas assez de RAM",
+    "description": "Étiquette 'Pas assez de RAM' dans le menu des paramètres"
   }
 }

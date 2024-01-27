@@ -52,7 +52,12 @@ const Download = () => {
         .get()
         .then((chunks) => {
           const chunkArray = [];
+          let lastTimestamp = 0;
           for (const chunk of chunks) {
+            if (chunk.timestamp < lastTimestamp) {
+              continue;
+            }
+            lastTimestamp = chunk.timestamp;
             chunkArray.push(chunk.chunk);
           }
           const blob = new Blob(chunkArray, { type: "video/webm" });

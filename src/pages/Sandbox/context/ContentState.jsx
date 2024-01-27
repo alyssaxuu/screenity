@@ -15,6 +15,7 @@ export const ContentStateContext = createContext();
 const ContentState = (props) => {
   const videoChunks = useRef([]);
   const makeVideoCheck = useRef(false);
+  const chunkCount = useRef(0);
 
   const defaultState = {
     time: 0,
@@ -352,8 +353,16 @@ const ContentState = (props) => {
     }
   };
 
+  useEffect(() => {
+    chunkCount.current = contentState.chunkCount;
+  }, [contentState.chunkCount]);
+
   const handleBatch = async (chunks, sendResponse) => {
     for (const chunk of chunks) {
+      // Check if too many chunks have been received
+      if (contentState.chunkIndex >= chunkCount.current) {
+        return;
+      }
       const chunkData = base64ToUint8Array(chunk.chunk);
       videoChunks.current.push(chunkData);
       setContentState((prevState) => ({

@@ -9,6 +9,8 @@ const RecorderOffscreen = () => {
   const isFinishing = useRef(false);
   const sentLast = useRef(false);
   const index = useRef(0);
+  const lastTimecode = useRef(0);
+  const hasChunks = useRef(false);
 
   const [started, setStarted] = useState(false);
 
@@ -31,7 +33,8 @@ const RecorderOffscreen = () => {
 
   const isTab = useRef(false);
   const tabID = useRef(null);
-  const quality = useRef("max");
+  const quality = useRef("1080p");
+  const fps = useRef(30);
   const backupRef = useRef(false);
 
   async function startRecording() {
@@ -51,8 +54,66 @@ const RecorderOffscreen = () => {
     // Clear chunks collection
     await db.collection("chunks").delete();
 
+    lastTimecode.current = 0;
+    hasChunks.current = 0;
+
     try {
-      recorder.current = new MediaRecorder(liveStream.current);
+      const qualityValue = quality.current;
+
+      let audioBitsPerSecond = 128000;
+      let videoBitsPerSecond = 5000000;
+
+      if (qualityValue === "4k") {
+        audioBitsPerSecond = 192000;
+        videoBitsPerSecond = 40000000;
+      } else if (qualityValue === "1080p") {
+        audioBitsPerSecond = 192000;
+        videoBitsPerSecond = 8000000;
+      } else if (qualityValue === "720p") {
+        audioBitsPerSecond = 128000;
+        videoBitsPerSecond = 5000000;
+      } else if (qualityValue === "480p") {
+        audioBitsPerSecond = 96000;
+        videoBitsPerSecond = 2500000;
+      } else if (qualityValue === "360p") {
+        audioBitsPerSecond = 96000;
+        videoBitsPerSecond = 1000000;
+      } else if (qualityValue === "240p") {
+        audioBitsPerSecond = 64000;
+        videoBitsPerSecond = 500000;
+      }
+
+      // List all mimeTypes
+      const mimeTypes = [
+        "video/webm;codecs=avc1",
+        "video/webm;codecs=vp8,opus",
+        "video/webm;codecs=vp9,opus",
+        "video/webm;codecs=vp9",
+        "video/webm;codecs=vp8",
+        "video/webm;codecs=h264",
+        "video/webm",
+      ];
+
+      // Check if the browser supports any of the mimeTypes, make sure to select the first one that is supported from the list
+      let mimeType = mimeTypes.find((mimeType) =>
+        MediaRecorder.isTypeSupported(mimeType)
+      );
+
+      // If no mimeType is supported, throw an error
+      if (!mimeType) {
+        chrome.runtime.sendMessage({
+          type: "recording-error",
+          error: "stream-error",
+          why: "No supported mimeTypes available",
+        });
+        return;
+      }
+
+      recorder.current = new MediaRecorder(liveStream.current, {
+        mimeType: mimeType,
+        audioBitsPerSecond: audioBitsPerSecond,
+        videoBitsPerSecond: videoBitsPerSecond,
+      });
     } catch (err) {
       chrome.runtime.sendMessage({
         type: "recording-error",
@@ -67,17 +128,7 @@ const RecorderOffscreen = () => {
 
     // I don't know what the ideal chunk size should be here
     try {
-      // I don't know what the ideal chunk size should be here
-      if (quality.current === "max") {
-        recorder.current.start(3000, {
-          mimeType: "video/webm; codecs=vp8,opus",
-        });
-      } else {
-        recorder.current.start(3000, {
-          videoBitsPerSecond: 1000,
-          mimeType: "video/webm; codecs=vp8,opus",
-        });
-      }
+      recorder.current.start(3000);
     } catch (err) {
       chrome.runtime.sendMessage({
         type: "recording-error",
@@ -121,24 +172,26 @@ const RecorderOffscreen = () => {
       }
     };
 
-    const handleDataAvailable = (e) => {
+    const handleDataAvailable = async (e) => {
       checkMaxMemory();
 
       if (e.data.size > 0) {
         try {
-          const timestamp = Date.now();
-          db.collection("chunks")
-            .add({
-              index: index.current,
-              chunk: e.data,
-              timestamp: timestamp,
-            })
-            .catch((err) => {
-              chrome.runtime.sendMessage({
-                type: "stop-recording-tab",
-                memoryError: true,
-              });
-            });
+          const timestamp = e.timecode;
+          if (hasChunks.current === false) {
+            hasChunks.current = true;
+            lastTimecode.current = timestamp;
+          } else if (timestamp < lastTimecode.current) {
+            // This is a duplicate chunk, ignore it
+            return;
+          } else {
+            lastTimecode.current = timestamp;
+          }
+          await db.collection("chunks").add({
+            index: index.current,
+            chunk: e.data,
+            timestamp: timestamp,
+          });
 
           if (backupRef.current) {
             chrome.runtime.sendMessage({
@@ -170,7 +223,7 @@ const RecorderOffscreen = () => {
     };
 
     recorder.current.ondataavailable = async (e) => {
-      handleDataAvailable(e);
+      await handleDataAvailable(e);
     };
 
     liveStream.current.getVideoTracks()[0].onended = () => {
@@ -276,6 +329,39 @@ const RecorderOffscreen = () => {
   }
 
   async function startStreaming(data) {
+    // Get quality value
+    const qualityValue = quality.current;
+
+    let width = 1920;
+    let height = 1080;
+
+    if (qualityValue === "4k") {
+      width = 4096;
+      height = 2160;
+    } else if (qualityValue === "1080p") {
+      width = 1920;
+      height = 1080;
+    } else if (qualityValue === "720p") {
+      width = 1280;
+      height = 720;
+    } else if (qualityValue === "480p") {
+      width = 854;
+      height = 480;
+    } else if (qualityValue === "360p") {
+      width = 640;
+      height = 360;
+    } else if (qualityValue === "240p") {
+      width = 426;
+      height = 240;
+    }
+
+    const fpsValue = fps.current;
+    let fpsVal = parseInt(fpsValue);
+
+    // Check if fps is a number
+    if (isNaN(fps)) {
+      fpsVal = 30;
+    }
     // Check user permissions for camera and microphone individually
     const permissions = await navigator.permissions.query({
       name: "camera",
@@ -291,6 +377,15 @@ const RecorderOffscreen = () => {
         },
         video: {
           deviceId: data.defaultVideoInput,
+          width: {
+            ideal: width,
+          },
+          height: {
+            ideal: height,
+          },
+          frameRate: {
+            ideal: fpsVal,
+          },
         },
       };
       if (permissions.state === "denied") {
@@ -334,9 +429,22 @@ const RecorderOffscreen = () => {
               mandatory: {
                 chromeMediaSource: "tab",
                 chromeMediaSourceId: tabID.current,
+                minWidth: width,
+                minHeight: height,
+                minFrameRate: fps,
               },
             },
           });
+
+          // Check if the stream actually has data in it
+          if (stream.getVideoTracks().length === 0) {
+            chrome.runtime.sendMessage({
+              type: "recording-error",
+              error: "stream-error",
+              why: "No video tracks available",
+            });
+            return;
+          }
         } else {
           stream = await navigator.mediaDevices.getDisplayMedia({
             audio: data.systemAudio,
@@ -347,6 +455,16 @@ const RecorderOffscreen = () => {
             selfBrowserSurface: "exclude",
             systemAudio: "include",
           });
+
+          // Check if the stream actually has data in it
+          if (stream.getVideoTracks().length === 0) {
+            chrome.runtime.sendMessage({
+              type: "recording-error",
+              error: "stream-error",
+              why: "No video tracks available",
+            });
+            return;
+          }
         }
         helperVideoStream.current = stream;
 
@@ -431,6 +549,7 @@ const RecorderOffscreen = () => {
       backupRef.current = request.backup;
       isTab.current = request.isTab;
       quality.current = request.quality;
+      fps.current = request.fps;
       if (request.isTab) {
         tabID.current = request.tabID;
       }

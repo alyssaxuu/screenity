@@ -1002,5 +1002,18 @@
   "recordAudioWarningOtherDescription": {
     "message": "如果您想录制计算机音频，请确保启用'共享系统音频'选项。如果您看不到此选项，请尝试更新Chrome或切换到选项卡录制选项。",
     "description": "其他系统音频警告说明"
+  },
+  "maxResolutionLabel": {
+    "message": "最高分辨率",
+    "description": "设置菜单中的最高分辨率标签"
+  },
+  "maxFPSLabel": {
+    "message": "最高帧率",
+    "description": "设置菜单中的最高帧率标签"
+  },
+
+  "notEnoughRAM": {
+    "message": "内存不足",
+    "description": "设置菜单中的内存不足标签"
   }
 }

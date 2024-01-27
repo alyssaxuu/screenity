@@ -1802,9 +1802,9 @@ body {
   min-width: 200px;
   background-color: white;
   margin-top: 4px;
-  margin-right: 18px;
-  padding-top: 8px;
-  padding-bottom: 8px;
+  margin-right: 8px;
+  padding-top: 12px;
+  padding-bottom: 12px;
   border-radius: 15px;
   z-index: 99999;
   font-family: "Satoshi-Medium", sans-serif;
@@ -1835,7 +1835,8 @@ body {
   animation-name: slideRightAndFade;
 }
 
-.ItemIndicator {
+.ItemIndicator,
+.ItemIndicatorArrow {
   position: absolute;
   right: 12px;
   width: 18px;
@@ -1845,6 +1846,10 @@ body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+}
+
+.ItemIndicatorArrow {
+  background: transparent !important;
 }
 
 .DropdownMenuItem,
@@ -3063,6 +3068,104 @@ button {
   -webkit-user-select: none;
      -moz-user-select: none;
           user-select: none;
+}
+
+.TooltipContent {
+  border-radius: 30px;
+  background-color: #29292F;
+  padding: 10px 15px;
+  font-size: 12px;
+  line-height: 1;
+  font-family: "Satoshi-Medium", sans-serif;
+  z-index: 99999999 !important;
+  color: #FFF;
+  box-shadow: hsla(206, 22%, 7%, 0.35) 0px 10px 38px -10px, hsla(206, 22%, 7%, 0.2) 0px 10px 20px -15px;
+  -webkit-user-select: none;
+     -moz-user-select: none;
+          user-select: none;
+  transition: opacity 0.3 ease-in-out !important;
+  will-change: transform, opacity;
+  animation-duration: 400ms;
+  animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: transform, opacity;
+}
+
+.hide-tooltip {
+  display: none !important;
+}
+
+.tooltip-tall {
+  margin-bottom: 20px;
+}
+
+.tooltip-small {
+  margin-bottom: 5px;
+}
+
+.TooltipContent[data-state=delayed-open][data-side=top] {
+  animation-name: slideDownAndFade;
+}
+
+.TooltipContent[data-state=delayed-open][data-side=right] {
+  animation-name: slideLeftAndFade;
+}
+
+.TooltipContent[data-state=delayed-open][data-side=bottom] {
+  animation-name: slideUpAndFade;
+}
+
+.TooltipContent[data-state=delayed-open][data-side=left] {
+  animation-name: slideRightAndFade;
+}
+
+@keyframes slideUpAndFade {
+  from {
+    opacity: 0;
+    transform: translateY(2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes slideRightAndFade {
+  from {
+    opacity: 0;
+    transform: translateX(-2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+@keyframes slideDownAndFade {
+  from {
+    opacity: 0;
+    transform: translateY(-2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes slideLeftAndFade {
+  from {
+    opacity: 0;
+    transform: translateX(2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+[data-radix-popper-content-wrapper] {
+  z-index: 99999999999 !important;
+}
+
+.override {
+  display: none !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
 }
 
 .CanvasContainer {

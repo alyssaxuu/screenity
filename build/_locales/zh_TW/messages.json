@@ -1007,5 +1007,18 @@
   "recordAudioWarningOtherDescription": {
     "message": "如果您想錄製計算機音訊，請確保啟用'共享系統音訊'選項。如果您看不到此選項，請嘗試更新Chrome或切換到選項卡錄製選項。",
     "description": "其他系統音訊警告說明"
+  },
+
+  "maxResolutionLabel": {
+    "message": "最高解析度",
+    "description": "設定選單中的最高解析度標籤"
+  },
+  "maxFPSLabel": {
+    "message": "最高幀率",
+    "description": "設定選單中的最高幀率標籤"
+  },
+  "notEnoughRAM": {
+    "message": "內存不足",
+    "description": "設置選單中的內存不足標籤"
   }
 }

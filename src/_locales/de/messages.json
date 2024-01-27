@@ -1006,5 +1006,19 @@
   "recordAudioWarningOtherDescription": {
     "message": "Stellen Sie sicher, dass Sie die Option 'System-Audio teilen' aktivieren, wenn Sie Computer-Audio aufzeichnen möchten. Wenn Sie diese Option nicht sehen, versuchen Sie, Chrome zu aktualisieren oder zur Tab-Aufzeichnung zu wechseln.",
     "description": "Beschreibung der Audio-Warnung für andere Systeme"
+  },
+
+  "maxResolutionLabel": {
+    "message": "Maximale Auflösung",
+    "description": "Beschriftung für maximale Auflösung im Einstellungsmenü"
+  },
+  "maxFPSLabel": {
+    "message": "Maximale FPS",
+    "description": "Beschriftung für maximale FPS im Einstellungsmenü"
+  },
+
+  "notEnoughRAM": {
+    "message": "Nicht genügend RAM",
+    "description": "Beschriftung 'Nicht genügend RAM' im Einstellungsmenü"
   }
 }
