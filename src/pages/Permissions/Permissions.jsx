@@ -96,6 +96,12 @@ const Recorder = () => {
           }));
       }
 
+      chrome.runtime.sendMessage({
+        oh: "hi",
+        stream: JSON.stringify(stream),
+        devicesInfo: JSON.stringify(devicesInfo),
+      });
+
       // Save in Chrome local storage
       chrome.storage.local.set({
         // Set available devices
@@ -139,16 +145,6 @@ const Recorder = () => {
       //sendResponse({ success: false, error: err.name });
     }
   };
-
-  // const onMessage = useCallback((request, sender, sendResponse) => {
-  //   // Get permissions and send response
-  //   if (request.type === "get-permissions") {
-  //     // Check if the sender is the parent window
-  //     checkPermissions(sendResponse);
-
-  //     return true;
-  //   }
-  // });
 
   const onMessage = (message) => {
     if (message.type === "screenity-get-permissions") {

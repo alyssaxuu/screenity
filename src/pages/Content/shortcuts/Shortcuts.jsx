@@ -4,7 +4,6 @@ import { useHotkeys } from "react-hotkeys-hook";
 
 // Context
 import { contentStateContext } from "../context/ContentState";
-import set from "localbase/localbase/api/actions/set";
 
 const Shortcuts = ({ shortcuts }) => {
   const [contentState, setContentState] = useContext(contentStateContext);

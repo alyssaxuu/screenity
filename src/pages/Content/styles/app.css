@@ -2036,6 +2036,7 @@ button {
 }
 
 .SelectValue {
+  text-align: left;
   flex: 1;
   display: block;
   width: 100%;
@@ -2052,7 +2053,8 @@ button {
   line-height: 44px;
 }
 
-.SelectIconDrop, .SelectIconType {
+.SelectIconDrop,
+.SelectIconType {
   text-align: center;
 }
 

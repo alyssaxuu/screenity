@@ -1020,5 +1020,21 @@
   "notEnoughRAM": {
     "message": "Yetersiz RAM",
     "description": "Ayarlar menüsünde yetersiz RAM etiketi"
+  },
+  "resizeWindowLabel": {
+    "message": "Pencereyi Yeniden Boyutlandır",
+    "description": "Ayarlar menüsündeki pencere boyutlandırma etiketi"
+  },
+  "screenTooSmallTooltip": {
+    "message": "Bu çözünürlüğe pencereyi yeniden boyutlandırmak için ekran çok küçük",
+    "description": "Ayarlar menüsündeki ekran çok küçük bilgi baloncuğu"
+  },
+  "maxResolutionTooltip": {
+    "message": "Bu çözünürlükte kayıt yapmak cihazınızda mümkün değil",
+    "description": "Ayarlar menüsündeki maksimum çözünürlük bilgi baloncuğu"
+  },
+  "permissionsModalReview": {
+    "message": "İzinleri İncele",
+    "description": "İzinleri İncele düğmesi"
   }
 }

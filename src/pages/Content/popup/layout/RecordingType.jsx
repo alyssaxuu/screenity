@@ -156,9 +156,13 @@ const RecordingType = (props) => {
             contentState.openModal(
               chrome.i18n.getMessage("permissionsModalTitle"),
               chrome.i18n.getMessage("permissionsModalDescription"),
-              null,
+              chrome.i18n.getMessage("permissionsModalReview"),
               chrome.i18n.getMessage("permissionsModalDismiss"),
-              () => {},
+              () => {
+                chrome.runtime.sendMessage({
+                  type: "extension-media-permissions",
+                });
+              },
               () => {},
               chrome.runtime.getURL("assets/helper/permissions.webp"),
               chrome.i18n.getMessage("learnMoreDot"),
@@ -200,9 +204,13 @@ const RecordingType = (props) => {
             contentState.openModal(
               chrome.i18n.getMessage("permissionsModalTitle"),
               chrome.i18n.getMessage("permissionsModalDescription"),
-              null,
+              chrome.i18n.getMessage("permissionsModalReview"),
               chrome.i18n.getMessage("permissionsModalDismiss"),
-              () => {},
+              () => {
+                chrome.runtime.sendMessage({
+                  type: "extension-media-permissions",
+                });
+              },
               () => {},
               chrome.runtime.getURL("assets/helper/permissions.webp"),
               chrome.i18n.getMessage("learnMoreDot"),

@@ -1006,5 +1006,21 @@
   "notEnoughRAM": {
     "message": "RAM insufficiente",
     "description": "Etichetta 'RAM insufficiente' nel menu delle impostazioni"
+  },
+  "resizeWindowLabel": {
+    "message": "Ridimensiona finestra",
+    "description": "Etichetta per il ridimensionamento della finestra nel menu delle impostazioni"
+  },
+  "screenTooSmallTooltip": {
+    "message": "Lo schermo è troppo piccolo per questa risoluzione",
+    "description": "Tooltip che indica che lo schermo è troppo piccolo nel menu delle impostazioni"
+  },
+  "maxResolutionTooltip": {
+    "message": "Impossibile registrare a questa risoluzione sul tuo dispositivo",
+    "description": "Tooltip che indica che non è possibile registrare a questa risoluzione nel menu delle impostazioni"
+  },
+  "permissionsModalReview": {
+    "message": "Rivedi le autorizzazioni",
+    "description": "Pulsante per la revisione delle autorizzazioni"
   }
 }

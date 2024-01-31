@@ -102,7 +102,7 @@ const CropUI = (props) => {
             {chrome.i18n.getMessage("croppingInfoTitle")}
           </div>
           <div className={styles.buttonDescription}>
-            {chrome.i18n.getMessage("croppingInfoDescription")}
+            {chrome.i18n.getMessage("videoProcessingLabelDescription")}
           </div>
         </div>
         <div

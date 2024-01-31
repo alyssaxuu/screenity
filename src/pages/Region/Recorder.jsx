@@ -5,10 +5,19 @@ import React, {
   useCallback,
   useContext,
 } from "react";
-import Localbase from "localbase";
 
-let db = new Localbase("db");
-db.config.debug = false;
+import localforage from "localforage";
+
+localforage.config({
+  driver: localforage.INDEXEDDB, // or choose another driver
+  name: "screenity", // optional
+  version: 1, // optional
+});
+
+// Get chunks store
+const chunksStore = localforage.createInstance({
+  name: "chunks",
+});
 
 const Recorder = () => {
   const isRestarting = useRef(false);
@@ -107,8 +116,7 @@ const Recorder = () => {
       return;
     }
 
-    // Clear chunks collection
-    await db.collection("chunks").delete();
+    chunksStore.clear();
 
     try {
       const { qualityValue } = await chrome.storage.local.get(["qualityValue"]);
@@ -210,6 +218,7 @@ const Recorder = () => {
     }
 
     recorder.current.onstop = async (e) => {
+      regionRef.current = false;
       recordingRef.current = false;
       if (isRestarting.current) return;
       if (!isDismissing.current) {
@@ -278,11 +287,13 @@ const Recorder = () => {
           } else {
             lastTimecode.current = timestamp;
           }
-          await db.collection("chunks").add({
+
+          await chunksStore.setItem(`chunk_${index.current}`, {
             index: index.current,
             chunk: e.data,
             timestamp: timestamp,
           });
+
           if (backupRef.current) {
             chrome.runtime.sendMessage({
               type: "write-file",
@@ -348,6 +359,7 @@ const Recorder = () => {
     };
 
     liveStream.current.getVideoTracks()[0].onended = () => {
+      regionRef.current = false;
       chrome.storage.local.set({
         recording: false,
         restarting: false,
@@ -357,6 +369,7 @@ const Recorder = () => {
     };
 
     helperVideoStream.current.getVideoTracks()[0].onended = () => {
+      regionRef.current = false;
       chrome.storage.local.set({
         recording: false,
         restarting: false,
@@ -662,38 +675,41 @@ const Recorder = () => {
     }
   };
 
-  const onMessage = useCallback((request, sender, sendResponse) => {
-    if (request.type === "loaded") {
-      backupRef.current = request.backup;
-      if (request.region) {
-        chrome.runtime.sendMessage({ type: "get-streaming-data" });
+  const onMessage = useCallback(
+    (request, sender, sendResponse) => {
+      if (request.type === "loaded") {
+        backupRef.current = request.backup;
+        if (request.region) {
+          chrome.runtime.sendMessage({ type: "get-streaming-data" });
+        }
       }
-    }
-    if (request.type === "streaming-data") {
-      if (regionRef.current) {
-        startStreaming(JSON.parse(request.data));
+      if (request.type === "streaming-data") {
+        if (regionRef.current) {
+          startStreaming(JSON.parse(request.data));
+        }
+      } else if (request.type === "start-recording-tab") {
+        if (regionRef.current) {
+          startRecording();
+        }
+      } else if (request.type === "stop-recording-tab") {
+        if (isFinishing.current) return;
+        stopRecording();
+      } else if (request.type === "set-mic-active-tab") {
+        setMic(request);
+      } else if (request.type === "set-audio-output-volume") {
+        setAudioOutputVolume(request.volume);
+      } else if (request.type === "pause-recording-tab") {
+        if (!recorder.current) return;
+        recorder.current.pause();
+      } else if (request.type === "resume-recording-tab") {
+        if (!recorder.current) return;
+        recorder.current.resume();
+      } else if (request.type === "dismiss-recording") {
+        dismissRecording();
       }
-    } else if (request.type === "start-recording-tab") {
-      if (regionRef.current) {
-        startRecording();
-      }
-    } else if (request.type === "stop-recording-tab") {
-      if (isFinishing.current) return;
-      stopRecording();
-    } else if (request.type === "set-mic-active-tab") {
-      setMic(request);
-    } else if (request.type === "set-audio-output-volume") {
-      setAudioOutputVolume(request.volume);
-    } else if (request.type === "pause-recording-tab") {
-      if (!recorder.current) return;
-      recorder.current.pause();
-    } else if (request.type === "resume-recording-tab") {
-      if (!recorder.current) return;
-      recorder.current.resume();
-    } else if (request.type === "dismiss-recording") {
-      dismissRecording();
-    }
-  });
+    },
+    [regionRef.current, isFinishing.current, recorder.current]
+  );
 
   useEffect(() => {
     // Event listener (extension messaging)

@@ -1020,5 +1020,21 @@
   "notEnoughRAM": {
     "message": "Za mało pamięci RAM",
     "description": "Etykieta 'Za mało pamięci RAM' w menu ustawień"
+  },
+  "resizeWindowLabel": {
+    "message": "Zmień rozmiar okna",
+    "description": "Etykieta opcji zmiany rozmiaru okna w menu ustawień"
+  },
+  "screenTooSmallTooltip": {
+    "message": "Ekran jest zbyt mały, by zmienić rozmiar na tę rozdzielczość",
+    "description": "Etykieta ostrzeżenia o zbyt małym ekranie w menu ustawień"
+  },
+  "maxResolutionTooltip": {
+    "message": "Nie można nagrywać w tej rozdzielczości na tym urządzeniu",
+    "description": "Etykieta ostrzeżenia o maksymalnej rozdzielczości w menu ustawień"
+  },
+  "permissionsModalReview": {
+    "message": "Przejrzyj uprawnienia",
+    "description": "Etykieta przycisku przejrzenia uprawnień w oknie dialogowym uprawnień"
   }
 }

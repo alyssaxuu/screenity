@@ -100,7 +100,7 @@ const Countdown = () => {
         }
       }
     },
-    [countdownRef, contentState]
+    [countdownRef, contentState, cancelRef.current]
   );
 
   useEffect(() => {

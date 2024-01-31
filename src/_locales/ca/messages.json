@@ -1020,5 +1020,21 @@
   "notEnoughRAM": {
     "message": "No hi ha prou RAM",
     "description": "Etiqueta 'No hi ha prou RAM' al menú de configuració"
+  },
+  "resizeWindowLabel": {
+    "message": "Redimensionar finestra",
+    "description": "Etiqueta de redimensionar finestra al menú de configuració"
+  },
+  "screenTooSmallTooltip": {
+    "message": "La pantalla és massa petita per a aquesta resolució",
+    "description": "Consell per a pantalles massa petites al menú de configuració"
+  },
+  "maxResolutionTooltip": {
+    "message": "No es pot enregistrar en aquesta resolució al seu dispositiu",
+    "description": "Consell per a la resolució màxima al menú de configuració"
+  },
+  "permissionsModalReview": {
+    "message": "Revisar permisos",
+    "description": "Botó de revisar permisos"
   }
 }

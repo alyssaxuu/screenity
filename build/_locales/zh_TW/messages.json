@@ -1020,5 +1020,21 @@
   "notEnoughRAM": {
     "message": "內存不足",
     "description": "設置選單中的內存不足標籤"
+  },
+  "resizeWindowLabel": {
+    "message": "調整視窗大小",
+    "description": "設定選單中的調整視窗大小標籤"
+  },
+  "screenTooSmallTooltip": {
+    "message": "螢幕尺寸不足以支援此解析度",
+    "description": "設定選單中的螢幕尺寸不足提示"
+  },
+  "maxResolutionTooltip": {
+    "message": "您的設備無法以此解析度錄製",
+    "description": "設定選單中的最大解析度提示"
+  },
+  "permissionsModalReview": {
+    "message": "審查權限",
+    "description": "審查權限按鈕"
   }
 }

@@ -1020,5 +1020,21 @@
   "notEnoughRAM": {
     "message": "RAM 부족",
     "description": "설정 메뉴에서 'RAM 부족' 라벨"
+  },
+  "resizeWindowLabel": {
+    "message": "창 크기 조절",
+    "description": "설정 메뉴의 창 크기 조절 레이블"
+  },
+  "screenTooSmallTooltip": {
+    "message": "이 화면은 이 해상도로 조절하기에 너무 작습니다",
+    "description": "설정 메뉴의 화면 너무 작음 툴팁"
+  },
+  "maxResolutionTooltip": {
+    "message": "귀하의 장치에서 이 해상도로 녹화할 수 없습니다",
+    "description": "설정 메뉴의 최대 해상도 툴팁"
+  },
+  "permissionsModalReview": {
+    "message": "권한 검토",
+    "description": "권한 검토 버튼"
   }
 }

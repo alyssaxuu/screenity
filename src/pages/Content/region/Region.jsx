@@ -3,7 +3,6 @@ import { Rnd } from "react-rnd";
 
 // Context
 import { contentStateContext } from "../context/ContentState";
-import set from "localbase/localbase/api/actions/set";
 
 const ResizableBox = () => {
   const regionRef = useRef(null);

@@ -1021,5 +1021,21 @@
   "notEnoughRAM": {
     "message": "Pas assez de RAM",
     "description": "Étiquette 'Pas assez de RAM' dans le menu des paramètres"
+  },
+  "resizeWindowLabel": {
+    "message": "Redimensionner la fenêtre",
+    "description": "Étiquette de redimensionnement de fenêtre dans le menu des paramètres"
+  },
+  "screenTooSmallTooltip": {
+    "message": "L'écran est trop petit pour cette résolution",
+    "description": "Info-bulle indiquant que l'écran est trop petit dans le menu des paramètres"
+  },
+  "maxResolutionTooltip": {
+    "message": "Impossible d'enregistrer à cette résolution sur votre appareil",
+    "description": "Info-bulle indiquant qu'il est impossible d'enregistrer à cette résolution dans le menu des paramètres"
+  },
+  "permissionsModalReview": {
+    "message": "Réviser les autorisations",
+    "description": "Bouton de révision des autorisations"
   }
 }

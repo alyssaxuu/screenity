@@ -1015,5 +1015,21 @@
   "notEnoughRAM": {
     "message": "内存不足",
     "description": "设置菜单中的内存不足标签"
+  },
+  "resizeWindowLabel": {
+    "message": "调整窗口大小",
+    "description": "设置菜单中的调整窗口大小标签"
+  },
+  "screenTooSmallTooltip": {
+    "message": "屏幕尺寸不足以支持此分辨率",
+    "description": "设置菜单中的屏幕尺寸不足提示"
+  },
+  "maxResolutionTooltip": {
+    "message": "您的设备无法以此分辨率录制",
+    "description": "设置菜单中的最大分辨率提示"
+  },
+  "permissionsModalReview": {
+    "message": "审查权限",
+    "description": "审查权限按钮"
   }
 }

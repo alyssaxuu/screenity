@@ -8,10 +8,23 @@ import {
   createTab,
 } from "./modules/tabHelper";
 
-import Localbase from "localbase";
+import localforage from "localforage";
 
-const db = new Localbase("db");
-db.config.debug = false;
+localforage.config({
+  driver: localforage.INDEXEDDB,
+  name: "screenity",
+  version: 1,
+});
+
+// Get chunks store
+const chunksStore = localforage.createInstance({
+  name: "chunks",
+});
+
+// Get localDirectory store
+const localDirectoryStore = localforage.createInstance({
+  name: "localDirectory",
+});
 
 const startAfterCountdown = async () => {
   // Check that the recording didn't get dismissed
@@ -469,15 +482,11 @@ const handleChunks = async (chunks, override = false) => {
 
 const sendChunks = async (override = false) => {
   try {
-    db.collection("chunks")
-      .get()
-      .then(async (chunks) => {
-        handleChunks(chunks, override);
-      })
-      .catch((error) => {
-        // Try restarting indexedDB
-        chrome.runtime.reload();
-      });
+    const chunks = [];
+    await chunksStore.iterate((value, key) => {
+      chunks.push(value);
+    });
+    handleChunks(chunks, override);
   } catch (error) {
     chrome.runtime.reload();
   }
@@ -1114,23 +1123,6 @@ chrome.runtime.onInstalled.addListener(async (details) => {
       );
     }
   }
-
-  // Check if db is accessible
-  try {
-    db.collection("chunks")
-      .get()
-      .then(() => {
-        // Indexed DB is accessible
-      })
-      .catch(() => {
-        // Try reloading extension to get IndexedDB to work
-        chrome.runtime.reload();
-      });
-  } catch (error) {
-    // Try reloading extension to get IndexedDB to work
-    chrome.runtime.reload();
-  }
-
   // Check chrome version, if 109 or below, disable backups
   if (navigator.userAgent.includes("Chrome/")) {
     const version = parseInt(navigator.userAgent.match(/Chrome\/([0-9]+)/)[1]);
@@ -1342,52 +1334,50 @@ const restoreRecording = async () => {
     }
   }
 
-  // Make a video out of the db chunks, and download it
-  db.collection("chunks")
-    .get()
-    .then((chunks) => {
-      // Check if there's any chunks
-      if (chunks.empty || chunks.length === 0) {
-        return;
-      }
+  let chunks = [];
+  await chunksStore.iterate((value, key) => {
+    chunks.push(value);
+  });
 
-      chrome.tabs.create(
-        {
-          url: editor_url,
-          active: true,
-        },
-        async (tab) => {
-          // Set URL as sandbox tab
-          chrome.storage.local.set({ sandboxTab: tab.id });
-          // Wait for the tab to be loaded
-          await new Promise((resolve) => {
-            chrome.tabs.onUpdated.addListener(function listener(tabId, info) {
-              if (info.status === "complete" && tabId === tab.id) {
-                sendMessageTab(tab.id, {
-                  type: "restore-recording",
-                });
+  if (chunks.length === 0) {
+    return;
+  }
 
-                sendChunks();
-              }
+  chrome.tabs.create(
+    {
+      url: editor_url,
+      active: true,
+    },
+    async (tab) => {
+      // Set URL as sandbox tab
+      chrome.storage.local.set({ sandboxTab: tab.id });
+      // Wait for the tab to be loaded
+      await new Promise((resolve) => {
+        chrome.tabs.onUpdated.addListener(function listener(tabId, info) {
+          if (info.status === "complete" && tabId === tab.id) {
+            sendMessageTab(tab.id, {
+              type: "restore-recording",
             });
-          });
-        }
-      );
-    });
+
+            sendChunks();
+          }
+        });
+      });
+    }
+  );
 };
 
-const checkRestore = (sendResponse) => {
-  // Check if there's any chunks
-  db.collection("chunks")
-    .get()
-    .then((chunks) => {
-      // Check if there's any chunks
-      if (chunks.empty || chunks.length === 0) {
-        sendResponse({ restore: false, chunks: [] });
-        return;
-      }
-      sendResponse({ restore: true });
-    });
+const checkRestore = async (sendResponse) => {
+  const chunks = [];
+  await chunksStore.iterate((value, key) => {
+    chunks.push(value);
+  });
+
+  if (chunks.length === 0) {
+    sendResponse({ restore: false, chunks: [] });
+    return;
+  }
+  sendResponse({ restore: true });
 };
 
 const checkCapturePermissions = (sendResponse) => {
@@ -1440,7 +1430,7 @@ const base64ToUint8Array = (base64) => {
   }
 };
 
-const handleSaveToDrive = (sendResponse, request, fallback = false) => {
+const handleSaveToDrive = async (sendResponse, request, fallback = false) => {
   if (!fallback) {
     const blob = base64ToUint8Array(request.base64);
 
@@ -1452,28 +1442,29 @@ const handleSaveToDrive = (sendResponse, request, fallback = false) => {
       savedToDrive();
     });
   } else {
-    db.collection("chunks")
-      .get()
-      .then((chunks) => {
-        // Build the video from chunks
-        let array = [];
-        let lastTimestamp = 0;
-        for (const chunk of chunks) {
-          // Check if chunk timestamp is smaller than last timestamp, if so, skip
-          if (chunk.timestamp < lastTimestamp) {
-            continue;
-          }
-          lastTimestamp = chunk.timestamp;
-          array.push(chunk.chunk);
-        }
-        const blob = new Blob(array, { type: "video/webm" });
+    const chunks = [];
+    await chunksStore.iterate((value, key) => {
+      chunks.push(value);
+    });
 
-        const filename = request.title + ".webm";
+    // Build the video from chunks
+    let array = [];
+    let lastTimestamp = 0;
+    for (const chunk of chunks) {
+      // Check if chunk timestamp is smaller than last timestamp, if so, skip
+      if (chunk.timestamp < lastTimestamp) {
+        continue;
+      }
+      lastTimestamp = chunk.timestamp;
+      array.push(chunk.chunk);
+    }
+    const blob = new Blob(array, { type: "video/webm" });
 
-        saveToDrive(blob, filename, sendResponse).then(() => {
-          savedToDrive();
-        });
-      });
+    const filename = request.title + ".webm";
+
+    saveToDrive(blob, filename, sendResponse).then(() => {
+      savedToDrive();
+    });
   }
 };
 
@@ -1482,8 +1473,7 @@ const desktopCapture = async (request) => {
   const { backupSetup } = await chrome.storage.local.get(["backupSetup"]);
   if (backup) {
     if (!backupSetup) {
-      // This will prompt the user with the file picker
-      db.collection("localDirectory").delete();
+      localDirectoryStore.clear();
     }
 
     let activeTab = await getCurrentTab();
@@ -1682,9 +1672,31 @@ const handleStopRecordingTabBackup = async (request) => {
   focusTab(activeTab);
 };
 
+const clearAllRecordings = async () => {
+  chunksStore.clear();
+};
+
+const resizeWindow = async (width, height) => {
+  if (width === 0 || height === 0) {
+    return;
+  }
+
+  chrome.windows.getCurrent((window) => {
+    chrome.windows.update(window.id, {
+      width: width,
+      height: height,
+    });
+  });
+};
+
+const checkAvailableMemory = (sendResponse) => {
+  navigator.storage.estimate().then((data) => {
+    sendResponse({ data: data });
+  });
+};
+
 // Listen for messages
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  console.log(request);
   if (request.type === "desktop-capture") {
     desktopCapture(request);
   } else if (request.type === "backup-created") {
@@ -1796,7 +1808,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       true
     );
   } else if (request.type === "clear-recordings") {
-    db.collection("chunks").delete();
+    clearAllRecordings();
   } else if (request.type === "force-processing") {
     forceProcessing();
   } else if (request.type === "focus-this-tab") {
@@ -1827,6 +1839,20 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true;
   } else if (request.type === "request-download") {
     requestDownload(request.base64, request.title);
+  } else if (request.type === "resize-window") {
+    resizeWindow(request.width, request.height);
+  } else if (request.type === "available-memory") {
+    checkAvailableMemory(sendResponse);
+    return true;
+  } else if (request.type === "extension-media-permissions") {
+    createTab(
+      "chrome://settings/content/siteDetails?site=chrome-extension://" +
+        chrome.runtime.id,
+      false,
+      true
+    );
+  } else if (request.type === "add-alarm-listener") {
+    addAlarmListener();
   }
 });
 

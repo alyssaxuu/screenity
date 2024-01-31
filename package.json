@@ -37,7 +37,7 @@
     "fabric": "^5.3.0",
     "fix-webm-duration": "^1.0.5",
     "jszip": "^3.10.1",
-    "localbase": "^0.7.5",
+    "localforage": "^1.10.0",
     "patch-package": "^8.0.0",
     "plyr": "^3.7.8",
     "plyr-react": "^5.3.0",

@@ -135,6 +135,9 @@ const WaveformGenerator = (props) => {
       const cursorX =
         containerRect.width * (contentState.time / video.duration);
       customCursorRef.current.style.left = `${cursorX}px`;
+
+      URL.revokeObjectURL(video.src);
+      video.remove();
     };
     video.src = URL.createObjectURL(contentState.blob);
   }, [contentState.time, contentState.blob, waveformContainerRef.current]);

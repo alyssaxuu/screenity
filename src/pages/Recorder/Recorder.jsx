@@ -1,10 +1,18 @@
 import React, { useEffect, useState, useRef, useCallback } from "react";
-import Localbase from "localbase";
+import localforage from "localforage";
 
 import Warning from "./warning/Warning";
 
-let db = new Localbase("db");
-db.config.debug = false;
+localforage.config({
+  driver: localforage.INDEXEDDB, // or choose another driver
+  name: "screenity", // optional
+  version: 1, // optional
+});
+
+// Get chunks store
+const chunksStore = localforage.createInstance({
+  name: "chunks",
+});
 
 const Recorder = () => {
   const isRestarting = useRef(false);
@@ -65,8 +73,7 @@ const Recorder = () => {
       return;
     }
 
-    // Clear chunks collection
-    await db.collection("chunks").delete();
+    chunksStore.clear();
 
     lastTimecode.current = 0;
     hasChunks.current = 0;
@@ -206,11 +213,13 @@ const Recorder = () => {
           } else {
             lastTimecode.current = timestamp;
           }
-          await db.collection("chunks").add({
+
+          await chunksStore.setItem(`chunk_${index.current}`, {
             index: index.current,
             chunk: e.data,
             timestamp: timestamp,
           });
+
           if (backupRef.current) {
             chrome.runtime.sendMessage({
               type: "write-file",
@@ -295,8 +304,6 @@ const Recorder = () => {
       });
       helperAudioStream.current = null;
     }
-
-    await db.collection("chunks").orderBy("timestamp").get();
   }
 
   const dismissRecording = async () => {
@@ -457,9 +464,9 @@ const Recorder = () => {
           mandatory: {
             chromeMediaSource: isTab.current ? "tab" : "desktop",
             chromeMediaSourceId: id,
-            minWidth: width,
-            minHeight: height,
-            minFrameRate: fps,
+            maxWidth: width,
+            maxHeight: height,
+            maxFrameRate: fps,
           },
         },
       };
@@ -622,41 +629,44 @@ const Recorder = () => {
     tabID.current = streamId;
   };
 
-  const onMessage = useCallback((request, sender, sendResponse) => {
-    if (request.type === "loaded") {
-      backupRef.current = request.backup;
-      if (!tabPreferred.current) {
-        isTab.current = request.isTab;
-        if (request.isTab) {
-          getStreamID(request.tabID);
+  const onMessage = useCallback(
+    (request, sender, sendResponse) => {
+      if (request.type === "loaded") {
+        backupRef.current = request.backup;
+        if (!tabPreferred.current) {
+          isTab.current = request.isTab;
+          if (request.isTab) {
+            getStreamID(request.tabID);
+          }
+        } else {
+          isTab.current = false;
         }
-      } else {
-        isTab.current = false;
+        chrome.runtime.sendMessage({ type: "get-streaming-data" });
       }
-      chrome.runtime.sendMessage({ type: "get-streaming-data" });
-    }
-    if (request.type === "streaming-data") {
-      startStreaming(JSON.parse(request.data));
-    } else if (request.type === "start-recording-tab") {
-      startRecording();
-    } else if (request.type === "restart-recording-tab") {
-      restartRecording();
-    } else if (request.type === "stop-recording-tab") {
-      stopRecording();
-    } else if (request.type === "set-mic-active-tab") {
-      setMic(request);
-    } else if (request.type === "set-audio-output-volume") {
-      setAudioOutputVolume(request.volume);
-    } else if (request.type === "pause-recording-tab") {
-      if (!recorder.current) return;
-      recorder.current.pause();
-    } else if (request.type === "resume-recording-tab") {
-      if (!recorder.current) return;
-      recorder.current.resume();
-    } else if (request.type === "dismiss-recording") {
-      dismissRecording();
-    }
-  });
+      if (request.type === "streaming-data") {
+        startStreaming(JSON.parse(request.data));
+      } else if (request.type === "start-recording-tab") {
+        startRecording();
+      } else if (request.type === "restart-recording-tab") {
+        restartRecording();
+      } else if (request.type === "stop-recording-tab") {
+        stopRecording();
+      } else if (request.type === "set-mic-active-tab") {
+        setMic(request);
+      } else if (request.type === "set-audio-output-volume") {
+        setAudioOutputVolume(request.volume);
+      } else if (request.type === "pause-recording-tab") {
+        if (!recorder.current) return;
+        recorder.current.pause();
+      } else if (request.type === "resume-recording-tab") {
+        if (!recorder.current) return;
+        recorder.current.resume();
+      } else if (request.type === "dismiss-recording") {
+        dismissRecording();
+      }
+    },
+    [recorder.current, tabPreferred.current]
+  );
 
   useEffect(() => {
     // Event listener (extension messaging)

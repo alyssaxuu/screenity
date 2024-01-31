@@ -1,8 +1,16 @@
 import React, { useEffect, useState, useRef, useCallback } from "react";
-import Localbase from "localbase";
+import localforage from "localforage";
 
-let db = new Localbase("db");
-db.config.debug = false;
+localforage.config({
+  driver: localforage.INDEXEDDB, // or choose another driver
+  name: "screenity", // optional
+  version: 1, // optional
+});
+
+// Get chunks store
+const chunksStore = localforage.createInstance({
+  name: "chunks",
+});
 
 const RecorderOffscreen = () => {
   const isRestarting = useRef(false);
@@ -51,8 +59,7 @@ const RecorderOffscreen = () => {
       return;
     }
 
-    // Clear chunks collection
-    await db.collection("chunks").delete();
+    chunksStore.clear();
 
     lastTimecode.current = 0;
     hasChunks.current = 0;
@@ -187,7 +194,8 @@ const RecorderOffscreen = () => {
           } else {
             lastTimecode.current = timestamp;
           }
-          await db.collection("chunks").add({
+
+          await chunksStore.setItem(`chunk_${index.current}`, {
             index: index.current,
             chunk: e.data,
             timestamp: timestamp,
@@ -262,8 +270,6 @@ const RecorderOffscreen = () => {
       });
       helperAudioStream.current = null;
     }
-
-    db.collection("chunks").orderBy("timestamp").get();
   }
 
   const dismissRecording = async () => {
@@ -429,8 +435,8 @@ const RecorderOffscreen = () => {
               mandatory: {
                 chromeMediaSource: "tab",
                 chromeMediaSourceId: tabID.current,
-                minWidth: width,
-                minHeight: height,
+                maxWidth: width,
+                maxHeight: height,
                 minFrameRate: fps,
               },
             },
@@ -544,39 +550,42 @@ const RecorderOffscreen = () => {
     }
   };
 
-  const onMessage = useCallback((request, sender, sendResponse) => {
-    if (request.type === "loaded") {
-      backupRef.current = request.backup;
-      isTab.current = request.isTab;
-      quality.current = request.quality;
-      fps.current = request.fps;
-      if (request.isTab) {
-        tabID.current = request.tabID;
+  const onMessage = useCallback(
+    (request, sender, sendResponse) => {
+      if (request.type === "loaded") {
+        backupRef.current = request.backup;
+        isTab.current = request.isTab;
+        quality.current = request.quality;
+        fps.current = request.fps;
+        if (request.isTab) {
+          tabID.current = request.tabID;
+        }
+        chrome.runtime.sendMessage({ type: "get-streaming-data" });
       }
-      chrome.runtime.sendMessage({ type: "get-streaming-data" });
-    }
-    if (request.type === "streaming-data") {
-      startStreaming(JSON.parse(request.data));
-    } else if (request.type === "start-recording-tab") {
-      startRecording();
-    } else if (request.type === "restart-recording-tab") {
-      restartRecording();
-    } else if (request.type === "stop-recording-tab") {
-      stopRecording();
-    } else if (request.type === "set-mic-active-tab") {
-      setMic(request);
-    } else if (request.type === "set-audio-output-volume") {
-      setAudioOutputVolume(request.volume);
-    } else if (request.type === "pause-recording-tab") {
-      if (!recorder.current) return;
-      recorder.current.pause();
-    } else if (request.type === "resume-recording-tab") {
-      if (!recorder.current) return;
-      recorder.current.resume();
-    } else if (request.type === "dismiss-recording") {
-      dismissRecording();
-    }
-  });
+      if (request.type === "streaming-data") {
+        startStreaming(JSON.parse(request.data));
+      } else if (request.type === "start-recording-tab") {
+        startRecording();
+      } else if (request.type === "restart-recording-tab") {
+        restartRecording();
+      } else if (request.type === "stop-recording-tab") {
+        stopRecording();
+      } else if (request.type === "set-mic-active-tab") {
+        setMic(request);
+      } else if (request.type === "set-audio-output-volume") {
+        setAudioOutputVolume(request.volume);
+      } else if (request.type === "pause-recording-tab") {
+        if (!recorder.current) return;
+        recorder.current.pause();
+      } else if (request.type === "resume-recording-tab") {
+        if (!recorder.current) return;
+        recorder.current.resume();
+      } else if (request.type === "dismiss-recording") {
+        dismissRecording();
+      }
+    },
+    [recorder.current]
+  );
 
   useEffect(() => {
     // Event listener (extension messaging)

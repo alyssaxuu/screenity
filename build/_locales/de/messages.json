@@ -1020,5 +1020,21 @@
   "notEnoughRAM": {
     "message": "Nicht genügend RAM",
     "description": "Beschriftung 'Nicht genügend RAM' im Einstellungsmenü"
+  },
+  "resizeWindowLabel": {
+    "message": "Fenstergröße ändern",
+    "description": "Beschriftung für die Änderung der Fenstergröße im Einstellungsmenü"
+  },
+  "screenTooSmallTooltip": {
+    "message": "Der Bildschirm ist zu klein für diese Auflösung",
+    "description": "Tooltip, der anzeigt, dass der Bildschirm zu klein ist, im Einstellungsmenü"
+  },
+  "maxResolutionTooltip": {
+    "message": "Auf diesem Gerät ist diese Auflösung nicht verfügbar",
+    "description": "Tooltip, der anzeigt, dass diese Auflösung auf dem Gerät nicht verfügbar ist, im Einstellungsmenü"
+  },
+  "permissionsModalReview": {
+    "message": "Berechtigungen überprüfen",
+    "description": "Schaltfläche zur Überprüfung von Berechtigungen"
   }
 }

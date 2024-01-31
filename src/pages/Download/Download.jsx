@@ -1,9 +1,17 @@
 import React, { useState, useCallback, useEffect } from "react";
 
-import Localbase from "localbase";
+import localforage from "localforage";
 
-const db = new Localbase("db");
-db.config.debug = false;
+localforage.config({
+  driver: localforage.INDEXEDDB,
+  name: "screenity",
+  version: 1,
+});
+
+// Get chunks store
+const chunksStore = localforage.createInstance({
+  name: "chunks",
+});
 
 const Download = () => {
   const base64ToUint8Array = (base64) => {
@@ -47,19 +55,13 @@ const Download = () => {
           window.close();
         });
     } else if (message.type === "recover-indexed-db") {
-      // Download the whole chunks collection
-      db.collection("chunks")
-        .get()
-        .then((chunks) => {
-          const chunkArray = [];
-          let lastTimestamp = 0;
-          for (const chunk of chunks) {
-            if (chunk.timestamp < lastTimestamp) {
-              continue;
-            }
-            lastTimestamp = chunk.timestamp;
-            chunkArray.push(chunk.chunk);
-          }
+      // Rewrite in localforage
+      const chunkArray = [];
+      chunksStore
+        .iterate((value, key, iterationNumber) => {
+          chunkArray.push(value.chunk);
+        })
+        .then(() => {
           const blob = new Blob(chunkArray, { type: "video/webm" });
           const url = URL.createObjectURL(blob);
           chrome.downloads

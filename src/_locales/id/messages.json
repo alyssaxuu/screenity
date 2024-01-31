@@ -1021,5 +1021,21 @@
   "notEnoughRAM": {
     "message": "Tidak cukup RAM",
     "description": "Label 'Tidak cukup RAM' dalam menu pengaturan"
+  },
+  "resizeWindowLabel": {
+    "message": "Ubah Ukuran Jendela",
+    "description": "Label Ubah Ukuran Jendela di menu pengaturan"
+  },
+  "screenTooSmallTooltip": {
+    "message": "Layar terlalu kecil untuk resolusi ini",
+    "description": "Tooltip Layar terlalu kecil di menu pengaturan"
+  },
+  "maxResolutionTooltip": {
+    "message": "Tidak dapat merekam pada resolusi ini di perangkat Anda",
+    "description": "Tooltip Resolusi maksimum di menu pengaturan"
+  },
+  "permissionsModalReview": {
+    "message": "Ulasan Izin",
+    "description": "Tombol Ulasan Izin"
   }
 }

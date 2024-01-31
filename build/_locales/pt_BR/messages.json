@@ -1018,5 +1018,21 @@
   "notEnoughRAM": {
     "message": "Memória RAM insuficiente",
     "description": "Etiqueta 'Memória RAM insuficiente' no menu de configurações"
+  },
+  "resizeWindowLabel": {
+    "message": "Redimensionar janela",
+    "description": "Rótulo de redimensionamento de janela no menu de configurações"
+  },
+  "screenTooSmallTooltip": {
+    "message": "A tela é muito pequena para essa resolução",
+    "description": "Dica de tela muito pequena no menu de configurações"
+  },
+  "maxResolutionTooltip": {
+    "message": "Não é possível gravar nessa resolução neste dispositivo",
+    "description": "Dica de resolução máxima no menu de configurações"
+  },
+  "permissionsModalReview": {
+    "message": "Revisar permissões",
+    "description": "Botão de revisão de permissões"
   }
 }

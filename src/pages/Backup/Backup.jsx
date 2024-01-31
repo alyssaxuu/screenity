@@ -1,9 +1,22 @@
 import React, { useState, useEffect, useRef } from "react";
 
-import Localbase from "localbase";
+import localforage from "localforage";
 
-let db = new Localbase("db");
-db.config.debug = false;
+localforage.config({
+  driver: localforage.INDEXEDDB,
+  name: "screenity",
+  version: 1,
+});
+
+// Get chunks store
+const chunksStore = localforage.createInstance({
+  name: "chunks",
+});
+
+// Get localDirectory store
+const localDirectoryStore = localforage.createInstance({
+  name: "localDirectory",
+});
 
 const Backup = () => {
   const [setupComplete, setSetupComplete] = useState(false);
@@ -78,7 +91,8 @@ const Backup = () => {
     } else if (repeatRef.current < 3) {
       chrome.runtime.sendMessage({ type: "focus-this-tab" });
       repeatRef.current = repeatRef.current + 1;
-      db.collection("localDirectory").delete();
+      localDirectoryStore.clear();
+
       localSaving(prompt);
     } else {
       alert(
@@ -139,9 +153,9 @@ const Backup = () => {
         { create: true }
       );
     }
-    db.collection("localDirectory").add({
-      directoryHandle: directoryHandle,
-    });
+
+    await localDirectoryStore.clear();
+    await localDirectoryStore.setItem("directoryHandle", directoryHandle);
 
     initLocalDirectory(directoryHandle, prompt);
   };
@@ -156,34 +170,30 @@ const Backup = () => {
     }
 
     if (!backupRef.current) {
-      db.collection("localDirectory").delete();
+      localDirectoryStore.clear();
     }
 
     // Check if the FileSystem API is available
     if ("showDirectoryPicker" in window) {
-      db.collection("localDirectory")
-        .get()
-        .then(async (directory) => {
-          if (directory && directory.length > 0) {
-            try {
-              const permissions = await verifyFilePermissions(
-                directory[0].directoryHandle
-              );
-              if (!permissions) {
-                directoryPicker(prompt);
-                //db.collection("localDirectory").delete();
-                //localSaving(prompt);
-              } else {
-                initLocalDirectory(directory[0].directoryHandle, prompt);
-              }
-            } catch (e) {
-              db.collection("localDirectory").delete();
+      localDirectoryStore.getItem("directoryHandle").then(async (directory) => {
+        if (directory) {
+          try {
+            const permissions = await verifyFilePermissions(
+              directory.directoryHandle
+            );
+            if (!permissions) {
               directoryPicker(prompt);
+            } else {
+              initLocalDirectory(directory.directoryHandle, prompt);
             }
-          } else {
+          } catch (e) {
+            localDirectoryStore.clear();
             directoryPicker(prompt);
           }
-        });
+        } else {
+          directoryPicker(prompt);
+        }
+      });
     } else {
       alert(
         "Your browser doesn't support local backups. Reach out to us at support@screenity.io for more help. You can still record your screen."
@@ -204,9 +214,12 @@ const Backup = () => {
     if (!writingFile.current) return;
     waitWrite.current = true;
     try {
-      db.collection("chunks")
-        .get()
-        .then(async (chunks) => {
+      const chunks = [];
+      chunksStore
+        .iterate((value, key, iterationNumber) => {
+          chunks.push(value);
+        })
+        .then(async () => {
           if (chunks && chunks.length > 0) {
             const chunk = chunks.find((chunk) => chunk.index === index);
 
@@ -247,23 +260,21 @@ const Backup = () => {
     if (writingFile.current) {
       await writable.current.close();
       writingFile.current = false;
-      db.collection("localDirectory")
-        .get()
-        .then(async (directory) => {
-          if (directory && directory.length > 0) {
-            const permissions = await verifyFilePermissions(
-              directory[0].directoryHandle
-            );
-            if (permissions) {
-              await directory[0].directoryHandle.removeEntry(titleRef.current);
-              if (restart) {
-                localSaving(false);
-              }
-            } else if (restart) {
-              localSaving(false);
-            }
+
+      const directory = await localDirectoryStore.getItem("directoryHandle");
+      if (directory && directory !== null) {
+        const permissions = await verifyFilePermissions(
+          directory.directoryHandle
+        );
+        if (permissions) {
+          await directory.directoryHandle.removeEntry(titleRef.current);
+          if (restart) {
+            localSaving(false);
           }
-        });
+        } else if (restart) {
+          localSaving(false);
+        }
+      }
     } else if (restart) {
       localSaving(false);
     }

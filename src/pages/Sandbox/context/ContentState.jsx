@@ -189,6 +189,9 @@ const ContentState = (props) => {
         prevWidth: video.videoWidth,
         prevHeight: video.videoHeight,
       }));
+
+      URL.revokeObjectURL(video.src);
+      video.remove();
     };
     video.src = URL.createObjectURL(contentState.blob);
   }, [contentState.blob]);
@@ -360,9 +363,10 @@ const ContentState = (props) => {
   const handleBatch = async (chunks, sendResponse) => {
     for (const chunk of chunks) {
       // Check if too many chunks have been received
-      if (contentState.chunkIndex >= chunkCount.current) {
+      if (contentStateRef.current.chunkIndex >= chunkCount.current) {
         return;
       }
+
       const chunkData = base64ToUint8Array(chunk.chunk);
       videoChunks.current.push(chunkData);
       setContentState((prevState) => ({
@@ -388,55 +392,63 @@ const ContentState = (props) => {
     }
   }, []);
 
-  const onChromeMessage = useCallback((request, sender, sendResponse) => {
-    const message = request;
-    if (message.type === "chunk-count") {
-      setContentState((prevState) => ({
-        ...prevState,
-        chunkCount: message.count,
-      }));
-    } else if (message.type === "new-chunk-tab") {
-      handleBatch(message.chunks, sendResponse);
+  const onChromeMessage = useCallback(
+    (request, sender, sendResponse) => {
+      const message = request;
+      if (message.type === "chunk-count") {
+        setContentState((prevState) => ({
+          ...prevState,
+          chunkCount: message.count,
+        }));
+      } else if (message.type === "new-chunk-tab") {
+        handleBatch(message.chunks, sendResponse);
 
-      return true;
-    } else if (message.type === "make-video-tab") {
-      if (makeVideoCheck.current) return;
-      makeVideoCheck.current = true;
-      setContentState((prevState) => ({
-        ...prevState,
-        override: message.override,
-      }));
-      // All chunks received, reconstruct video
-      checkMemory();
-      reconstructVideo();
-      sendResponse({ status: "ok" });
-    } else if (message.type === "saved-to-drive") {
-      setContentState((prevContentState) => ({
-        ...prevContentState,
-        saveDrive: false,
-        driveEnabled: true,
-        saved: true,
-      }));
-    } else if (message.type === "restore-recording") {
-      setContentState((prevContentState) => ({
-        ...prevContentState,
-        fallback: true,
-        isFfmpegRunning: false,
-        noffmpeg: true,
-        ffmpegLoaded: true,
-        ffmpeg: true,
-      }));
-    } else if (message.type === "fallback-recording") {
-      setContentState((prevContentState) => ({
-        ...prevContentState,
-        fallback: true,
-        isFfmpegRunning: false,
-        noffmpeg: true,
-        ffmpegLoaded: true,
-        ffmpeg: true,
-      }));
-    }
-  });
+        return true;
+      } else if (message.type === "make-video-tab") {
+        if (makeVideoCheck.current) return;
+        makeVideoCheck.current = true;
+        setContentState((prevState) => ({
+          ...prevState,
+          override: message.override,
+        }));
+        // All chunks received, reconstruct video
+        checkMemory();
+        reconstructVideo();
+        sendResponse({ status: "ok" });
+      } else if (message.type === "saved-to-drive") {
+        setContentState((prevContentState) => ({
+          ...prevContentState,
+          saveDrive: false,
+          driveEnabled: true,
+          saved: true,
+        }));
+      } else if (message.type === "restore-recording") {
+        setContentState((prevContentState) => ({
+          ...prevContentState,
+          fallback: true,
+          isFfmpegRunning: false,
+          noffmpeg: true,
+          ffmpegLoaded: true,
+          ffmpeg: true,
+        }));
+      } else if (message.type === "fallback-recording") {
+        setContentState((prevContentState) => ({
+          ...prevContentState,
+          fallback: true,
+          isFfmpegRunning: false,
+          noffmpeg: true,
+          ffmpegLoaded: true,
+          ffmpeg: true,
+        }));
+      }
+    },
+    [
+      makeVideoCheck.current,
+      videoChunks.current,
+      contentState,
+      contentStateRef.current,
+    ]
+  );
 
   useEffect(() => {
     chrome.runtime.onMessage.addListener(onChromeMessage);
@@ -482,6 +494,9 @@ const ContentState = (props) => {
         if (event.data.addToHistory) {
           contentState.addToHistory();
         }
+
+        URL.revokeObjectURL(video.src);
+        video.remove();
       };
       video.src = URL.createObjectURL(blob);
 
@@ -785,6 +800,8 @@ const ContentState = (props) => {
           base64: reader.result,
           title: title,
         });
+        URL.revokeObjectURL(url);
+        return;
       };
     } else {
       chrome.downloads.download({
@@ -812,6 +829,11 @@ const ContentState = (props) => {
               title: title,
             });
           };
+          URL.revokeObjectURL(url);
+          return;
+        } else {
+          URL.revokeObjectURL(url);
+          return;
         }
       });
     }

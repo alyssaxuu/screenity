@@ -161,7 +161,7 @@ const Background = (props) => {
         renderFrame();
       });
     }
-  }, []);
+  }, [frameRequestedRef.current]);
 
   // Function to handle frame rendering
   const renderFrame = async () => {

@@ -1016,5 +1016,21 @@
   "notEnoughRAM": {
     "message": "Not enough RAM",
     "description": "Not enough RAM label in settings menu"
+  },
+  "resizeWindowLabel": {
+    "message": "Resize window",
+    "description": "Resize window label in settings menu"
+  },
+  "screenTooSmallTooltip": {
+    "message": "The screen is too small for this resolution",
+    "description": "Screen too small tooltip in settings menu"
+  },
+  "maxResolutionTooltip": {
+    "message": "Cannot record at this resolution in your device",
+    "description": "Maxed out resolution tooltip in settings menu"
+  },
+  "permissionsModalReview": {
+    "message": "Review permissions",
+    "description": "Review permissions button"
   }
 }

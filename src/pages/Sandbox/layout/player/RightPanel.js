@@ -168,10 +168,15 @@ const RightPanel = () => {
         () => {
           const blob = contentStateRef.current.rawBlob;
           const url = window.URL.createObjectURL(blob);
-          chrome.downloads.download({
-            url: url,
-            filename: "raw-recording.webm",
-          });
+          chrome.downloads.download(
+            {
+              url: url,
+              filename: "raw-recording.webm",
+            },
+            () => {
+              window.URL.revokeObjectURL(url);
+            }
+          );
         },
         () => {}
       );
@@ -207,10 +212,15 @@ const RightPanel = () => {
             zip.file("troubleshooting.json", JSON.stringify(data));
             zip.generateAsync({ type: "blob" }).then(function (blob) {
               const url = window.URL.createObjectURL(blob);
-              chrome.downloads.download({
-                url: url,
-                filename: "troubleshooting.zip",
-              });
+              chrome.downloads.download(
+                {
+                  url: url,
+                  filename: "troubleshooting.zip",
+                },
+                () => {
+                  window.URL.revokeObjectURL(url);
+                }
+              );
             });
           });
         },

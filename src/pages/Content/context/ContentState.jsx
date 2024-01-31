@@ -10,11 +10,6 @@ import React, {
 // Shortcuts
 import Shortcuts from "../shortcuts/Shortcuts";
 
-import Localbase from "localbase";
-
-let db = new Localbase("db");
-db.config.debug = false;
-
 //create a context, with createContext api
 export const contentStateContext = createContext();
 
@@ -72,7 +67,7 @@ const ContentState = (props) => {
 
     // This cannot be triggered from here because the user might not have the page focused
     //chrome.runtime.sendMessage({ type: "start-recording" });
-  });
+  }, [contentStateRef.current]);
 
   const restartRecording = useCallback(() => {
     chrome.storage.local.set({ recording: false, restarting: true });
@@ -103,7 +98,7 @@ const ContentState = (props) => {
         paused: false,
       }));
     }, 100);
-  });
+  }, [contentStateRef.current]);
 
   const stopRecording = useCallback(() => {
     chrome.storage.local.set({
@@ -172,206 +167,258 @@ const ContentState = (props) => {
     setTimer(0);
   });
 
-  const startStreaming = useCallback(() => {
-    navigator.storage.estimate().then((data) => {
-      // Check if there's enough space to keep recording
-      if (data.quota < 524288000) {
-        if (typeof contentStateRef.current.openModal === "function") {
-          let clear = null;
-          let clearAction = () => {};
-          // Add help link to modal
-          const locale = chrome.i18n.getMessage("@@ui_locale");
-          let helpURL =
-            "https://help.screenity.io/troubleshooting/9Jy5RGjNrBB42hqUdREQ7W/what-does-%E2%80%9Cmemory-limit-reached%E2%80%9D-mean-when-recording/8WkwHbt3puuXunYqQnyPcb";
+  const checkChromeCapturePermissions = useCallback(async () => {
+    const containsPromise = new Promise((resolve) => {
+      chrome.permissions.contains(
+        {
+          permissions: ["desktopCapture", "alarms", "offscreen"],
+        },
+        (result) => {
+          resolve(result);
+        }
+      );
+    });
 
-          if (!locale.includes("en")) {
-            helpURL =
-              "https://translate.google.com/translate?sl=en&tl=" +
-              locale +
-              "&u=https://help.screenity.io/troubleshooting/9Jy5RGjNrBB42hqUdREQ7W/what-does-%E2%80%9Cmemory-limit-reached%E2%80%9D-mean-when-recording/8WkwHbt3puuXunYqQnyPcb";
+    const result = await containsPromise;
+
+    if (!result) {
+      const requestPromise = new Promise((resolve) => {
+        chrome.permissions.request(
+          {
+            permissions: ["desktopCapture", "alarms", "offscreen"],
+          },
+          (granted) => {
+            resolve(granted);
+          }
+        );
+      });
+
+      const granted = await requestPromise;
+
+      if (!granted) {
+        return false;
+      } else {
+        chrome.runtime.sendMessage({
+          type: "add-alarm-listener",
+        });
+        return true;
+      }
+    } else {
+      return true;
+    }
+  }, []);
+
+  const checkChromeCapturePermissionsSW = useCallback(async () => {
+    return new Promise((resolve) => {
+      chrome.runtime.sendMessage(
+        {
+          type: "check-capture-permissions",
+        },
+        (response) => {
+          if (response.status === "ok") {
+            resolve(true);
+          } else {
+            resolve(false);
+          }
+        }
+      );
+    });
+  }, []);
+
+  const startStreaming = useCallback(async () => {
+    chrome.runtime
+      .sendMessage({ type: "available-memory" })
+      .then(async (data) => {
+        // Check if there's enough space to keep recording
+        if (data.quota < 524288000) {
+          if (typeof contentStateRef.current.openModal === "function") {
+            let clear = null;
+            let clearAction = () => {};
+            // Add help link to modal
+            const locale = chrome.i18n.getMessage("@@ui_locale");
+            let helpURL =
+              "https://help.screenity.io/troubleshooting/9Jy5RGjNrBB42hqUdREQ7W/what-does-%E2%80%9Cmemory-limit-reached%E2%80%9D-mean-when-recording/8WkwHbt3puuXunYqQnyPcb";
+
+            if (!locale.includes("en")) {
+              helpURL =
+                "https://translate.google.com/translate?sl=en&tl=" +
+                locale +
+                "&u=https://help.screenity.io/troubleshooting/9Jy5RGjNrBB42hqUdREQ7W/what-does-%E2%80%9Cmemory-limit-reached%E2%80%9D-mean-when-recording/8WkwHbt3puuXunYqQnyPcb";
+            }
+
+            // Check if chunks collection exists and has data
+            chrome.runtime
+              .sendMessage({ type: "check-restore" })
+              .then((response) => {
+                if (response.restore) {
+                  clear = chrome.i18n.getMessage("clearSpaceButton");
+                  clearAction = () => {
+                    chrome.runtime.sendMessage({ type: "clear-recordings" });
+                  };
+                }
+                contentStateRef.current.openModal(
+                  chrome.i18n.getMessage("notEnoughSpaceTitle"),
+                  chrome.i18n.getMessage("notEnoughSpaceDescription"),
+                  clear,
+                  chrome.i18n.getMessage("permissionsModalDismiss"),
+                  clearAction,
+                  () => {},
+                  null,
+                  chrome.i18n.getMessage("learnMoreDot"),
+                  helpURL
+                );
+              });
+          }
+        } else {
+          // Check if recording a region & if a custom region is set
+          if (
+            contentStateRef.current.recordingType === "region" &&
+            contentStateRef.current.cropTarget
+          ) {
+            contentStateRef.current.regionCaptureRef.contentWindow.postMessage(
+              {
+                type: "crop-target",
+                target: contentStateRef.current.cropTarget,
+              },
+              "*"
+            );
           }
 
-          // Check if chunks collection exists and has data
-          chrome.runtime
-            .sendMessage({ type: "check-restore" })
-            .then((response) => {
-              if (response.restore) {
-                clear = chrome.i18n.getMessage("clearSpaceButton");
-                clearAction = () => {
-                  chrome.runtime.sendMessage({ type: "clear-recordings" });
-                };
-              }
-              contentStateRef.current.openModal(
-                chrome.i18n.getMessage("notEnoughSpaceTitle"),
-                chrome.i18n.getMessage("notEnoughSpaceDescription"),
-                clear,
-                chrome.i18n.getMessage("permissionsModalDismiss"),
-                clearAction,
-                () => {},
-                null,
-                chrome.i18n.getMessage("learnMoreDot"),
-                helpURL
-              );
-            });
-        }
-      } else {
-        // Check if recording a region & if a custom region is set
-        if (
-          contentStateRef.current.recordingType === "region" &&
-          contentStateRef.current.cropTarget
-        ) {
-          contentStateRef.current.regionCaptureRef.contentWindow.postMessage(
-            {
-              type: "crop-target",
-              target: contentStateRef.current.cropTarget,
-            },
-            "*"
-          );
-          contentStateRef.current.regionCaptureRef.addEventListener(
-            "load",
-            () => {
-              contentStateRef.current.regionCaptureRef.contentWindow.postMessage(
-                {
-                  type: "crop-target",
-                  target: contentStateRef.current.cropTarget,
-                },
-                "*"
-              );
-            }
-          );
-        }
+          let permission = false;
+          // Check if is in a content script vs an extension page (Chrome)
+          if (window.location.href.includes("chrome-extension://")) {
+            permission = await checkChromeCapturePermissions();
+          } else {
+            permission = await checkChromeCapturePermissionsSW();
+          }
 
-        chrome.runtime
-          .sendMessage({ type: "check-capture-permissions" })
-          .then((response) => {
-            if (response.status != "ok") {
-              contentStateRef.current.openModal(
-                chrome.i18n.getMessage("chromePermissionsModalTitle"),
-                chrome.i18n.getMessage("chromePermissionsModalDescription"),
-                chrome.i18n.getMessage("chromePermissionsModalAction"),
-                chrome.i18n.getMessage("chromePermissionsModalCancel"),
-                () => {
-                  startStreaming();
-                },
-                () => {},
-                null,
-                chrome.i18n.getMessage("learnMoreDot"),
-                URL,
-                true
-              );
-              return;
-            }
+          if (!permission) {
+            contentStateRef.current.openModal(
+              chrome.i18n.getMessage("chromePermissionsModalTitle"),
+              chrome.i18n.getMessage("chromePermissionsModalDescription"),
+              chrome.i18n.getMessage("chromePermissionsModalAction"),
+              chrome.i18n.getMessage("chromePermissionsModalCancel"),
+              () => {
+                startStreaming();
+              },
+              () => {},
+              null,
+              chrome.i18n.getMessage("learnMoreDot"),
+              URL,
+              true
+            );
+            return;
+          }
 
-            chrome.storage.local.set({
-              tabRecordedID: null,
-            });
+          chrome.storage.local.set({
+            tabRecordedID: null,
+          });
 
-            if (
-              contentStateRef.current.recordingType === "region" &&
-              !contentStateRef.current.customRegion
-            ) {
-              setContentState((prevContentState) => ({
-                ...prevContentState,
-                tabCaptureFrame: true,
-              }));
-            }
-
+          if (
+            contentStateRef.current.recordingType === "region" &&
+            !contentStateRef.current.customRegion
+          ) {
             setContentState((prevContentState) => ({
               ...prevContentState,
-              showOnboardingArrow: false,
+              tabCaptureFrame: true,
             }));
+          }
 
-            // Show modal if microphone is not enabled
-            if (
-              !contentStateRef.current.micActive &&
-              contentStateRef.current.askMicrophone
-            ) {
-              contentStateRef.current.openModal(
-                chrome.i18n.getMessage("micMutedModalTitle"),
-                chrome.i18n.getMessage("micMutedModalDescription"),
-                chrome.i18n.getMessage("micMutedModalAction"),
-                chrome.i18n.getMessage("micMutedModalCancel"),
-                () => {
-                  chrome.runtime.sendMessage({
-                    type: "desktop-capture",
-                    region:
-                      contentStateRef.current.recordingType === "region"
-                        ? true
-                        : false,
-                    customRegion: contentStateRef.current.customRegion,
-                    offscreenRecording:
-                      contentStateRef.current.offscreenRecording,
-                    camera:
-                      contentStateRef.current.recordingType === "camera"
-                        ? true
-                        : false,
-                  });
-                  setContentState((prevContentState) => ({
-                    ...prevContentState,
-                    pendingRecording: true,
-                    surface: "default",
-                    pipEnded: false,
-                  }));
-                },
-                () => {},
-                false,
-                false,
-                false,
-                false,
-                chrome.i18n.getMessage("noShowAgain"),
-                () => {
-                  setContentState((prevContentState) => ({
-                    ...prevContentState,
-                    askMicrophone: false,
-                  }));
-                  chrome.storage.local.set({ askMicrophone: false });
-                  chrome.runtime.sendMessage({
-                    type: "desktop-capture",
-                    region:
-                      contentStateRef.current.recordingType === "region"
-                        ? true
-                        : false,
-                    customRegion: contentStateRef.current.customRegion,
-                    offscreenRecording:
-                      contentStateRef.current.offscreenRecording,
-                    camera:
-                      contentStateRef.current.recordingType === "camera"
-                        ? true
-                        : false,
-                  });
-                  setContentState((prevContentState) => ({
-                    ...prevContentState,
-                    pendingRecording: true,
-                    surface: "default",
-                    pipEnded: false,
-                  }));
-                }
-              );
-            } else {
-              chrome.runtime.sendMessage({
-                type: "desktop-capture",
-                region:
-                  contentStateRef.current.recordingType === "region"
-                    ? true
-                    : false,
-                customRegion: contentStateRef.current.customRegion,
-                offscreenRecording: contentStateRef.current.offscreenRecording,
-                camera:
-                  contentStateRef.current.recordingType === "camera"
-                    ? true
-                    : false,
-              });
-              setContentState((prevContentState) => ({
-                ...prevContentState,
-                pendingRecording: true,
-                surface: "default",
-                pipEnded: false,
-              }));
-            }
-          });
-      }
-    });
-  });
+          setContentState((prevContentState) => ({
+            ...prevContentState,
+            showOnboardingArrow: false,
+          }));
+
+          // Show modal if microphone is not enabled
+          if (
+            !contentStateRef.current.micActive &&
+            contentStateRef.current.askMicrophone
+          ) {
+            contentStateRef.current.openModal(
+              chrome.i18n.getMessage("micMutedModalTitle"),
+              chrome.i18n.getMessage("micMutedModalDescription"),
+              chrome.i18n.getMessage("micMutedModalAction"),
+              chrome.i18n.getMessage("micMutedModalCancel"),
+              () => {
+                chrome.runtime.sendMessage({
+                  type: "desktop-capture",
+                  region:
+                    contentStateRef.current.recordingType === "region"
+                      ? true
+                      : false,
+                  customRegion: contentStateRef.current.customRegion,
+                  offscreenRecording:
+                    contentStateRef.current.offscreenRecording,
+                  camera:
+                    contentStateRef.current.recordingType === "camera"
+                      ? true
+                      : false,
+                });
+                setContentState((prevContentState) => ({
+                  ...prevContentState,
+                  pendingRecording: true,
+                  surface: "default",
+                  pipEnded: false,
+                }));
+              },
+              () => {},
+              false,
+              false,
+              false,
+              false,
+              chrome.i18n.getMessage("noShowAgain"),
+              () => {
+                setContentState((prevContentState) => ({
+                  ...prevContentState,
+                  askMicrophone: false,
+                }));
+                chrome.storage.local.set({ askMicrophone: false });
+                chrome.runtime.sendMessage({
+                  type: "desktop-capture",
+                  region:
+                    contentStateRef.current.recordingType === "region"
+                      ? true
+                      : false,
+                  customRegion: contentStateRef.current.customRegion,
+                  offscreenRecording:
+                    contentStateRef.current.offscreenRecording,
+                  camera:
+                    contentStateRef.current.recordingType === "camera"
+                      ? true
+                      : false,
+                });
+                setContentState((prevContentState) => ({
+                  ...prevContentState,
+                  pendingRecording: true,
+                  surface: "default",
+                  pipEnded: false,
+                }));
+              }
+            );
+          } else {
+            chrome.runtime.sendMessage({
+              type: "desktop-capture",
+              region:
+                contentStateRef.current.recordingType === "region"
+                  ? true
+                  : false,
+              customRegion: contentStateRef.current.customRegion,
+              offscreenRecording: contentStateRef.current.offscreenRecording,
+              camera:
+                contentStateRef.current.recordingType === "camera"
+                  ? true
+                  : false,
+            });
+            setContentState((prevContentState) => ({
+              ...prevContentState,
+              pendingRecording: true,
+              surface: "default",
+              pipEnded: false,
+            }));
+          }
+        }
+      });
+  }, [contentState, contentStateRef]);
 
   const tryRestartRecording = useCallback(() => {
     contentState.pauseRecording();
@@ -390,18 +437,18 @@ const ContentState = (props) => {
   });
 
   const tryDismissRecording = useCallback(() => {
-    if (contentState.askDismiss) {
-      contentState.pauseRecording(true);
-      contentState.openModal(
+    if (contentStateRef.current.askDismiss) {
+      contentStateRef.current.pauseRecording(true);
+      contentStateRef.current.openModal(
         chrome.i18n.getMessage("discardModalTitle"),
         chrome.i18n.getMessage("discardModalDescription"),
         chrome.i18n.getMessage("discardModalDiscard"),
         chrome.i18n.getMessage("discardModalResume"),
         () => {
-          contentState.dismissRecording();
+          contentStateRef.current.dismissRecording();
         },
         () => {
-          contentState.resumeRecording();
+          contentStateRef.current.resumeRecording();
         }
         // false,
         // false,
@@ -418,9 +465,9 @@ const ContentState = (props) => {
         // }
       );
     } else {
-      contentState.dismissRecording();
+      contentStateRef.current.dismissRecording();
     }
-  });
+  }, [contentState, contentStateRef.current]);
 
   const handleDevicePermissions = (data) => {
     if (data && data != undefined && data.success) {
@@ -794,177 +841,180 @@ const ContentState = (props) => {
     }
   }, [contentState.hideToolbar, contentState.hideUI]);
 
-  const onMessage = useCallback((request, sender, sendResponse) => {
-    if (request.type === "time") {
-      chrome.storage.local.get(["recording"], (result) => {
-        if (result.recording) {
-          setTimer(request.time);
-        }
-      });
-    } else if (request.type === "toggle-popup") {
-      setContentState((prevContentState) => ({
-        ...prevContentState,
-        showExtension: !prevContentState.showExtension,
-        showPopup: true,
-      }));
-      setTimer(0);
-      updateFromStorage();
-    } else if (request.type === "ready-to-record") {
-      setContentState((prevContentState) => ({
-        ...prevContentState,
-        showPopup: false,
-      }));
-    } else if (request.type === "stop-recording-tab") {
-      chrome.storage.local.set({ recording: false });
-      setContentState((prevContentState) => ({
-        ...prevContentState,
-        recording: false,
-        paused: false,
-        showExtension: false,
-        showPopup: true,
-      }));
-    } else if (request.type === "recording-ended") {
-      if (
-        !contentStateRef.current.showPopup &&
-        !contentStateRef.current.pendingRecording
-      ) {
+  const onMessage = useCallback(
+    (request, sender, sendResponse) => {
+      if (request.type === "time") {
+        chrome.storage.local.get(["recording"], (result) => {
+          if (result.recording) {
+            setTimer(request.time);
+          }
+        });
+      } else if (request.type === "toggle-popup") {
         setContentState((prevContentState) => ({
           ...prevContentState,
-          showExtension: false,
+          showExtension: !prevContentState.showExtension,
+          showPopup: true,
+        }));
+        setTimer(0);
+        updateFromStorage();
+      } else if (request.type === "ready-to-record") {
+        setContentState((prevContentState) => ({
+          ...prevContentState,
+          showPopup: false,
+        }));
+      } else if (request.type === "stop-recording-tab") {
+        chrome.storage.local.set({ recording: false });
+        setContentState((prevContentState) => ({
+          ...prevContentState,
           recording: false,
           paused: false,
-          time: 0,
-          timer: 0,
+          showExtension: false,
+          showPopup: true,
         }));
-      }
-    } else if (request.type === "recording-error") {
-      setContentState((prevContentState) => ({
-        ...prevContentState,
-        pendingRecording: false,
-      }));
-    } else if (request.type === "start-stream") {
-      if (contentStateRef.current.recording) return;
-
-      // Make sure the extension + popup is visible
-      setContentState((prevContentState) => ({
-        ...prevContentState,
-        showExtension: true,
-        showPopup: true,
-      }));
-
-      // Check if recording type is camera, if no camera is set, show the camera picker
-      if (contentStateRef.current.recordingType != "camera") {
-        contentStateRef.current.startStreaming();
-      } else if (
-        contentStateRef.current.defaultVideoInput != "none" &&
-        contentStateRef.current.cameraActive
-      ) {
-        contentStateRef.current.startStreaming();
-      }
-    } else if (request.type === "commands") {
-      // Find the command with the name "start-recording"
-      const startRecordingCommand = request.commands.find(
-        (command) => command.name === "start-recording"
-      );
-      const cancelRecordingCommand = request.commands.find(
-        (command) => command.name === "cancel-recording"
-      );
-      setContentState((prevContentState) => ({
-        ...prevContentState,
-        recordingShortcut: startRecordingCommand.shortcut,
-        dismissRecordingShortcut: cancelRecordingCommand.shortcut,
-      }));
-    } else if (request.type === "cancel-recording") {
-      contentState.dismissRecording();
-    } else if (request.type === "pause-recording") {
-      // Toggle pause / resume
-      if (contentStateRef.current.paused) {
-        contentState.resumeRecording();
-      } else {
-        contentState.pauseRecording();
-      }
-    } else if (request.type === "set-surface") {
-      setContentState((prevContentState) => ({
-        ...prevContentState,
-        surface: request.surface,
-      }));
-    } else if (request.type === "pip-ended") {
-      if (
-        contentStateRef.current.recording ||
-        contentStateRef.current.pendingRecording
-      ) {
+      } else if (request.type === "recording-ended") {
+        if (
+          !contentStateRef.current.showPopup &&
+          !contentStateRef.current.pendingRecording
+        ) {
+          setContentState((prevContentState) => ({
+            ...prevContentState,
+            showExtension: false,
+            recording: false,
+            paused: false,
+            time: 0,
+            timer: 0,
+          }));
+        }
+      } else if (request.type === "recording-error") {
         setContentState((prevContentState) => ({
           ...prevContentState,
-          pipEnded: true,
+          pendingRecording: false,
         }));
-      }
-    } else if (request.type === "pip-started") {
-      if (
-        contentStateRef.current.recording ||
-        contentStateRef.current.pendingRecording
-      ) {
-        setContentState((prevContentState) => ({
-          ...prevContentState,
-          pipEnded: false,
-        }));
-      }
-    } else if (request.type === "setup-complete") {
-      setContentState((prevContentState) => ({
-        ...prevContentState,
-        showOnboardingArrow: true,
-      }));
-    } else if (request.type === "hide-popup-recording") {
-      setContentState((prevContentState) => ({
-        ...prevContentState,
-        showPopup: false,
-        showExtension: false,
-      }));
-    } else if (request.type === "stream-error") {
-      contentStateRef.current.openModal(
-        chrome.i18n.getMessage("streamErrorModalTitle"),
-        chrome.i18n.getMessage("streamErrorModalDescription"),
-        chrome.i18n.getMessage("permissionsModalDismiss"),
-        null,
-        () => {
-          contentStateRef.current.dismissRecording();
-        },
-        () => {
-          contentStateRef.current.dismissRecording();
-        }
-      );
-    } else if (request.type === "backup-error") {
-      contentStateRef.current.openModal(
-        chrome.i18n.getMessage("backupPermissionFailTitle"),
-        chrome.i18n.getMessage("backupPermissionFailDescription"),
-        chrome.i18n.getMessage("permissionsModalDismiss"),
-        null,
-        () => {
-          contentStateRef.current.dismissRecording();
-        },
-        () => {
-          contentStateRef.current.dismissRecording();
-        }
-      );
-    } else if (request.type === "recording-check") {
-      if (!request.force) {
-        if (!contentStateRef.showExtension && !contentStateRef.recording) {
-          updateFromStorage(true, sender.tab.id);
-        }
-      } else if (request.force) {
+      } else if (request.type === "start-stream") {
+        if (contentStateRef.current.recording) return;
+
+        // Make sure the extension + popup is visible
         setContentState((prevContentState) => ({
           ...prevContentState,
           showExtension: true,
-          recording: true,
+          showPopup: true,
         }));
-        updateFromStorage(false, sender.tab.id);
+
+        // Check if recording type is camera, if no camera is set, show the camera picker
+        if (contentStateRef.current.recordingType != "camera") {
+          contentStateRef.current.startStreaming();
+        } else if (
+          contentStateRef.current.defaultVideoInput != "none" &&
+          contentStateRef.current.cameraActive
+        ) {
+          contentStateRef.current.startStreaming();
+        }
+      } else if (request.type === "commands") {
+        // Find the command with the name "start-recording"
+        const startRecordingCommand = request.commands.find(
+          (command) => command.name === "start-recording"
+        );
+        const cancelRecordingCommand = request.commands.find(
+          (command) => command.name === "cancel-recording"
+        );
+        setContentState((prevContentState) => ({
+          ...prevContentState,
+          recordingShortcut: startRecordingCommand.shortcut,
+          dismissRecordingShortcut: cancelRecordingCommand.shortcut,
+        }));
+      } else if (request.type === "cancel-recording") {
+        contentState.dismissRecording();
+      } else if (request.type === "pause-recording") {
+        // Toggle pause / resume
+        if (contentStateRef.current.paused) {
+          contentState.resumeRecording();
+        } else {
+          contentState.pauseRecording();
+        }
+      } else if (request.type === "set-surface") {
+        setContentState((prevContentState) => ({
+          ...prevContentState,
+          surface: request.surface,
+        }));
+      } else if (request.type === "pip-ended") {
+        if (
+          contentStateRef.current.recording ||
+          contentStateRef.current.pendingRecording
+        ) {
+          setContentState((prevContentState) => ({
+            ...prevContentState,
+            pipEnded: true,
+          }));
+        }
+      } else if (request.type === "pip-started") {
+        if (
+          contentStateRef.current.recording ||
+          contentStateRef.current.pendingRecording
+        ) {
+          setContentState((prevContentState) => ({
+            ...prevContentState,
+            pipEnded: false,
+          }));
+        }
+      } else if (request.type === "setup-complete") {
+        setContentState((prevContentState) => ({
+          ...prevContentState,
+          showOnboardingArrow: true,
+        }));
+      } else if (request.type === "hide-popup-recording") {
+        setContentState((prevContentState) => ({
+          ...prevContentState,
+          showPopup: false,
+          showExtension: false,
+        }));
+      } else if (request.type === "stream-error") {
+        contentStateRef.current.openModal(
+          chrome.i18n.getMessage("streamErrorModalTitle"),
+          chrome.i18n.getMessage("streamErrorModalDescription"),
+          chrome.i18n.getMessage("permissionsModalDismiss"),
+          null,
+          () => {
+            contentStateRef.current.dismissRecording();
+          },
+          () => {
+            contentStateRef.current.dismissRecording();
+          }
+        );
+      } else if (request.type === "backup-error") {
+        contentStateRef.current.openModal(
+          chrome.i18n.getMessage("backupPermissionFailTitle"),
+          chrome.i18n.getMessage("backupPermissionFailDescription"),
+          chrome.i18n.getMessage("permissionsModalDismiss"),
+          null,
+          () => {
+            contentStateRef.current.dismissRecording();
+          },
+          () => {
+            contentStateRef.current.dismissRecording();
+          }
+        );
+      } else if (request.type === "recording-check") {
+        if (!request.force) {
+          if (!contentStateRef.showExtension && !contentStateRef.recording) {
+            updateFromStorage(true, sender.tab.id);
+          }
+        } else if (request.force) {
+          setContentState((prevContentState) => ({
+            ...prevContentState,
+            showExtension: true,
+            recording: true,
+          }));
+          updateFromStorage(false, sender.tab.id);
+        }
+      } else if (request.type === "stop-pending") {
+        setContentState((prevContentState) => ({
+          ...prevContentState,
+          pendingRecording: false,
+        }));
       }
-    } else if (request.type === "stop-pending") {
-      setContentState((prevContentState) => ({
-        ...prevContentState,
-        pendingRecording: false,
-      }));
-    }
-  });
+    },
+    [contentStateRef.current, contentState]
+  );
 
   useEffect(() => {
     chrome.storage.local.set({
@@ -975,13 +1025,16 @@ const ContentState = (props) => {
   // Check if user has enough RAM to record for each quality option
   useEffect(() => {
     const checkRAM = () => {
+      let width = Math.round(window.screen.width * window.devicePixelRatio);
+      let height = Math.round(window.screen.height * window.devicePixelRatio);
       const ram = navigator.deviceMemory;
 
       // Check if ramValue needs to be updated
       if (
-        (ram < 2 && contentState.qualityValue === "720p") ||
-        contentState.qualityValue === "4k" ||
-        contentState.qualityValue === "1080p"
+        (ram < 2 || width < 1280 || height < 720) &&
+        (contentState.qualityValue === "720p" ||
+          contentState.qualityValue === "4k" ||
+          contentState.qualityValue === "1080p")
       ) {
         setContentState((prevContentState) => ({
           ...prevContentState,
@@ -991,8 +1044,9 @@ const ContentState = (props) => {
           qualityValue: "480p",
         });
       } else if (
-        (ram < 8 && contentState.qualityValue === "4k") ||
-        contentState.qualityValue === "1080p"
+        (ram < 8 || width < 3840 || height < 2160) &&
+        (contentState.qualityValue === "4k" ||
+          contentState.qualityValue === "1080p")
       ) {
         setContentState((prevContentState) => ({
           ...prevContentState,
