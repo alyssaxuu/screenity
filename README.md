@@ -75,7 +75,7 @@ You can create it accessing [Google Cloud Console](https://console.cloud.google.
 - [Fabric.js](https://github.com/fabricjs/fabric.js) for drawing and annotating
 - [Radix Primitives](https://www.radix-ui.com/primitives) for the UI components
 - [react-color](https://uiwjs.github.io/react-color/) for the color wheel
-- [Localbase](https://github.com/dannyconnell/localbase) to help store videos offline with IndexedDB
+- [localForage](https://github.com/localForage/localForage) to help store videos offline with IndexedDB
 - [Wavesurfer.js](https://wavesurfer.xyz/) to create audio waveforms in the popup and the editor
 - [React Advanced Cropper](https://advanced-cropper.github.io/react-advanced-cropper/) for the cropping UI in the editor
 - [fix-webm-duration](https://github.com/yusitnikov/fix-webm-duration) to add missing metadata to WEBM files
