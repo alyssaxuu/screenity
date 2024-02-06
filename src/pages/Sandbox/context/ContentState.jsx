@@ -364,6 +364,7 @@ const ContentState = (props) => {
     for (const chunk of chunks) {
       // Check if too many chunks have been received
       if (contentStateRef.current.chunkIndex >= chunkCount.current) {
+        makeVideoTab(null, { override: true });
         return;
       }
 
@@ -375,6 +376,8 @@ const ContentState = (props) => {
       }));
     }
     sendResponse({ status: "ok" });
+
+    return;
   };
 
   // Check Chrome version
@@ -392,6 +395,21 @@ const ContentState = (props) => {
     }
   }, []);
 
+  const makeVideoTab = (sendResponse = null, message) => {
+    if (makeVideoCheck.current) return;
+    makeVideoCheck.current = true;
+    setContentState((prevState) => ({
+      ...prevState,
+      override: message.override,
+    }));
+    // All chunks received, reconstruct video
+    checkMemory();
+    reconstructVideo();
+    if (sendResponse !== null) {
+      sendResponse({ status: "ok" });
+    }
+  };
+
   const onChromeMessage = useCallback(
     (request, sender, sendResponse) => {
       const message = request;
@@ -399,22 +417,16 @@ const ContentState = (props) => {
         setContentState((prevState) => ({
           ...prevState,
           chunkCount: message.count,
+          override: message.override,
         }));
       } else if (message.type === "new-chunk-tab") {
         handleBatch(message.chunks, sendResponse);
 
         return true;
       } else if (message.type === "make-video-tab") {
-        if (makeVideoCheck.current) return;
-        makeVideoCheck.current = true;
-        setContentState((prevState) => ({
-          ...prevState,
-          override: message.override,
-        }));
-        // All chunks received, reconstruct video
-        checkMemory();
-        reconstructVideo();
-        sendResponse({ status: "ok" });
+        makeVideoTab(sendResponse, message);
+
+        return;
       } else if (message.type === "saved-to-drive") {
         setContentState((prevContentState) => ({
           ...prevContentState,

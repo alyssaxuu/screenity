@@ -96,12 +96,6 @@ const Recorder = () => {
           }));
       }
 
-      chrome.runtime.sendMessage({
-        oh: "hi",
-        stream: JSON.stringify(stream),
-        devicesInfo: JSON.stringify(devicesInfo),
-      });
-
       // Save in Chrome local storage
       chrome.storage.local.set({
         // Set available devices

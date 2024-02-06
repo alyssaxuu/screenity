@@ -381,7 +381,11 @@ const handleChunks = async (chunks, override = false) => {
   const maxRetries = 5; // Maximum number of retry attempts per batch
   const retryDelay = 1000; // Delay in milliseconds between retry attempts
 
-  sendMessageTab(sandboxTab, { type: "chunk-count", count: chunksCount });
+  sendMessageTab(sandboxTab, {
+    type: "chunk-count",
+    count: chunksCount,
+    override: override,
+  });
 
   const sendNextBatch = async (retryCount = 0) => {
     // Determine the range of chunks for the current batch
