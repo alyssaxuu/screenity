@@ -56,7 +56,7 @@ var options = {
       __dirname,
       "src",
       "pages",
-      "permissions",
+      "Permissions",
       "index.jsx"
     ),
     setup: path.join(__dirname, "src", "pages", "Setup", "index.jsx"),
