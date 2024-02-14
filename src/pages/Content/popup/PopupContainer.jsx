@@ -322,10 +322,10 @@ const PopupContainer = (props) => {
             <div
               className="popup-control popup-close"
               onClick={() => {
-                setContentState({
-                  ...contentState,
+                setContentState((prevContentState) => ({
+                  ...prevContentState,
                   showExtension: false,
-                });
+                }));
               }}
             >
               <CloseIconPopup />

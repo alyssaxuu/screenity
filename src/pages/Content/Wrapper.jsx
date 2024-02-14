@@ -84,26 +84,31 @@ const Wrapper = () => {
 
   return (
     <div ref={parentRef}>
-      <iframe
-        style={{
-          // all: "unset",
-          display: "none",
-          visibility: "hidden",
-        }}
-        ref={permissionsRef}
-        src={chrome.runtime.getURL("permissions.html")}
-        allow="camera *; microphone *"
-      ></iframe>
-      <iframe
-        style={{
-          // all: "unset",
-          display: "none",
-          visibility: "hidden",
-        }}
-        ref={regionCaptureRef}
-        src={chrome.runtime.getURL("region.html")}
-        allow="camera *; microphone *; display-capture *"
-      ></iframe>
+      {contentState.showExtension && (
+        <iframe
+          style={{
+            // all: "unset",
+            display: "none",
+            visibility: "hidden",
+          }}
+          ref={permissionsRef}
+          src={chrome.runtime.getURL("permissions.html")}
+          allow="camera *; microphone *"
+        ></iframe>
+      )}
+      {contentState.hasOpenedBefore && (
+        <iframe
+          style={{
+            // all: "unset",
+            display: "none",
+            visibility: "hidden",
+          }}
+          ref={regionCaptureRef}
+          src={chrome.runtime.getURL("region.html")}
+          allow="camera *; microphone *; display-capture *"
+        ></iframe>
+      )}
+
       {contentState.zoomEnabled && <ZoomContainer />}
       <BlurTool />
       {contentState.showExtension || contentState.recording ? (
@@ -143,11 +148,11 @@ const Wrapper = () => {
                     !contentState.pendingRecording &&
                     !contentState.customRegion
                   ) {
-                    setContentState({
-                      ...contentState,
+                    setContentState((prevContentState) => ({
+                      ...prevContentState,
                       showExtension: false,
                       showPopup: false,
-                    });
+                    }));
                   }
                 }}
               ></div>

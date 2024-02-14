@@ -91,8 +91,6 @@ const SettingsMenu = (props) => {
               platformInfo = response;
               const manifestInfo = chrome.runtime.getManifest().version;
 
-              //const contentStateData = JSON.stringify({ ...contentState });
-
               // Now we need to create a file with all of this data
               const data = {
                 userAgent: userAgent,

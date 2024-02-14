@@ -7,8 +7,6 @@ import Editor from "./layout/editor/Editor";
 import Player from "./layout/player/Player";
 import Modal from "./components/global/Modal";
 
-import fixWebmDuration from "fix-webm-duration";
-
 import HelpButton from "./components/player/HelpButton";
 
 // Context

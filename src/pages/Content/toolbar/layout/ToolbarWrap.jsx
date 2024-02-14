@@ -438,7 +438,9 @@ const ToolbarWrap = () => {
               content={chrome.i18n.getMessage("cancelRecordingTooltip")}
               disabled={!contentState.recording}
               onClick={() => {
-                contentState.tryDismissRecording();
+                if (contentState.tryDismissRecording !== undefined) {
+                  contentState.tryDismissRecording();
+                }
               }}
             >
               <DiscardIcon />

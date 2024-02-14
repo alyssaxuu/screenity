@@ -105,7 +105,11 @@ const DrawingToolbar = (props) => {
         className="ToolbarToggleGroup"
         value={tool}
         onValueChange={(value) => {
-          if (value) setContentState({ ...contentState, tool: value });
+          if (value)
+            setContentState((prevContentState) => ({
+              ...prevContentState,
+              tool: value,
+            }));
         }}
       >
         <ToolTrigger

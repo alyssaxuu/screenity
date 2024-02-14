@@ -298,7 +298,8 @@ const ContentState = (props) => {
               chrome.i18n.getMessage("chromePermissionsModalDescription"),
               chrome.i18n.getMessage("chromePermissionsModalAction"),
               chrome.i18n.getMessage("chromePermissionsModalCancel"),
-              () => {
+              async () => {
+                await checkChromeCapturePermissionsSW();
                 startStreaming();
               },
               () => {},
@@ -685,6 +686,7 @@ const ContentState = (props) => {
     backup: false,
     backupSetup: false,
     openWarning: false,
+    hasOpenedBefore: false,
     qualityValue: "720p",
     fpsValue: "30",
   });
@@ -853,6 +855,7 @@ const ContentState = (props) => {
         setContentState((prevContentState) => ({
           ...prevContentState,
           showExtension: !prevContentState.showExtension,
+          hasOpenedBefore: true,
           showPopup: true,
         }));
         setTimer(0);
@@ -1004,6 +1007,7 @@ const ContentState = (props) => {
             showExtension: true,
             recording: true,
           }));
+          //checkRecording(sender.tab.id);
           updateFromStorage(false, sender.tab.id);
         }
       } else if (request.type === "stop-pending") {

@@ -17,10 +17,10 @@ const CameraToolbar = () => {
       <Toolbar.Button
         className="CameraToolbarButton"
         onClick={() => {
-          setContentState({
-            ...contentState,
+          setContentState((prevContentState) => ({
+            ...prevContentState,
             cameraActive: false,
-          });
+          }));
           chrome.storage.local.set({ cameraActive: false });
         }}
       >

@@ -44,6 +44,7 @@ const VideoPlayer = (props) => {
         "pip",
         "fullscreen",
       ],
+      urls: null,
       ratio: "16:9",
       blankVideo:
         "chrome-extension://" +

@@ -287,7 +287,6 @@ const Recorder = () => {
           } else {
             lastTimecode.current = timestamp;
           }
-
           await chunksStore.setItem(`chunk_${index.current}`, {
             index: index.current,
             chunk: e.data,

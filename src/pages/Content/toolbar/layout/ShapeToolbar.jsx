@@ -30,7 +30,11 @@ const ShapeToolbar = (props) => {
         className="ToolbarToggleGroup"
         value={contentState.shape}
         onValueChange={(value) => {
-          if (value) setContentState({ ...contentState, shape: value });
+          if (value)
+            setContentState((prevContentState) => ({
+              ...prevContentState,
+              shape: value,
+            }));
           chrome.storage.local.set({ shape: value });
         }}
       >
@@ -60,10 +64,10 @@ const ShapeToolbar = (props) => {
         value="fill"
         content={chrome.i18n.getMessage("toggleFillTooltip")}
         onClick={() => {
-          setContentState({
-            ...contentState,
+          setContentState((prevContentState) => ({
+            ...prevContentState,
             shapeFill: !contentState.shapeFill,
-          });
+          }));
           chrome.storage.local.set({ shapeFill: !contentState.shapeFill });
         }}
       >

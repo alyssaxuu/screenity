@@ -57,7 +57,11 @@ const RadialMenu = (props) => {
     eyeDropper
       .open()
       .then((color) => {
-        setContentState({ ...contentState, color: color.sRGBHex, swatch: 5 });
+        setContentState((prevContentState) => ({
+          ...prevContentState,
+          color: color.sRGBHex,
+          swatch: 5,
+        }));
         setEyeDropperActive(false);
       })
       .catch((err) => {
@@ -140,7 +144,10 @@ const RadialMenu = (props) => {
                 type="single"
                 value={contentState.strokeWidth}
                 onValueChange={(value) => {
-                  setContentState({ ...contentState, strokeWidth: value });
+                  setContentState((prevContentState) => ({
+                    ...prevContentState,
+                    strokeWidth: value,
+                  }));
                 }}
               >
                 <StrokeWeight open={open} />
@@ -156,11 +163,11 @@ const RadialMenu = (props) => {
                       <div
                         tabIndex={open ? "0" : "-1"}
                         onClick={() => {
-                          setContentState({
-                            ...contentState,
+                          setContentState((prevContentState) => ({
+                            ...prevContentState,
                             color: color.color,
                             swatch: index,
-                          });
+                          }));
                           chrome.storage.local.set({
                             color: color.color,
                             swatch: index,

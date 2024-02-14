@@ -60,10 +60,10 @@ const CanvasWrap = (props) => {
 
     canvas.renderAll();
 
-    setContentState({
-      ...contentState,
+    setContentState((prevContentState) => ({
+      ...prevContentState,
       canvas: canvas,
-    });
+    }));
 
     CustomControls(canvas);
     saveCanvas(

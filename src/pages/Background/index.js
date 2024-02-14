@@ -1384,33 +1384,6 @@ const checkRestore = async (sendResponse) => {
   sendResponse({ restore: true });
 };
 
-const checkCapturePermissions = (sendResponse) => {
-  chrome.permissions.contains(
-    {
-      permissions: ["desktopCapture", "alarms", "offscreen"],
-    },
-    (result) => {
-      if (!result) {
-        chrome.permissions.request(
-          {
-            permissions: ["desktopCapture", "alarms", "offscreen"],
-          },
-          (granted) => {
-            if (!granted) {
-              sendResponse({ status: "error" });
-            } else {
-              addAlarmListener();
-              sendResponse({ status: "ok" });
-            }
-          }
-        );
-      } else {
-        sendResponse({ status: "ok" });
-      }
-    }
-  );
-};
-
 const base64ToUint8Array = (base64) => {
   const dataUrlRegex = /^data:(.*?);base64,/;
   const matches = base64.match(dataUrlRegex);
@@ -1549,6 +1522,12 @@ const handleStopRecordingTab = async (request) => {
       memoryError: true,
     });
   }
+  // sendMessageRecord({
+  //   type: "loaded",
+  //   request: request,
+  //   backup: backup,
+  //   region: true,
+  // });
   sendMessageRecord({ type: "stop-recording-tab" });
 };
 
@@ -1830,7 +1809,30 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     checkRestore(sendResponse);
     return true;
   } else if (request.type === "check-capture-permissions") {
-    checkCapturePermissions(sendResponse);
+    chrome.permissions.contains(
+      {
+        permissions: ["desktopCapture", "alarms", "offscreen"],
+      },
+      (result) => {
+        if (!result) {
+          chrome.permissions.request(
+            {
+              permissions: ["desktopCapture", "alarms", "offscreen"],
+            },
+            (granted) => {
+              if (!granted) {
+                sendResponse({ status: "error" });
+              } else {
+                addAlarmListener();
+                sendResponse({ status: "ok" });
+              }
+            }
+          );
+        } else {
+          sendResponse({ status: "ok" });
+        }
+      }
+    );
     return true;
   } else if (request.type === "is-pinned") {
     isPinned(sendResponse);

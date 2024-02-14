@@ -17,6 +17,8 @@ const ResizableBox = () => {
 
   // Check for contentState.regionDimensions to update the Rnd component width and height
   useEffect(() => {
+    if (contentState.recordingType != "region") return;
+    if (!contentState.customRegion) return;
     if (regionRef.current === null) return;
     if (
       contentState.regionWidth === 0 ||
@@ -63,6 +65,8 @@ const ResizableBox = () => {
     });
     setCropTarget();
   }, [
+    contentState.recordingType,
+    contentState.customRegion,
     contentState.regionWidth,
     contentState.regionHeight,
     contentState.regionX,

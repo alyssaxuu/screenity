@@ -58,11 +58,11 @@ const ColorWheel = (props) => {
           height={100}
           onChange={(color) => {
             setHsva({ ...hsva, ...color.hsva });
-            setContentState({
-              ...contentState,
+            setContentState((prevContentState) => ({
+              ...prevContentState,
               color: hsvaToHex({ h: hsva.h, s: hsva.s, v: hsva.v, a: hsva.a }),
               swatch: 5,
-            });
+            }));
             chrome.storage.local.set({
               color: hsvaToHex({ h: hsva.h, s: hsva.s, v: hsva.v, a: hsva.a }),
               swatch: 5,

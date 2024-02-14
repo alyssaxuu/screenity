@@ -62,14 +62,14 @@ const CameraWrap = (props) => {
     const ref =
       props.shadowRef.current.shadowRoot.querySelector(".camera-draggable");
 
-    setContentState({
-      ...contentState,
+    setContentState((prevContentState) => ({
+      ...prevContentState,
       cameraDimensions: {
         size: ref.getBoundingClientRect().width,
         x: ref.getBoundingClientRect().x,
         y: ref.getBoundingClientRect().y,
       },
-    });
+    }));
     chrome.storage.local.set({
       cameraDimensions: {
         size: ref.getBoundingClientRect().width,

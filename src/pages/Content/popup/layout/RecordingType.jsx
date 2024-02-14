@@ -153,23 +153,25 @@ const RecordingType = (props) => {
         <button
           className="permission-button"
           onClick={() => {
-            contentState.openModal(
-              chrome.i18n.getMessage("permissionsModalTitle"),
-              chrome.i18n.getMessage("permissionsModalDescription"),
-              chrome.i18n.getMessage("permissionsModalReview"),
-              chrome.i18n.getMessage("permissionsModalDismiss"),
-              () => {
-                chrome.runtime.sendMessage({
-                  type: "extension-media-permissions",
-                });
-              },
-              () => {},
-              chrome.runtime.getURL("assets/helper/permissions.webp"),
-              chrome.i18n.getMessage("learnMoreDot"),
-              URL2,
-              true,
-              false
-            );
+            if (typeof contentState.openModal === "function") {
+              contentState.openModal(
+                chrome.i18n.getMessage("permissionsModalTitle"),
+                chrome.i18n.getMessage("permissionsModalDescription"),
+                chrome.i18n.getMessage("permissionsModalReview"),
+                chrome.i18n.getMessage("permissionsModalDismiss"),
+                () => {
+                  chrome.runtime.sendMessage({
+                    type: "extension-media-permissions",
+                  });
+                },
+                () => {},
+                chrome.runtime.getURL("assets/helper/permissions.webp"),
+                chrome.i18n.getMessage("learnMoreDot"),
+                URL2,
+                true,
+                false
+              );
+            }
           }}
         >
           <img src={CameraOffBlue} />
@@ -200,25 +202,27 @@ const RecordingType = (props) => {
       {!contentState.microphonePermission && (
         <button
           className="permission-button"
-          onClick={() =>
-            contentState.openModal(
-              chrome.i18n.getMessage("permissionsModalTitle"),
-              chrome.i18n.getMessage("permissionsModalDescription"),
-              chrome.i18n.getMessage("permissionsModalReview"),
-              chrome.i18n.getMessage("permissionsModalDismiss"),
-              () => {
-                chrome.runtime.sendMessage({
-                  type: "extension-media-permissions",
-                });
-              },
-              () => {},
-              chrome.runtime.getURL("assets/helper/permissions.webp"),
-              chrome.i18n.getMessage("learnMoreDot"),
-              URL2,
-              true,
-              false
-            )
-          }
+          onClick={() => {
+            if (typeof contentState.openModal === "function") {
+              contentState.openModal(
+                chrome.i18n.getMessage("permissionsModalTitle"),
+                chrome.i18n.getMessage("permissionsModalDescription"),
+                chrome.i18n.getMessage("permissionsModalReview"),
+                chrome.i18n.getMessage("permissionsModalDismiss"),
+                () => {
+                  chrome.runtime.sendMessage({
+                    type: "extension-media-permissions",
+                  });
+                },
+                () => {},
+                chrome.runtime.getURL("assets/helper/permissions.webp"),
+                chrome.i18n.getMessage("learnMoreDot"),
+                URL2,
+                true,
+                false
+              );
+            }
+          }}
         >
           <img src={MicOffBlue} />
           <span>{chrome.i18n.getMessage("allowMicrophoneAccessButton")}</span>
