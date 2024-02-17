@@ -361,23 +361,37 @@ const ContentState = (props) => {
   }, [contentState.chunkCount]);
 
   const handleBatch = async (chunks, sendResponse) => {
-    for (const chunk of chunks) {
-      // Check if too many chunks have been received
-      if (contentStateRef.current.chunkIndex >= chunkCount.current) {
-        makeVideoTab(null, { override: true });
-        return;
-      }
+    // Process chunks with a promise to ensure all async operations are completed
+    await Promise.all(
+      chunks.map(async (chunk) => {
+        if (contentStateRef.current.chunkIndex >= chunkCount.current) {
+          console.warn("Too many chunks received");
+          // Handling for too many chunks
+          return Promise.resolve(); // Resolve early for this case
+        }
 
-      const chunkData = base64ToUint8Array(chunk.chunk);
-      videoChunks.current.push(chunkData);
-      setContentState((prevState) => ({
-        ...prevState,
-        chunkIndex: prevState.chunkIndex + 1,
-      }));
-    }
-    sendResponse({ status: "ok" });
+        const chunkData = base64ToUint8Array(chunk.chunk);
+        videoChunks.current.push(chunkData);
 
-    return;
+        // Assuming setContentState doesn't need to be awaited
+        setContentState((prevState) => ({
+          ...prevState,
+          chunkIndex: prevState.chunkIndex + 1,
+        }));
+
+        return Promise.resolve(); // Resolve after processing each chunk
+      })
+    )
+      .then(() => {
+        // Only send response after all chunks are processed
+        sendResponse({ status: "ok" });
+      })
+      .catch((error) => {
+        console.error("Error processing batch", error);
+        // Handle error scenario, possibly notify sender of failure
+      });
+
+    return true; // Keep the messaging channel open for the response
   };
 
   // Check Chrome version
@@ -420,9 +434,7 @@ const ContentState = (props) => {
           override: message.override,
         }));
       } else if (message.type === "new-chunk-tab") {
-        handleBatch(message.chunks, sendResponse);
-
-        return true;
+        return handleBatch(message.chunks, sendResponse);
       } else if (message.type === "make-video-tab") {
         makeVideoTab(sendResponse, message);
 

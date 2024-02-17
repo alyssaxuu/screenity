@@ -1049,8 +1049,7 @@ const ContentState = (props) => {
         });
       } else if (
         (ram < 8 || width < 3840 || height < 2160) &&
-        (contentState.qualityValue === "4k" ||
-          contentState.qualityValue === "1080p")
+        contentState.qualityValue === "4k"
       ) {
         setContentState((prevContentState) => ({
           ...prevContentState,

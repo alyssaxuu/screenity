@@ -1,41 +1,50 @@
 const sendMessageTab = async (
   tabId,
   message,
-  responseCallback = false,
-  noTab = false
+  responseCallback = null,
+  noTab = null
 ) => {
-  if (tabId === null || message === null) return;
+  if (tabId === null || message === null)
+    return Promise.reject("Tab ID or message is null");
+
   try {
-    const tab = await new Promise((resolve) => {
+    const tab = await new Promise((resolve, reject) => {
       chrome.tabs.get(tabId, (tab) => {
-        resolve(tab);
+        if (chrome.runtime.lastError) {
+          reject(chrome.runtime.lastError.message);
+        } else {
+          resolve(tab);
+        }
       });
     });
 
-    // Check if tab is an internal chrome:// page
     if (
-      (tab && tab.url && tab.url.startsWith("chrome://")) ||
+      !tab ||
+      !tab.url ||
+      tab.url.startsWith("chrome://") ||
       tab.url.startsWith("chromewebstore.google.com") ||
       tab.url.startsWith("chrome.google.com/webstore") ||
       tab.url === "" ||
       tab.url === "about:blank"
     ) {
-      return;
-    } else if (!tab || !tab.url) {
-      return;
+      return Promise.reject("Invalid tab URL");
     }
 
-    if (tab && tab.id) {
-      if (responseCallback && typeof responseCallback === "function") {
-        chrome.tabs.sendMessage(tab.id, message, responseCallback);
-      } else {
-        chrome.tabs.sendMessage(tab.id, message);
-      }
-    } else if (noTab && typeof noTab === "function") {
+    return new Promise((resolve, reject) => {
+      chrome.tabs.sendMessage(tab.id, message, (response) => {
+        if (chrome.runtime.lastError) {
+          reject(chrome.runtime.lastError.message);
+        } else {
+          responseCallback ? responseCallback(response) : resolve(response);
+        }
+      });
+    });
+  } catch (error) {
+    console.error("Error sending message to tab:", error);
+    if (noTab && typeof noTab === "function") {
       noTab();
     }
-  } catch (error) {
-    // Tab doesn't exist or can't be accessed
+    return Promise.reject(error);
   }
 };
 

@@ -365,123 +365,84 @@ function blobToBase64(blob) {
 }
 
 const handleChunks = async (chunks, override = false) => {
-  // Order chunks by timestamp
-  chunks.sort((a, b) => {
-    return a.timestamp - b.timestamp;
-  });
-  const { sandboxTab } = await chrome.storage.local.get(["sandboxTab"]);
-  if (chunks.length === 0) {
-    sendMessageTab(sandboxTab, { type: "make-video-tab", override: override });
+  const { sendingChunks, sandboxTab } = await chrome.storage.local.get([
+    "sendingChunks",
+    "sandboxTab",
+  ]);
+
+  if (sendingChunks) {
+    console.warn("Chunks are already being sent, skipping...");
     return;
   }
-  let lastTimestamp = 0;
-  const batchSize = 10; // Number of chunks to send in each batch
-  const chunksCount = chunks.length;
+  await chrome.storage.local.set({ sendingChunks: true });
+
+  if (chunks.length === 0) {
+    await chrome.storage.local.set({ sendingChunks: false });
+    sendMessageTab(sandboxTab, { type: "make-video-tab", override });
+    return;
+  }
+
+  // Order chunks by timestamp
+  chunks.sort((a, b) => a.timestamp - b.timestamp);
+
   let currentIndex = 0;
-  const maxRetries = 5; // Maximum number of retry attempts per batch
-  const retryDelay = 1000; // Delay in milliseconds between retry attempts
+  const batchSize = 10;
+  const maxRetries = 3;
+  const retryDelay = 1000;
+  const chunksCount = chunks.length;
 
   sendMessageTab(sandboxTab, {
     type: "chunk-count",
     count: chunksCount,
-    override: override,
+    override,
   });
 
-  const sendNextBatch = async (retryCount = 0) => {
-    // Determine the range of chunks for the current batch
-    const start = currentIndex;
-    const end = Math.min(currentIndex + batchSize, chunksCount);
-
-    // Collect the chunks for the batch
-    const batch = [];
-    for (let i = start; i < end; i++) {
-      const chunk = chunks[i];
-      const chunkData = chunk.chunk;
-      const index = chunk.index;
-
-      // Check if timestamp is higher than lastTimestamp
-      if (chunk.timestamp < lastTimestamp) {
-        continue;
+  const sendBatch = async (batch, retryCount = 0) => {
+    try {
+      const response = await sendMessageTab(sandboxTab, {
+        type: "new-chunk-tab",
+        chunks: batch,
+      });
+      if (!response) {
+        throw new Error("No response or failed response from tab.");
       }
-      lastTimestamp = chunk.timestamp;
-      try {
-        const base64 = await blobToBase64(chunkData);
-        if (base64) {
-          batch.push({ chunk: base64, index: index });
-        } else {
-          console.error("Error converting a chunk to Base64:", chunk);
-
-          // Handle the error by trying again
-          if (retryCount < maxRetries) {
-            setTimeout(() => {
-              sendNextBatch(retryCount + 1);
-            }, retryDelay);
-          } else {
-            console.error("Maximum retry attempts reached for this batch.");
-          }
-
-          return;
-        }
-      } catch (error) {
-        console.error("Error converting a chunk to Base64:", error);
-
-        // Handle the error by trying again
-        if (retryCount < maxRetries) {
-          setTimeout(() => {
-            sendNextBatch(retryCount + 1);
-          }, retryDelay);
-        } else {
-          console.error("Maximum retry attempts reached for this batch.");
-        }
-
-        return;
-      }
-    }
-
-    if (batch.length > 0) {
-      sendMessageTab(
-        sandboxTab,
-        {
-          type: "new-chunk-tab",
-          chunks: batch,
-        },
-        (response) => {
-          if (response) {
-            currentIndex += batchSize;
-            if (currentIndex < chunksCount) {
-              sendNextBatch();
-            } else {
-              chrome.tabs.sendMessage(sandboxTab, {
-                type: "make-video-tab",
-                override: override,
-              });
-            }
-          } else {
-            if (retryCount < maxRetries) {
-              setTimeout(() => {
-                sendNextBatch(retryCount + 1);
-              }, retryDelay);
-            } else {
-              console.error("Maximum retry attempts reached for this batch.");
-            }
-          }
-        }
-      );
-    } else {
-      currentIndex += batchSize;
-      if (currentIndex < chunksCount) {
-        sendNextBatch();
+    } catch (error) {
+      if (retryCount < maxRetries) {
+        console.error(
+          `Sending batch failed, retrying... Attempt ${retryCount + 1}`,
+          error
+        );
+        setTimeout(() => sendBatch(batch, retryCount + 1), retryDelay);
       } else {
-        chrome.tabs.sendMessage(sandboxTab, {
-          type: "make-video-tab",
-          override: override,
-        });
+        console.error("Maximum retry attempts reached for this batch.", error);
       }
     }
   };
 
-  // Start sending batches
-  sendNextBatch();
+  while (currentIndex < chunksCount) {
+    const end = Math.min(currentIndex + batchSize, chunksCount);
+    const batch = await Promise.all(
+      chunks.slice(currentIndex, end).map(async (chunk, index) => {
+        try {
+          const base64 = await blobToBase64(chunk.chunk);
+          return { chunk: base64, index: currentIndex + index };
+        } catch (error) {
+          console.error("Error converting chunk to Base64", error);
+          return null;
+        }
+      })
+    );
+
+    // Filter out any failed conversions
+    const filteredBatch = batch.filter((chunk) => chunk !== null);
+    if (filteredBatch.length > 0) {
+      await sendBatch(filteredBatch);
+    }
+    currentIndex += batchSize;
+  }
+
+  await chrome.storage.local.set({ sendingChunks: false });
+  sendMessageTab(sandboxTab, { type: "make-video-tab", override });
 };
 
 const sendChunks = async (override = false) => {
@@ -1448,6 +1409,7 @@ const handleSaveToDrive = async (sendResponse, request, fallback = false) => {
 const desktopCapture = async (request) => {
   const { backup } = await chrome.storage.local.get(["backup"]);
   const { backupSetup } = await chrome.storage.local.get(["backupSetup"]);
+  chrome.storage.local.set({ sendingChunks: false });
   if (backup) {
     if (!backupSetup) {
       localDirectoryStore.clear();
