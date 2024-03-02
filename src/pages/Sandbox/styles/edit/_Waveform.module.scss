@@ -1,0 +1,29 @@
+@use "../global/variables.scss" as *;
+
+.waveform {
+  height: 100%;
+}
+.waveform ::part(cursor) {
+  display: none;
+}
+.cursor {
+  height: 100%;
+  background-color: $color-primary;
+  z-index: 999999;
+  width: 3px;
+  position: absolute;
+  border-radius: 30px;
+  padding-top: 20px;
+  transform: translateY(-10px);
+}
+.ghostCursor {
+  height: 100%;
+  padding-top: 20px;
+  transform: translateY(-10px);
+  background-color: #8aafee;
+  z-index: 999999;
+  width: 3px;
+  position: absolute;
+  border-radius: 30px;
+  pointer-events: none;
+}

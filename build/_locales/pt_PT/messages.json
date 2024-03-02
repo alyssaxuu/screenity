@@ -1,0 +1,1040 @@
+{
+  "extName": {
+    "message": "Screenity - Grave o ecrã e faça anotações",
+    "description": "Nome da extensão"
+  },
+  "extDesc": {
+    "message": "O melhor gravador de ecrã para o Chrome sem limites. Captura, desenha, amplia, desfoca, edita vídeos e muito mais, sem necessidade de registo, totalmente privado e gratuito.",
+    "description": "Descrição da extensão"
+  },
+  "recordTab": {
+    "message": "Gravar",
+    "description": "Etiqueta da página de gravação no popup"
+  },
+  "videosTab": {
+    "message": "Os teus vídeos",
+    "description": "Etiqueta da página de vídeos no popup"
+  },
+  "screenType": {
+    "message": "Ecrã",
+    "description": "Etiqueta de tipo de gravação de ecrã no popup"
+  },
+  "tabType": {
+    "message": "Área",
+    "description": "Etiqueta de tipo de gravação de área de página no popup"
+  },
+  "cameraType": {
+    "message": "Câmara",
+    "description": "Etiqueta de tipo de gravação de câmara no popup"
+  },
+  "mockupType": {
+    "message": "Mockup",
+    "description": "Etiqueta de tipo de gravação de mockup no popup"
+  },
+  "customAreaRecordingDisabledTitle": {
+    "message": "Gravação de área personalizada desativada",
+    "description": "Aviso de gravação de área personalizada desativada para versões do Chrome anteriores à 104"
+  },
+  "customAreaRecordingDisabledDescription": {
+    "message": "Atualiza a versão do Chrome para 110+",
+    "description": "Descrição do aviso de gravação de área personalizada desativada para versões do Chrome anteriores à 104"
+  },
+  "customAreaRecordingDisabledAction": {
+    "message": "Atualizar",
+    "description": "Ação do aviso de gravação de área personalizada desativada para versões do Chrome anteriores à 104"
+  },
+  "permissionsModalTitle": {
+    "message": "Verifica as tuas permissões",
+    "description": "Título do modal de aviso de permissões de câmara/microfone"
+  },
+  "permissionsModalDescription": {
+    "message": "Parece que o Screenity não consegue aceder à tua câmara ou microfone. Certifica-te de permitir o acesso ao clicar no ícone da câmara na barra de endereço.",
+    "description": "Descrição do modal de aviso de permissões de câmara/microfone"
+  },
+  "permissionsModalDismiss": {
+    "message": "Ignorar",
+    "description": "Botão de ignorar no modal de aviso de permissões de câmara/microfone"
+  },
+  "allowCameraAccessButton": {
+    "message": "Permitir acesso à câmara",
+    "description": "Botão de permitir acesso à câmara"
+  },
+  "allowMicrophoneAccessButton": {
+    "message": "Permitir acesso ao microfone",
+    "description": "Botão de permitir acesso ao microfone"
+  },
+  "pushToTalkLabel": {
+    "message": "Premir para falar",
+    "description": "Etiqueta do interruptor premir para falar"
+  },
+  "customAreaLabel": {
+    "message": "Definir uma área para gravar",
+    "description": "Etiqueta do interruptor de área personalizada"
+  },
+  "flipCameraLabel": {
+    "message": "Inverter câmara",
+    "description": "Etiqueta do interruptor de inverter câmara"
+  },
+  "backgroundEffectsLabel": {
+    "message": "Efeitos de fundo",
+    "description": "Etiqueta do interruptor de efeitos de fundo"
+  },
+  "recordButtonLabel": {
+    "message": "Iniciar gravação",
+    "description": "Etiqueta do botão de gravar"
+  },
+  "recordButtonNoCameraLabel": {
+    "message": "Defina uma câmara para gravar",
+    "description": "Rótulo do botão de gravação quando no modo de câmera e nenhuma câmera está selecionada"
+  },
+  "recordButtonInProgressLabel": {
+    "message": "A iniciar gravação...",
+    "description": "Etiqueta em progresso do botão de gravar"
+  },
+  "showMoreOptionsLabel": {
+    "message": "Mostrar mais opções",
+    "description": "Etiqueta de mostrar mais opções"
+  },
+
+  "systemAudioLabel": {
+    "message": "Incluir áudio do sistema",
+    "description": "Etiqueta de áudio do sistema/guia"
+  },
+  "hideToolbarLabel": {
+    "message": "Ocultar barra de ferramentas",
+    "description": "Etiqueta de ocultar barra de ferramentas"
+  },
+  "countdownLabel": {
+    "message": "Contagem decrescente",
+    "description": "Etiqueta de contagem decrescente"
+  },
+  "alarmLabel": {
+    "message": "Definir um limite de tempo",
+    "description": "Etiqueta de alarme"
+  },
+  "blurTypeLabel": {
+    "message": "Blur",
+    "description": "Etiqueta de desfocar fundo"
+  },
+  "noneDropdownLabel": {
+    "message": "Nenhum",
+    "description": "Nenhum dispositivo selecionado"
+  },
+  "noCameraDropdownLabel": {
+    "message": "Sem câmara",
+    "description": "Nenhuma câmara selecionada"
+  },
+  "noMicrophoneDropdownLabel": {
+    "message": "Sem microfone",
+    "description": "Nenhum microfone selecionado"
+  },
+  "selectSourceDropdownPlaceholder": {
+    "message": "Selecionar uma fonte",
+    "description": "Marcador de posição para selecionar fonte"
+  },
+  "offLabel": {
+    "message": "Desligado",
+    "description": "Etiqueta de desligado no menu suspenso"
+  },
+  "regionWidthLabel": {
+    "message": "Largura",
+    "description": "Etiqueta de largura de região"
+  },
+  "regionHeightLabel": {
+    "message": "Altura",
+    "description": "Etiqueta de altura de região"
+  },
+  "addImageToastTitle": {
+    "message": "Clica para colocar a imagem",
+    "description": "Brinde que aparece ao adicionar uma nova imagem"
+  },
+  "finishRecordingTooltip": {
+    "message": "Terminar gravação",
+    "description": "Dica de terminar gravação"
+  },
+  "restartRecordingTooltip": {
+    "message": "Reiniciar gravação",
+    "description": "Dica de reiniciar gravação"
+  },
+  "pauseRecordingTooltip": {
+    "message": "Pausar gravação",
+    "description": "Dica de pausar gravação"
+  },
+  "resumeRecordingTooltip": {
+    "message": "Continuar gravação",
+    "description": "Dica de continuar gravação"
+  },
+  "cancelRecordingTooltip": {
+    "message": "Cancelar gravação",
+    "description": "Dica de cancelar gravação"
+  },
+  "toggleDrawingToolsTooltip": {
+    "message": "Ferramentas de desenho",
+    "description": "Dica de alternar ferramentas de desenho"
+  },
+  "toggleBlurToolTooltip": {
+    "message": "Ferramenta de desfoque",
+    "description": "Dica de alternar ferramentas de desfoque"
+  },
+  "toggleCursorOptionsTooltip": {
+    "message": "Opções de cursor",
+    "description": "Dica de alternar opções de cursor"
+  },
+  "disableCameraTooltip": {
+    "message": "Desativar câmara",
+    "description": "Dica de desativar câmara"
+  },
+  "enableCameraTooltip": {
+    "message": "Ativar câmara",
+    "description": "Dica de ativar câmara"
+  },
+  "noCameraPermissionsTooltip": {
+    "message": "Sem permissões de câmara",
+    "description": "Dica de sem permissões de câmara"
+  },
+  "disableMicrophoneTooltip": {
+    "message": "Desativar microfone",
+    "description": "Dica de desativar microfone"
+  },
+  "enableMicrophoneTooltip": {
+    "message": "Ativar microfone",
+    "description": "Dica de ativar microfone"
+  },
+  "noMicrophonePermissionsTooltip": {
+    "message": "Sem permissões de microfone",
+    "description": "Dica de sem permissões de microfone"
+  },
+  "selectToolTooltip": {
+    "message": "Selecionar ferramenta",
+    "description": "Dica de selecionar ferramenta"
+  },
+  "penToolTooltip": {
+    "message": "Ferramenta de caneta",
+    "description": "Dica de ferramenta de caneta"
+  },
+  "highlighterToolTooltip": {
+    "message": "Ferramenta de marcador",
+    "description": "Dica de ferramenta de marcador"
+  },
+  "eraserToolTooltip": {
+    "message": "Ferramenta de borracha",
+    "description": "Dica de ferramenta de borracha"
+  },
+  "textToolTooltip": {
+    "message": "Ferramenta de texto",
+    "description": "Dica de ferramenta de texto"
+  },
+  "shapeToolTooltip": {
+    "message": "Ferramenta de formas",
+    "description": "Dica de ferramenta de formas"
+  },
+  "arrowToolTooltip": {
+    "message": "Ferramenta de seta",
+    "description": "Dica de ferramenta de seta"
+  },
+  "imageToolTooltip": {
+    "message": "Ferramenta de imagem",
+    "description": "Dica de ferramenta de imagem"
+  },
+  "undoTooltip": {
+    "message": "Desfazer",
+    "description": "Dica de desfazer"
+  },
+  "redoTooltip": {
+    "message": "Refazer",
+    "description": "Dica de refazer"
+  },
+  "clearCanvasTooltip": {
+    "message": "Limpar tela",
+    "description": "Dica de limpar tela"
+  },
+  "moreColorsTooltip": {
+    "message": "Mais cores",
+    "description": "Dica de mais cores"
+  },
+  "thickStrokeTooltip": {
+    "message": "Traço grosso",
+    "description": "Dica de traço grosso"
+  },
+  "mediumStrokeTooltip": {
+    "message": "Traço médio",
+    "description": "Dica de traço médio"
+  },
+  "thinStrokeTooltip": {
+    "message": "Traço fino",
+    "description": "Dica de traço fino"
+  },
+  "togglePictureinPictureModeTooltip": {
+    "message": "Alternar modo de Picture-in-Picture (PIP)",
+    "description": "Dica de alternar modo de imagem sobre imagem"
+  },
+  "toggleFillTooltip": {
+    "message": "Alternar preenchimento",
+    "description": "Dica de alternar preenchimento"
+  },
+  "drawingModeToast": {
+    "message": "Modo de desenho",
+    "description": "Brinde de modo de desenho"
+  },
+  "blurModeToast": {
+    "message": "Modo de desfoque",
+    "description": "Brinde de modo de desfoque"
+  },
+  "clearBlurredElementsTooltip": {
+    "message": "Limpar todos os elementos desfocados",
+    "description": "Dica de limpar todos os elementos desfocados"
+  },
+  "highlightClicksTooltip": {
+    "message": "Destacar cliques",
+    "description": "Dica de destacar cliques"
+  },
+  "highlightCursorTooltip": {
+    "message": "Destacar cursor",
+    "description": "Dica de destacar cursor"
+  },
+  "spotlightCursorTooltip": {
+    "message": "Foco no cursor",
+    "description": "Dica de foco no cursor"
+  },
+  "permissionsModalNoShowAgain": {
+    "message": "Não mostrar novamente",
+    "description": "Botão de fechar modal de permissões"
+  },
+  "restartModalTitle": {
+    "message": "Tens a certeza que queres reiniciar a gravação?",
+    "description": "Título do modal de reiniciar gravação"
+  },
+  "restartModalDescription": {
+    "message": "O teu progresso no vídeo será perdido.",
+    "description": "Descrição do modal de reiniciar gravação"
+  },
+  "restartModalRestart": {
+    "message": "Reiniciar gravação",
+    "description": "Botão de reiniciar gravação no modal"
+  },
+  "restartModalResume": {
+    "message": "Continuar gravação",
+    "description": "Botão de continuar gravação no modal"
+  },
+  "discardModalTitle": {
+    "message": "Tens a certeza que queres descartar a gravação?",
+    "description": "Título do modal de descartar gravação"
+  },
+  "discardModalDescription": {
+    "message": "O teu progresso no vídeo será perdido.",
+    "description": "Descrição do modal de descartar gravação"
+  },
+  "discardModalDiscard": {
+    "message": "Descartar gravação",
+    "description": "Botão de descartar gravação no modal"
+  },
+  "discardModalResume": {
+    "message": "Continuar gravação",
+    "description": "Botão de continuar gravação no modal"
+  },
+  "recorderSelectTitle": {
+    "message": "Escolhe o que queres gravar",
+    "description": "Título na página de gravação"
+  },
+  "recorderSelectProgressTitle": {
+    "message": "Gravando...",
+    "description": "Título na página de gravação durante a gravação"
+  },
+  "recorderSelectDescription": {
+    "message": "Mantém este separador aberto. Será fechado assim que a tua gravação for guardada.",
+    "description": "Descrição na página de gravação"
+  },
+  "sandboxProgressTitle": {
+    "message": "Preparando a gravação...",
+    "description": "Título na página de testes durante a gravação/salvamento"
+  },
+  "sandboxProgressDescription": {
+    "message": "Mantém este separador aberto. Será atualizado com a tua gravação quando estiver pronta.",
+    "description": "Descrição na página de testes durante a gravação/salvamento"
+  },
+  "sandboxEditorMainTitle": {
+    "message": "Editor",
+    "description": "Título na navegação da página do editor de testes"
+  },
+  "sandboxEditorCancelButton": {
+    "message": "Cancelar",
+    "description": "Botão de cancelar na página do editor de testes"
+  },
+  "sandboxEditorRevertButton": {
+    "message": "Reverter para o original",
+    "description": "Botão de reverter na página do editor de testes"
+  },
+  "sandboxEditorResetButton": {
+    "message": "Redefinir",
+    "description": "Botão de redefinir na página do editor de testes"
+  },
+  "sandboxEditorSaveButton": {
+    "message": "Guardar alterações",
+    "description": "Botão de salvar na página do editor de testes"
+  },
+  "sandboxEditorSaveProgressButton": {
+    "message": "Guardando...",
+    "description": "Botão de salvar na página do editor de testes durante o salvamento"
+  },
+  "sandboxAudioDragAndDrop": {
+    "message": "Arrasta o teu ficheiro de áudio",
+    "description": "Arraste e solte arquivo de áudio na página do editor de testes"
+  },
+  "sandboxAudioOrBrowse": {
+    "message": "Ou clica para procurar",
+    "description": "Ou clique para procurar arquivo de áudio na página do editor de testes"
+  },
+  "sandboxAudioSettingsTitle": {
+    "message": "Configurações",
+    "description": "Título de configurações de áudio na página do editor de testes"
+  },
+  "sandboxAudioVolumeLabel": {
+    "message": "Volume",
+    "description": "Rótulo de volume de áudio na página do editor de testes"
+  },
+  "sandboxAudioUpdateButton": {
+    "message": "Aplicar",
+    "description": "Botão de atualizar áudio na página do editor de testes"
+  },
+  "sandboxCropTitle": {
+    "message": "Recortar",
+    "description": "Título de recorte na página do editor de testes"
+  },
+  "widthLabel": {
+    "message": "Largura",
+    "description": "Rótulo de largura para propriedades"
+  },
+  "heightLabel": {
+    "message": "Altura",
+    "description": "Rótulo de altura para propriedades"
+  },
+  "leftLabel": {
+    "message": "Esquerda",
+    "description": "Rótulo de esquerda para propriedades"
+  },
+  "topLabel": {
+    "message": "Topo",
+    "description": "Rótulo de topo para propriedades"
+  },
+  "sandboxEditorTrimInfo": {
+    "message": "Arrasta as abas e usa os botões à esquerda para editar a secção selecionada.",
+    "description": "Informações sobre recorte na página do editor de testes"
+  },
+  "sandboxEditorTrimButton": {
+    "message": "Recortar vídeo",
+    "description": "Botão de recortar na página do editor de testes"
+  },
+  "sandboxEditorTrimProgressButton": {
+    "message": "Recortando...",
+    "description": "Botão de recortar na página do editor de testes durante o recorte"
+  },
+  "sandboxEditorCutButton": {
+    "message": "Cortar secção",
+    "description": "Botão de cortar na página do editor de testes"
+  },
+  "sandboxEditorCutProgressButton": {
+    "message": "Cortando...",
+    "description": "Botão de cortar na página do editor de testes durante o corte"
+  },
+  "sandboxEditorMuteButton": {
+    "message": "Silenciar áudio",
+    "description": "Botão de silenciar na página do editor de testes"
+  },
+  "sandboxEditorMuteProgressButton": {
+    "message": "Silenciando...",
+    "description": "Botão de silenciar na página do editor de testes durante o silenciamento"
+  },
+  "learnMoreDot": {
+    "message": "Sabe mais.",
+    "description": "Saiba mais com um ponto"
+  },
+  "undoLabel": {
+    "message": "Desfazer",
+    "description": "Rótulo de desfazer"
+  },
+  "redoLabel": {
+    "message": "Refazer",
+    "description": "Rótulo de refazer"
+  },
+  "leaveReview": {
+    "message": "Deixa uma avaliação",
+    "description": "Botão de deixar uma avaliação"
+  },
+  "followForUpdates": {
+    "message": "Seguir para atualizações",
+    "description": "Botão de seguir para atualizações"
+  },
+  "offlineLabelTitle": {
+    "message": "Atualmente offline",
+    "description": "Rótulo de offline"
+  },
+  "offlineLabelDescription": {
+    "message": "Algumas funcionalidades estão indisponíveis até te reconectares",
+    "description": "Descrição do rótulo de offline"
+  },
+  "offlineLabelTryAgain": {
+    "message": "Tentar novamente",
+    "description": "Botão de tentar novamente do rótulo de offline"
+  },
+  "updateChromeLabelTitle": {
+    "message": "O Chrome precisa de ser atualizado",
+    "description": "Rótulo de atualizar o Chrome"
+  },
+  "updateChromeLabelDescription": {
+    "message": "Atualiza para aceder a mais funcionalidades",
+    "description": "Descrição do rótulo de atualizar o Chrome"
+  },
+  "learnMoreLabel": {
+    "message": "Sabe mais",
+    "description": "Botão de saiba mais"
+  },
+  "overLimitLabelTitle": {
+    "message": "Vídeo demasiado longo para processar no teu dispositivo",
+    "description": "Etiqueta de limite superior a 5 minutos no editor"
+  },
+  "overLimitLabelDescription": {
+    "message": "Edição e exportação em formato MP4 não estão disponíveis",
+    "description": "Descrição de limite superior a 5 minutos no editor"
+  },
+  "videoProcessingLabelTitle": {
+    "message": "O vídeo está a ser processado...",
+    "description": "Rótulo de processamento de vídeo no editor"
+  },
+  "videoProcessingLabelDescription": {
+    "message": "Faz upgrade para um editor mais rápido",
+    "description": "Descrição do processamento de vídeo no editor"
+  },
+  "sandboxEditTitle": {
+    "message": "Editar",
+    "description": "Título de edição na página do editor de testes"
+  },
+  "noConnectionLabel": {
+    "message": "Sem conexão",
+    "description": "Rótulo de sem conexão"
+  },
+  "notAvailableLabel": {
+    "message": "Indisponível",
+    "description": "Rótulo de não disponível"
+  },
+  "editButtonTitle": {
+    "message": "Editar vídeo",
+    "description": "Rótulo de botão de recorte"
+  },
+  "editButtonDescription": {
+    "message": "Remove, corta ou silencia o vídeo",
+    "description": "Rótulo de recorte"
+  },
+  "preparingLabel": {
+    "message": "Preparando o vídeo, por favor aguarda...",
+    "description": "Rótulo de preparação"
+  },
+  "cropButtonTitle": {
+    "message": "Recortar",
+    "description": "Rótulo de botão de recorte"
+  },
+  "cropButtonDescription": {
+    "message": "Recorta e redimensiona o vídeo",
+    "description": "Rótulo de recorte"
+  },
+  "addAudioButtonTitle": {
+    "message": "Adicionar áudio",
+    "description": "Rótulo de botão de adicionar áudio"
+  },
+  "addAudioButtonDescription": {
+    "message": "Carrega o teu próprio áudio para o vídeo",
+    "description": "Rótulo de adicionar áudio"
+  },
+  "sandboxSaveTitle": {
+    "message": "Guardar",
+    "description": "Título de salvar na página do editor de testes"
+  },
+  "signOutDriveLabel": {
+    "message": "Sair do Google Drive",
+    "description": "Rótulo de sair do Google Drive"
+  },
+  "savingDriveLabel": {
+    "message": "Guardando...",
+    "description": "Rótulo de salvamento no Google Drive"
+  },
+  "saveDriveButtonTitle": {
+    "message": "Guardar no Google Drive",
+    "description": "Botão de salvar no Google Drive"
+  },
+  "saveDriveButtonDescription": {
+    "message": "Guarda a versão atual do vídeo",
+    "description": "Rótulo de salvar no Google Drive"
+  },
+  "signInDriveLabel": {
+    "message": "Inicia a sessão e guarda no Google Drive",
+    "description": "Rótulo de iniciar sessão no Google Drive"
+  },
+  "sandboxExportTitle": {
+    "message": "Exportar",
+    "description": "Título de exportação na página do editor de testes"
+  },
+  "downloadingLabel": {
+    "message": "Descarregando...",
+    "description": "Rótulo de download"
+  },
+  "downloadWEBMButtonTitle": {
+    "message": "Descarregar como .webm",
+    "description": "Botão de baixar WEBM"
+  },
+  "downloadWEBMButtonDescription": {
+    "message": "Exportar um vídeo .webm",
+    "description": "Rótulo de baixar WEBM"
+  },
+  "downloadMP4ButtonTitle": {
+    "message": "Descarregar como .mp4",
+    "description": "Botão de baixar MP4"
+  },
+  "downloadMP4ButtonDescription": {
+    "message": "Exportar um vídeo .mp4 (recomendado)",
+    "description": "Rótulo de baixar MP4"
+  },
+  "downloadGIFButtonTitle": {
+    "message": "Descarregar como .gif",
+    "description": "Botão de baixar GIF"
+  },
+  "downloadGIFButtonDescription": {
+    "message": "Exportar um GIF (máximo de 30 segundos)",
+    "description": "Rótulo de baixar GIF"
+  },
+  "shareModalSandboxTitle": {
+    "message": "Partilha os teus vídeos com um link",
+    "description": "Título do modal de partilha na página do editor de testes"
+  },
+  "shareModalSandboxDescription": {
+    "message": "Em breve! Deixa o teu email para seres notificado quando estiver disponível.",
+    "description": "Descrição do modal de partilha na página do editor de testes"
+  },
+  "shareModalSandboxButton": {
+    "message": "Junta-te à lista de espera",
+    "description": "Espaço reservado para o email no modal de partilha na página do editor de testes"
+  },
+  "shareSandboxButton": {
+    "message": "Partilhar vídeo",
+    "description": "Botão de partilha na página do editor de testes"
+  },
+  "replaceAudioEditor": {
+    "message": "Substituir áudio existente",
+    "description": "Botão de substituição de áudio no editor"
+  },
+  "zoomToPointPopup": {
+    "message": "Zoom para o cursor",
+    "description": "Popup de zoom para o ponto"
+  },
+  "stayInPagePopup": {
+    "message": "Permanece na página durante a gravação",
+    "description": "Popup de permanência na página"
+  },
+  "micReminderPopup": {
+    "message": "Mostrar aviso de microfone desligado",
+    "description": "Popup de lembrete de microfone"
+  },
+  "helpPopup": {
+    "message": "Ajuda",
+    "description": "Botão de popup de ajuda"
+  },
+  "pausedRecordingToast": {
+    "message": "Gravação pausada. Pressiona o botão de reprodução para continuar.",
+    "description": "Título do modal de gravação pausada"
+  },
+  "chromePermissionsModalTitle": {
+    "message": "O Screenity não tem permissão para gravar o teu ecrã",
+    "description": "Título do modal de permissões"
+  },
+  "chromePermissionsModalDescription": {
+    "message": "Para permitir a gravação de ecrã, deves dar permissões ao Screenity.",
+    "description": "Descrição do modal de permissões"
+  },
+  "chromePermissionsModalAction": {
+    "message": "Ativar gravação de ecrã",
+    "description": "Ação do modal de permissões"
+  },
+  "chromePermissionsModalCancel": {
+    "message": "Cancelar",
+    "description": "Cancelar do modal de permissões"
+  },
+  "micMutedModalTitle": {
+    "message": "O teu microfone está desligado",
+    "description": "Título do modal de microfone desligado"
+  },
+  "micMutedModalDescription": {
+    "message": "Para incluir áudio na tua gravação, terás de ativar o teu microfone. Queres continuar sem áudio?",
+    "description": "Descrição do modal de microfone desligado"
+  },
+  "micMutedModalAction": {
+    "message": "Sim, continuar",
+    "description": "Continuar do modal de microfone desligado"
+  },
+  "micMutedModalCancel": {
+    "message": "Cancelar",
+    "description": "Cancelar do modal de microfone desligado"
+  },
+  "setupTitle": {
+    "message": "Começa com o Screenity em três passos simples:",
+    "description": "Título dos passos de configuração"
+  },
+  "setupStep1Before": {
+    "message": "1- Clica no ícone de ",
+    "description": "Passo 1 de configuração, antes do ícone. Precisa de um espaço no final."
+  },
+  "setupStep1After": {
+    "message": " extensões",
+    "description": "Passo 1 de configuração, depois do ícone. Precisa de um espaço no início."
+  },
+  "setupStep2Before": {
+    "message": "2- Pressiona o ícone de ",
+    "description": "Passo 2 de configuração, antes do ícone. Precisa de um espaço no final."
+  },
+  "setupStep2After": {
+    "message": " alfinete",
+    "description": "Passo 2 de configuração, depois do ícone. Precisa de um espaço no início."
+  },
+  "setupStep3Before": {
+    "message": "3- Clica no ícone de ",
+    "description": "Passo 3 de configuração, antes do ícone. Precisa de um espaço no final."
+  },
+  "setupStep3After": {
+    "message": " Screenity para começar",
+    "description": "Passo 3 de configuração, depois do ícone. Precisa de um espaço no início."
+  },
+  "setupCompleteTitle": {
+    "message": "Fantástico! Vamos começar",
+    "description": "Título de configuração completa"
+  },
+  "setupCompleteDescription": {
+    "message": "Agora podes começar a gravar aqui ou em qualquer outro separdor.",
+    "description": "Descrição de configuração completa"
+  },
+  "clickHereDrawOnboarding": {
+    "message": "Clica aqui para desenhar",
+    "description": "Instruções para clicar aqui"
+  },
+  "countdownMessage": {
+    "message": "Relaxa. Clica em qualquer lugar para parar a contagem decrescente.",
+    "description": "Mensagem de contagem regressiva"
+  },
+
+  "sandboxEditorTooSmallInfo": {
+    "message": "A edição de vídeos com durações curtas pode ser imprecisa devido aos pequenos intervalos entre imagens.",
+    "description": "Informação sobre o editor ser demasiado pequeno"
+  },
+  "processingBannerEditor": {
+    "message": "O vídeo está a ser processado, a reprodução pode ser imprecisa ou interrompida.",
+    "description": "Banner de processamento no editor"
+  },
+  "croppingInfoTitle": {
+    "message": "Recortar o vídeo pode demorar algum tempo",
+    "description": "Título da informação de recorte"
+  },
+  "croppingInfoDescription": {
+    "message": "Subscreva para editar vídeos mais rapidamente",
+    "description": "Descrição da informação de recorte"
+  },
+  "micOnToast": {
+    "message": "Microfone ativado",
+    "description": "Título do aviso de microfone ativado"
+  },
+  "micOffToast": {
+    "message": "Microfone desativado",
+    "description": "Título do aviso de microfone desativado"
+  },
+  "hideUIAlerts": {
+    "message": "Ocultar notificações da interface",
+    "description": "Botão para ocultar alertas da interface"
+  },
+  "noShowAgain": {
+    "message": "Não mostrar novamente",
+    "description": "Botão de não mostrar novamente"
+  },
+  "toolbarHoverOnly": {
+    "message": "Ocultar os controles quando não estiverem em uso",
+    "description": "Botão para mostrar a barra de ferramentas apenas ao passar o cursor"
+  },
+  "stopRecording": {
+    "message": "Parar gravação",
+    "description": "Stop recording button in recording screen"
+  },
+  "updateAnnouncementTitle": {
+    "message": "Bem-vindo ao novo Screenity!",
+    "description": "Título do anúncio de atualização para usuários existentes"
+  },
+  "updateAnnouncementDescription": {
+    "message": "Atualizamos o design e desenvolvemos novas funcionalidades, mas não te preocupes, continua a ser a mesma extensão gratuita, privada e de código de acesso livre.",
+    "description": "Descrição do anúncio de atualização para utilizadores existentes"
+  },
+  "updateAnnouncementLearnMore": {
+    "message": "Obtém mais informações sobre a atualização.",
+    "description": "Link 'Saber mais' do anúncio de atualização para usuários existentes"
+  },
+  "updateAnnouncementButton": {
+    "message": "Começar",
+    "description": "Botão do anúncio de atualização para usuários existentes"
+  },
+  "streamErrorModalTitle": {
+    "message": "Erro ao iniciar a gravação",
+    "description": "Título do modal de erro de transmissão"
+  },
+  "streamErrorModalDescription": {
+    "message": "Houve um erro ao iniciar a gravação. Reinicia o teu navegador e tenta novamente. Se o problema persistir, por favor, entra em contato conosco em support@screenity.io.",
+    "description": "Descrição do modal de erro de transmissão"
+  },
+  "highestQuality": {
+    "message": "Qualidade mais alta",
+    "description": "Rótulo de alternar a qualidade mais alta no popup"
+  },
+  "restoreRecording": {
+    "message": "Restaurar a última gravação",
+    "description": "Botão para restaurar a última gravação no popup"
+  },
+  "havingIssuesButton": {
+    "message": "A ter problemas?",
+    "description": "Botão de problemas no editor"
+  },
+  "havingIssuesModalTitle": {
+    "message": "Não consegue ver a sua gravação?",
+    "description": "Título do modal de problemas no editor"
+  },
+  "havingIssuesModalDescription": {
+    "message": "Se completou a sua gravação e se encontra nesta página sem conseguir ver o seu vídeo, pode tentar descarregar os dados brutos do vídeo, se estiverem disponíveis. Também pode entrar em contacto e enviar um relatório de erro.",
+    "description": "Descrição do modal de problemas no editor"
+  },
+  "havingIssuesModalButton": {
+    "message": "Descarregar dados brutos do vídeo",
+    "description": "Botão do modal de problemas no editor"
+  },
+  "havingIssuesModalButton2": {
+    "message": "Reportar erro",
+    "description": "Segundo botão do modal de problemas no editor"
+  },
+  "noRecordingFound": {
+    "message": "Não foi encontrada nenhuma gravação, lamento :(",
+    "description": "Alerta de não foi encontrada nenhuma gravação no editor"
+  },
+  "memoryLimitTitle": {
+    "message": "Limite de memória atingido",
+    "description": "Título de limite de memória atingido"
+  },
+  "memoryLimitDescription": {
+    "message": "O seu dispositivo ficou sem memória para gravar, pelo que a gravação foi interrompida automaticamente. Se desejar gravar por mais tempo, pode tentar reduzir a qualidade do vídeo ou libertar espaço no dispositivo.",
+    "description": "Descrição de limite de memória atingido"
+  },
+  "understoodButton": {
+    "message": "Entendi",
+    "description": "Botão de entendi"
+  },
+  "notEnoughSpaceTitle": {
+    "message": "Espaço insuficiente",
+    "description": "Título de espaço insuficiente"
+  },
+  "notEnoughSpaceDescription": {
+    "message": "O Screenity precisa de pelo menos 1 GB de espaço livre para gravar. Por favor, liberte espaço e tente novamente.",
+    "description": "Descrição de espaço insuficiente"
+  },
+  "clearSpaceButton": {
+    "message": "Apagar gravações anteriores",
+    "description": "Botão de apagar gravações anteriores"
+  },
+  "sandboxAdvancedTitle": {
+    "message": "Avançado",
+    "description": "Secção avançada na página do editor no ambiente seguro"
+  },
+  "rawRecordingButtonTitle": {
+    "message": "Transferir ficheiro de vídeo bruto",
+    "description": "Botão de transferência de gravação em bruto"
+  },
+  "rawRecordingButtonDescription": {
+    "message": "Exportar os dados originais da gravação",
+    "description": "Etiqueta do botão de transferência de gravação em bruto"
+  },
+  "troubleshootButtonTitle": {
+    "message": "Obter ajuda com a tua gravação",
+    "description": "Botão de resolução de problemas"
+  },
+  "troubleShootButtonDescription": {
+    "message": "Recupera o teu vídeo e resolve outros problemas",
+    "description": "Etiqueta de resolução de problemas"
+  },
+  "rawRecordingModalTitle": {
+    "message": "Transferir ficheiro de vídeo bruto",
+    "description": "Título do modal de gravação em bruto"
+  },
+  "rawRecordingModalDescription": {
+    "message": "O ficheiro de vídeo bruto é o ficheiro original gravado pelo Screenity. Este vídeo não foi processado nem editado, pelo que pode ser muito grande e pode não ser reproduzível em todos os dispositivos. Se estiveres a ter problemas com o vídeo processado, podes usar este ficheiro para recuperar o teu vídeo.",
+    "description": "Descrição do modal de gravação em bruto"
+  },
+  "rawRecordingModalButton": {
+    "message": "Transferir",
+    "description": "Botão do modal de gravação em bruto"
+  },
+  "troubleshootModalTitle": {
+    "message": "Transferir informação do sistema e dados de vídeo para resolução de problemas",
+    "description": "Título do modal de resolução de problemas"
+  },
+  "troubleshootModalDescription": {
+    "message": "Após a transferência, envia o ficheiro para support@screenity.io com qualquer informação relevante. Utilizaremos estes dados para te ajudar a resolver quaisquer problemas que tenhas com a extensão e, se possível, recuperar o teu vídeo.",
+    "description": "Descrição do modal de resolução de problemas"
+  },
+  "troubleshootModalButton": {
+    "message": "Transferir",
+    "description": "Botão do modal de resolução de problemas"
+  },
+  "overLimitModalTitle": {
+    "message": "O vídeo é demasiado longo para ser processado no teu dispositivo",
+    "description": "Título do modal de limite superior a 5 minutos"
+  },
+  "overLimitModalDescription": {
+    "message": "Uma vez que o Screenity é completamente privado e funciona localmente, está limitado pelo hardware do teu dispositivo. Processar um vídeo com esta duração levaria demasiado tempo e seria muito intensivo em recursos. Não te preocupes, ainda podes descarregar o ficheiro WEBM ou a gravação em bruto, mas a edição e a exportação para MP4 não estão disponíveis. Dito isto, ainda podes tentar processar o vídeo mesmo assim, se compreenderes os riscos.",
+    "description": "Descrição do modal de limite superior a 5 minutos"
+  },
+  "overLimitModalButton": {
+    "message": "Compreendo o risco, tentar mesmo assim",
+    "description": "Botão do modal de limite superior a 5 minutos"
+  },
+  "overLimitModalLearnMore": {
+    "message": "Sabe mais sobre o processamento de vídeos longos.",
+    "description": "Link 'Sabe mais' do modal de limite superior a 5 minutos com um ponto"
+  },
+  "recoveryModeTitle": {
+    "message": "Modo de recuperação",
+    "description": "Título do modo de recuperação"
+  },
+  "downloadForTroubleshootingOption": {
+    "message": "Descarregar dados para solucionar problemas",
+    "description": "Opção de descarregamento para solucionar problemas"
+  },
+  "getHelpNav": {
+    "message": "Centro de Ajuda",
+    "description": "Item de Navegação para Obter Ajuda"
+  },
+  "audioWarningTitle": {
+    "message": "Gravar Áudio do Computador",
+    "description": "Título do Aviso de Áudio"
+  },
+  "audioWarningDescription": {
+    "message": "Para gravar áudio desta página, precisa alternar para '$tab$'.",
+    "description": "Descrição do Aviso de Áudio",
+    "placeholders": {
+      "tab": {
+        "content": "$1",
+        "example": "Área da Guia"
+      }
+    }
+  },
+  "extensionNotSupportedTitle": {
+    "message": "Extensão não suportada na guia",
+    "description": "Título de Extensão não Suportada na Guia"
+  },
+  "extensionNotSupportedDescription": {
+    "message": "O Screenity não foi suportado na sua guia anterior. Ainda pode iniciar a sua gravação aqui e alternar para a guia, mas a sua câmara e barra de ferramentas não serão visíveis.",
+    "description": "Descrição de Extensão não Suportada na Guia"
+  },
+  "backupsTitle": {
+    "message": "Configurar uma Cópia de Segurança Local para as suas Gravações no Screenity",
+    "description": "Título de Cópias de Segurança"
+  },
+  "backupsDescription1": {
+    "message": "Mantenha uma cópia de todas as gravações que efetuar. Se não configurar cópias de segurança, as suas gravações só serão guardadas quando optar por as descarregar.",
+    "description": "Descrição de Cópias de Segurança"
+  },
+  "backupsDescription2": {
+    "message": "Poderá ser necessário criar uma nova pasta primeiro se estiver a tentar guardar em 'Transferências' ou outras pastas do sistema.",
+    "description": "Descrição de Cópias de Segurança"
+  },
+  "backupsSelectFolder": {
+    "message": "Selecionar uma Pasta",
+    "description": "Botão Selecionar Pasta"
+  },
+  "backupsNotNow": {
+    "message": "Agora Não",
+    "description": "Botão Agora Não"
+  },
+  "backupsOnTitle": {
+    "message": "As Suas Gravações Estão a Ser Guardadas Localmente",
+    "description": "Título de Cópias de Segurança Ativas"
+  },
+  "backupsOnDescription": {
+    "message": "Para evitar pedir permissões sempre que efetuar gravações, recomendamos que deixe esta guia aberta.",
+    "description": "Descrição de Cópias de Segurança Ativas"
+  },
+  "backupsClose": {
+    "message": "Fechar Guia de Qualquer Maneira",
+    "description": "Botão Fechar Guia de Qualquer Maneira"
+  },
+  "backupsStop": {
+    "message": "Parar Todas as Cópias de Segurança de Gravações",
+    "description": "Botão Parar Cópias de Segurança"
+  },
+  "backupsConfirmTitle": {
+    "message": "Por Favor, Reconfirme o Acesso à Sua Pasta Local de Cópias de Segurança do Screenity",
+    "description": "Título de Confirmação de Cópias de Segurança"
+  },
+  "backupsConfirmDescription": {
+    "message": "Lamentamos, mas precisamos da sua permissão mais uma vez para continuar a efetuar cópias locais das suas gravações. Infelizmente, teremos de pedir sempre que encerrar esta guia, o que pode acontecer se encerrar o navegador ou reiniciar o seu computador.",
+    "description": "Descrição de Confirmação de Cópias de Segurança"
+  },
+  "backupsConfirmAllow": {
+    "message": "Permitir ao Screenity Continuar a Efetuar Cópias de Segurança das Gravações",
+    "description": "Botão Permitir na Confirmação de Cópias de Segurança"
+  },
+  "backupsToggle": {
+    "message": "Efetuar Cópias de Segurança das Gravações",
+    "description": "Etiqueta de Alternar Cópias de Segurança"
+  },
+  "backupPermissionFailTitle": {
+    "message": "Permissão Não Concedida para Efetuar uma Cópia de Segurança da Gravação",
+    "description": "Título de Falha de Permissão de Cópia de Segurança"
+  },
+  "backupPermissionFailDescription": {
+    "message": "Não selecionou uma pasta para efetuar uma cópia local das suas gravações. Dependendo da versão do seu navegador ou sistema operativo, poderá ser solicitado a selecionar a pasta sempre que iniciar uma gravação. Pode tentar novamente ou desativar as cópias de segurança por completo se preferir não conceder permissões repetidamente.",
+    "description": "Descrição de Falha de Permissão de Cópia de Segurança"
+  },
+  "recordAudioWarningMacTitle": {
+    "message": "Gravar Áudio do Computador",
+    "description": "Título do Aviso de Áudio para macOS"
+  },
+  "recordAudioWarningMacDescription": {
+    "message": "No macOS, só pode gravar áudio das guias. Selecione a opção 'Guia do Chrome' e certifique-se de que 'Também partilhar áudio da guia' está ativado.",
+    "description": "Descrição do Aviso de Áudio para macOS"
+  },
+  "recordAudioWarningOtherTitle": {
+    "message": "Gravar Áudio do Computador",
+    "description": "Título do Aviso de Áudio para Outros Sistemas"
+  },
+  "recordAudioWarningOtherDescription": {
+    "message": "Certifique-se de ativar a opção 'Partilhar áudio do sistema' se desejar gravar áudio do computador. Se não visualizar esta opção, tente atualizar o Chrome ou alternar para a gravação de guias.",
+    "description": "Descrição do Aviso de Áudio para Outros Sistemas"
+  },
+
+  "maxResolutionLabel": {
+    "message": "Resolução máxima",
+    "description": "Etiqueta de resolução máxima no menu de configurações"
+  },
+  "maxFPSLabel": {
+    "message": "Máximo de FPS",
+    "description": "Etiqueta de máximo de FPS no menu de configurações"
+  },
+
+  "notEnoughRAM": {
+    "message": "Memória RAM insuficiente",
+    "description": "Etiqueta de memória RAM insuficiente no menu de configurações"
+  },
+  "resizeWindowLabel": {
+    "message": "Redimensionar janela",
+    "description": "Rótulo de redimensionar janela no menu de configurações"
+  },
+  "screenTooSmallTooltip": {
+    "message": "O ecrã é demasiado pequeno para esta resolução",
+    "description": "Dica de ecrã muito pequeno no menu de configurações"
+  },
+  "maxResolutionTooltip": {
+    "message": "Não é possível gravar nesta resolução no seu dispositivo",
+    "description": "Dica de resolução máxima no menu de configurações"
+  },
+  "permissionsModalReview": {
+    "message": "Rever permissões",
+    "description": "Botão de rever permissões"
+  }
+}

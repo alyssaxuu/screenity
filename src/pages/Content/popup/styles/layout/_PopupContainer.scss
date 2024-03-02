@@ -1,0 +1,283 @@
+@use "../../../styles/_variables" as *;
+
+.popup-container:hover .popup-controls {
+  opacity: 1;
+}
+.open {
+  opacity: 1 !important;
+}
+.popup-drag-head {
+  position: fixed;
+  top: 0px;
+  left: 0px;
+  width: 100%;
+  height: 100px;
+  z-index: 1;
+  border-radius: 30px 30px 0px 0px;
+  opacity: 0;
+}
+.popup-controls {
+  opacity: 0;
+  position: absolute;
+  top: -10px;
+  right: -10px;
+  box-sizing: border-box;
+  border-radius: $container-border-radius;
+  border: 1px solid $color-border;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  z-index: 999999999;
+  background: rgba(240, 238, 238, 1);
+  backdrop-filter: blur(10px);
+  padding-left: 8px;
+  padding-right: 8px;
+  padding-top: 6px;
+  padding-bottom: 6px;
+  transition: opacity 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+
+  .popup-control {
+    svg {
+      color: $color-icon;
+      margin-bottom: -2px;
+    }
+  }
+  .popup-grab {
+    cursor: grab;
+  }
+
+  .popup-close {
+    cursor: pointer;
+  }
+}
+
+.tempimg {
+  height: 100%;
+  opacity: 1;
+  position: fixed;
+  right: 0px;
+  top: 20px;
+}
+
+.container {
+  width: 100%;
+  height: 100%;
+  position: fixed;
+  top: 0px;
+  left: 0px;
+  z-index: 999999999;
+  font-family: $font-medium;
+  font-size: $font-size-normal;
+}
+
+/* Recording popup parent */
+.popup-container {
+  width: 356px;
+  position: fixed;
+  top: 32px;
+  right: 28px;
+  z-index: $z-index-max;
+  filter: $container-shadow;
+  pointer-events: all;
+  transition: transform 0.25s cubic-bezier(0.61, 0.11, 0.08, 0.96),
+    filter 0.2s cubic-bezier(0.61, 0.11, 0.08, 0.96);
+}
+.ToolbarDragging .popup-container {
+  transform: scale(1.02);
+
+  filter: drop-shadow(0px 20px 50px rgba(0, 0, 0, 0.4)) !important;
+}
+.popup-container::before {
+  content: "";
+  display: block;
+  width: 100%;
+  height: 100%;
+  transition: 2s;
+  background: $color-background;
+  background-clip: content-box;
+  -webkit-mask-image: radial-gradient(
+    circle at center top,
+    transparent 31px,
+    #000 31px
+  );
+  mask-image: radial-gradient(
+    circle at center top,
+    transparent 31px,
+    #000 31px
+  );
+  background-position: center bottom 50px;
+  border-radius: $container-border-radius;
+  position: absolute;
+  top: 0px;
+  left: 0px;
+}
+/*
+.popup-shape {
+	width: 100%;
+	height: 100%;
+	background: $color-background;
+	background-clip: content-box;
+  -webkit-mask-image: radial-gradient(circle at center top, transparent 31px, #000 31px);
+  mask-image: radial-gradient(circle at center top, transparent 31px, #000 31px);
+  background-position: center bottom 50px;
+	border-radius: $container-border-radius;
+	position: relative;
+}
+*/
+
+.popup-cutout {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  text-align: center;
+  position: absolute;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  top: -22px;
+  left: 0px;
+  right: 0px;
+  margin: auto;
+}
+.popup-cutout img {
+  text-align: center;
+  margin: auto;
+  display: inline-block;
+  width: 100%;
+  border-radius: 50%;
+}
+
+/* Recording nav area */
+.popup-nav {
+  width: 100%;
+  position: relative;
+}
+
+/* Recording content area */
+.popup-content {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: $container-border-radius;
+  overflow: hidden;
+}
+
+.waveform {
+  width: 100%;
+  margin-top: $spacing-04;
+  margin-bottom: $spacing-04;
+}
+
+.popup-content-divider {
+  width: 100%;
+  height: 1px;
+  background: $color-border;
+  margin-top: $spacing-04;
+  margin-bottom: $spacing-04;
+}
+
+.popup-warning {
+  display: flex;
+  width: calc(100% + 32px);
+  height: 80px;
+  justify-content: space-between;
+  align-items: center;
+  position: relative;
+  overflow: hidden;
+  background-color: rgba(56, 126, 247, 0.1);
+  margin-left: -16px;
+  margin-top: -16px;
+  margin-bottom: 8px;
+
+  .popup-warning-right {
+    color: $color-primary;
+    font-family: $font-medium;
+    width: 90px;
+  }
+}
+.popup-warning-left,
+.popup-warning-right {
+  width: 50px;
+  display: flex;
+  align-items: center;
+  text-align: center;
+  height: 100%;
+  justify-content: center;
+
+  svg {
+    color: $color-primary;
+  }
+}
+.popup-warning-right {
+  cursor: pointer;
+}
+.popup-warning-middle {
+  flex: 1;
+
+  .popup-warning-title {
+    font-family: $font-bold;
+    color: $color-text-primary;
+  }
+  .popup-warning-description {
+    font-family: $font-medium;
+    color: $color-text-secondary;
+    margin-top: 4px;
+  }
+}
+.permission-button {
+  background: rgba(48, 128, 248, 0.1);
+  border-radius: $container-border-radius;
+  color: $color-primary;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 44px;
+  gap: 8px;
+  margin-top: $spacing-03;
+  margin-bottom: $spacing-03;
+
+  &:first-child {
+    margin-top: $spacing-02 !important;
+  }
+  &:last-child {
+    margin-bottom: $spacing-02 !important;
+  }
+  &:hover {
+    background: rgba(48, 128, 248, 0.15);
+    cursor: pointer;
+  }
+
+  svg {
+    color: $color-primary;
+  }
+}
+
+.HelpSection {
+  position: absolute;
+  left: 0px;
+  right: 0px;
+  margin: auto;
+  bottom: -40px;
+  background: #edeef2;
+  border-radius: 30px;
+  padding: 4px 12px;
+  text-align: center;
+  font-family: $font-medium;
+  color: $color-text-secondary;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: fit-content;
+
+  .HelpIcon {
+    margin-top: 3px;
+  }
+
+  &:hover {
+    cursor: pointer;
+    background: #fefeff;
+  }
+}

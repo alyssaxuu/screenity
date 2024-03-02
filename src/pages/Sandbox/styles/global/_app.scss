@@ -1,0 +1,338 @@
+@use "./variables.scss" as *;
+
+body {
+  background: $color-light-grey;
+  font-family: $font-medium;
+  font-size: $font-size-normal;
+  height: 100vh;
+  overflow-y: hidden;
+  margin: 0px;
+}
+
+// max width 900px
+@media (max-width: 900px) {
+  body {
+    overflow-y: unset !important;
+  }
+}
+
+/* Button component */
+.button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  border: none;
+  padding: 8px 16px;
+  gap: 6px;
+  text-align: center;
+  box-sizing: border-box;
+  border-radius: $container-border-radius;
+  font-family: $font-bold;
+  font-weight: 500;
+
+  &.primaryButton:disabled,
+  &.secondaryButton:disabled {
+    background-color: $color-light-grey !important;
+    color: $color-icon !important;
+    cursor: not-allowed !important;
+    border: 1px solid transparent !important;
+
+    svg {
+      color: $color-icon !important;
+      margin-top: 5px;
+    }
+  }
+
+  &.simpleButton:disabled {
+    opacity: 0.5;
+    cursor: not-allowed !important;
+  }
+
+  &.primaryButton {
+    color: $color-text-contrast;
+    background-color: $color-primary;
+    height: 40px;
+
+    svg {
+      margin-top: 5px;
+      color: $color-text-contrast;
+    }
+    &:hover {
+      background-color: darken($color-primary, 10%);
+      cursor: pointer;
+    }
+  }
+
+  &.secondaryButton {
+    color: $color-text-primary;
+    background-color: #fff;
+    border: 1px solid $color-border;
+    height: 40px;
+    svg {
+      margin-top: 5px;
+      color: $color-icon;
+    }
+    &:hover {
+      background-color: $color-light-grey;
+      cursor: pointer;
+    }
+  }
+
+  &.simpleButton {
+    color: $color-text-secondary;
+    background: none;
+
+    svg {
+      margin-top: 5px;
+    }
+
+    &:hover {
+      background-color: $color-light-grey;
+      cursor: pointer;
+    }
+  }
+
+  &.blueButton {
+    color: $color-primary;
+  }
+
+  &.blackButton {
+    color: $color-text-primary !important;
+  }
+}
+
+/* Define variables for handle size, border width, and margin */
+$handle-size: 15px;
+$border-width: 4px;
+$margin-offset: 8px;
+
+/* Disable transitions for Cropper */
+.cropper,
+.advanced-cropper-artificial-transition,
+.advanced-cropper-background-image,
+.advanced-cropper-wrapper,
+.advanced-cropper,
+.CropperBackgroundWrapper,
+.cropper * {
+  transition: none !important;
+}
+
+.cropper {
+  max-width: 80%;
+  height: 80%;
+  border-radius: 15px;
+  margin: auto !important;
+  position: absolute !important;
+  top: 0px;
+  left: 0px;
+  right: 0px;
+  bottom: 0px !important;
+  display: block;
+  transition: none !important;
+  padding-left: 40px;
+  padding-right: 40px;
+}
+.advanced-cropper-artificial-transition {
+  transition: none !important;
+}
+
+.advanced-cropper-background-image {
+  transition: none !important;
+}
+
+.advanced-cropper-wrapper,
+.advanced-cropper,
+.CropperBackgroundWrapper {
+  /* tile background image svg */
+  background-image: url("chrome-extension://__MSG_@@extension_id__/assets/editor/transparenttile.png") !important;
+  background-repeat: repeat !important;
+  background-size: 20px !important;
+  transition: none !important;
+}
+/* Custom styles for the handles */
+.advanced-cropper-simple-handler {
+  width: $handle-size !important; /* Adjust the handle width */
+  height: $handle-size !important; /* Adjust the handle height */
+  background-color: transparent !important;
+  position: absolute;
+  border-style: solid; /* Specify the border style as solid */
+  border-width: 0 !important; /* Initialize border width to 0 */
+  border-radius: 2px;
+
+  &--west-north,
+  &--west-south {
+    margin-left: $margin-offset !important; /* Offset from the left */
+  }
+
+  &--west-north,
+  &--east-north {
+    margin-top: $margin-offset !important; /* Offset from the top */
+  }
+
+  &--west-south,
+  &--east-south {
+    margin-bottom: $margin-offset !important; /* Offset from the bottom */
+  }
+
+  &--east {
+    margin-right: $margin-offset !important;
+    border-right-width: $border-width !important; /* Border on the right */
+  }
+
+  &--west {
+    margin-left: $margin-offset;
+    border-left-width: $border-width !important; /* Border on the left */
+  }
+
+  &--north {
+    margin-top: $margin-offset;
+    border-top-width: $border-width !important; /* Border on the top */
+  }
+
+  &--south {
+    margin-bottom: $margin-offset;
+    border-bottom-width: $border-width !important; /* Border on the bottom */
+  }
+}
+
+/* reset */
+button {
+  all: unset;
+}
+
+.AlertDialogOverlay {
+  background-color: rgba(0, 0, 0, 0.5);
+  position: fixed;
+  inset: 0;
+  animation: overlayShow 150ms cubic-bezier(0.16, 1, 0.3, 1);
+  z-index: 99999999999;
+}
+
+.AlertDialogContent {
+  background-color: white;
+  border-radius: 30px;
+  box-shadow: hsl(206 22% 7% / 35%) 0px 10px 38px -10px,
+    hsl(206 22% 7% / 20%) 0px 10px 20px -15px;
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 90vw;
+  max-width: 500px;
+  max-height: 85vh;
+  padding: 35px 25px;
+  animation: contentShow 150ms cubic-bezier(0.16, 1, 0.3, 1);
+  z-index: $z-index-max;
+}
+.AlertDialogContent:focus {
+  outline: none;
+}
+
+.AlertDialogTitle {
+  margin: 0;
+  color: $color-text-primary;
+  font-size: $font-size-normal;
+  font-family: $font-bold;
+  font-weight: 700;
+}
+
+.AlertDialogDescription {
+  margin-bottom: 20px;
+  color: $color-text-secondary;
+  font-size: $font-size-normal;
+  line-height: 1.5;
+
+  a {
+    color: $color-primary !important;
+    font-weight: 600 !important;
+    text-decoration: none !important;
+    display: inline-block;
+    cursor: pointer;
+  }
+}
+
+.Button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 30px;
+  padding: 0 15px;
+  font-size: 14px;
+  line-height: 1;
+  font-weight: 500;
+  height: 35px;
+}
+.Button.blue {
+  background-color: rgba(48, 128, 248, 0.1);
+  color: $color-primary;
+
+  &:hover {
+    background-color: rgba(48, 128, 248, 0.15);
+    cursor: pointer;
+  }
+  &:focus {
+    box-shadow: $focus-border;
+  }
+}
+.Button.red {
+  background-color: rgba(247, 56, 90, 0.1);
+  color: rgba(247, 56, 90, 1);
+}
+.Button.red:hover {
+  background-color: rgba(247, 56, 90, 0.15);
+  cursor: pointer;
+}
+.Button.red:focus {
+  box-shadow: $focus-border;
+}
+.Button.grey {
+  background: rgba(110, 118, 132, 0.1);
+  color: $color-text-secondary;
+}
+.Button.grey:hover {
+  background: rgba(110, 118, 132, 0.15);
+  cursor: pointer;
+}
+.Button.grey:focus {
+  box-shadow: $focus-border;
+}
+
+@keyframes overlayShow {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes contentShow {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -48%) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+.SideButtonModal {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 30px;
+  padding: 0 15px;
+  font-size: 14px;
+  line-height: 1;
+  font-weight: 500;
+  height: 35px;
+  color: $color-text-secondary;
+  font-family: $font-medium;
+
+  &:hover {
+    cursor: pointer;
+    background: rgba(110, 118, 132, 0.05);
+  }
+}

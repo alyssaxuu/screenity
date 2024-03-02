@@ -1,0 +1,48 @@
+@use "../global/variables.scss" as *;
+
+.SwitchRow {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 40px;
+}
+
+.SwitchRoot {
+  width: 34px;
+  height: 22px;
+  background-color: $color-border;
+  border-radius: 9999px;
+  position: relative;
+  -webkit-tap-highlight-color: rgba(0, 0, 0, 0);
+  border: none !important;
+}
+.SwitchRoot:focus {
+  box-shadow: $focus-border;
+}
+.SwitchRoot[data-state="checked"] {
+  background-color: $color-primary;
+}
+.SwitchRoot:hover {
+  cursor: pointer;
+}
+
+.SwitchThumb {
+  display: block;
+  width: 14px;
+  height: 14px;
+  background-color: white;
+  border-radius: 9999px;
+  box-shadow: 0px 1px 10px rgba(0, 0, 0, 0.1);
+  transition: transform 100ms;
+  transform: translateX(2px);
+  will-change: transform;
+  margin-left: -5px;
+}
+.SwitchThumb[data-state="checked"] {
+  transform: translateX(15px);
+}
+
+.Label {
+  color: $color-text-secondary;
+}

@@ -1,0 +1,42 @@
+@use '../../../styles/_variables' as *;
+
+.time-set-parent {
+	width: 100%;
+	display: flex;
+	gap: 10px;
+	margin-top: 10px;
+	margin-bottom: 10px;
+}
+.time-set-input {
+	flex: 1;
+	position: relative;
+
+	input {
+		border-radius: $container-border-radius;
+		height: 40px;
+		box-sizing: border-box;
+		position: relative;
+		width: 100%;
+		padding-left: 18px;
+		padding-right: 40px;
+		font-family: $font-medium;
+		background-color: $color-background;
+		-webkit-appearance: textfield;
+     -moz-appearance: textfield;
+          appearance: textfield;
+
+					&:focus-visible {
+						outline: none;
+						box-shadow: $focus-border;
+					}
+
+	}
+	span {
+		color: $color-text-secondary;
+		font-family: $font-medium;
+		position: absolute;
+		right: 18px;
+		bottom: 12px;
+		user-select: none;
+	}
+}

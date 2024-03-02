@@ -1,0 +1,27 @@
+@use '../../../styles/_variables' as *;
+
+.CanvasContainer {
+	width: 100%;
+	height: 100%;
+	position: absolute;
+	pointer-events: all!important;
+	top: 0px!important;
+	left: 0px!important;
+	z-index: 99999999999!important;
+}
+.canvas {
+	width: 100%;
+	height: 100%;
+	position: absolute;
+	top: 0px!important;
+	left: 0px!important;
+	z-index: 99999999999!important;
+}
+.canvas-container {
+	width: 100vw!important;
+	height: 100vh!important;
+	top: 0px!important;
+	left: 0px!important;
+	z-index: 99999999999;
+	position: absolute!important;
+}

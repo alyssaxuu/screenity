@@ -1,0 +1,101 @@
+@use '../../../styles/_variables' as *;
+
+
+.ToastViewport {
+  --viewport-padding: 25px;
+  position: fixed;
+  bottom: 0;
+  right: 0;
+	left: 0;
+	margin: auto!important;
+  display: flex;
+  flex-direction: column;
+  padding: var(--viewport-padding);
+  gap: 14px;
+  max-width: 100vw;
+	width: fit-content;
+  list-style: none;
+  z-index: 2147483647;
+  outline: none;
+	pointer-events: all!important;
+}
+
+.ToastRoot {
+  background-color: $color-text-primary;
+	color: $color-text-contrast;
+  border-radius: $container-border-radius;
+  box-shadow: hsl(206 22% 7% / 35%) 0px 10px 38px -10px, hsl(206 22% 7% / 20%) 0px 10px 20px -15px;
+  padding: 10px 14px;
+  display: flex;
+	flex-direction: row;
+	gap: 8px;
+	font-size: 15px;
+	line-height: 1.5;
+	max-width: 100%;
+	overflow: hidden;
+	justify-content: center;
+	align-items: center;
+}
+.ToastRoot[data-state='open'] {
+  animation: slideIn 150ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.ToastRoot[data-state='closed'] {
+  animation: hide 100ms ease-in;
+}
+.ToastRoot[data-swipe='move'] {
+  transform: translateY(var(--radix-toast-swipe-move-y));
+}
+.ToastRoot[data-swipe='cancel'] {
+  transform: translateY(0);
+  transition: transform 200ms ease-out;
+}
+.ToastRoot[data-swipe='end'] {
+  animation: swipeOut 100ms ease-out;
+}
+
+@keyframes hide {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateY(calc(100% + var(--viewport-padding)));
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+@keyframes swipeOut {
+  from {
+    transform: translateY(var(--radix-toast-swipe-end-y));
+  }
+  to {
+    transform: translateY(calc(100% + var(--viewport-padding)));
+  }
+}
+
+.ToastTitle {
+  color: $color-text-contrast;
+	font-family: $font-medium;
+}
+
+.ToastDescription {
+  color: var(--slate-11);
+	font-family: $font-medium;
+}
+
+.ToastAction {
+	color: $color-text-contrast;
+  font-family: $font-medium;
+	text-align: right;
+	background-color: #51515F;
+	padding: 0px 12px!important;
+	height: 24px!important;
+	cursor: pointer;
+}

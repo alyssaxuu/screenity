@@ -1,0 +1,13 @@
+{
+  "type": "service_account",
+  "project_id": "screenityv2",
+  "private_key_id": "ba4b5a4c0dc2d90e86da2f7791356dcd1c72ef21",
+  "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQDLbjBLsMsOrwzG\nXWWUjdg8DhZ5RoCnpbB9nods7Oq8rwUb2LHn7FgDHnOpxVgJAPpGpHS00dBXewRh\nwRCv4tVZ50EK5XR2lqkPaDlQDQE/eAtwoQi5AzQ26QSH5un50lkHi4OB0FP3IXtv\nJ6O+Jl26GdTtxcNT1Bee+a4gfs4o5hhKvY93QSNkjrUJNdOn6GNLbyJgixJPHa+z\nhfkzaQNgz8rXSDQnz6IGW6FPepaNFGWHcoyWzx4AZLVp/CL1zY/VukEKaQo7NBt/\nBWDLNX+KbKZj2Kgx/9yx/4voL8oLt5j8kzVLWbcQz1YUarRb0xV2x4u9sxmA62hF\nO+Qdv5+nAgMBAAECggEAXzt+MHDbHkykVlhyrVCZ4cNWkf+HSvQt4yDLlRpz6VCl\nu5t97Wye5xbiXp+bzts+TsO+PsfaGJnmOzz+athtuGCh+k/gbYOqMSRBcFAmPWgd\nMuSwCKyPTQVYsaZP8jueogGV1reIFzD9b9PGu8WKKwzcuVLTVfL7+9g2w8+ZA1ue\naWJPslrKVPuOiobr2dA4DwjnEowVMk8D+9cv/4DKKsejVOzjZHQIGsCZu0+k5qgT\nOshB8WqcmJWjbjEDaMSc2QPTP3U+6gs5ILuX81qoG9tnAt7q+aoFUMrbc2un5eKL\njyfdCozF/SYWDqaVlllkBpKG1UWvxzUA6K2x6VjlwQKBgQDkOOTa79sMQwxz+goP\ngVY+sZj7b4SRtCv2T3T0vmkBzcZuzwX4a9P0DXaBljpx8WbKILw/j77ww9ZCbKws\nlt8e6czFpd3BNc+ybZHlzfQ0TJNqF3RDbGSurm01FBGx+ITVU4bWC8RupbN9VvXl\n442KD0thoSY0dHMB6E2Up+az2wKBgQDkMNBrMczI9t7yCfxATmOIiYpnEBsyt5z2\nHOF08p+qsrq9UicyCzl0kwXt5I/paXAcepNZbgalxFCI/HlnK2W/6S9mI0FE42WV\n5MDorJhPyxHiqaoJHUdYgzP7H5+RfKYJIvqDisyd+v7ZTSNU7+cRgzMoYKsGc5CQ\nTbkE+KkzJQKBgHWKG8vqhn1tNsewemf768hEPY8Zo0RLb+zehVTbkEdejJlbRC7q\nkfH60RLypU0z0AXAEFQIG4XyxrHVOGOKnIVWUqFkyK4Ooda6ec7KYMBiw/V6+OUU\nuVICAbq5iFeJsBgSebpZuyRlcOjX1bM9nBMDx4YTshKH+wd7diFezAHLAoGBAK+V\nUAnrm+PW8d3UCSGCL9xT2QdMwWDZIBHQTzsppeo29LHQkRBUyrUEnD9c689yri17\ns/3QR5Ut5bpCazgTkIuG5k31OrfDMduQ1U8z308mtnBulMPGn6tf6ZOF1cag3zGQ\nlKq7Fo9JHugeDt3Aa1ByX97l4zNnoQkohQFqROdxAoGAYBHmQc3FdmCu8OTGTGCF\nn5IrnjMLBDrRzP6Y9tUjsE7qO2J8OcYOFJS/vBAf7B54OH31mmAHvwLJB9GPJ+ra\nbxZ2Q6HG7MKVIYctOSw3+b5sYXcrHtGGlkeRc6oMq4GihbFPR/ohy+EmxBaQJ7Ev\nuo1weCsUs0iCFZQLNHEb4Qw=\n-----END PRIVATE KEY-----\n",
+  "client_email": "screenity@screenityv2.iam.gserviceaccount.com",
+  "client_id": "103444725546726905598",
+  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+  "token_uri": "https://oauth2.googleapis.com/token",
+  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+  "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/screenity%40screenityv2.iam.gserviceaccount.com",
+  "universe_domain": "googleapis.com"
+}

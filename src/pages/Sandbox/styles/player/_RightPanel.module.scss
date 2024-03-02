@@ -1,0 +1,306 @@
+@use "../global/variables.scss" as *;
+
+.panel {
+  height: 100%;
+  width: 460px;
+  background-color: #fff;
+  border: 1px solid $color-border;
+  box-sizing: border-box;
+  overflow-y: auto;
+  z-index: 9999999;
+}
+// Max width 900px
+@media (max-width: 900px) {
+  .panel {
+    width: 100% !important;
+    position: relative !important;
+    top: 0px;
+    left: 0px;
+    overflow: unset !important;
+  }
+}
+.section {
+  width: 90%;
+  margin: auto;
+  padding-top: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid $color-border;
+  position: relative;
+
+  &:last-child {
+    border-bottom: none;
+  }
+}
+.sectionTitle {
+  margin-top: 8px;
+  margin-bottom: 16px;
+  font-family: $font-bold;
+  color: $color-text-primary;
+}
+.buttonLogout {
+  position: absolute;
+  right: 8px;
+  top: 26px;
+  font-family: $font-medium;
+  color: $color-text-secondary;
+  cursor: pointer;
+}
+.buttonWrap {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.alert {
+  display: flex;
+  width: 100%;
+  height: 80px;
+  justify-content: space-between;
+  align-items: center;
+  position: relative;
+  overflow: hidden;
+  background-color: rgba(56, 126, 247, 0.1);
+
+  .buttonRight {
+    color: $color-primary;
+    font-family: $font-bold;
+    width: 150px;
+
+    &:hover {
+      cursor: pointer;
+    }
+  }
+}
+.button {
+  display: flex;
+  width: 100%;
+  height: 80px;
+  border-radius: $container-border-radius;
+  border: 1px solid $color-border;
+  justify-content: space-between;
+  align-items: center;
+  position: relative;
+  overflow: hidden;
+
+  &:hover {
+    cursor: pointer;
+    background-color: $color-light-grey;
+  }
+  &:disabled,
+  &[disabled] {
+    background-color: $color-light-grey !important;
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  &.progress::after {
+    content: "";
+    display: block;
+    position: absolute;
+    background-color: $color-primary;
+    opacity: 0.1;
+    height: 100%;
+    width: 80px;
+    left: 0px;
+    top: 0px;
+  }
+}
+.buttonLeft,
+.buttonRight {
+  width: 60px;
+  display: flex;
+  align-items: center;
+  text-align: center;
+  height: 100%;
+  justify-content: center;
+
+  svg {
+    color: $color-icon;
+  }
+}
+.buttonMiddle {
+  flex: 1;
+
+  .buttonTitle {
+    font-family: $font-bold;
+    color: $color-text-primary;
+  }
+  .buttonDescription {
+    font-family: $font-medium;
+    color: $color-text-secondary;
+    margin-top: 4px;
+  }
+}
+.inputSection {
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
+.inputSectionTitle {
+  font-family: $font-medium;
+  color: $color-text-secondary;
+  margin-bottom: 4px;
+}
+.inputs {
+  display: flex;
+  gap: 18px;
+  margin-bottom: 16px;
+}
+.inputVolume {
+  flex: none !important;
+  width: 100px;
+}
+.input,
+.inputVolume {
+  flex: 1;
+  position: relative;
+
+  input {
+    border-radius: $container-border-radius;
+    border: 1px solid $color-border;
+    height: 40px;
+    box-sizing: border-box;
+    position: relative;
+    width: 100%;
+    padding-left: 18px;
+    padding-right: 40px;
+    font-family: $font-medium;
+  }
+  span {
+    color: $color-text-secondary;
+    font-family: $font-medium;
+    position: absolute;
+    right: 18px;
+    bottom: 12px;
+    user-select: none;
+  }
+}
+.inputTitle {
+  font-family: $font-medium;
+  color: $color-text-secondary;
+  margin-bottom: 8px;
+}
+.uploadArea {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 16px;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  border: 1px solid $color-border;
+  border-radius: $container-border-radius;
+  text-align: center;
+  padding-top: 20px;
+  padding-bottom: 20px;
+
+  svg {
+    color: #6e7684;
+  }
+
+  .uploadTitle {
+    font-family: $font-bold;
+    color: $color-text-primary;
+  }
+  .uploadDescription {
+    margin-top: 10px;
+    font-family: $font-medium;
+    color: $color-text-secondary;
+  }
+
+  &:hover {
+    cursor: pointer;
+    background-color: $color-light-grey;
+  }
+}
+.audioDetails {
+  display: flex;
+  border-radius: $container-border-radius;
+  border: 1px solid $color-border;
+  height: 43px;
+  align-items: center;
+  position: relative;
+
+  .audioDetailsLeft {
+    display: flex;
+    padding-left: 14px;
+    padding-right: 8px;
+    svg {
+      color: #6e7684;
+    }
+  }
+  .audioDetailsMiddle {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    overflow: hidden;
+
+    span {
+      text-overflow: ellipsis;
+      overflow: hidden;
+      white-space: nowrap;
+      width: 90%;
+    }
+  }
+  .audioDetailsRight {
+    right: 0px;
+    top: 0px;
+    bottom: 0px;
+    display: flex;
+    align-items: center;
+    padding-right: 14px;
+    position: absolute;
+    height: 100%;
+    svg {
+      color: #6e7684;
+    }
+
+    &:hover {
+      cursor: pointer;
+    }
+  }
+}
+
+.SliderRoot {
+  position: relative;
+  display: flex;
+  align-items: center;
+  user-select: none;
+  touch-action: none;
+  width: 200px;
+  height: 20px;
+  margin-top: 36px;
+  flex: 1;
+}
+
+.SliderTrack {
+  background-color: $color-border;
+  position: relative;
+  flex-grow: 1;
+  border-radius: 9999px;
+  height: 6px;
+}
+
+.SliderRange {
+  position: absolute;
+  background-color: $color-primary;
+  border-radius: 9999px;
+  height: 100%;
+}
+
+.SliderThumb {
+  display: block;
+  width: 16px;
+  height: 16px;
+  background-color: #fff;
+  box-sizing: border-box;
+  border: 2px solid $color-primary;
+  border-radius: 10px;
+}
+.SliderThumb:focus {
+  outline: none;
+  box-shadow: $focus-border;
+}
+
+.updateButton {
+  margin-top: 20px;
+  float: right;
+}

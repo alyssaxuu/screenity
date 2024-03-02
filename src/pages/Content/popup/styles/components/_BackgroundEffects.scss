@@ -1,0 +1,71 @@
+@use '../../../styles/_variables' as *;
+
+.background-effects-toggle-group {
+	display: flex;
+	height: 40px;
+	width: 100%;
+	gap: 8px;
+	margin-bottom: 8px;
+	margin-top: 8px;
+}
+.background-effect {
+	display: flex;
+	width: 40px;
+	height: 40px;
+	align-items: center;
+	justify-content: center;
+	border-radius: 30px;
+	position: relative;
+	color: #FFF;
+
+	span {
+		position: absolute;
+		top: 0px;
+		left: 0px;
+		width: 100%;
+		height: 100%;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		font-size: 12px;
+		font-weight: 600;
+		z-index: 99999;
+		font-weight: 500;
+	}
+	&[data-state='on']::after {
+		content: "";
+		border-radius: 50%;
+		display: block;
+		width: 46px;
+		height: 46px;
+		position: absolute;
+		border: 2px solid $color-primary;
+		box-sizing: border-box;
+	}
+	img {
+		width: 100%;
+		height: 100%;
+		border-radius: 50%;
+		position: absolute;
+		top: 0px;
+		left: 0px;
+	}
+	&:hover:not([data-state='on']) {
+		cursor: pointer;
+		&::after {
+			content: "";
+		border-radius: 50%;
+		display: block;
+		width: 46px;
+		height: 46px;
+		position: absolute;
+		border: 2px solid $color-primary;
+		opacity: .5;
+		box-sizing: border-box;
+		}
+	}
+	&:focus-visible {
+		box-shadow: $focus-border;
+
+	}
+}
