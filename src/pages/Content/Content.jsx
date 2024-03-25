@@ -125,7 +125,7 @@ const Content = () => {
   }
 }
 
-[data-radix-popper-content-wrapper] { z-index: 999999999999!important; } 
+#screenity-ui [data-radix-popper-content-wrapper] { z-index: 999999999999!important; } 
 
 .screenity-shadow-dom .CanvasContainer {
 	position: fixed;

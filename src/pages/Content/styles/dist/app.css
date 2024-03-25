@@ -598,7 +598,7 @@ body {
     transform: translateX(0);
   }
 }
-[data-radix-popper-content-wrapper] {
+#screenity-ui [data-radix-popper-content-wrapper] {
   z-index: 99999999999 !important;
 }
 

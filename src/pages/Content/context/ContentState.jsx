@@ -999,7 +999,7 @@ const ContentState = (props) => {
       } else if (request.type === "recording-check") {
         if (!request.force) {
           if (!contentStateRef.showExtension && !contentStateRef.recording) {
-            updateFromStorage(true, sender.tab.id);
+            updateFromStorage(true, sender.id);
           }
         } else if (request.force) {
           setContentState((prevContentState) => ({
@@ -1008,7 +1008,7 @@ const ContentState = (props) => {
             recording: true,
           }));
           //checkRecording(sender.tab.id);
-          updateFromStorage(false, sender.tab.id);
+          updateFromStorage(false, sender.id);
         }
       } else if (request.type === "stop-pending") {
         setContentState((prevContentState) => ({
