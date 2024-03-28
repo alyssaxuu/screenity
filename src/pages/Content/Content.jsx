@@ -150,6 +150,7 @@ const Content = () => {
 }
 
 .ScreenityDropdownMenuContent {
+	z-index: 99999999999!important;
   min-width: 200px;
   background-color: white;
   margin-top: 4px;
