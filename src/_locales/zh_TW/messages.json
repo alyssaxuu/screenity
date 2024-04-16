@@ -36,7 +36,7 @@
     "description": "Custom area recording disabled warning on popup for Chrome version older than 104"
   },
   "customAreaRecordingDisabledDescription": {
-    "message": "更新Chrome版本至110+",
+    "message": "更新 Chrome 版本至 110+",
     "description": "Custom area recording disabled warning description on popup for Chrome version older than 104"
   },
   "customAreaRecordingDisabledAction": {
@@ -48,7 +48,7 @@
     "description": "Camera / microphone permissions warning modal title"
   },
   "permissionsModalDescription": {
-    "message": "看起來Screenity無法訪問您的攝影機或麥克風。請確保通過單擊地址欄中的攝影機圖示允許訪問。",
+    "message": "看起來 Screenity 無法訪問您的攝影機或麥克風。請確保通過單擊地址欄中的攝影機圖示允許訪問。",
     "description": "Camera / microphone permissions warning modal description"
   },
   "permissionsModalDismiss": {
@@ -490,11 +490,11 @@
   },
   "overLimitLabelTitle": {
     "message": "影片過長，無法在本地處理",
-    "description": "編輯器中超過5分鐘的限制標籤"
+    "description": "編輯器中超過 5 分鐘的限制標籤"
   },
   "overLimitLabelDescription": {
-    "message": "編輯和MP4格式導出不可用",
-    "description": "編輯器中超過5分鐘的限制描述"
+    "message": "編輯和 MP4 格式導出不可用",
+    "description": "編輯器中超過 5 分鐘的限制描述"
   },
   "videoProcessingLabelTitle": {
     "message": "影片正在處理中...",
@@ -597,7 +597,7 @@
     "description": "Download GIF button"
   },
   "downloadGIFButtonDescription": {
-    "message": "導出為 GIF（最長30秒）",
+    "message": "導出為 GIF（最長 30 秒）",
     "description": "Download GIF label"
   },
   "shareModalSandboxTitle": {
@@ -673,7 +673,7 @@
     "description": "Microphone muted modal cancel"
   },
   "setupTitle": {
-    "message": "在三個簡單步驟中開始使用Screenity：",
+    "message": "在三個簡單步驟中開始使用 Screenity：",
     "description": "Set up steps title"
   },
   "setupStep1Before": {
@@ -697,7 +697,7 @@
     "description": "Set up step 3, before the icon. It needs a space at the end."
   },
   "setupStep3After": {
-    "message": " Screenity圖示以啟動",
+    "message": "Screenity 圖示以啟動",
     "description": "Set up step 3, after the icon. It needs a space at the beginning."
   },
   "setupCompleteTitle": {
@@ -741,7 +741,7 @@
     "description": "Microphone disabled toast title"
   },
   "hideUIAlerts": {
-    "message": "隱藏UI通知",
+    "message": "隱藏 UI 通知",
     "description": "Hide UI alerts button"
   },
   "noShowAgain": {
@@ -861,7 +861,7 @@
     "description": "原始錄製模態框標題"
   },
   "rawRecordingModalDescription": {
-    "message": "原始影片檔案是由Screenity錄製的原始影片檔案。此影片未經處理或編輯，因此可能非常大且可能無法在所有設備上播放。如果您在處理後的影片方面遇到問題，可以使用此文件恢復您的影片。",
+    "message": "原始影片檔案是由 Screenity 錄製的原始影片檔案。此影片未經處理或編輯，因此可能非常大且可能無法在所有設備上播放。如果您在處理後的影片方面遇到問題，可以使用此文件恢復您的影片。",
     "description": "原始錄製模態框描述"
   },
   "rawRecordingModalButton": {
@@ -873,7 +873,7 @@
     "description": "故障排除模態框標題"
   },
   "troubleshootModalDescription": {
-    "message": "下載後，請將文件發送至support@screenity.io，並附上任何相關資訊。我們將使用這些數據來幫助您解決擴展程序的任何問題，並在可能的情況下恢復您的影片。",
+    "message": "下載後，請將文件發送至 support@screenity.io，並附上任何相關資訊。我們將使用這些數據來幫助您解決擴展程序的任何問題，並在可能的情況下恢復您的影片。",
     "description": "故障排除模態框描述"
   },
   "troubleshootModalButton": {
@@ -882,19 +882,19 @@
   },
   "overLimitModalTitle": {
     "message": "影片太長，無法在您的設備上處理",
-    "description": "超過5分鐘限制的模態框標題"
+    "description": "超過 5 分鐘限制的模態框標題"
   },
   "overLimitModalDescription": {
-    "message": "由於Screenity完全私密且在本地運行，它受到您設備硬體的限制。處理這樣長度的影片需要很長時間，而且資源消耗很大。但您仍然可以下載WEBM文件或原始錄製文件，但無法進行編輯和MP4導出。儘管如此，如果您了解風險，仍然可以嘗試處理該影片。",
-    "description": "超過5分鐘限制的模態框描述"
+    "message": "由於 Screenity 完全私密且在本地運行，它受到您設備硬體的限制。處理這樣長度的影片需要很長時間，而且資源消耗很大。但您仍然可以下載 WEBM 文件或原始錄製文件，但無法進行編輯和 MP4 導出。儘管如此，如果您了解風險，仍然可以嘗試處理該影片。",
+    "description": "超過 5 分鐘限制的模態框描述"
   },
   "overLimitModalButton": {
     "message": "我理解風險，仍然嘗試",
-    "description": "超過5分鐘限制的模態框按鈕"
+    "description": "超過 5 分鐘限制的模態框按鈕"
   },
   "overLimitModalLearnMore": {
     "message": "了解有關處理長影片的更多資訊。",
-    "description": "超過5分鐘限制的模態框了解更多連結（帶有句號）"
+    "description": "超過 5 分鐘限制的模態框了解更多連結（帶有句號）"
   },
 
   "recoveryModeTitle": {
@@ -929,11 +929,11 @@
     "description": "選項卡上不支援擴展功能的標題"
   },
   "extensionNotSupportedDescription": {
-    "message": "Screenity在您之前的選項卡上不受支援。儘管如此，您可以在此開始錄製，然後切換到選項卡，但您的攝影機和工具欄將不可見。",
+    "message": "Screenity 在您之前的選項卡上不受支援。儘管如此，您可以在此開始錄製，然後切換到選項卡，但您的攝影機和工具欄將不可見。",
     "description": "選項卡上不支援擴展功能的說明"
   },
   "backupsTitle": {
-    "message": "為Screenity錄製設定本地備份",
+    "message": "為 Screenity 錄製設定本地備份",
     "description": "備份標題"
   },
   "backupsDescription1": {
@@ -969,7 +969,7 @@
     "description": "停止備份按鈕"
   },
   "backupsConfirmTitle": {
-    "message": "請重新確認對Screenity本地備份文件夾的訪問權限",
+    "message": "請重新確認對 Screenity 本地備份文件夾的訪問權限",
     "description": "備份確認標題"
   },
   "backupsConfirmDescription": {
@@ -977,7 +977,7 @@
     "description": "備份確認說明"
   },
   "backupsConfirmAllow": {
-    "message": "允許Screenity繼續備份錄製",
+    "message": "允許 Screenity 繼續備份錄製",
     "description": "備份確認中的允許按鈕"
   },
   "backupsToggle": {
@@ -994,18 +994,18 @@
   },
   "recordAudioWarningMacTitle": {
     "message": "錄製計算機音訊",
-    "description": "macOS音訊警告標題"
+    "description": "macOS 音訊警告標題"
   },
   "recordAudioWarningMacDescription": {
-    "message": "在macOS上，您只能錄製選項卡的音訊。請選擇'Chrome選項卡'選項，並確保啟用'同時共享選項卡音訊'選項。",
-    "description": "macOS音訊警告說明"
+    "message": "在 macOS 上，您只能錄製選項卡的音訊。請選擇'Chrome 選項卡'選項，並確保啟用'同時共享選項卡音訊'選項。",
+    "description": "macOS 音訊警告說明"
   },
   "recordAudioWarningOtherTitle": {
     "message": "錄製計算機音訊",
     "description": "其他系統音訊警告標題"
   },
   "recordAudioWarningOtherDescription": {
-    "message": "如果您想錄製計算機音訊，請確保啟用'共享系統音訊'選項。如果您看不到此選項，請嘗試更新Chrome或切換到選項卡錄製選項。",
+    "message": "如果您想錄製計算機音訊，請確保啟用'共享系統音訊'選項。如果您看不到此選項，請嘗試更新 Chrome 或切換到選項卡錄製選項。",
     "description": "其他系統音訊警告說明"
   },
 
