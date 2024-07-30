@@ -43,10 +43,11 @@ const Recorder = () => {
           {
             type: "screenity-permissions",
             success: false,
-            error: err.name,
+            error: "Permissions not granted",
           },
           "*"
         );
+        throw new Error("Permissions not granted");
         // sendResponse({ success: false, error: err.name });
       }
     } catch (err) {
