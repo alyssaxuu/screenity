@@ -201,7 +201,7 @@ const Recorder = () => {
     const handleDataAvailable = async (e) => {
       checkMaxMemory();
 
-      if (e.data.size > 0 && e.timecode) {
+      if (e.data.size > 0 && (e.timecode != null || e.timecode != undefined)) {
         try {
           const timestamp = e.timecode;
           if (hasChunks.current === false) {
