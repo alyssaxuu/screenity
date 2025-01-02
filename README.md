@@ -2,7 +2,8 @@
 [![jiewjjc232](https://github.com/alyssaxuu/screenity/assets/7581348/ed55e52e-4adf-442b-b774-6856abacdffb)](https://screenity.io)
 
 
-The free and privacy-friendly screen recorder with no limits 🎥
+The free and privacy-friendly screen recorder with no limits sarvar 🎥
+manashera birnimala qo'shdim
 
 [Get it now - it's free!](https://chrome.google.com/webstore/detail/screenity-screen-recorder/kbbdabhdfibnancpjfhlkhafgdilcnji)
 
