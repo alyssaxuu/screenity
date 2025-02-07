@@ -179,12 +179,18 @@ const handleAlarm = async (alarm) => {
     const { recording } = await chrome.storage.local.get(["recording"]);
     if (recording) {
       stopRecording();
-      const { recordingTab } = await chrome.storage.local.get(["recordingTab"]);
-      sendMessageTab(recordingTab, { type: "stop-recording-tab" });
+
       const { activeTab } = await chrome.storage.local.get(["activeTab"]);
-      sendMessageTab(activeTab, { type: "stop-recording-tab" });
-      const currentTab = await getCurrentTab();
-      sendMessageTab(currentTab.id, { type: "stop-recording-tab" });
+
+      // Check if actual tab
+      chrome.tabs.get(activeTab, (t) => {
+        if (t) {
+          sendMessageTab(activeTab, { type: "stop-recording-tab" });
+        } else {
+          sendMessageTab(tab.id, { type: "stop-recording-tab" });
+          chrome.storage.local.set({ activeTab: tab.id });
+        }
+      });
     }
     chrome.alarms.clear("recording-alarm");
   }

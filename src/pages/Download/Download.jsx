@@ -41,8 +41,9 @@ const Download = () => {
     if (message.type === "download-video") {
       const base64 = message.base64;
       const blob = base64ToUint8Array(base64);
-      const title = message.title;
+      const title = message.title.replace(/[\/\\:?~<>|*"]/g, "_");
       const url = URL.createObjectURL(blob);
+
       chrome.downloads
         .download({
           url: url,

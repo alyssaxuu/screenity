@@ -809,7 +809,7 @@ const ContentState = (props) => {
     // The title must not have these characters  " : ? ~ < > * |
     // Replace them with a space
     const title =
-      contentStateRef.current.title.replace(/[:?~<>|*]/g, " ") + ext;
+      contentStateRef.current.title.replace(/[\/\\:?~<>|*]/g, " ") + ext;
 
     // Check if user is on Brave browser
     if ((navigator.brave && (await navigator.brave.isBrave())) || false) {

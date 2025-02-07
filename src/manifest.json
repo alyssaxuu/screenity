@@ -3,7 +3,7 @@
   "name": "__MSG_extName__",
   "description": "__MSG_extDesc__",
   "default_locale": "en",
-  "version": "3.1.12",
+  "version": "3.1.13",
   "background": {
     "service_worker": "background.bundle.js"
   },
