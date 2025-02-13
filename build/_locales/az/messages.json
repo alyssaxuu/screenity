@@ -1,0 +1,1037 @@
+{
+    "extName": {
+      "message": "Screenity - Ekran Recorder & Şərh Aləti",
+      "description": "Extension name"
+    },
+    "extDesc": {
+      "message": "Pulsuz və məxfiliyə uyğun, məhdudiyyətsiz ekran yazıcısı. Videoları çəkin, şərh edin, redaktə edin və s. - bunların hamısı heç bir giriş tələb olunmadan.",
+      "description": "Extension description"
+    },
+    "recordTab": {
+      "message": "Qeyd",
+      "description": "Record tab label on popup"
+    },
+    "videosTab": {
+      "message": "Videolar",
+      "description": "Videos tab label on popup"
+    },
+    "screenType": {
+      "message": "Ekran",
+      "description": "Screen recording type label on popup"
+    },
+    "tabType": {
+      "message": "Tab sahəsi",
+      "description": "Tab area recording type label on popup"
+    },
+    "cameraType": {
+      "message": "Kamera",
+      "description": "Camera recording type label on popup"
+    },
+    "mockupType": {
+      "message": "Mockup",
+      "description": "Mockup recording type label on popup"
+    },
+    "customAreaRecordingDisabledTitle": {
+      "message": "Custom sahə qeyd etmə imkanı yoxdur",
+      "description": "Custom area recording disabled warning on popup for Chrome version older than 104"
+    },
+    "customAreaRecordingDisabledDescription": {
+      "message": "Chrome versiyasını 110+ versiyasına yeniləyin",
+      "description": "Custom area recording disabled warning description on popup for Chrome version older than 104"
+    },
+    "customAreaRecordingDisabledAction": {
+      "message": "Yenilə",
+      "description": "Custom area recording disabled warning action on popup for Chrome version older than 104"
+    },
+    "permissionsModalTitle": {
+      "message": "İcazələrinizi yoxlayın",
+      "description": "Camera / microphone permissions warning modal title"
+    },
+    "permissionsModalDescription": {
+      "message": "Görünür, Screenity kameranıza və ya mikrofonunuza daxil ola bilmir. Ünvan çubuğundakı kamera simgesini klikləməklə girişə icazə verdiyinizə əmin olun.",
+      "description": "Camera / microphone permissions warning modal description"
+    },
+    "permissionsModalDismiss": {
+      "message": "Bağla",
+      "description": "Camera / microphone permissions warning modal dismiss button"
+    },
+    "allowCameraAccessButton": {
+      "message": "Kamera icazəsini ver",
+      "description": "Allow camera access button"
+    },
+    "allowMicrophoneAccessButton": {
+      "message": "Mikrofon icazəsini ver",
+      "description": "Allow microphone access button"
+    },
+    "pushToTalkLabel": {
+      "message": "Danışmaq üçün bas",
+      "description": "Push to talk switch label"
+    },
+    "customAreaLabel": {
+      "message": "Qeyd etmək üçün sahə təyin edin",
+      "description": "Custom area switch label"
+    },
+    "flipCameraLabel": {
+      "message": "Kamera çevir",
+      "description": "Flip camera switch label"
+    },
+    "backgroundEffectsLabel": {
+      "message": "Arxa fon effektləri",
+      "description": "Background effects switch label"
+    },
+    "recordButtonLabel": {
+      "message": "Qeyd başlat",
+      "description": "Record button label"
+    },
+    "recordButtonInProgressLabel": {
+      "message": "Qeyd edilir...",
+      "description": "Record button in progress label"
+    },
+    "recordButtonNoCameraLabel": {
+      "message": "Kameranı qeyd etmək üçün təyin et",
+      "description": "Record button label when in camera mode and no camera is selected"
+    },
+    "showMoreOptionsLabel": {
+      "message": "Daha çox seçimləri göstər",
+      "description": "Show more options label"
+    },
+    "systemAudioLabel": {
+      "message": "System səsini daxil et",
+      "description": "Tab/system audio label"
+    },
+    "hideToolbarLabel": {
+      "message": "Alətlər panelini gizlədin",
+      "description": "Hide toolbar label"
+    },
+    "countdownLabel": {
+      "message": "Geri sayım",
+      "description": "Countdown label"
+    },
+    "alarmLabel": {
+      "message": "Vaxt limiti təyin edin",
+      "description": "Alarm label"
+    },
+    "blurTypeLabel": {
+      "message": "Blur",
+      "description": "Blur background label"
+    },
+    "noneDropdownLabel": {
+      "message": "Heç biri",
+      "description": "No device selected"
+    },
+    "noCameraDropdownLabel": {
+      "message": "Kamera yoxdur",
+      "description": "No camera selected"
+    },
+    "noMicrophoneDropdownLabel": {
+      "message": "Mikrofon yoxdur",
+      "description": "No microphone selected"
+    },
+    "selectSourceDropdownPlaceholder": {
+      "message": "Mənbəni seçin",
+      "description": "Select source placeholder"
+    },
+    "offLabel": {
+      "message": "Söndür",
+      "description": "Off label on dropdown"
+    },
+    "regionWidthLabel": {
+      "message": "Genişlik",
+      "description": "Region width label"
+    },
+    "regionHeightLabel": {
+      "message": "Hündürlük",
+      "description": "Region height label"
+    },
+    "addImageToastTitle": {
+      "message": "Şəkli yerləşdirmək üçün klikləyin",
+      "description": "Toast that shows when adding a new image"
+    },
+    "finishRecordingTooltip": {
+      "message": "Qeydi tamamlayın",
+      "description": "Finish recording tooltip"
+    },
+    "restartRecordingTooltip": {
+      "message": "Qeydi yenidən başladın",
+      "description": "Restart recording tooltip"
+    },
+    "pauseRecordingTooltip": {
+      "message": "Qeydi dayandır",
+      "description": "Pause recording tooltip"
+    },
+    "resumeRecordingTooltip": {
+      "message": "Qeydi davam etdir",
+      "description": "Resume recording tooltip"
+    },
+    "cancelRecordingTooltip": {
+      "message": "Qeydi ləğv et",
+      "description": "Cancel recording tooltip"
+    },
+    "toggleDrawingToolsTooltip": {
+      "message": "Rəsm alətlərini dəyişdirin",
+      "description": "Toggle drawing tools tooltip"
+    },
+    "toggleBlurToolTooltip": {
+      "message": "Blur alətlərini dəyişdirin",
+      "description": "Toggle blur tools tooltip"
+    },
+    "toggleCursorOptionsTooltip": {
+      "message": "Kursor seçimlərini dəyişdirin",
+      "description": "Toggle cursor options tooltip"
+    },
+    "disableCameraTooltip": {
+      "message": "Kameranı söndürün",
+      "description": "Disable camera tooltip"
+    },
+    "enableCameraTooltip": {
+      "message": "Kameranı aktivləşdirin",
+      "description": "Enable camera tooltip"
+    },
+    "noCameraPermissionsTooltip": {
+      "message": "Kamera icazələri yoxdur",
+      "description": "No camera permissions tooltip"
+    },
+    "disableMicrophoneTooltip": {
+      "message": "Mikrofonu söndürün",
+      "description": "Disable microphone tooltip"
+    },
+    "enableMicrophoneTooltip": {
+      "message": "Mikrofonu aktivləşdirin",
+      "description": "Enable microphone tooltip"
+    },
+    "noMicrophonePermissionsTooltip": {
+      "message": "Mikrofon icazələri yoxdur",
+      "description": "No microphone permissions tooltip"
+    },
+    "selectToolTooltip": {
+      "message": "Aləti seçin",
+      "description": "Select tool tooltip"
+    },
+    "penToolTooltip": {
+      "message": "Qələm aləti",
+      "description": "Pen tool tooltip"
+    },
+    "highlighterToolTooltip": {
+      "message": "Vurğulama aləti",
+      "description": "Highlighter tool tooltip"
+    },
+    "eraserToolTooltip": {
+      "message": "Silgi",
+      "description": "Eraser tool tooltip"
+    },
+    "textToolTooltip": {
+      "message": "Mətn aləti",
+      "description": "Text tool tooltip"
+    },
+    "shapeToolTooltip": {
+      "message": "Şəkil aləti",
+      "description": "Shape tool tooltip"
+    },
+    "arrowToolTooltip": {
+      "message": "Ox aləti",
+      "description": "Arrow tool tooltip"
+    },
+    "imageToolTooltip": {
+      "message": "Şəkil aləti",
+      "description": "Image tool tooltip"
+    },
+    "undoTooltip": {
+      "message": "Geri al",
+      "description": "Undo tooltip"
+    },
+    "redoTooltip": {
+      "message": "Yenidən et",
+      "description": "Redo tooltip"
+    },
+    "clearCanvasTooltip": {
+      "message": "Canvası təmizlə",
+      "description": "Clear canvas tooltip"
+    },
+    "moreColorsTooltip": {
+      "message": "Daha çox rənglər",
+      "description": "More colors tooltip"
+    },
+    "thickStrokeTooltip": {
+      "message": "Qalın kontur",
+      "description": "Thick stroke tooltip"
+    },
+    "mediumStrokeTooltip": {
+      "message": "Orta kontur",
+      "description": "Medium stroke tooltip"
+    },
+    "thinStrokeTooltip": {
+      "message": "İncə kontur",
+      "description": "Thin stroke tooltip"
+    },
+    "togglePictureinPictureModeTooltip": {
+      "message": "Picture-in-picture rejimini dəyişdir",
+      "description": "Toggle picture-in-picture mode tooltip"
+    },
+    "toggleFillTooltip": {
+      "message": "Doldurma rejimini dəyişdir",
+      "description": "Toggle fill tooltip"
+    },
+    "drawingModeToast": {
+      "message": "Rəsm rejimi",
+      "description": "Drawing mode toast"
+    },
+    "blurModeToast": {
+      "message": "Blur rejimi",
+      "description": "Blur mode toast"
+    },
+    "clearBlurredElementsTooltip": {
+      "message": "Bütün bulanıq elementləri təmizlə",
+      "description": "Clear all blurred elements tooltip"
+    },
+    "highlightClicksTooltip": {
+      "message": "Klikləri vurğula",
+      "description": "Highlight clicks tooltip"
+    },
+    "highlightCursorTooltip": {
+      "message": "Kursoru vurğula",
+      "description": "Highlight cursor tooltip"
+    },
+    "spotlightCursorTooltip": {
+      "message": "Kursoru işıqlandır",
+      "description": "Spotlight cursor tooltip"
+    },
+    "permissionsModalNoShowAgain": {
+      "message": "Bir daha göstərmə",
+      "description": "Permissions modal dismiss button"
+    },
+    "restartModalTitle": {
+      "message": "Yenidən qeydi başlatmaq istədiyinizə əminsiniz?",
+      "description": "Restart recording modal title"
+    },
+    "restartModalDescription": {
+      "message": "Cari video irəliləyişiniz itiriləcək.",
+      "description": "Restart recording modal description"
+    },
+    "restartModalRestart": {
+      "message": "Qeydi yenidən başlat",
+      "description": "Restart recording modal restart button"
+    },
+    "restartModalResume": {
+      "message": "Qeydi davam etdir",
+      "description": "Restart recording modal resume button"
+    },
+    "discardModalTitle": {
+      "message": "Qeydi ləğv etmək istədiyinizə əminsiniz?",
+      "description": "Discard recording modal title"
+    },
+    "discardModalDescription": {
+      "message": "Cari video irəliləyişiniz itiriləcək.",
+      "description": "Discard recording modal description"
+    },
+    "discardModalDiscard": {
+      "message": "Qeydi ləğv et",
+      "description": "Discard recording modal discard button"
+    },
+    "discardModalResume": {
+      "message": "Qeydi davam etdir",
+      "description": "Discard recording modal resume button"
+    },
+    "recorderSelectTitle": {
+      "message": "Qeydə almaq istədiyinizi seçin",
+      "description": "Title in recording page"
+    },
+    "recorderSelectProgressTitle": {
+      "message": "Qeydə alınır...",
+      "description": "Title in recording page while recording"
+    },
+    "recorderSelectDescription": {
+      "message": "",
+      "description": "Description in recording page"
+    },
+    "sandboxProgressTitle": {
+      "message": "Preparing recording...",
+      "description": "Title in sandbox page while recording / saving"
+    },
+    "sandboxProgressDescription": {
+      "message": "Bu tabı açıq saxlayın. Səsyazmanız yadda saxlandıqdan sonra bağlanacaq.",
+      "description": "Description in sandbox page while recording / saving"
+    },
+    "sandboxEditorMainTitle": {
+      "message": "Redaktor",
+      "description": "Title in navigation of the sandbox editor page"
+    },
+    "sandboxEditorCancelButton": {
+      "message": "Ləğv et",
+      "description": "Cancel button in sandbox editor page"
+    },
+    "sandboxEditorRevertButton": {
+      "message": "Orijinala qayıt",
+      "description": "Revert button in sandbox editor page"
+    },
+    "sandboxEditorResetButton": {
+      "message": "Sıfırla",
+      "description": "Reset button in sandbox editor page"
+    },
+    "sandboxEditorSaveButton": {
+      "message": "Dəyişiklikləri saxla",
+      "description": "Save button in sandbox editor page"
+    },
+    "sandboxEditorSaveProgressButton": {
+      "message": "Saxlanır...",
+      "description": "Save button in sandbox editor page while saving"
+    },
+    "sandboxAudioDragAndDrop": {
+      "message": "Audio faylınızı sürükləyib buraxın",
+      "description": "Drag and drop audio file in sandbox editor page"
+    },
+    "sandboxAudioOrBrowse": {
+      "message": "Və ya gözdən keçirmək üçün klikləyin",
+      "description": "Or click to browse audio file in sandbox editor page"
+    },
+    "sandboxAudioSettingsTitle": {
+      "message": "Ayarları",
+      "description": "Audio settings title in sandbox editor page"
+    },
+    "sandboxAudioVolumeLabel": {
+      "message": "Səs səviyyəsi",
+      "description": "Audio volume label in sandbox editor page"
+    },
+    "sandboxAudioUpdateButton": {
+      "message": "Yeniləyin",
+      "description": "Update audio button in sandbox editor page"
+    },
+    "sandboxCropTitle": {
+      "message": "Kəsmək",
+      "description": "Crop title in sandbox editor page"
+    },
+    "widthLabel": {
+      "message": "Genişlik",
+      "description": "Width label for properties"
+    },
+    "heightLabel": {
+      "message": "Hündürlük",
+      "description": "Height label for properties"
+    },
+    "leftLabel": {
+      "message": "Sol",
+      "description": "Left label for properties"
+    },
+    "topLabel": {
+      "message": "Üst",
+      "description": "Top label for properties"
+    },
+    "sandboxEditorTrimInfo": {
+      "message": "Qoları sürükləyin və seçilmiş bölməni redaktə etmək üçün soldakı düymələrdən istifadə edin.",
+      "description": "Info about trimming in sandbox editor"
+    },
+    "sandboxEditorTrimButton": {
+      "message": "Videonu Kəs",
+      "description": "Trim button in sandbox editor"
+    },
+    "sandboxEditorTrimProgressButton": {
+      "message": "Kəsilir...",
+      "description": "Trim button in sandbox editor while trimming"
+    },
+    "sandboxEditorCutButton": {
+      "message": "Bölməni kəsin",
+      "description": "Cut button in sandbox editor"
+    },
+    "sandboxEditorCutProgressButton": {
+      "message": "Kəsilir...",
+      "description": "Cut button in sandbox editor while cutting"
+    },
+    "sandboxEditorMuteButton": {
+      "message": "Səssizləşdir",
+      "description": "Mute button in sandbox editor"
+    },
+    "sandboxEditorMuteProgressButton": {
+      "message": "Səssizləşdirilir...",
+      "description": "Mute button in sandbox editor while muting"
+    },
+    "learnMoreDot": {
+      "message": "Daha çox öyrənin.",
+      "description": "Learn more with a dot"
+    },
+    "undoLabel": {
+      "message": "Geri al",
+      "description": "Undo label"
+    },
+    "redoLabel": {
+      "message": "Yenidən et",
+      "description": "Redo label"
+    },
+    "leaveReview": {
+      "message": "Rəy yazın",
+      "description": "Leave a review button"
+    },
+    "followForUpdates": {
+      "message": "Yeniliklər üçün izləyin",
+      "description": "Follow for updates button"
+    },
+    "offlineLabelTitle": {
+      "message": "İnternet yoxdur",
+      "description": "Offline label"
+    },
+    "offlineLabelDescription": {
+      "message": "Bəzi funksiyalar yenidən qoşulana qədər əlçatan deyil",
+      "description": "Offline label description"
+    },
+    "offlineLabelTryAgain": {
+      "message": "Yenidən cəhd edin",
+      "description": "Offline label try again button"
+    },
+    "updateChromeLabelTitle": {
+      "message": "Chrome yeniləyin",
+      "description": "Update Chrome label"
+    },
+    "updateChromeLabelDescription": {
+      "message": "Daha çox funksiyaya çatmaq üçün güncəlləyin",
+      "description": "Update Chrome label description"
+    },
+    "learnMoreLabel": {
+      "message": "Daha çox öyrənin",
+      "description": "Learn more button"
+    },
+    "overLimitLabelTitle": {
+      "message": "Video çox uzundur",
+      "description": "Over 5 minutes limit label in editor"
+    },
+    "overLimitLabelDescription": {
+      "message": "Redaktə və MP4 ixracı mümkün deyil",
+      "description": "Over 5 minutes limit description in editor"
+    },
+    "videoProcessingLabelTitle": {
+      "message": "Video emal edilir...",
+      "description": "Video processing label in editor"
+    },
+    "videoProcessingLabelDescription": {
+      "message": "Daha sürətli bulud versiyası haqqında məlumat əldə edin",
+      "description": "Video processing description in editor"
+    },
+    "sandboxEditTitle": {
+      "message": "Redaktə",
+      "description": "Edit title in sandbox editor page"
+    },
+    "noConnectionLabel": {
+      "message": "Bağlantı yoxdur",
+      "description": "No connection label"
+    },
+    "notAvailableLabel": {
+      "message": "Əlçatan deyil",
+      "description": "Not available label"
+    },
+    "editButtonTitle": {
+      "message": "Videonu redaktə edin",
+      "description": "Trim label button"
+    },
+    "editButtonDescription": {
+      "message": "Videonu kəsin və ya səsini söndürün",
+      "description": "Trim label"
+    },
+    "preparingLabel": {
+      "message": "Video hazırlanır, zəhmət olmasa gözləyin...",
+      "description": "Preparing label"
+    },
+    "cropButtonTitle": {
+      "message": "Kəs",
+      "description": "Crop label button"
+    },
+    "cropButtonDescription": {
+      "message": "Videonu kəsin və ölçüsünü dəyişdirin",
+      "description": "Crop label"
+    },
+    "addAudioButtonTitle": {
+      "message": "Səs əlavə edin",
+      "description": "Add audio label button"
+    },
+    "addAudioButtonDescription": {
+      "message": "Videoya əlavə etmək üçün öz səsinizi yükləyin",
+      "description": "Add audio label"
+    },
+    "sandboxSaveTitle": {
+      "message": "Saxlayın",
+      "description": "Save title in sandbox editor page"
+    },
+    "signOutDriveLabel": {
+      "message": "Google Drive çıxın",
+      "description": "Sign out of Google Drive label"
+    },
+    "savingDriveLabel": {
+      "message": "Saxlanılır...",
+      "description": "Saving to Google Drive label"
+    },
+    "saveDriveButtonTitle": {
+      "message": "Google Drive'da saxlayın",
+      "description": "Save to Google Drive button"
+    },
+    "saveDriveButtonDescription": {
+      "message": "Cari versiyanı Google Drive'da saxlayın",
+      "description": "Save to Google Drive label"
+    },
+    "signInDriveLabel": {
+      "message": "Daxil olun və Google Drive'da saxlayın",
+      "description": "Sign in to Google Drive label"
+    },
+    "sandboxExportTitle": {
+      "message": "İxrac",
+      "description": "Export title in sandbox editor page"
+    },
+    "downloadingLabel": {
+      "message": "Yüklənir...",
+      "description": "Downloading label"
+    },
+    "downloadWEBMButtonTitle": {
+      "message": ".webm kimi yükləyin",
+      "description": "Download WEBM button"
+    },
+    "downloadWEBMButtonDescription": {
+      "message": ".webm videosunu ixrac edin",
+      "description": "Download WEBM label"
+    },
+    "downloadMP4ButtonTitle": {
+      "message": ".mp4 kimi yükləyin",
+      "description": "Download MP4 button"
+    },
+    "downloadMP4ButtonDescription": {
+      "message": ".mp4 videonu ixrac edin (tövsiyə olunur)",
+      "description": "Download MP4 label"
+    },
+    "downloadGIFButtonTitle": {
+      "message": ".gif kimi endirin",
+      "description": "Download GIF button"
+    },
+    "downloadGIFButtonDescription": {
+      "message": "GIF ixrac edin (maksimum 30 saniyə)",
+      "description": "Download GIF label"
+    },
+    "shareModalSandboxTitle": {
+      "message": "Paylaş",
+      "description": "Share modal title in sandbox editor page"
+    },
+    "shareModalSandboxDescription": {
+      "message": "Tezliklə! Güncəllənmək və paylaşma mümkün olduqda xəbərdar olmaq üçün e-poçtunuzu qeyd edin.",
+      "description": "Share modal description in sandbox editor page"
+    },
+    "shareModalSandboxButton": {
+      "message": "Gözləmə siyahısına qoşulun",
+      "description": "Share modal email placeholder in sandbox editor page"
+    },
+    "shareSandboxButton": {
+      "message": "Paylaş",
+      "description": "Share button in sandbox editor page"
+    },
+    "replaceAudioEditor": {
+      "message": "Səsi əvəzlə",
+      "description": "Replace audio button in editor"
+    },
+    "zoomToPointPopup": {
+      "message": "Kursora yaxınlaşdırın",
+      "description": "Zoom to point popup"
+    },
+    "stayInPagePopup": {
+      "message": "Yazarkən səhifədə qalın",
+      "description": "Stay in page popup"
+    },
+    "micReminderPopup": {
+      "message": "Mikrofonun söndürülməsi xəbərdarlığı",
+      "description": "Mic reminder popup"
+    },
+    "helpPopup": {
+      "message": "Kömək",
+      "description": "Help popup button"
+    },
+    "pausedRecordingToast": {
+      "message": "Qeydəalma dayandırıldı. Davam etmək üçün oynatma düyməsini basın.",
+      "description": "Paused recording modal title"
+    },
+    "chromePermissionsModalTitle": {
+      "message": "Screenity-nin ekranınızı yazmağa icazəsi yoxdur",
+      "description": "Permission modal title"
+    },
+    "chromePermissionsModalDescription": {
+      "message": "Ekran qeydini aktivləşdirmək üçün sizdən tələb olunduqda ekranınızı çəkmək üçün Screenity icazəsi verməlisiniz.",
+      "description": "Permission modal description"
+    },
+    "chromePermissionsModalAction": {
+      "message": "Ekran qeydini aktivləşdirin",
+      "description": "Permission modal action"
+    },
+    "chromePermissionsModalCancel": {
+      "message": "Ləğv et",
+      "description": "Permission modal cancel"
+    },
+    "micMutedModalTitle": {
+      "message": "Mikrofon səssizləşdirildi",
+      "description": "Microphone muted modal title"
+    },
+    "micMutedModalDescription": {
+      "message": "Səs yazınıza audio daxil etmək üçün mikrofonunuzun səsini söndürməlisiniz. Audio olmadan davam etmək istəyirsiniz?",
+      "description": "Microphone muted modal description"
+    },
+    "micMutedModalAction": {
+      "message": "Davam et",
+      "description": "Microphone muted modal continue"
+    },
+    "micMutedModalCancel": {
+      "message": "Ləğv et",
+      "description": "Microphone muted modal cancel"
+    },
+    "setupTitle": {
+      "message": "Üç sadə addımda Screenity ilə başlayın:",
+      "description": "Set up steps title"
+    },
+    "setupStep1Before": {
+      "message": " 1- üzərinə klikləyin",
+      "description": "Set up step 1, before the icon. It needs a space at the end."
+    },
+    "setupStep1After": {
+      "message": " uzantılar ikonu",
+      "description": "Set up step 1, after the icon. It needs a space at the beginning."
+    },
+    "setupStep2Before": {
+      "message": "2- düyməsini basın ",
+      "description": "Set up step 2, before the icon. It needs a space at the end."
+    },
+    "setupStep2After": {
+      "message": " pin ikonuna tıklayın",
+      "description": "Set up step 2, after the icon. It needs a space at the beginning."
+    },
+    "setupStep3Before": {
+      "message": "3- üzərinə klikləyin ",
+      "description": "Set up step 3, before the icon. It needs a space at the end."
+    },
+    "setupStep3After": {
+      "message": " Başlamaq üçün Screenity ikonuna basın",
+      "description": "Set up step 3, after the icon. It needs a space at the beginning."
+    },
+    "setupCompleteTitle": {
+      "message": "Möhtəşəm! Hazırsınız.",
+      "description": "Set up complete title"
+    },
+    "setupCompleteDescription": {
+      "message": "İndi burada və ya hər hansı digər tabda qeyd etməyə başlaya bilərsiniz.",
+      "description": "Set up complete description"
+    },
+    "clickHereDrawOnboarding": {
+      "message": "Çəkmək üçün bura klikləyin",
+      "description": "Click here onboarding"
+    },
+    "countdownMessage": {
+      "message": "Rahatlayın. Geri sayımı dayandırmaq üçün istənilən yerə klikləyin.",
+      "description": "Countdown message"
+    },
+    "sandboxEditorTooSmallInfo": {
+      "message": "Çərçivələr arasındakı intervallara görə redaktələr qısa zaman intervalları üçün qeyri-dəqiq ola bilər.",
+      "description": "Info about the editor being too small"
+    },
+    "processingBannerEditor": {
+      "message": "Video emal olunur, oxutma qeyri-dəqiq və ya kəsilə bilər.",
+      "description": "Processing banner in editor"
+    },
+    "croppingInfoTitle": {
+      "message": "Kəsmə bir müddət çəkə bilər",
+      "description": "Cropping info title"
+    },
+    "croppingInfoDescription": {
+      "message": "Daha sürətli emal üçün təkmilləşdirin",
+      "description": "Cropping info description"
+    },
+    "micOnToast": {
+      "message": "Mikrofon aktivləşdirildi",
+      "description": "Microphone enabled toast title"
+    },
+    "micOffToast": {
+      "message": "Mikrofon deaktiv edilib",
+      "description": "Microphone disabled toast title"
+    },
+    "hideUIAlerts": {
+      "message": "UI bildirişlərini gizlət",
+      "description": "Hide UI alerts button"
+    },
+    "noShowAgain": {
+      "message": "Bir daha göstərmə",
+      "description": "Don't show again button"
+    },
+    "toolbarHoverOnly": {
+      "message": "İstifadə edilmədikdə alətlər panelini gizlədin",
+      "description": "Only show toolbar on hover button"
+    },
+    "stopRecording": {
+      "message": "Qeydi dayandır",
+      "description": "Stop recording button in recording scren"
+    },
+    "updateAnnouncementTitle": {
+      "message": "Yeni Screenity-ə xoş gəlmisiniz!",
+      "description": "Update announcement title for existing users"
+    },
+    "updateAnnouncementDescription": {
+      "message": "Biz yeni görünüş və bir çox maraqlı funksiyalar təqdim edirik, lakin narahat olmayın, o, hələ də bildiyiniz və sevdiyiniz eyni pulsuz, özəl və açıq mənbə artırmadır.",
+      "description": "Update announcement description for existing users"
+    },
+    "updateAnnouncementLearnMore": {
+      "message": "Yeniləmə haqqında ətraflı məlumat əldə edin.",
+      "description": "Update announcement learn more link for existing users"
+    },
+    "updateAnnouncementButton": {
+      "message": "Başlayın",
+      "description": "Update announcement button for existing users"
+    },
+    "streamErrorModalTitle": {
+      "message": "Qeydə başlama xətası",
+      "description": "Stream error modal title"
+    },
+    "streamErrorModalDescription": {
+      "message": "Görünür, qeydi başlatarkən xəta baş verdi. Brauzerinizi yenidən başladın və yenidən cəhd edin. Problem davam edərsə, support@screenity.io ünvanında bizimlə əlaqə saxlayın.",
+      "description": "Stream error modal description"
+    },
+    "highestQuality": {
+      "message": "Ən yüksək keyfiyyət",
+      "description": "Highest quality toggle label in popup"
+    },
+    "restoreRecording": {
+      "message": "Son qeydi bərpa edin",
+      "description": "Restore last recording button in popup"
+    },
+    "havingIssuesButton": {
+      "message": "Probleminiz var?",
+      "description": "Having issues button in editor"
+    },
+    "havingIssuesModalTitle": {
+      "message": "Səsyazmanızı görə bilmirsiniz?",
+      "description": "Having issues modal title in editor"
+    },
+    "havingIssuesModalDescription": {
+      "message": "Əgər qeydinizi tamamladınızsa və videonuzu görmədən özünüzü bu səhifədə tapsanız, əgər varsa, xam video datasını endirməyə cəhd edə bilərsiniz. Siz həmçinin əlaqə saxlaya və səhv hesabatı təqdim edə bilərsiniz.",
+      "description": "Having issues modal description in editor"
+    },
+    "havingIssuesModalButton": {
+      "message": "Xam video datasını endirin",
+      "description": "Having issues modal button in editor"
+    },
+    "havingIssuesModalButton2": {
+      "message": "Səhv haqqında məlumat verin",
+      "description": "Having issues modal button 2 in editor"
+    },
+    "noRecordingFound": {
+      "message": "Heç bir yazı tapılmadı, üzr istəyirik :(",
+      "description": "No recording found alert in editor"
+    },
+    "memoryLimitTitle": {
+      "message": "Yaddaş limitinə çatdı",
+      "description": "Memory limit reached title"
+    },
+    "memoryLimitDescription": {
+      "message": "Cihazınızın qeyd etmək üçün yaddaşı bitdi, ona görə də qeyd avtomatik olaraq dayandırıldı. Daha uzun müddətə yazmaq istəyirsinizsə, videonun keyfiyyətini aşağı salmağa və ya cihazınızda yer boşaltmağa cəhd edə bilərsiniz.",
+      "description": "Memory limit reached description"
+    },
+    "understoodButton": {
+      "message": "Anladım",
+      "description": "Understood button"
+    },
+    "notEnoughSpaceTitle": {
+      "message": "Yer kifayət deyil",
+      "description": "Not enough space title"
+    },
+    "notEnoughSpaceDescription": {
+      "message": "Ekranın qeydə alınması üçün ən azı 1 GB boş yer lazımdır. Lütfən, bir az yer boşaltın və yenidən cəhd edin.",
+      "description": "Not enough space description"
+    },
+    "clearSpaceButton": {
+      "message": "Əvvəlki qeydləri silin",
+      "description": "Clear previous recordings button"
+    },
+    "sandboxAdvancedTitle": {
+      "message": "Qabaqcıl",
+      "description": "Advanced section in sandbox editor page"
+    },
+    "rawRecordingButtonTitle": {
+      "message": "Ham video faylı yükləyin",
+      "description": "Download raw recording button"
+    },
+    "rawRecordingButtonDescription": {
+      "message": "Export the original recording data",
+      "description": "Download raw recording label"
+    },
+    "troubleshootButtonTitle": {
+      "message": "Səsyazmanızla bağlı kömək alın",
+      "description": "Troubleshoot button"
+    },
+    "troubleShootButtonDescription": {
+      "message": "Videonuzu bərpa edin və digər problemləri həll edin",
+      "description": "Troubleshoot label"
+    },
+    "rawRecordingModalTitle": {
+      "message": "Ham video faylı yükləyin",
+      "description": "Raw recording modal title"
+    },
+    "rawRecordingModalDescription": {
+      "message": "Xam video faylı Screenity tərəfindən qeydə alınmış orijinal video fayldır. Bu video emal edilməyib və ya redaktə olunmayıb, ona görə də o, çox böyük ola bilər və bütün cihazlarda oynatıla bilməz. Əgər işlənmiş video ilə bağlı probleminiz varsa, videonuzu bərpa etmək üçün bu fayldan istifadə edə bilərsiniz.",
+      "description": "Raw recording modal description"
+    },
+    "rawRecordingModalButton": {
+      "message": "Yükləyin",
+      "description": "Raw recording modal button"
+    },
+    "troubleshootModalTitle": {
+      "message": "Sistem məlumatlarını və video məlumatlarını endirin və problemlərin aradan qaldırılması üçün göndərin",
+      "description": "Troubleshoot modal title"
+    },
+    "troubleshootModalDescription": {
+      "message": "Yüklədikdən sonra faylı hər hansı müvafiq məlumatla support@screenity.io ünvanına göndərin. Biz bu məlumatı genişləndirmə ilə bağlı hər hansı problemi həll etməyə kömək etmək üçün istifadə edəcəyik və mümkünsə videonuzu bərpa edəcəyik.",
+      "description": "Troubleshoot modal description"
+    },
+    "troubleshootModalButton": {
+      "message": "Yükləyin",
+      "description": "Troubleshoot modal button"
+    },
+    "overLimitModalTitle": {
+      "message": "Videonu cihazınızda emal etmək üçün çox uzundur",
+      "description": "Over 5 minutes limit modal title"
+    },
+    "overLimitModalDescription": {
+      "message": "Screenity tamamilə özəl olduğundan və yerli olaraq işlədiyindən, o, cihazınızın avadanlıqları ilə məhdudlaşır. Bu uzunluqdakı videonun işlənməsi çox uzun çəkər və çox resurs tələb edər. Narahat olmayın, siz hələ də WEBM faylını və ya xam qeydi endirə bilərsiniz, lakin redaktə və MP4 ixracı mövcud deyil. Bununla belə, riskləri başa düşsəniz, yenə də videonu emal etməyə cəhd edə bilərsiniz.",
+      "description": "Over 5 minutes limit modal description"
+    },
+    "overLimitModalButton": {
+      "message": "Mən riski başa düşürəm, hər halda cəhd edin",
+      "description": "Over 5 minutes limit modal button"
+    },
+    "overLimitModalLearnMore": {
+      "message": "Uzun videoların işlənməsi haqqında ətraflı məlumat əldə edin.",
+      "description": "Over 5 minutes limit modal learn more link with a dot"
+    },
+    "recoveryModeTitle": {
+      "message": "Bərpa rejimi",
+      "description": "Recovery mode title"
+    },
+    "downloadForTroubleshootingOption": {
+      "message": "Problemləri həll etmək üçün məlumatları endirin",
+      "description": "Download for troubleshooting option"
+    },
+    "getHelpNav": {
+      "message": "Yardım mərkəzi",
+      "description": "Get help nav item"
+    },
+    "audioWarningTitle": {
+      "message": "Kompüter səsini yazın",
+      "description": "Audio warning title"
+    },
+    "audioWarningDescription": {
+      "message": "Bu səhifədən audio yazmaq üçün “$tab$”a keçməlisiniz.",
+      "description": "Audio warning description",
+      "placeholders": {
+        "tab": {
+          "content": "$1",
+          "example": "Tab area"
+        }
+      }
+    },
+    "extensionNotSupportedTitle": {
+      "message": "Extension tabda dəstəklənmir",
+      "description": "Extension not supported on tab"
+    },
+    "extensionNotSupportedDescription": {
+      "message": "Ekranlıq əvvəlki tabda dəstəklənmirdi. Siz hələ də burada yazmağa başlaya və yenidən tablaya keçə bilərsiniz, lakin kameranız və alətlər paneliniz görünməyəcək.",
+      "description": "Extension not supported on tab description"
+    },
+    "backupsTitle": {
+      "message": "Screenity qeydləriniz üçün yerli ehtiyat nüsxəsini qurun",
+      "description": "Backups title"
+    },
+    "backupsDescription1": {
+      "message": "Etdiyiniz bütün qeydlərin surətini saxlayın. Yedəkləmələr qurmasanız, qeydləriniz yalnız onları endirməyi seçdiyiniz zaman yadda saxlanılacaq.",
+      "description": "Backups description"
+    },
+    "backupsDescription2": {
+      "message": "Yükləmələr və ya digər sistem qovluqlarında yadda saxlamağa çalışırsınızsa, əvvəlcə yeni qovluq yaratmalı ola bilərsiniz.",
+      "description": "Backups description"
+    },
+    "backupsSelectFolder": {
+      "message": "Qovluq seçin",
+      "description": "Select a folder button"
+    },
+    "backupsNotNow": {
+      "message": "İndi yox",
+      "description": "Not now button"
+    },
+    "backupsOnTitle": {
+      "message": " Səsyazmalarınız yerli olaraq yedəklənir",
+      "description": "Backups on title"
+    },
+    "backupsOnDescription": {
+      "message": "Hər dəfə qeyd etdiyiniz zaman icazə istənilməməsi üçün bu tabı açıq qoymağı tövsiyə edirik.",
+      "description": "Backups on description"
+    },
+    "backupsClose": {
+      "message": "Hər halda tabı bağlayın",
+      "description": "Close tab anyway button"
+    },
+    "backupsStop": {
+      "message": "Bütün qeydlərin yedəklənməsini dayandırın",
+      "description": "Stop backups button"
+    },
+    "backupsConfirmTitle": {
+      "message": "Bütün qeydlərin yedəklənməsini dayandırın",
+      "description": "Backups confirm title"
+    },
+    "backupsConfirmDescription": {
+      "message": "Üzr istəyirik, lakin qeydlərinizin yedəklənməsini davam etdirmək üçün bir daha icazəniz lazımdır. Təəssüf ki, biz hər dəfə bu tab bağlı olanda soruşmalıyıq ki, bu da brauzeri bağladığınız zaman və ya kompüterinizi yenidən başlatdığınız zaman baş verə bilər.",
+      "description": "Backups confirm description"
+    },
+    "backupsConfirmAllow": {
+      "message": "Screenity-ə qeydlərin ehtiyat nüsxəsini çıxarmağa davam etməyə icazə verin",
+      "description": "Backups confirm allow button"
+    },
+    "backupsToggle": {
+      "message": "Səsyazmaları yedəkləyin",
+      "description": "Backups toggle label"
+    },
+    "backupPermissionFailTitle": {
+      "message": "Səsyazmanın yedəklənməsinə icazə verilməyib",
+      "description": "Backup permission fail title"
+    },
+    "backupPermissionFailDescription": {
+      "message": "Siz qeydlərinizi yedəkləmək üçün qovluq seçmədiniz. Brauzerinizin versiyasından və ya əməliyyat sistemindən asılı olaraq hər dəfə yazmağa başlayanda sizdən qovluğu seçməyiniz tələb oluna bilər. Yenidən cəhd edə və ya təkrar icazə vermək istəməsəniz, yedəkləmələri tamamilə söndürə bilərsiniz.",
+      "description": "Backup permission fail description"
+    },
+    "recordAudioWarningMacTitle": {
+      "message": "Kompüter səsini yazın",
+      "description": "Record audio warning title"
+    },
+    "recordAudioWarningMacDescription": {
+      "message": "MacOS-da siz yalnız Tab səsini yaza bilərsiniz. Chrome Tab seçimini seçin və 'Həmçinin tab audiosunu paylaş'ın aktiv olduğundan əmin olun.",
+      "description": "macOS audio warning description"
+    },
+    "recordAudioWarningOtherTitle": {
+      "message": "Kompüter səsini yazın",
+      "description": "Record audio warning title"
+    },
+    "recordAudioWarningOtherDescription": {
+      "message": "Kompüter səsini yazmaq istəyirsinizsə, 'Sistem səsini paylaş' seçimini aktivləşdirdiyinizə əmin olun. Bu seçimi görmürsünüzsə, Chrome'u güncəlləməyə cəhd edin və ya Tab qeydinə keçin.",
+      "description": "Other audio warning description"
+    },
+    "maxResolutionLabel": {
+      "message": "Maksimum qətnamə",
+      "description": "Max resolution label in settings menu"
+    },
+    "maxFPSLabel": {
+      "message": "Maksimum FPS",
+      "description": "Max FPS label in settings menu"
+    },
+    "notEnoughRAM": {
+      "message": "Kifayət qədər RAM yoxdur",
+      "description": "Not enough RAM label in settings menu"
+    },
+    "resizeWindowLabel": {
+      "message": "Pəncərənin ölçüsünü dəyişdirin",
+      "description": "Resize window label in settings menu"
+    },
+    "screenTooSmallTooltip": {
+      "message": "Ekran bu qətnamə üçün çox kiçikdir",
+      "description": "Screen too small tooltip in settings menu"
+    },
+    "maxResolutionTooltip": {
+      "message": "Cihazınızda bu qətnamə ilə qeyd etmək mümkün deyil",
+      "description": "Maxed out resolution tooltip in settings menu"
+    },
+    "permissionsModalReview": {
+      "message": "İcazələri nəzərdən keçirin",
+      "description": "Review permissions button"
+    }
+  }
+  
