@@ -1,0 +1,29 @@
+@use "../global/variables.scss" as *;
+
+.HelpButton {
+  position: absolute;
+  bottom: 20px;
+  right: 20px;
+  z-index: 99999;
+  background: $color-background;
+  border-radius: 50%;
+  border: 1px solid $color-border;
+  box-shadow: 0px 4px 30px 0px rgba(63, 67, 72, 0.15);
+  cursor: pointer;
+  pointer-events: all;
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  &:hover {
+    border: $focus-border !important;
+  }
+
+  svg {
+    fill: $color-text-secondary;
+    color: $color-text-secondary;
+    margin-top: 3px;
+  }
+}

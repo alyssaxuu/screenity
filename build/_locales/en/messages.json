@@ -1,0 +1,1036 @@
+{
+  "extName": {
+    "message": "Screenity - Screen Recorder & Annotation Tool",
+    "description": "Extension name"
+  },
+  "extDesc": {
+    "message": "The free and privacy-friendly screen recorder with no limits. Capture, annotate, edit videos and more - all with no sign in needed.",
+    "description": "Extension description"
+  },
+  "recordTab": {
+    "message": "Record",
+    "description": "Record tab label on popup"
+  },
+  "videosTab": {
+    "message": "Your videos",
+    "description": "Videos tab label on popup"
+  },
+  "screenType": {
+    "message": "Screen",
+    "description": "Screen recording type label on popup"
+  },
+  "tabType": {
+    "message": "Tab area",
+    "description": "Tab area recording type label on popup"
+  },
+  "cameraType": {
+    "message": "Camera",
+    "description": "Camera recording type label on popup"
+  },
+  "mockupType": {
+    "message": "Mockup",
+    "description": "Mockup recording type label on popup"
+  },
+  "customAreaRecordingDisabledTitle": {
+    "message": "Custom area recording disabled",
+    "description": "Custom area recording disabled warning on popup for Chrome version older than 104"
+  },
+  "customAreaRecordingDisabledDescription": {
+    "message": "Update Chrome version to 110+",
+    "description": "Custom area recording disabled warning description on popup for Chrome version older than 104"
+  },
+  "customAreaRecordingDisabledAction": {
+    "message": "Update",
+    "description": "Custom area recording disabled warning action on popup for Chrome version older than 104"
+  },
+  "permissionsModalTitle": {
+    "message": "Check your permissions",
+    "description": "Camera / microphone permissions warning modal title"
+  },
+  "permissionsModalDescription": {
+    "message": "Looks like Screenity can’t access your camera or microphone. Make sure to allow access by clicking on the camera icon in the address bar.",
+    "description": "Camera / microphone permissions warning modal description"
+  },
+  "permissionsModalDismiss": {
+    "message": "Dismiss",
+    "description": "Camera / microphone permissions warning modal dismiss button"
+  },
+  "allowCameraAccessButton": {
+    "message": "Allow camera access",
+    "description": "Allow camera access button"
+  },
+  "allowMicrophoneAccessButton": {
+    "message": "Allow microphone access",
+    "description": "Allow microphone access button"
+  },
+  "pushToTalkLabel": {
+    "message": "Push to talk",
+    "description": "Push to talk switch label"
+  },
+  "customAreaLabel": {
+    "message": "Set an area to record in",
+    "description": "Custom area switch label"
+  },
+  "flipCameraLabel": {
+    "message": "Flip camera",
+    "description": "Flip camera switch label"
+  },
+  "backgroundEffectsLabel": {
+    "message": "Background effects",
+    "description": "Background effects switch label"
+  },
+  "recordButtonLabel": {
+    "message": "Start recording",
+    "description": "Record button label"
+  },
+  "recordButtonInProgressLabel": {
+    "message": "Starting recording...",
+    "description": "Record button in progress label"
+  },
+  "recordButtonNoCameraLabel": {
+    "message": "Set a camera to record",
+    "description": "Record button label when in camera mode and no camera is selected"
+  },
+  "showMoreOptionsLabel": {
+    "message": "Show more options",
+    "description": "Show more options label"
+  },
+  "systemAudioLabel": {
+    "message": "Include system audio",
+    "description": "Tab/system audio label"
+  },
+  "hideToolbarLabel": {
+    "message": "Hide toolbar",
+    "description": "Hide toolbar label"
+  },
+  "countdownLabel": {
+    "message": "Countdown",
+    "description": "Countdown label"
+  },
+  "alarmLabel": {
+    "message": "Set a time limit",
+    "description": "Alarm label"
+  },
+  "blurTypeLabel": {
+    "message": "Blur",
+    "description": "Blur background label"
+  },
+  "noneDropdownLabel": {
+    "message": "None",
+    "description": "No device selected"
+  },
+  "noCameraDropdownLabel": {
+    "message": "No camera",
+    "description": "No camera selected"
+  },
+  "noMicrophoneDropdownLabel": {
+    "message": "No microphone",
+    "description": "No microphone selected"
+  },
+  "selectSourceDropdownPlaceholder": {
+    "message": "Select a source",
+    "description": "Select source placeholder"
+  },
+  "offLabel": {
+    "message": "Off",
+    "description": "Off label on dropdown"
+  },
+  "regionWidthLabel": {
+    "message": "Width",
+    "description": "Region width label"
+  },
+  "regionHeightLabel": {
+    "message": "Height",
+    "description": "Region height label"
+  },
+  "addImageToastTitle": {
+    "message": "Click to place image",
+    "description": "Toast that shows when adding a new image"
+  },
+  "finishRecordingTooltip": {
+    "message": "Finish recording",
+    "description": "Finish recording tooltip"
+  },
+  "restartRecordingTooltip": {
+    "message": "Restart recording",
+    "description": "Restart recording tooltip"
+  },
+  "pauseRecordingTooltip": {
+    "message": "Pause recording",
+    "description": "Pause recording tooltip"
+  },
+  "resumeRecordingTooltip": {
+    "message": "Resume recording",
+    "description": "Resume recording tooltip"
+  },
+  "cancelRecordingTooltip": {
+    "message": "Cancel recording",
+    "description": "Cancel recording tooltip"
+  },
+  "toggleDrawingToolsTooltip": {
+    "message": "Toggle drawing tools",
+    "description": "Toggle drawing tools tooltip"
+  },
+  "toggleBlurToolTooltip": {
+    "message": "Toggle blur tool",
+    "description": "Toggle blur tools tooltip"
+  },
+  "toggleCursorOptionsTooltip": {
+    "message": "Toggle cursor options",
+    "description": "Toggle cursor options tooltip"
+  },
+  "disableCameraTooltip": {
+    "message": "Disable camera",
+    "description": "Disable camera tooltip"
+  },
+  "enableCameraTooltip": {
+    "message": "Enable camera",
+    "description": "Enable camera tooltip"
+  },
+  "noCameraPermissionsTooltip": {
+    "message": "No camera permissions",
+    "description": "No camera permissions tooltip"
+  },
+  "disableMicrophoneTooltip": {
+    "message": "Disable microphone",
+    "description": "Disable microphone tooltip"
+  },
+  "enableMicrophoneTooltip": {
+    "message": "Enable microphone",
+    "description": "Enable microphone tooltip"
+  },
+  "noMicrophonePermissionsTooltip": {
+    "message": "No microphone permissions",
+    "description": "No microphone permissions tooltip"
+  },
+  "selectToolTooltip": {
+    "message": "Select tool",
+    "description": "Select tool tooltip"
+  },
+  "penToolTooltip": {
+    "message": "Pen tool",
+    "description": "Pen tool tooltip"
+  },
+  "highlighterToolTooltip": {
+    "message": "Highlighter tool",
+    "description": "Highlighter tool tooltip"
+  },
+  "eraserToolTooltip": {
+    "message": "Eraser tool",
+    "description": "Eraser tool tooltip"
+  },
+  "textToolTooltip": {
+    "message": "Text tool",
+    "description": "Text tool tooltip"
+  },
+  "shapeToolTooltip": {
+    "message": "Shape tool",
+    "description": "Shape tool tooltip"
+  },
+  "arrowToolTooltip": {
+    "message": "Arrow tool",
+    "description": "Arrow tool tooltip"
+  },
+  "imageToolTooltip": {
+    "message": "Image tool",
+    "description": "Image tool tooltip"
+  },
+  "undoTooltip": {
+    "message": "Undo",
+    "description": "Undo tooltip"
+  },
+  "redoTooltip": {
+    "message": "Redo",
+    "description": "Redo tooltip"
+  },
+  "clearCanvasTooltip": {
+    "message": "Clear canvas",
+    "description": "Clear canvas tooltip"
+  },
+  "moreColorsTooltip": {
+    "message": "More colors",
+    "description": "More colors tooltip"
+  },
+  "thickStrokeTooltip": {
+    "message": "Thick stroke",
+    "description": "Thick stroke tooltip"
+  },
+  "mediumStrokeTooltip": {
+    "message": "Medium stroke",
+    "description": "Medium stroke tooltip"
+  },
+  "thinStrokeTooltip": {
+    "message": "Thin stroke",
+    "description": "Thin stroke tooltip"
+  },
+  "togglePictureinPictureModeTooltip": {
+    "message": "Toggle picture-in-picture mode",
+    "description": "Toggle picture-in-picture mode tooltip"
+  },
+  "toggleFillTooltip": {
+    "message": "Toggle fill",
+    "description": "Toggle fill tooltip"
+  },
+  "drawingModeToast": {
+    "message": "Drawing mode",
+    "description": "Drawing mode toast"
+  },
+  "blurModeToast": {
+    "message": "Blur mode",
+    "description": "Blur mode toast"
+  },
+  "clearBlurredElementsTooltip": {
+    "message": "Clear all blurred elements",
+    "description": "Clear all blurred elements tooltip"
+  },
+  "highlightClicksTooltip": {
+    "message": "Highlight clicks",
+    "description": "Highlight clicks tooltip"
+  },
+  "highlightCursorTooltip": {
+    "message": "Highlight cursor",
+    "description": "Highlight cursor tooltip"
+  },
+  "spotlightCursorTooltip": {
+    "message": "Spotlight cursor",
+    "description": "Spotlight cursor tooltip"
+  },
+  "permissionsModalNoShowAgain": {
+    "message": "Don't show again",
+    "description": "Permissions modal dismiss button"
+  },
+  "restartModalTitle": {
+    "message": "Are you sure you want to restart the recording?",
+    "description": "Restart recording modal title"
+  },
+  "restartModalDescription": {
+    "message": "Your current video progress will be lost.",
+    "description": "Restart recording modal description"
+  },
+  "restartModalRestart": {
+    "message": "Restart recording",
+    "description": "Restart recording modal restart button"
+  },
+  "restartModalResume": {
+    "message": "Resume recording",
+    "description": "Restart recording modal resume button"
+  },
+  "discardModalTitle": {
+    "message": "Are you sure you want to discard the recording?",
+    "description": "Discard recording modal title"
+  },
+  "discardModalDescription": {
+    "message": "Your current video progress will be lost.",
+    "description": "Discard recording modal description"
+  },
+  "discardModalDiscard": {
+    "message": "Discard recording",
+    "description": "Discard recording modal discard button"
+  },
+  "discardModalResume": {
+    "message": "Resume recording",
+    "description": "Discard recording modal resume button"
+  },
+  "recorderSelectTitle": {
+    "message": "Choose what you want to record",
+    "description": "Title in recording page"
+  },
+  "recorderSelectProgressTitle": {
+    "message": "Recording...",
+    "description": "Title in recording page while recording"
+  },
+  "recorderSelectDescription": {
+    "message": "Keep this tab open. It will close once your recording has been saved.",
+    "description": "Description in recording page"
+  },
+  "sandboxProgressTitle": {
+    "message": "Preparing recording...",
+    "description": "Title in sandbox page while recording / saving"
+  },
+  "sandboxProgressDescription": {
+    "message": "Keep this tab open. It will update with your recording when it's ready.",
+    "description": "Description in sandbox page while recording / saving"
+  },
+  "sandboxEditorMainTitle": {
+    "message": "Editor",
+    "description": "Title in navigation of the sandbox editor page"
+  },
+  "sandboxEditorCancelButton": {
+    "message": "Cancel",
+    "description": "Cancel button in sandbox editor page"
+  },
+  "sandboxEditorRevertButton": {
+    "message": "Revert to original",
+    "description": "Revert button in sandbox editor page"
+  },
+  "sandboxEditorResetButton": {
+    "message": "Reset",
+    "description": "Reset button in sandbox editor page"
+  },
+  "sandboxEditorSaveButton": {
+    "message": "Save changes",
+    "description": "Save button in sandbox editor page"
+  },
+  "sandboxEditorSaveProgressButton": {
+    "message": "Saving...",
+    "description": "Save button in sandbox editor page while saving"
+  },
+  "sandboxAudioDragAndDrop": {
+    "message": "Drag and drop your audio file",
+    "description": "Drag and drop audio file in sandbox editor page"
+  },
+  "sandboxAudioOrBrowse": {
+    "message": "Or click to browse",
+    "description": "Or click to browse audio file in sandbox editor page"
+  },
+  "sandboxAudioSettingsTitle": {
+    "message": "Settings",
+    "description": "Audio settings title in sandbox editor page"
+  },
+  "sandboxAudioVolumeLabel": {
+    "message": "Volume",
+    "description": "Audio volume label in sandbox editor page"
+  },
+  "sandboxAudioUpdateButton": {
+    "message": "Update",
+    "description": "Update audio button in sandbox editor page"
+  },
+  "sandboxCropTitle": {
+    "message": "Crop",
+    "description": "Crop title in sandbox editor page"
+  },
+  "widthLabel": {
+    "message": "Width",
+    "description": "Width label for properties"
+  },
+  "heightLabel": {
+    "message": "Height",
+    "description": "Height label for properties"
+  },
+  "leftLabel": {
+    "message": "Left",
+    "description": "Left label for properties"
+  },
+  "topLabel": {
+    "message": "Top",
+    "description": "Top label for properties"
+  },
+  "sandboxEditorTrimInfo": {
+    "message": "Drag the handles and use the buttons on the left to edit the selected section.",
+    "description": "Info about trimming in sandbox editor"
+  },
+  "sandboxEditorTrimButton": {
+    "message": "Trim video",
+    "description": "Trim button in sandbox editor"
+  },
+  "sandboxEditorTrimProgressButton": {
+    "message": "Trimming...",
+    "description": "Trim button in sandbox editor while trimming"
+  },
+  "sandboxEditorCutButton": {
+    "message": "Cut section",
+    "description": "Cut button in sandbox editor"
+  },
+  "sandboxEditorCutProgressButton": {
+    "message": "Cutting...",
+    "description": "Cut button in sandbox editor while cutting"
+  },
+  "sandboxEditorMuteButton": {
+    "message": "Mute audio",
+    "description": "Mute button in sandbox editor"
+  },
+  "sandboxEditorMuteProgressButton": {
+    "message": "Muting...",
+    "description": "Mute button in sandbox editor while muting"
+  },
+  "learnMoreDot": {
+    "message": "Learn more.",
+    "description": "Learn more with a dot"
+  },
+  "undoLabel": {
+    "message": "Undo",
+    "description": "Undo label"
+  },
+  "redoLabel": {
+    "message": "Redo",
+    "description": "Redo label"
+  },
+  "leaveReview": {
+    "message": "Leave a review, it helps!",
+    "description": "Leave a review button"
+  },
+  "followForUpdates": {
+    "message": "Follow for updates",
+    "description": "Follow for updates button"
+  },
+  "offlineLabelTitle": {
+    "message": "You are currently offline",
+    "description": "Offline label"
+  },
+  "offlineLabelDescription": {
+    "message": "Some features are unavailable until reconnected",
+    "description": "Offline label description"
+  },
+  "offlineLabelTryAgain": {
+    "message": "Try again",
+    "description": "Offline label try again button"
+  },
+  "updateChromeLabelTitle": {
+    "message": "Chrome needs to be updated",
+    "description": "Update Chrome label"
+  },
+  "updateChromeLabelDescription": {
+    "message": "Update to access more features",
+    "description": "Update Chrome label description"
+  },
+  "learnMoreLabel": {
+    "message": "Learn more",
+    "description": "Learn more button"
+  },
+  "overLimitLabelTitle": {
+    "message": "Video too long to process in device",
+    "description": "Over 5 minutes limit label in editor"
+  },
+  "overLimitLabelDescription": {
+    "message": "Editing and MP4 export are unavailable",
+    "description": "Over 5 minutes limit description in editor"
+  },
+  "videoProcessingLabelTitle": {
+    "message": "The video is processing locally...",
+    "description": "Video processing label in editor"
+  },
+  "videoProcessingLabelDescription": {
+    "message": "Learn about the faster cloud version",
+    "description": "Video processing description in editor"
+  },
+  "sandboxEditTitle": {
+    "message": "Edit",
+    "description": "Edit title in sandbox editor page"
+  },
+  "noConnectionLabel": {
+    "message": "No connection",
+    "description": "No connection label"
+  },
+  "notAvailableLabel": {
+    "message": "Not available",
+    "description": "Not available label"
+  },
+  "editButtonTitle": {
+    "message": "Edit video",
+    "description": "Trim label button"
+  },
+  "editButtonDescription": {
+    "message": "Trim, cut, or mute the video",
+    "description": "Trim label"
+  },
+  "preparingLabel": {
+    "message": "Preparing video, please wait...",
+    "description": "Preparing label"
+  },
+  "cropButtonTitle": {
+    "message": "Crop",
+    "description": "Crop label button"
+  },
+  "cropButtonDescription": {
+    "message": "Crop and resize the video",
+    "description": "Crop label"
+  },
+  "addAudioButtonTitle": {
+    "message": "Add audio",
+    "description": "Add audio label button"
+  },
+  "addAudioButtonDescription": {
+    "message": "Upload your own audio to add to the video",
+    "description": "Add audio label"
+  },
+  "sandboxSaveTitle": {
+    "message": "Save",
+    "description": "Save title in sandbox editor page"
+  },
+  "signOutDriveLabel": {
+    "message": "Sign out of Drive",
+    "description": "Sign out of Google Drive label"
+  },
+  "savingDriveLabel": {
+    "message": "Saving...",
+    "description": "Saving to Google Drive label"
+  },
+  "saveDriveButtonTitle": {
+    "message": "Save to Drive",
+    "description": "Save to Google Drive button"
+  },
+  "saveDriveButtonDescription": {
+    "message": "Save the current version to Google Drive",
+    "description": "Save to Google Drive label"
+  },
+  "signInDriveLabel": {
+    "message": "Sign in and save to Drive",
+    "description": "Sign in to Google Drive label"
+  },
+  "sandboxExportTitle": {
+    "message": "Export",
+    "description": "Export title in sandbox editor page"
+  },
+  "downloadingLabel": {
+    "message": "Downloading...",
+    "description": "Downloading label"
+  },
+  "downloadWEBMButtonTitle": {
+    "message": "Download as .webm",
+    "description": "Download WEBM button"
+  },
+  "downloadWEBMButtonDescription": {
+    "message": "Export a .webm video",
+    "description": "Download WEBM label"
+  },
+  "downloadMP4ButtonTitle": {
+    "message": "Download as .mp4",
+    "description": "Download MP4 button"
+  },
+  "downloadMP4ButtonDescription": {
+    "message": "Export an .mp4 video (recommended)",
+    "description": "Download MP4 label"
+  },
+  "downloadGIFButtonTitle": {
+    "message": "Download as .gif",
+    "description": "Download GIF button"
+  },
+  "downloadGIFButtonDescription": {
+    "message": "Export a GIF (max 30 seconds)",
+    "description": "Download GIF label"
+  },
+  "shareModalSandboxTitle": {
+    "message": "Share your videos with others",
+    "description": "Share modal title in sandbox editor page"
+  },
+  "shareModalSandboxDescription": {
+    "message": "Coming soon! Leave your email to stay updated and be notified when sharing is available.",
+    "description": "Share modal description in sandbox editor page"
+  },
+  "shareModalSandboxButton": {
+    "message": "Join the waitlist",
+    "description": "Share modal email placeholder in sandbox editor page"
+  },
+  "shareSandboxButton": {
+    "message": "Share video",
+    "description": "Share button in sandbox editor page"
+  },
+  "replaceAudioEditor": {
+    "message": "Replace existing audio",
+    "description": "Replace audio button in editor"
+  },
+  "zoomToPointPopup": {
+    "message": "Zoom to cursor",
+    "description": "Zoom to point popup"
+  },
+  "stayInPagePopup": {
+    "message": "Stay in the page when recording",
+    "description": "Stay in page popup"
+  },
+  "micReminderPopup": {
+    "message": "Microphone off warning",
+    "description": "Mic reminder popup"
+  },
+  "helpPopup": {
+    "message": "Help",
+    "description": "Help popup button"
+  },
+  "pausedRecordingToast": {
+    "message": "Recording paused. Press the play button to resume.",
+    "description": "Paused recording modal title"
+  },
+  "chromePermissionsModalTitle": {
+    "message": "Screenity doesn't have permission to record your screen",
+    "description": "Permission modal title"
+  },
+  "chromePermissionsModalDescription": {
+    "message": "To enable screen recording, you must grant Screenity permission to capture your screen when prompted.",
+    "description": "Permission modal description"
+  },
+  "chromePermissionsModalAction": {
+    "message": "Enable screen recording",
+    "description": "Permission modal action"
+  },
+  "chromePermissionsModalCancel": {
+    "message": "Cancel",
+    "description": "Permission modal cancel"
+  },
+  "micMutedModalTitle": {
+    "message": "Your microphone is muted",
+    "description": "Microphone muted modal title"
+  },
+  "micMutedModalDescription": {
+    "message": "To include audio in your recording, you'll need to unmute your microphone. Do you want to continue without audio?",
+    "description": "Microphone muted modal description"
+  },
+  "micMutedModalAction": {
+    "message": "Yes, continue",
+    "description": "Microphone muted modal continue"
+  },
+  "micMutedModalCancel": {
+    "message": "Cancel",
+    "description": "Microphone muted modal cancel"
+  },
+  "setupTitle": {
+    "message": "Get started with Screenity in three simple steps:",
+    "description": "Set up steps title"
+  },
+  "setupStep1Before": {
+    "message": "1- Click the ",
+    "description": "Set up step 1, before the icon. It needs a space at the end."
+  },
+  "setupStep1After": {
+    "message": " extensions icon",
+    "description": "Set up step 1, after the icon. It needs a space at the beginning."
+  },
+  "setupStep2Before": {
+    "message": "2- Press the ",
+    "description": "Set up step 2, before the icon. It needs a space at the end."
+  },
+  "setupStep2After": {
+    "message": " pin icon",
+    "description": "Set up step 2, after the icon. It needs a space at the beginning."
+  },
+  "setupStep3Before": {
+    "message": "3- Click on the ",
+    "description": "Set up step 3, before the icon. It needs a space at the end."
+  },
+  "setupStep3After": {
+    "message": " Screenity icon to start",
+    "description": "Set up step 3, after the icon. It needs a space at the beginning."
+  },
+  "setupCompleteTitle": {
+    "message": "Awesome! You’re all set",
+    "description": "Set up complete title"
+  },
+  "setupCompleteDescription": {
+    "message": "You can now start recording here, or in any other tab.",
+    "description": "Set up complete description"
+  },
+  "clickHereDrawOnboarding": {
+    "message": "Click here to draw",
+    "description": "Click here onboarding"
+  },
+  "countdownMessage": {
+    "message": "Relax. Click anywhere to stop the countdown.",
+    "description": "Countdown message"
+  },
+  "sandboxEditorTooSmallInfo": {
+    "message": "Edits may be inaccurate for short time ranges due to the intervals between frames.",
+    "description": "Info about the editor being too small"
+  },
+  "processingBannerEditor": {
+    "message": "Video is processing, playback might be inaccurate or interrupted.",
+    "description": "Processing banner in editor"
+  },
+  "croppingInfoTitle": {
+    "message": "Cropping might take a while",
+    "description": "Cropping info title"
+  },
+  "croppingInfoDescription": {
+    "message": "Upgrade for faster processing",
+    "description": "Cropping info description"
+  },
+  "micOnToast": {
+    "message": "Microphone enabled",
+    "description": "Microphone enabled toast title"
+  },
+  "micOffToast": {
+    "message": "Microphone disabled",
+    "description": "Microphone disabled toast title"
+  },
+  "hideUIAlerts": {
+    "message": "Hide UI notifications",
+    "description": "Hide UI alerts button"
+  },
+  "noShowAgain": {
+    "message": "Don't show again",
+    "description": "Don't show again button"
+  },
+  "toolbarHoverOnly": {
+    "message": "Hide toolbar when not in use",
+    "description": "Only show toolbar on hover button"
+  },
+  "stopRecording": {
+    "message": "Stop recording",
+    "description": "Stop recording button in recording scren"
+  },
+  "updateAnnouncementTitle": {
+    "message": "Welcome to the new Screenity!",
+    "description": "Update announcement title for existing users"
+  },
+  "updateAnnouncementDescription": {
+    "message": "We’re introducing a new look and many exciting features, but don’t worry, it’s still the same free, private and open source extension you know and love.",
+    "description": "Update announcement description for existing users"
+  },
+  "updateAnnouncementLearnMore": {
+    "message": "Learn more about the update.",
+    "description": "Update announcement learn more link for existing users"
+  },
+  "updateAnnouncementButton": {
+    "message": "Get started",
+    "description": "Update announcement button for existing users"
+  },
+  "streamErrorModalTitle": {
+    "message": "Error starting the recording",
+    "description": "Stream error modal title"
+  },
+  "streamErrorModalDescription": {
+    "message": "Looks like there was an error starting the recording. Restart your browser and try again. If the issue persists, please contact us at support@screenity.io.",
+    "description": "Stream error modal description"
+  },
+  "highestQuality": {
+    "message": "Highest quality",
+    "description": "Highest quality toggle label in popup"
+  },
+  "restoreRecording": {
+    "message": "Restore last recording",
+    "description": "Restore last recording button in popup"
+  },
+  "havingIssuesButton": {
+    "message": "Having issues?",
+    "description": "Having issues button in editor"
+  },
+  "havingIssuesModalTitle": {
+    "message": "Can't see your recording?",
+    "description": "Having issues modal title in editor"
+  },
+  "havingIssuesModalDescription": {
+    "message": "If you've completed your recording and find yourself on this page without seeing your video, you can attempt to download the raw video data if it's available. You can also reach out and submit a bug report.",
+    "description": "Having issues modal description in editor"
+  },
+  "havingIssuesModalButton": {
+    "message": "Download raw video data",
+    "description": "Having issues modal button in editor"
+  },
+  "havingIssuesModalButton2": {
+    "message": "Report bug",
+    "description": "Having issues modal button 2 in editor"
+  },
+  "noRecordingFound": {
+    "message": "No recording found, sorry :(",
+    "description": "No recording found alert in editor"
+  },
+  "memoryLimitTitle": {
+    "message": "Memory limit reached",
+    "description": "Memory limit reached title"
+  },
+  "memoryLimitDescription": {
+    "message": "Your device has run out of memory to record, so the recording has stopped automatically. If you'd like to record for longer, you can try lowering the quality of the video, or clearing up some space on your device.",
+    "description": "Memory limit reached description"
+  },
+  "understoodButton": {
+    "message": "Understood",
+    "description": "Understood button"
+  },
+  "notEnoughSpaceTitle": {
+    "message": "Not enough space",
+    "description": "Not enough space title"
+  },
+  "notEnoughSpaceDescription": {
+    "message": "Screenity needs at least 1GB of free space to record. Please free up some space and try again.",
+    "description": "Not enough space description"
+  },
+  "clearSpaceButton": {
+    "message": "Clear previous recordings",
+    "description": "Clear previous recordings button"
+  },
+  "sandboxAdvancedTitle": {
+    "message": "Advanced",
+    "description": "Advanced section in sandbox editor page"
+  },
+  "rawRecordingButtonTitle": {
+    "message": "Download raw video file",
+    "description": "Download raw recording button"
+  },
+  "rawRecordingButtonDescription": {
+    "message": "Export the original recording data",
+    "description": "Download raw recording label"
+  },
+  "troubleshootButtonTitle": {
+    "message": "Get help with your recording",
+    "description": "Troubleshoot button"
+  },
+  "troubleShootButtonDescription": {
+    "message": "Recover your video and solve other issues",
+    "description": "Troubleshoot label"
+  },
+  "rawRecordingModalTitle": {
+    "message": "Download raw video file",
+    "description": "Raw recording modal title"
+  },
+  "rawRecordingModalDescription": {
+    "message": "The raw video file is the original video file that was recorded by Screenity. This video is not processed or edited, so it may be very large and may not be playable on all devices. If you are having issues with the processed video, you can use this file to recover your video.",
+    "description": "Raw recording modal description"
+  },
+  "rawRecordingModalButton": {
+    "message": "Download",
+    "description": "Raw recording modal button"
+  },
+  "troubleshootModalTitle": {
+    "message": "Download system information and video data and send for troubleshooting",
+    "description": "Troubleshoot modal title"
+  },
+  "troubleshootModalDescription": {
+    "message": "After downloading, send the file to support@screenity.io with any relevant information. We will use this data to help you troubleshoot any issues you are having with the extension, and recover your video if possible.",
+    "description": "Troubleshoot modal description"
+  },
+  "troubleshootModalButton": {
+    "message": "Download",
+    "description": "Troubleshoot modal button"
+  },
+  "overLimitModalTitle": {
+    "message": "The video is too long to process in your device",
+    "description": "Over 5 minutes limit modal title"
+  },
+  "overLimitModalDescription": {
+    "message": "Since Screenity is completely private and runs locally, it's limited by your device's hardware. Processing a video of this length would take too long, and be very resource intensive. Don't worry, you can still download the WEBM file or the raw recording, but editing and MP4 export are not available. That said, you can still try to process the video anyway, if you understand the risks.",
+    "description": "Over 5 minutes limit modal description"
+  },
+  "overLimitModalButton": {
+    "message": "I understand the risk, try anyway",
+    "description": "Over 5 minutes limit modal button"
+  },
+  "overLimitModalLearnMore": {
+    "message": "Learn more about processing long videos.",
+    "description": "Over 5 minutes limit modal learn more link with a dot"
+  },
+  "recoveryModeTitle": {
+    "message": "Recovery mode",
+    "description": "Recovery mode title"
+  },
+  "downloadForTroubleshootingOption": {
+    "message": "Download data for troubleshooting",
+    "description": "Download for troubleshooting option"
+  },
+  "getHelpNav": {
+    "message": "Help center",
+    "description": "Get help nav item"
+  },
+  "audioWarningTitle": {
+    "message": "Record computer audio",
+    "description": "Audio warning title"
+  },
+  "audioWarningDescription": {
+    "message": "To record audio from this page, you need to switch to ‘$tab$’.",
+    "description": "Audio warning description",
+    "placeholders": {
+      "tab": {
+        "content": "$1",
+        "example": "Tab area"
+      }
+    }
+  },
+  "extensionNotSupportedTitle": {
+    "message": "Extension not supported on tab",
+    "description": "Extension not supported on tab"
+  },
+  "extensionNotSupportedDescription": {
+    "message": "Screenity wasn't supported in your previous tab. You can still start your recording here and switch back to the tab, but your camera and toolbar won't be visible.",
+    "description": "Extension not supported on tab description"
+  },
+  "backupsTitle": {
+    "message": "Set up a local backup for your Screenity recordings",
+    "description": "Backups title"
+  },
+  "backupsDescription1": {
+    "message": "Keep a copy of all the recordings you make. If you don’t set up backups, your recordings will only be saved when you choose to download them.",
+    "description": "Backups description"
+  },
+  "backupsDescription2": {
+    "message": "You might need to create a new folder first if you're trying to save to Downloads or other system folders.",
+    "description": "Backups description"
+  },
+  "backupsSelectFolder": {
+    "message": "Select a folder",
+    "description": "Select a folder button"
+  },
+  "backupsNotNow": {
+    "message": "Not now",
+    "description": "Not now button"
+  },
+  "backupsOnTitle": {
+    "message": " Your recordings are being backed up locally",
+    "description": "Backups on title"
+  },
+  "backupsOnDescription": {
+    "message": "To prevent being asked for permissions every time you record, we recommend leaving this tab open.",
+    "description": "Backups on description"
+  },
+  "backupsClose": {
+    "message": "Close tab anyway",
+    "description": "Close tab anyway button"
+  },
+  "backupsStop": {
+    "message": "Stop backing up all recordings",
+    "description": "Stop backups button"
+  },
+  "backupsConfirmTitle": {
+    "message": "Please reconfirm access to your local Screenity backup folder",
+    "description": "Backups confirm title"
+  },
+  "backupsConfirmDescription": {
+    "message": "We’re sorry, but we need your permission once more to keep backing up your recordings. Unfortunately we will need to ask every time this tab is closed, which can happen if you close the browser or restart your computer.",
+    "description": "Backups confirm description"
+  },
+  "backupsConfirmAllow": {
+    "message": "Allow Screenity to keep backing up recordings",
+    "description": "Backups confirm allow button"
+  },
+  "backupsToggle": {
+    "message": "Back up recordings",
+    "description": "Backups toggle label"
+  },
+  "backupPermissionFailTitle": {
+    "message": "Permission not granted to back up the recording",
+    "description": "Backup permission fail title"
+  },
+  "backupPermissionFailDescription": {
+    "message": "You didn't select a folder to backup your recordings. Depending on your browser version or operating system you might be asked to select the folder every time you start recording. You can try again, or disable backups entirely if you'd rather not give permissions repeatedly.",
+    "description": "Backup permission fail description"
+  },
+  "recordAudioWarningMacTitle": {
+    "message": "Record computer audio",
+    "description": "Record audio warning title"
+  },
+  "recordAudioWarningMacDescription": {
+    "message": "In macOS, you can only record Tab audio. Select the Chrome Tab option and make sure 'Also share tab audio' is enabled.",
+    "description": "macOS audio warning description"
+  },
+  "recordAudioWarningOtherTitle": {
+    "message": "Record computer audio",
+    "description": "Record audio warning title"
+  },
+  "recordAudioWarningOtherDescription": {
+    "message": "Make sure to enable the option to 'Share system audio' if you want to record computer audio. If you don't see this option, try updating Chrome, or switch to Tab recording.",
+    "description": "Other audio warning description"
+  },
+  "maxResolutionLabel": {
+    "message": "Max resolution",
+    "description": "Max resolution label in settings menu"
+  },
+  "maxFPSLabel": {
+    "message": "Max FPS",
+    "description": "Max FPS label in settings menu"
+  },
+  "notEnoughRAM": {
+    "message": "Not enough RAM",
+    "description": "Not enough RAM label in settings menu"
+  },
+  "resizeWindowLabel": {
+    "message": "Resize window",
+    "description": "Resize window label in settings menu"
+  },
+  "screenTooSmallTooltip": {
+    "message": "The screen is too small for this resolution",
+    "description": "Screen too small tooltip in settings menu"
+  },
+  "maxResolutionTooltip": {
+    "message": "Cannot record at this resolution in your device",
+    "description": "Maxed out resolution tooltip in settings menu"
+  },
+  "permissionsModalReview": {
+    "message": "Review permissions",
+    "description": "Review permissions button"
+  }
+}

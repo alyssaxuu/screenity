@@ -1,0 +1,80 @@
+@use '../../../styles/_variables' as *;
+
+.video-ui {
+	position: relative;
+	/* Blur the background */
+	&:before {
+		content: '';
+		position: absolute;
+		backdrop-filter: blur(5px);
+		top: 0px;
+		left: 0px;
+		width: 100%;
+		height: 100%;
+		background: rgba(255, 255, 255, 0.5);
+		z-index: 999;
+	}
+}
+.videos-list {
+	padding-bottom: 10px!important;
+	max-height: calc(96vh - 260px);
+	overflow-y: overlay;
+	padding: $spacing-05;
+}
+.bottom-section {
+	width: 100%;
+	bottom: 0px;
+	left: 0px;
+	box-sizing: border-box;
+	padding-top: $spacing-03!important;
+	padding-bottom: $spacing-04!important;
+
+	padding: $spacing-05;
+}
+.ModalSoon {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	height: fit-content;
+	width: 70%;
+	padding: 30px $spacing-05;
+	position: absolute;
+	left: 0px;
+	right: 0px;
+	top: 0px;
+	bottom: 0px;
+	margin: auto;
+	border-radius: $container-border-radius;
+	background: white;
+	box-shadow: 0px 4px 100px 0px rgba(0, 0, 0, 0.15);
+	z-index: 9999999;
+}
+.ModalSoonEmoji {
+	font-size: 20px;
+	margin-bottom: $spacing-03;
+}
+.ModalSoonTitle {
+	font-weight: 700;
+	color: $color-text-primary;
+	margin-bottom: $spacing-03;
+	text-align: center;
+}
+.ModalSoonDescription {
+	text-align: center;
+	color: $color-text-secondary;
+	text-align: center;
+	margin-bottom: $spacing-03;
+}
+.ModalSoonButton {
+	margin-top: $spacing-03;
+	color: $color-text-contrast;
+	text-align: center;
+	border-radius: 30px;
+	background: $gradient-primary;
+	padding: $spacing-03 $spacing-05;
+
+	&:hover {
+		cursor: pointer;
+	}
+}

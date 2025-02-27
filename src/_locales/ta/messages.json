@@ -1,0 +1,1040 @@
+{
+  "extName": {
+    "message": "ஸ்க்ரீனிட்டி - திரைப்பதிவு & குறிப்புகள்",
+    "description": "நீட்சிதம் பெயர்"
+  },
+  "extDesc": {
+    "message": "எந்த வரம்பின்னரும் இல்லாமாக உள்ள சிறந்த இலவச திரை படிக்குழு. படத்தை பிடிக்க, குறிப்பிடுக, அமை, மெதுவாக்கு, வீடியோக்களை திருத்துகின்றன மற்றும் மேலும் - புகுபதிக்க அந்த பேர் பதிவு செய்ய இல்லை, மற்றும் தனியுரிமை பருவமாக இருக்கின்றது.",
+    "description": "நீட்சிதம் விளக்கம்"
+  },
+  "recordTab": {
+    "message": "பதிவு",
+    "description": "பதிவு தலைப்பு படிதம்"
+  },
+  "videosTab": {
+    "message": "உங்கள் வீடியோக்கள்",
+    "description": "வீடியோக்கள் தலைப்பு படிதம்"
+  },
+  "screenType": {
+    "message": "திரை",
+    "description": "திரை படம் பதிவு வகை படிதம்"
+  },
+  "tabType": {
+    "message": "கையெழுத்து பகுதி",
+    "description": "கையெழுத்து பகுதி படம் பதிவு வகை படிதம்"
+  },
+  "cameraType": {
+    "message": "கேமரா",
+    "description": "கேமரா பதிவு வகை படிதம்"
+  },
+  "mockupType": {
+    "message": "மாக்கப்",
+    "description": "மாக்கப் பதிவு வகை படிதம்"
+  },
+  "customAreaRecordingDisabledTitle": {
+    "message": "தனிப்பட்ட பகுதி பதிவு முடக்கப்பட்டுள்ளது",
+    "description": "கூடித் தனிப்பட்ட பகுதி பதிவு முடக்கப்பட்டுள்ளது எச்சரிக்கை படம் (Chrome பதிப்பு 104 க்கு குறைந்த பதிப்புகள்)"
+  },
+  "customAreaRecordingDisabledDescription": {
+    "message": "Chrome பதிப்பு 110+ க்கு புதுப்பிக்கவும்",
+    "description": "கூடித் தனிப்பட்ட பகுதி பதிவு முடக்கப்பட்டுள்ளது எச்சரிக்கை விளக்கம் (Chrome பதிப்பு 104 க்கு குறைந்த பதிப்புகள்)"
+  },
+  "customAreaRecordingDisabledAction": {
+    "message": "புதுப்பிக்க",
+    "description": "104 க்கு குறுகிய க்ரோம் பதிப்புகளுக்கு மேம்படுத்த மாட்சியை முடக்கிய பிரிவு பதிப்பு எச்சரிக்கை செய்தியாகும்"
+  },
+  "permissionsModalTitle": {
+    "message": "உங்கள் அனுமதிகளை சரிபார்க்கவும்",
+    "description": "கேமரா / மைக்ரோஃபோன் அனுமதிகள் எச்சரிக்கை செய்தியின் தலைப்பு"
+  },
+  "permissionsModalDescription": {
+    "message": "போன்று போன்று தேர்வு செய்வதற்கு உங்கள் கேமரா அல்லது மைக்ரோஃபோனுக்கு அணுகலை அனுமதிக்க முடியவில்லை. அணுகலை அனுமதிக்க அனுமதி அளிக்க அடியில் கேமரா ஐகானை கிளிக் செய்து அனுமதி அளிக்கவும்.",
+    "description": "கேமரா / மைக்ரோஃபோன் அனுமதிகள் எச்சரிக்கை செய்தியின் விளக்கம் விளக்கம்"
+  },
+  "permissionsModalDismiss": {
+    "message": "விலகு",
+    "description": "கேமரா / மைக்ரோஃபோன் அனுமதிகள் எச்சரிக்கை செய்தியின் விளக்கம் விளக்கம்"
+  },
+  "allowCameraAccessButton": {
+    "message": "கேமரா அணுகலை அனுமதிக்கவும்",
+    "description": "கேமரா அணுகலை அனுமதிக்க பொத்தான்"
+  },
+  "allowMicrophoneAccessButton": {
+    "message": "மைக்ரோஃபோன் அணுகலை அனுமதிக்கவும்",
+    "description": "மைக்ரோஃபோன் அணுகலை அனுமதிக்க பொத்தான்"
+  },
+  "pushToTalkLabel": {
+    "message": "அழுக்கு",
+    "description": "அழுக்கு ஸ்விட்ச் பொத்தான்"
+  },
+  "customAreaLabel": {
+    "message": "புதுப்பிக்க பருவத்தை அமைக்கவும்",
+    "description": "புதுப்பிக்க ஸ்விட்ச் பொத்தான்"
+  },
+  "flipCameraLabel": {
+    "message": "கேமரா தளம்",
+    "description": "கேமரா தளம் ஸ்விட்ச் பொத்தான்"
+  },
+  "backgroundEffectsLabel": {
+    "message": "பின்னணி விளைவுகள்",
+    "description": "பின்னணி விளைவுகள் ஸ்விட்ச் பொத்தான்"
+  },
+  "recordButtonLabel": {
+    "message": "பதிவு செய்ய ஆரம்பிக்கவும்",
+    "description": "பதிவு பொத்தான் பொத்தான்"
+  },
+  "recordButtonInProgressLabel": {
+    "message": "பதிவு ஆரம்பிக்கின்றது...",
+    "description": "பதிவு பொத்தான் செயலி ஆரம்பிக்கின்றது செய்தி"
+  },
+  "recordButtonNoCameraLabel": {
+    "message": "கேமரா அமைக்கவும்",
+    "description": "கேமரா முறையில் உள்ளபடியாக கேமரா தேர்வு செய்தால் உள்ளபடி கேமரா செய்தி"
+  },
+  "showMoreOptionsLabel": {
+    "message": "மேலும் விருப்பங்கள் காட்டு",
+    "description": "மேலும் விருப்பங்கள் செய்தி"
+  },
+  "systemAudioLabel": {
+    "message": "அமைப்பு ஒலியை சேர்க்கவும்",
+    "description": "அமைப்பு ஒலி குறியீடு/அறை"
+  },
+  "hideToolbarLabel": {
+    "message": "கட்டுப்பாடு மறை",
+    "description": "கட்டுப்பாடு மறை செய்தி"
+  },
+  "countdownLabel": {
+    "message": "எண்ணிக்கை செய்யவும்",
+    "description": "எண்ணிக்கை செய்தி"
+  },
+  "alarmLabel": {
+    "message": "நேரம் எதிர்க்காட்டவும்",
+    "description": "அலாரம் செய்தி"
+  },
+  "blurTypeLabel": {
+    "message": "மறை",
+    "description": "பிரிவு பிரிப்பு செய்தி"
+  },
+  "noneDropdownLabel": {
+    "message": "இல்லை",
+    "description": "சாதனம் தேர்வு செய்தி"
+  },
+  "noCameraDropdownLabel": {
+    "message": "கேமரா இல்லை",
+    "description": "கேமரா தேர்வு செய்தி"
+  },
+  "noMicrophoneDropdownLabel": {
+    "message": "மைக்ரோஃபோன் இல்லை",
+    "description": "மைக்ரோஃபோன் தேர்வு செய்தி"
+  },
+  "selectSourceDropdownPlaceholder": {
+    "message": "ஒரு மூலம் தேர்வு செய்யவும்",
+    "description": "மூலம் தேர்வு செய்தி உள்ளிடம்"
+  },
+  "offLabel": {
+    "message": "அணுக்கம் இல்லை",
+    "description": "அணுக்கம் இல்லை செய்தி கீழே"
+  },
+  "regionWidthLabel": {
+    "message": "அகலம்",
+    "description": "பிரிவு அகல செய்தி"
+  },
+  "regionHeightLabel": {
+    "message": "உயரம்",
+    "description": "பிரிவு உயர செய்தி"
+  },
+  "addImageToastTitle": {
+    "message": "படம் வைக்க கிளிக் செய்யவும்",
+    "description": "புதிய படம் சேர்க்கும் போப்அப் தலைப்பு"
+  },
+  "finishRecordingTooltip": {
+    "message": "பதிவு முடிக்க",
+    "description": "பதிவு முடிக்க குழப்பு"
+  },
+  "restartRecordingTooltip": {
+    "message": "பதிவு மீட்டல்",
+    "description": "பதிவு மீட்டல் குழப்பு"
+  },
+  "pauseRecordingTooltip": {
+    "message": "பதிவு முடிக்க",
+    "description": "பதிவு முடிக்க குழப்பு"
+  },
+  "resumeRecordingTooltip": {
+    "message": "பதிவு தொடங்க",
+    "description": "பதிவு தொடங்க குழப்பு"
+  },
+  "cancelRecordingTooltip": {
+    "message": "பதிவு ரத்து செய்",
+    "description": "பதிவு ரத்து செய் உத்திபத்தி"
+  },
+  "toggleDrawingToolsTooltip": {
+    "message": "வரையறு கருவிகள் சோதனை செய்யுங்கள்",
+    "description": "வரையறு கருவிகள் சோதனை செய் உத்திபத்தி"
+  },
+  "toggleBlurToolTooltip": {
+    "message": "சுரூரிட கருவியை மாற்று",
+    "description": "சுரூரிட கருவிகள் சோதனை செய் உத்திபத்தி"
+  },
+  "toggleCursorOptionsTooltip": {
+    "message": "கோசர் விருப்பங்களை மாற்று",
+    "description": "கோசர் விருப்பங்களை மாற்று உத்திபத்தி"
+  },
+  "disableCameraTooltip": {
+    "message": "கேமரா முடக்கு",
+    "description": "கேமரா முடக்கு உத்திபத்தி"
+  },
+  "enableCameraTooltip": {
+    "message": "கேமரா இயக்கு",
+    "description": "கேமரா இயக்கு உத்திபத்தி"
+  },
+  "noCameraPermissionsTooltip": {
+    "message": "கேமரா அனுமதிகள் இல்லை",
+    "description": "கேமரா அனுமதிகள் இல்லை உத்திபத்தி"
+  },
+  "disableMicrophoneTooltip": {
+    "message": "மைக்ரோஃபோன் முடக்கு",
+    "description": "மைக்ரோஃபோன் முடக்கு உத்திபத்தி"
+  },
+  "enableMicrophoneTooltip": {
+    "message": "மைக்ரோஃபோன் இயக்கு",
+    "description": "மைக்ரோஃபோன் இயக்கு உத்திபத்தி"
+  },
+  "noMicrophonePermissionsTooltip": {
+    "message": "மைக்ரோஃபோன் அனுமதிகள் இல்லை",
+    "description": "மைக்ரோஃபோன் அனுமதிகள் இல்லை உத்திபத்தி"
+  },
+  "selectToolTooltip": {
+    "message": "கருவியை தேர்ந்தெடு",
+    "description": "கருவி உத்திபத்தி"
+  },
+  "penToolTooltip": {
+    "message": "பேன் கருவி",
+    "description": "பேன் கருவி உத்திபத்தி"
+  },
+  "highlighterToolTooltip": {
+    "message": "முக்கியமான கருவி",
+    "description": "முக்கியமான கருவி உத்திபத்தி"
+  },
+  "eraserToolTooltip": {
+    "message": "மொழி கருவி",
+    "description": "மொழி கருவி உத்திபத்தி"
+  },
+  "textToolTooltip": {
+    "message": "உரை கருவி",
+    "description": "உரை கருவி உத்திபத்தி"
+  },
+  "shapeToolTooltip": {
+    "message": "வடிவ கருவி",
+    "description": "வடிவ கருவி உத்திபத்தி"
+  },
+  "arrowToolTooltip": {
+    "message": "அம்பு கருவி",
+    "description": "அம்பு கருவி உத்திபத்தி"
+  },
+  "imageToolTooltip": {
+    "message": "படம் கருவி",
+    "description": "படம் கருவி உத்திபத்தி"
+  },
+  "undoTooltip": {
+    "message": "மீட்டமை",
+    "description": "மீட்டமை குருவி"
+  },
+  "redoTooltip": {
+    "message": "மீட்டமை செய்",
+    "description": "மீட்டமை செய் குருவி"
+  },
+  "clearCanvasTooltip": {
+    "message": "கவசம் அழி",
+    "description": "கவச டூல்டிப்"
+  },
+  "moreColorsTooltip": {
+    "message": "மேலும் வண்ணங்கள்",
+    "description": "மேலும் வண்ணங்கள் டூல்டிப்"
+  },
+  "thickStrokeTooltip": {
+    "message": "படிக்குழப்பு அச்சு",
+    "description": "படிக்குழப்பு அச்சு டூல்டிப்"
+  },
+  "mediumStrokeTooltip": {
+    "message": "இடைச்சுழப்பு அச்சு",
+    "description": "இடைச்சுழப்பு அச்சு டூல்டிப்"
+  },
+  "thinStrokeTooltip": {
+    "message": "இலேமெண்ட் அச்சு",
+    "description": "இலேமெண்ட் அச்சு டூல்டிப்"
+  },
+  "togglePictureinPictureModeTooltip": {
+    "message": "புகைப்படத்தில் புகைப்பட",
+    "description": "புகைப்படத்தில் புகைப்பட டூல்டிப்"
+  },
+  "toggleFillTooltip": {
+    "message": "நிரப்பு செய்",
+    "description": "நிரப்பு செய் டூல்டிப்"
+  },
+  "drawingModeToast": {
+    "message": "வரைபட முடிந்தது",
+    "description": "வரைபட முடிந்தது டோஸ்ட்"
+  },
+  "blurModeToast": {
+    "message": "மயிர் முடிந்தது",
+    "description": "மயிர் முடிந்தது டோஸ்ட்"
+  },
+  "clearBlurredElementsTooltip": {
+    "message": "அனைத்து மூடிய உருக்கங்களையும் அகற்று",
+    "description": "அனைத்து மூடிய உருக்கங்களையும் அகற்று டூல்டிப்"
+  },
+  "highlightClicksTooltip": {
+    "message": "கிளிக்குகளை குறிக்க",
+    "description": "கிளிக்குகளை குறிக்க டூல்டிப்"
+  },
+  "highlightCursorTooltip": {
+    "message": "கோர்சரை குறிக்க",
+    "description": "கோர்சரை குறிக்க டூல்டிப்"
+  },
+  "spotlightCursorTooltip": {
+    "message": "கோர்சரை ஒளிப்படுத்து",
+    "description": "கோர்சரை ஒளிப்படுத்து டூல்டிப்"
+  },
+  "permissionsModalNoShowAgain": {
+    "message": "மீது காண்பிக்க வேண்டாம்",
+    "description": "அனுமதிகள் மோடால் காண்பிக்க பொதுப்படுத்து பொத்தான்"
+  },
+  "restartModalTitle": {
+    "message": "புதியதாக பதிவுசெய்ய விரும்புகிறீர்களா?",
+    "description": "புதியதாக பதிவுசெய்ய விரும்புகிறீர்களா மோடால் தலைப்பு"
+  },
+  "restartModalDescription": {
+    "message": "உங்கள் தற்போதைய வீடியோ முன்னேற்றம் இழக்கப்படும்.",
+    "description": "மீள் அமைப்பு மாடல் விளக்கம்"
+  },
+  "restartModalRestart": {
+    "message": "வீடியோ மீள் அமைப்பு",
+    "description": "மீள் அமைப்பு மாடல் மீள் அமைப்பு பொத்தான்"
+  },
+  "restartModalResume": {
+    "message": "வீடியோ செயலாக்கம் தொடர்க",
+    "description": "மீள் அமைப்பு மாடல் தொடர்க பொத்தான்"
+  },
+  "discardModalTitle": {
+    "message": "நீங்கள் வீடியோ செயலாக்கியில் துணைமைக்கப்படுவீர்களா?",
+    "description": "வீடியோ விலக்க மாடல் தலைப்பு"
+  },
+  "discardModalDescription": {
+    "message": "உங்கள் தற்போதைய வீடியோ முன்னேற்றம் இழக்கப்படும்.",
+    "description": "வீடியோ விலக்க மாடல் விளக்கம்"
+  },
+  "discardModalDiscard": {
+    "message": "வீடியோ விலக்கு",
+    "description": "வீடியோ விலக்க மாடல் விலக்கு பொத்தான்"
+  },
+  "discardModalResume": {
+    "message": "வீடியோ செயலாக்கம் தொடர்க",
+    "description": "வீடியோ விலக்க மாடல் தொடர்க பொத்தான்"
+  },
+  "recorderSelectTitle": {
+    "message": "நீங்கள் எந்தவையை பதிவு செய்ய விரும்புகின்றீர்கள் என்று தேர்ந்தெடுக்கவும்",
+    "description": "பதிவு பக்கத்தில் தலைப்பு"
+  },
+  "recorderSelectProgressTitle": {
+    "message": "பதிவுசெய்தல்...",
+    "description": "பதிவு பக்கத்தில் பதிவுசெய்தல் போன்ற தலைப்பு"
+  },
+  "recorderSelectDescription": {
+    "message": "இந்த உதவியை மூட வேண்டும். உங்கள் பதிவு சேமிக்கப்பட்ட பிறகு அந்த உதவியும் மூடப்படும்.",
+    "description": "பதிவு பக்கத்தில் விளக்கம்"
+  },
+  "sandboxProgressTitle": {
+    "message": "பதிவுசெய்தல் தயாராகிக் கொள்ளப்படுகின்றது...",
+    "description": "பதிவு பக்கத்தில் பதிவுசெய்தல் / சேமிக்குகின்ற போன்ற தலைப்பு"
+  },
+  "sandboxProgressDescription": {
+    "message": "இந்த உதவியை மூட வேண்டும். அது உங்கள் பதிவு சேமிக்கப்பட்ட பிறகு அப்டேட் செய்யும்.",
+    "description": "பதிவு பக்கத்தில் விளக்கம்"
+  },
+  "sandboxEditorMainTitle": {
+    "message": "எடிட்டர்",
+    "description": "மையத்தின் வழிமுறைப்பு பக்கத்தின் தலைப்பு"
+  },
+  "sandboxEditorCancelButton": {
+    "message": "ரத்து செய்",
+    "description": "ரத்து செய்க பொத்தான் முகத்தில் உள்ள பொத்தான்"
+  },
+  "sandboxEditorRevertButton": {
+    "message": "மூல செய்தி திரும்பு",
+    "description": "மூல செய்தி திரும்பு பொத்தான் முகத்தில் உள்ள பொத்தான்"
+  },
+  "sandboxEditorResetButton": {
+    "message": "மீட்டமை",
+    "description": "மீட்டமை பொத்தான் முகத்தில் உள்ள பொத்தான்"
+  },
+  "sandboxEditorSaveButton": {
+    "message": "மாற்றங்கள் சேமிக்க",
+    "description": "சேமிப்பு பொத்தான் முகத்தில் உள்ள பொத்தான்"
+  },
+  "sandboxEditorSaveProgressButton": {
+    "message": "சேமிப்பதில்...",
+    "description": "சேமிப்பு பொத்தான் முகத்தில் உள்ள பொத்தான்"
+  },
+  "sandboxAudioDragAndDrop": {
+    "message": "உங்கள் ஒலியின் கோப்பை விளக்கம் செய்யவும்",
+    "description": "ஒலி கோப்பை விளக்கம் செய்யவும் பொத்தான் முகத்தில் உள்ள பொத்தான்"
+  },
+  "sandboxAudioOrBrowse": {
+    "message": "அல்லது பார்க்க கிளிக் செய்யவும்",
+    "description": "ஒலி கோப்பை பார்க்க கிளிக் செய்யவும் பொத்தான் முகத்தில் உள்ள பொத்தான்"
+  },
+  "sandboxAudioSettingsTitle": {
+    "message": "அமைப்புகள்",
+    "description": "ஒலி அமைப்புகள் தலைப்பு பொத்தான் முகத்தில் உள்ள பொத்தான்"
+  },
+  "sandboxAudioVolumeLabel": {
+    "message": "ஒலி அளவு",
+    "description": "ஒலி அளவு விளக்கம் பொத்தான் முகத்தில் உள்ள பொத்தான்"
+  },
+  "sandboxAudioUpdateButton": {
+    "message": "புதுப்பி",
+    "description": "ஒலி புதுப்பி பொத்தான் முகத்தில் உள்ள பொத்தான்"
+  },
+  "sandboxCropTitle": {
+    "message": "வெட்டு",
+    "description": "வெட்டு தலைப்பு பொத்தான் முகத்தில் உள்ள பொத்தான்"
+  },
+  "widthLabel": {
+    "message": "பருவம்",
+    "description": "சொத்துக்கள் குறிப்புக்கு பருவம் விளக்கம்"
+  },
+  "heightLabel": {
+    "message": "உயரம்",
+    "description": "சொத்துக்கள் குறிப்புக்கு உயரம் விளக்கம்"
+  },
+  "leftLabel": {
+    "message": "இடம்",
+    "description": "குறிப்பிட்ட பணியாளர் விவரங்கள் சிட்டில் இடம் குறிப்பு"
+  },
+  "topLabel": {
+    "message": "மேல்",
+    "description": "குறிப்பிட்ட பணியாளர் விவரங்கள் சிட்டில் மேல் குறிப்பு"
+  },
+  "sandboxEditorTrimInfo": {
+    "message": "ஹாண்டிளை இழுக்கவும் மற்றும் தொகுப்புகளை பயன்படுத்த இடது பட்டன்களை பயன்படுத்தவும்.",
+    "description": "சாண்ட்பாக்ஸ் எடிட்டிங்கில் வித்திக்குது பற்றிய விவரங்கள்"
+  },
+  "sandboxEditorTrimButton": {
+    "message": "வீடியோ குறை",
+    "description": "சாண்ட்பாக்ஸ் எடிட்டிங்கில் குறை பட்டன்"
+  },
+  "sandboxEditorTrimProgressButton": {
+    "message": "குறைக்கின்றது...",
+    "description": "சாண்ட்பாக்ஸ் எடிட்டிங்கில் குறை பட்டன் வித்திக்கின்றது போன்ற போது"
+  },
+  "sandboxEditorCutButton": {
+    "message": "பிளவு வைத்துப்படு",
+    "description": "சாண்ட்பாக்ஸ் எடிட்டிங்கில் கட் பட்டன்"
+  },
+  "sandboxEditorCutProgressButton": {
+    "message": "கட்டுகின்றது...",
+    "description": "சாண்ட்பாக்ஸ் எடிட்டிங்கில் கட் பட்டன் வித்திக்கின்றது போன்ற போது"
+  },
+  "sandboxEditorMuteButton": {
+    "message": "ஒலியை முடக்கு",
+    "description": "சாண்ட்பாக்ஸ் எடிட்டிங்கில் ஒலி முடக்கு பட்டன்"
+  },
+  "sandboxEditorMuteProgressButton": {
+    "message": "ஒலி முடக்குகின்றது...",
+    "description": "சாண்ட்பாக்ஸ் எடிட்டிங்கில் ஒலி முடக்கு பட்டன் வித்திக்கின்றது போன்ற போது"
+  },
+  "learnMoreDot": {
+    "message": "அதிகம் அறிய",
+    "description": "ஒரு டாட் சொல் சார்பு வெளியீடு செய்யும்"
+  },
+  "undoLabel": {
+    "message": "மீட்டமை",
+    "description": "மீட்டமை செய்"
+  },
+  "redoLabel": {
+    "message": "மீட்டமை செய்",
+    "description": "மீட்டமை செய் செய்"
+  },
+  "leaveReview": {
+    "message": "ஒரு மதிப்பீடு விளக்க",
+    "description": "விமர்சனம் விடுங்கள் பட்டன்"
+  },
+  "followForUpdates": {
+    "message": "புதுப்பிப்புக்காக பின்னுங்கள்",
+    "description": "புதுப்பிப்புக்காக பின்னுங்கள் பட்டன்"
+  },
+  "offlineLabelTitle": {
+    "message": "நீங்கள் தற்போது ஆஃப்லைன்",
+    "description": "ஆஃப்லைன் லேபிள்"
+  },
+  "offlineLabelDescription": {
+    "message": "சில அம்சங்கள் மீண்டும் இணைக்கப்படும் வரை கிடைக்காது",
+    "description": "ஆஃப்லைன் லேபிள் விளக்கம்"
+  },
+  "offlineLabelTryAgain": {
+    "message": "மீண்டும் முயற்சி செய்",
+    "description": "ஆஃப்லைன் லேபிள் மீண்டும் முயற்சி செய் பொத்தான்"
+  },
+  "updateChromeLabelTitle": {
+    "message": "கூகுள் புதுப்பிக்க வேண்டும்",
+    "description": "கைப்பு கூகுள் புதுப்பிப்பு லேபிள்"
+  },
+  "updateChromeLabelDescription": {
+    "message": "கூகுள் கைப்பு கூட்டுத்தளம் அணுக புதுப்பிக்கவும்",
+    "description": "கைப்பு கூகுள் புதுப்பிப்பு லேபிள் விளக்கம்"
+  },
+  "learnMoreLabel": {
+    "message": "மேலும் அறிய",
+    "description": "மேலும் அறிய பொத்தான்"
+  },
+  "overLimitLabelTitle": {
+    "message": "உங்கள் சாதனத்தில் வீடியோ மிகம் நீளம்",
+    "description": "எடிட்டரில் 5 நிமிடத்திற்குக் கீழ் வரும் கட்டுரை"
+  },
+  "overLimitLabelDescription": {
+    "message": "திருத்தல் மற்றும் MP4 வடிவம் விரும்பில்லை",
+    "description": "எடிட்டரில் 5 நிமிடத்திற்குக் கீழ் வரும் விளக்கம்"
+  },
+  "videoProcessingLabelTitle": {
+    "message": "வீடியோ செயலாக்கப்படுகின்றது...",
+    "description": "வீடியோ செயலாக்க லேபிள் இன் பதிவு"
+  },
+  "videoProcessingLabelDescription": {
+    "message": "விரிவாக்க மற்றும் விருத்திப் பதிவு செய்வதற்கு மேல் புதுப்பிப்பு செய்யவும்",
+    "description": "வீடியோ செயலாக்க விளக்கம் இன் பதிவு"
+  },
+  "sandboxEditTitle": {
+    "message": "திருத்து",
+    "description": "மின்னணு திருத்து பக்கத்தில் திருத்த தலைப்பு"
+  },
+  "noConnectionLabel": {
+    "message": "இணைப்பு இல்லை",
+    "description": "இணைப்பு லேபிள்"
+  },
+  "notAvailableLabel": {
+    "message": "கிடைக்காது",
+    "description": "கிடைக்காது லேபிள்"
+  },
+  "editButtonTitle": {
+    "message": "வீடியோ திருத்து",
+    "description": "குறைத்து திருத்த பொத்தான்"
+  },
+  "editButtonDescription": {
+    "message": "வீடியோவை குறைத்து, வெட்டுக்கள் அல்லது பாரம் செய்யுங்கள்",
+    "description": "குறைத்து பொத்தான்"
+  },
+  "preparingLabel": {
+    "message": "வீடியோ தயாரிக்கப்படுகின்றது, தயவு செய்து காத்திருக்கவும்...",
+    "description": "தயாரிக்கின்றது லேபிள்"
+  },
+  "cropButtonTitle": {
+    "message": "வீடியோவை வெட்டு",
+    "description": "வெட்டு பொத்தான் பொத்தான்"
+  },
+  "cropButtonDescription": {
+    "message": "வீடியோவை வெட்டுக்கும் மற்றும் அளவை அமைக்கவும்",
+    "description": "வெட்டு பொத்தான்"
+  },
+  "addAudioButtonTitle": {
+    "message": "ஒலியை சேர்",
+    "description": "ஒலி பொத்தான் பொத்தான்"
+  },
+  "addAudioButtonDescription": {
+    "message": "உங்கள் சொந்த ஒலியை வீடியோக்கு சேர்க்க பொத்தான்",
+    "description": "ஒலி பொத்தான்"
+  },
+  "sandboxSaveTitle": {
+    "message": "சேமிக்க",
+    "description": "மின்னணு திருத்து பக்கத்தில் சேமிக்க தலைப்பு"
+  },
+  "signOutDriveLabel": {
+    "message": "டிரைவை விடு",
+    "description": "கூகுள் டிரைவ் பெயர் விடுக"
+  },
+  "savingDriveLabel": {
+    "message": "சேமிக்கப்படுகின்றது...",
+    "description": "கூகுள் டிரைவ் கீபேழ்க"
+  },
+  "saveDriveButtonTitle": {
+    "message": "டிரைவ் கீபேழ்க",
+    "description": "கூகுள் டிரைவ் பொத்தான் பொத்தான்"
+  },
+  "saveDriveButtonDescription": {
+    "message": "தற்போதைய பதிப்பை கூகுள் டிரைவ் கீபேழ்க",
+    "description": "கூகுள் டிரைவ் பொத்தான்"
+  },
+  "signInDriveLabel": {
+    "message": "உள்நுழைக்கி டிரைவ் கீபேழ்க",
+    "description": "கூகுள் டிரைவ் பெயர் விடுக"
+  },
+  "sandboxExportTitle": {
+    "message": "ஏற்று",
+    "description": "மின்னணு திருத்து பக்கத்தில் ஏற்ற தலைப்பு"
+  },
+  "downloadingLabel": {
+    "message": "பதிவிறக்குதல்...",
+    "description": "பதிவிறக்குதல் லேபிள்"
+  },
+  "downloadWEBMButtonTitle": {
+    "message": ".webm ஆகப் பதிவிறக்க",
+    "description": "WEBM பொத்தான் பொத்தான்"
+  },
+  "downloadWEBMButtonDescription": {
+    "message": ".webm வீடியோவை ஏற்று",
+    "description": "WEBM பொத்தான்"
+  },
+  "downloadMP4ButtonTitle": {
+    "message": ".mp4 ஆகப் பதிவிறக்க",
+    "description": "MP4 பொத்தான் பொத்தான்"
+  },
+  "downloadMP4ButtonDescription": {
+    "message": ".mp4 வீடியோ ஏற்றுக் கொள்ள (பரிந்துரைக்கப்படுகின்றது)",
+    "description": ".mp4 பொத்தான் பொத்தான்"
+  },
+  "downloadGIFButtonTitle": {
+    "message": ".gif ஆகப் பதிவிறக்க",
+    "description": "GIF பொத்தான் பொத்தான்"
+  },
+  "downloadGIFButtonDescription": {
+    "message": "GIF ஐ ஏற்று (அதிகம் 30 வினாடிகள்)",
+    "description": "GIF பொத்தான்"
+  },
+  "shareModalSandboxTitle": {
+    "message": "உங்கள் வீடியோக்களை பிரித்தியம் பகிருங்கள்",
+    "description": "மின்னணு திருத்தி திருத்தி பக்கத்தில் பகிரும் மின்னணு திருத்தி திருத்தி பெயர்"
+  },
+  "shareModalSandboxDescription": {
+    "message": "விரைவில்! பகிர்ந்திருக்கின்றோம்! பகிர்ந்துகொள்ள உங்கள் மின்னணு அஞ்சலை விட்டு போக விரும்பினால் அப்பதிவு செய்து விடவும்.",
+    "description": "மின்னணு திருத்தி மின்னணு பெயர் மின்னணு பெயர்"
+  },
+  "shareModalSandboxButton": {
+    "message": "காத்திருக்க காத்திருக்க",
+    "description": "மின்னணு திருத்தி மின்னணு பெயர் மின்னணு பெயர் பிளேச்ஹோல்டர் மின்னணு பெயர் மின்னணு பெயர்"
+  },
+  "shareSandboxButton": {
+    "message": "வீடியோ பகிர்",
+    "description": "மின்னணு திருத்தி மின்னணு பெயர் மின்னணு பெயர்"
+  },
+  "replaceAudioEditor": {
+    "message": "தற்போதைய ஒலியை மாற்றுக",
+    "description": "தொகுப்பாளி இல் ஒலி பெயர்"
+  },
+  "zoomToPointPopup": {
+    "message": "கோர்சரை முடக்கு",
+    "description": "புள்ளி புள்ளி பெயர் பொத்தான்"
+  },
+  "stayInPagePopup": {
+    "message": "பதிவு செய்யும் பேஜில் உள்ளே இரு",
+    "description": "பக்க படுகின்றது பப்ப்"
+  },
+  "micReminderPopup": {
+    "message": "மைக்ரோஃபோன் அணை எச்சரிக்கை",
+    "description": "மைக் அனுக்கிரிப் பப்"
+  },
+  "helpPopup": {
+    "message": "உத்தமம்",
+    "description": "உத்தமம் பப் பொத்தான்"
+  },
+  "pausedRecordingToast": {
+    "message": "பதிவு நிறுத்தப்பட்டது. மீடியோ தொடர இயக்க புத்தரம் அழுக்கவும்.",
+    "description": "தற்போது இயக்கப்படுகின்ற விசை பட்டியல் தற்போது இயக்கப்படுகின்றது"
+  },
+  "chromePermissionsModalTitle": {
+    "message": "Screenity உங்கள் திரையை பதிவு செய்ய அனுமதியில்லை",
+    "description": "அனுமதி பட்டியல் தலைப்பு"
+  },
+  "chromePermissionsModalDescription": {
+    "message": "திரை பதிவு செய்ய உங்கள் திரையை காட்சிப்படுத்த அனுமதி இயக்க வேண்டும். போக்கில் உங்கள் திரையை பட்டியல் தலைப்பில் அனுமதி இயக்கவும்.",
+    "description": "அனுமதி பட்டியல் விளக்கம்"
+  },
+  "chromePermissionsModalAction": {
+    "message": "திரை பதிவை இயக்கு",
+    "description": "அனுமதி பட்டியல் செயல்"
+  },
+  "chromePermissionsModalCancel": {
+    "message": "ரத்து செய்",
+    "description": "அனுமதி பட்டியல் ரத்து"
+  },
+  "micMutedModalTitle": {
+    "message": "உங்கள் மைக்ரோஃபோன் அமைக்கப்பட்டுள்ளது",
+    "description": "மைக்ரோஃபோன் அமைக்கப்பட்டுள்ள தலைப்பு"
+  },
+  "micMutedModalDescription": {
+    "message": "உங்கள் பதிவுக்கு ஒலி சேர்க்க உங்கள் மைக்ரோஃபோன் அமைக்க வேண்டும். ஒலி இல்லாதிருந்தால் தொடர்வது விரும்புகின்றீர்களா?",
+    "description": "மைக்ரோஃபோன் அமைக்கப்பட்டுள்ள விளக்கம்"
+  },
+  "micMutedModalAction": {
+    "message": "ஆம், தொடர",
+    "description": "மைக்ரோஃபோன் அமைக்கப்பட்டுள்ள விளக்கம் தொடர்வது"
+  },
+  "micMutedModalCancel": {
+    "message": "ரத்து செய்",
+    "description": "மைக்ரோஃபோன் அமைக்கப்பட்டுள்ள விளக்கம் ரத்து"
+  },
+  "setupTitle": {
+    "message": "மூன்று எளிய படிகளில் ஸ்கிரீனிடி பயன்படுத்த ஆரம்பிக்கவும்:",
+    "description": "அமைதிகள் தலைப்பு"
+  },
+  "setupStep1Before": {
+    "message": "1- கிளிக் செய்யவும் ",
+    "description": "அமைதிப் படிகள் பட்டியல் 1, ஐகானுக்கு முந்திர விசை தேவை."
+  },
+  "setupStep1After": {
+    "message": " நீக்குதல் ஐகான்",
+    "description": "அமைதிப் படிகள் பட்டியல் 1, ஐகானுக்கு பின்னர் விசை தேவை."
+  },
+  "setupStep2Before": {
+    "message": "2- அழுத்தவும் ",
+    "description": "அமைதிப் படிகள் பட்டியல் 2, ஐகானுக்கு முந்திர விசை தேவை."
+  },
+  "setupStep2After": {
+    "message": " அடைவு ஐகான்",
+    "description": "அமைதிப் படிகள் பட்டியல் 2, ஐகானுக்கு பின்னர் விசை தேவை."
+  },
+  "setupStep3Before": {
+    "message": "3- கிளிக் செய்யவும் ",
+    "description": "அமைதிப் படிகள் பட்டியல் 3, ஐகானுக்கு முந்திர விசை தேவை."
+  },
+  "setupStep3After": {
+    "message": " Screenity ஐகானை தொடர்க",
+    "description": "அமைதிப் படிகள் பட்டியல் 3, ஐகானுக்கு பின்னர் விசை தேவை."
+  },
+  "setupCompleteTitle": {
+    "message": "அற்புதம்! உங்கள் அமைப்பு அனைத்து அமைப்புகளும் அமைந்துவிட்டன",
+    "description": "அமைதிப் படிகள் படிகள் பட்டியல் தலைப்பு"
+  },
+  "setupCompleteDescription": {
+    "message": "நீங்கள் இப்போது இங்கே அல்லது வேறு பக்கத்தில் பதிவு செய்ய முடியும்.",
+    "description": "அமைதிப் படிகள் படிகள் பட்டியல் விளக்கம்"
+  },
+  "clickHereDrawOnboarding": {
+    "message": "எங்கேயும் வரையுங்கள்",
+    "description": "இங்கே செய்ய வரையுங்கள்"
+  },
+  "countdownMessage": {
+    "message": "சமாதானமாக. எங்கேயும் கிளிக் செய்யவும் எண்ணிக்கொள்ள முடியும்.",
+    "description": "எண்ணிக்கொள்ள செய்தி"
+  },
+  "sandboxEditorTooSmallInfo": {
+    "message": "பட்டியல்கள் படிகளை திருத்த நிரப்பாது கூடிய கால இடங்களுக்காக வடிவங்கள் இடைவெளிக்காட்டப்படும் காரணமாக, திருத்தங்கள் தவறாக இருக்கலாம்.",
+    "description": "எடிட்டர் சிறியப் படிகள் படிக்கும் தகவல்"
+  },
+  "processingBannerEditor": {
+    "message": "வீடியோ செயலாக்கப்படுகின்றது, விளக்கத்துக்குச் சிறந்த அல்லது அடுத்துப் பார்க்கப்படும் என்று புதியது சொல்கின்றது.",
+    "description": "எடிட்டரில் செயலாக்கப்படும் அற்புத விளக்கம்"
+  },
+  "croppingInfoTitle": {
+    "message": "வெட்டுத்ததம் சிறிய நேரம் ஆகலாம்",
+    "description": "வெட்டுத்தம் தகவல் தலைப்பு"
+  },
+  "croppingInfoDescription": {
+    "message": "விரைவாக செயலாக்க முடியும் என்று மேம்படுகின்றது",
+    "description": "வெட்டுத்தம் தகவல் விளக்கம்"
+  },
+  "micOnToast": {
+    "message": "மைக்ரோஃபோன் இயக்கப்பட்டுள்ளது",
+    "description": "மைக்ரோஃபோன் இயக்கப்பட்டுள்ளது விளக்க தலைப்பு"
+  },
+  "micOffToast": {
+    "message": "மைக்ரோஃபோன் முடக்கப்பட்டுள்ளது",
+    "description": "மைக்ரோஃபோன் முடக்கப்பட்டுள்ளது விளக்க தலைப்பு"
+  },
+  "hideUIAlerts": {
+    "message": "UI அறிவிப்புகளை மறை",
+    "description": "UI அறிவிப்புகளை மறைக்க பொது பொது"
+  },
+  "noShowAgain": {
+    "message": "மீண்டும் காட்ட விரும்பாதே",
+    "description": "மீண்டும் காட்ட விரும்பாதே பொது"
+  },
+  "toolbarHoverOnly": {
+    "message": "பயன்படுத்தப்பட்ட போக்குகை மீட்டை மறை",
+    "description": "ஹோவர் பொத்தாக்கல் முக்கியம் பொது பொது"
+  },
+  "stopRecording": {
+    "message": "பதிவு முடிக்க",
+    "description": "பதிவு முடிக்க பொது பொது"
+  },
+  "updateAnnouncementTitle": {
+    "message": "புதிய Screenity க்கு வரவேற்கின்றது!",
+    "description": "அந்தப் பயனாளர்களுக்காக புதியது அற்புதம் தலைப்பு"
+  },
+  "updateAnnouncementDescription": {
+    "message": "நாங்கள் புதிய பார்வையும் அந்தப் பயனாளர்களுக்கு அற்புதமான அமைப்பை அறிமுகப்படுத்துகின்றோம், ஆனால் சிறுபக்கங்கள் அனைத்து இலவச, தனியுரிமையுடன் மூன்று விளம்பரச் செயல்பாடுகளாக இல்லை என்றாக, அதே கூட நீங்கள் அறிந்து கொள்ளும் மற்றும் காத்திருப்பதே அந்த படிவிக்கு மீதம்.",
+    "description": "அப்டேட் அறிவிப்பு விளக்கம் ஏற்படும் பயனாளர்களுக்கு"
+  },
+  "updateAnnouncementLearnMore": {
+    "message": "அப்டேட் பற்றி மேலும் அறிந்து கொள்ளவும்.",
+    "description": "அப்டேட் அறிவிப்பு மேலும் அறிந்து கொள்ள பட்டன் பயனாளர்களுக்கு"
+  },
+  "updateAnnouncementButton": {
+    "message": "ஆரம்பிக்கவும்",
+    "description": "அப்டேட் அறிவிப்பு பட்டன் பயனாளர்களுக்கு"
+  },
+  "streamErrorModalTitle": {
+    "message": "பதிவு ஆரம்பிப்பதில் பிழை",
+    "description": "ஸ்ட்ரீம் பிழை மாடல் தலைப்பு"
+  },
+  "streamErrorModalDescription": {
+    "message": "பதிவு ஆரம்பிப்பதில் ஒரு பிழை ஏற்பட்டதேன் என்று பார்க்கின்றது. உங்கள் உலாவி மீளவும் முயலுக்காக மீளவும் முயலவும் முயலுக்கு மீள்வார்கள். சிந்தனை தொடர்ந்து உத்தரவு பெறுகின்றதில், தயவுசெய்து எங்களுடன் தொடர்க support@screenity.io என்ற முகவரிக்கு தொடர்பு கொள்ளவும்.",
+    "description": "ஸ்ட்ரீம் பிழை மாடல் விளக்கம்"
+  },
+  "highestQuality": {
+    "message": "அதிசய உயர தரம்",
+    "description": "பாப் பப் வரிசையில் அதிசய உயர தரம் லேபிள்"
+  },
+  "restoreRecording": {
+    "message": "கடைசி பதிவு மீட்டமை",
+    "description": "பாப் பப் வரிசையில் கடைசி பதிவு மீட்டமை பட்டன்"
+  },
+  "havingIssuesButton": {
+    "message": "பிரச்சினைகள் உள்ளனவா?",
+    "description": "எடிட்டரில் பிரச்சினைகள் பொத்தான்"
+  },
+  "havingIssuesModalTitle": {
+    "message": "உங்கள் ரெக்கார்டிங் காணாதுவா?",
+    "description": "எடிட்டரில் பிரச்சினை படிக்கு தலைப்பு"
+  },
+  "havingIssuesModalDescription": {
+    "message": "உங்கள் ரெக்கார்டிங் முடிந்துவிட்டது மற்றும் உங்கள் வீடியோவை காணாத அவகாச வீடியோ தரவை பெற்ற பிறகு, அது கிடைக்கின்றால் உங்கள் அசையப்பட்ட வீடியோ தரவை பதிவிறக்க முயற்சிக்கலாம். அந்த தரவு கிடைக்கின்றதில், பிழை அறிக்கை அனுப்பி அழைக்கலாம்.",
+    "description": "எடிட்டரில் பிரச்சினை படிவம்"
+  },
+  "havingIssuesModalButton": {
+    "message": "அவகாச வீடியோ தரவை பதிவிறக்குங்கள்",
+    "description": "எடிட்டரில் பிரச்சினை படிக்கு பொத்தான்"
+  },
+  "havingIssuesModalButton2": {
+    "message": "பிழை அறிக்கை செய்க",
+    "description": "எடிட்டரில் பிரச்சினை படிக்கு இரண்டாவது பொத்தான்"
+  },
+  "noRecordingFound": {
+    "message": "ஒரு பதிவுக்கு காணப்பட்டதில்லை, மன்னிக்கவும் :(",
+    "description": "எடிட்டரில் ஒரு பதிவுக்கு காணப்பட்டதில்லை எச்சரிக்கை"
+  },
+  "memoryLimitTitle": {
+    "message": "நினைவர வரம்பு அடைந்துள்ளது",
+    "description": "நினைவர வரம்பு அடைந்துள்ளது தலைப்பு"
+  },
+  "memoryLimitDescription": {
+    "message": "உங்கள் சாதனம் பதிவு செய்ய உள்ள நினைவரம் முழுவதும் அவசியமாக அடைந்துள்ளது, அதனால் பதிவு தானியக்கம் நிறுத்தப்பட்டுள்ளது. கூடுதல் காலம் பதிவு செய்ய விரும்பினால், வீடியோ தரம் குறைக்க அல்லது உங்கள் சாதனத்தில் சில இடம் வெளியிட முடியும் என்பதை முயற்சிக்கலாம்.",
+    "description": "நினைவர வரம்பு அடைந்துள்ளது விளக்கம்"
+  },
+  "understoodButton": {
+    "message": "புரிந்தேன்",
+    "description": "புரிந்தேன் பட்டன்"
+  },
+  "notEnoughSpaceTitle": {
+    "message": "புதியவில் போக்கு இல்லை",
+    "description": "புதியவில் போக்கு இல்லை தலைப்பு"
+  },
+  "notEnoughSpaceDescription": {
+    "message": "Screenity பதிவு செய்ய குண்டெய்க குண்டு முதல் 1 ஜிபி குளையிடம் தேவை. உங்கள் சாதனத்தில் இடம் வெளியிடும்போது, தயவுசெய்து இடம் வெளியிட்டு மீட்டெடுக்கவும்.",
+    "description": "புதியவில் போக்கு இல்லை விளக்கம்"
+  },
+  "clearSpaceButton": {
+    "message": "முந்தைய பதிவுகளை நீக்கு",
+    "description": "முந்தைய பதிவுகளை நீக்கு பட்டன்"
+  },
+  "sandboxAdvancedTitle": {
+    "message": "உயர்தரம்",
+    "description": "பராமரிப்பு எடிட்டர் பகுதி பரம்பரையில்"
+  },
+  "rawRecordingButtonTitle": {
+    "message": "மூல வீடியோ கோப்புகளை பதிவிறக்கம் செய்க",
+    "description": "மூல பதிவிறக்கம் பட்டன்"
+  },
+  "rawRecordingButtonDescription": {
+    "message": "உயர்நிலை பதிவிறக்க தரவை வழங்குக",
+    "description": "மூல பதிவிறக்கம் லேபிள்"
+  },
+  "troubleshootButtonTitle": {
+    "message": "உங்கள் பதிவிறக்கத்தில் உதவியை பெறுங்கள்",
+    "description": "பிரச்சினைக்கு பெறுவதற்கான பட்டன்"
+  },
+  "troubleShootButtonDescription": {
+    "message": "உங்கள் வீடியோவை மீட்டரியாக்குகின்றது மற்றும் பிற சிக்கல்களை தீர்க்க",
+    "description": "பிரச்சினைக்கு பெறுவதற்கான லேபிள்"
+  },
+  "rawRecordingModalTitle": {
+    "message": "மூல வீடியோ கோப்புகளை பதிவிறக்கம் செய்க",
+    "description": "மூல பதிவிறக்கம் மாடல் தலைப்பு"
+  },
+  "rawRecordingModalDescription": {
+    "message": "மூல வீடியோ கோப்பு, ஸ்க்ரீனிட்டி மூலம் பதிக்கப்பட்ட உண்மை வீடியோ கோப்புக்கு அமைந்தது. இந்த வீடியோ செயலாக்கப்படாதது அல்லது திருத்தப்படாதது, அது மிக பெரியதாக இருக்கலாம் மற்றும் அனைத்து சாதனங்களிலும் புரட்டாததாக இருக்கலாம். உங்கள் செயலாக்க வீடியோவில் சிக்கல்கள் உள்ளதில், இந்த கோப்பை உங்கள் வீடியோவை மீட்டரியாக்க மற்றும் மேலும் திருத்த படுத்த முடியும்.",
+    "description": "மூல பதிவிறக்கம் மாடல் விளக்கம்"
+  },
+  "rawRecordingModalButton": {
+    "message": "பதிவிறக்குக",
+    "description": "மூல பதிவிறக்கம் மாடல் பட்டன்"
+  },
+  "troubleshootModalTitle": {
+    "message": "அமைப்பு தகவலுக்கு மற்றும் வீடியோ தரவுகளுக்கு உதவிக்கு அளிக்கவும்",
+    "description": "தகவலுக்கு உதவி மாடல் தலைப்பு"
+  },
+  "troubleshootModalDescription": {
+    "message": "பதிவிறக்கும் பின், இந்த கோப்பை support@screenity.io க்கு அனுப்புங்கள் மற்றும் அதிக தொடர்பான தகவலுடன். நாங்கள் இந்த தரவை பயன்படுத்தி உங்கள் விளக்க பெறும் பிரச்சினைகளை தீர்க்க உதவுவோம் மற்றும் வாடிக்கைக்கு வரை உங்கள் வீடியோவை மீட்டரியாக்குவதில் முடியும் என்பதை நிச்சயமாக சொல்லுக.",
+    "description": "தகவலுக்கு உதவி மாடல் விளக்கம்"
+  },
+  "troubleshootModalButton": {
+    "message": "பதிவிறக்குக",
+    "description": "தகவலுக்கு உதவி மாடல் பட்டன்"
+  },
+  "overLimitModalTitle": {
+    "message": "உங்கள் சாதனத்தில் விடியோ பொதுவாக செயல்படுத்த முடியவில்லை",
+    "description": "5 நிமிட வாரந்தோற்ற உள்ளடக்கம் உடைய மாதிரி மோடல் தலைப்பு"
+  },
+  "overLimitModalDescription": {
+    "message": "Screenity முழுவதும் தனியாக உழைந்து உழைக்கும் போது, உங்கள் சாதனத்தின் உபகரண வகைகளால் கட்டாயமாக வர்ம்வேர் செய்வது. இந்த நீளம் உள்ள விடியோவை செயல்படுத்துவது மிகவும் நேரம் எடுக்கும் மற்றும் மிகவும் வளர்ச்சியடையும். ஆனால் வேறு பரிமாற்றம் முடியும் என்று கவனிக்கவும், நீங்கள் இந்த அபரிசீலிதம் புரிந்திருந்தால்.",
+    "description": "5 நிமிட வாரந்தோற்ற உள்ளடக்கம் மோடல் விளக்கம்"
+  },
+  "overLimitModalButton": {
+    "message": "ஞாபகம், அதை முயற்சிக்கவும்",
+    "description": "5 நிமிட வாரந்தோற்ற உள்ளடக்கம் மோடல் பட்டன்"
+  },
+  "overLimitModalLearnMore": {
+    "message": "நீண்ட வீடியோக்களை செயல்படுத்துவது பற்றிய மேலும் அறிந்து கொள்ளுங்கள்.",
+    "description": "5 நிமிட வாரந்தோற்ற உள்ளடக்கம் மோடல் மேலும் அறிந்து கொள்ளுங்கள் இணைப்பு மூலம்"
+  },
+
+  "recoveryModeTitle": {
+    "message": "மீட்டமைப்பு முறை",
+    "description": "மீட்டமைப்பு முறை தலைப்பு"
+  },
+
+  "downloadForTroubleshootingOption": {
+    "message": "பிரச்சனைகளை தீர்க்க தரவை பதிவிறக்கவும்",
+    "description": "பிரச்சனைகளை தீர்க்க விருப்ப பதிவிறக்க விருப்பம்"
+  },
+  "getHelpNav": {
+    "message": "உதவி மையம்",
+    "description": "உதவி வழியிடம் உருவாக்குதல்"
+  },
+  "audioWarningTitle": {
+    "message": "பக்கத்தில் ஒலி பதிவு",
+    "description": "ஒலி எச்சரிக்கை தலைப்பு"
+  },
+  "audioWarningDescription": {
+    "message": "இந்த பக்கத்தில் ஒலியை பதிவு செய்ய உங்கள் விருப்பத்தை '$tab$' விருப்பம் பயன்படுத்த வேண்டும்.",
+    "description": "ஒலி எச்சரிக்கை விளக்கம்",
+    "placeholders": {
+      "tab": {
+        "content": "$1",
+        "example": "Tab area"
+      }
+    }
+  },
+  "extensionNotSupportedTitle": {
+    "message": "பக்கத்தில் கொள்ளும்போது ஆதரிக்கப்படாத நீக்கம்",
+    "description": "அட்டவணை ஆதரிக்கப்படாத நீக்கம் தலைப்பு"
+  },
+  "extensionNotSupportedDescription": {
+    "message": "உங்கள் முந்தைய பக்கத்தில் Screenity ஆதரிக்கப்படவில்லை. இதையடுத்து, நீங்கள் இங்கே பதிவு ஆரம்பிக்கலாம், அப்போது மற்றொரு பக்கத்திற்கு செல்ல அநுமதிக்கப்படும், ஆனால் உங்கள் கேமரா மற்றும் கருவிப்பட்டி காணப்படாது.",
+    "description": "அட்டவணை ஆதரிக்கப்படாத நீக்கம் விளக்கம்"
+  },
+  "backupsTitle": {
+    "message": "உங்கள் Screenity பதிவுகளுக்கான உள்ளூர் காப்பிடுதல் அமைத்துக்கொள்க",
+    "description": "காப்பிடுதல் தலைப்பு"
+  },
+  "backupsDescription1": {
+    "message": "நீங்கள் செய்த அனைத்து பதிவுகளின் ஒரு நகர்வு சொல்லியில் வைக்கவும். உங்கள் உள்ளூரை காப்பிடுவதில் தடுமாற்றம் அமையவில்லை, நீங்கள் அவை பதிவிறக்குவதை விரும்பும்போது மட்டும் பதிவு செய்யப்படும்.",
+    "description": "காப்பிடுதல் விளக்கம்"
+  },
+  "backupsDescription2": {
+    "message": "நீங்கள் பதிவு செய்ய விரும்பும்போது, 'பதிவுகள்' போன்ற அமைப்புகளில் பதிவு செய்ய முதல் புதிய கோப்பகத்தை உருவாக்க வேண்டும்.",
+    "description": "காப்பிடுதல் விளக்கம்"
+  },
+  "backupsSelectFolder": {
+    "message": "ஒரு கோப்பகம் தேர்ந்தெடுக்க",
+    "description": "கோப்பக தேர்ந்தெடுத்தோர் பொத்தான்"
+  },
+  "backupsNotNow": {
+    "message": "இப்போது அல்ல",
+    "description": "இப்போது பொத்தான்"
+  },
+  "backupsOnTitle": {
+    "message": "உங்கள் பதிவுகள் இடப்பட்டிருக்கின்றன",
+    "description": "செயல்பாட்டு காப்புகள் தலைப்பு"
+  },
+  "backupsOnDescription": {
+    "message": "பதிவிடும்போது ஒலி பதிவிறக்க விண்ணப்பங்களை கேட்டுக் கொள்கின்ற போது ஒலி பதிவிறக்க வேண்டாம், இந்த அட்டவணையை மூடவும் என்று பரிந்துரைக்கப்படுகின்றது.",
+    "description": "செயல்பாட்டு காப்புகள் விளக்கம்"
+  },
+  "backupsClose": {
+    "message": "பக்கத்தை அதேசமயம் மூடு",
+    "description": "அதேசமயம் பக்கத்தை மூடு"
+  },
+  "backupsStop": {
+    "message": "அனைத்து பதிவு காப்புகளையும் நிறுத்து",
+    "description": "பக்கத்து காப்பிடுதல் நிறுத்து"
+  },
+  "backupsConfirmTitle": {
+    "message": "தயவுசெய்து Screenity உங்கள் உள்ளூர் கோப்பகத்துக்கு அணுகலை மீள்க",
+    "description": "காப்பிடுதல் உறுதிப்படுத்துதல் தலைப்பு"
+  },
+  "backupsConfirmDescription": {
+    "message": "மன்னிக்கவும், உங்கள் பதிவிகளின் உள்ளூர் நகர்வுக்கு உங்கள் அனுமதியை மீண்டும் சேமிக்க தேவை. அதிசயமாக, நீங்கள் இந்த அட்டவணையை எப்போதும் மூடுவது வேண்டும், அது உங்கள் உலாவியை மூடும் அல்லது உங்கள் கணினியை மீட்டரைக் கொண்டு மீண்டும் ஆரம்பிக்கலாம் என்று சொல்கின்றது.",
+    "description": "காப்பிடுதல் உறுதிப்படுத்துதல் விளக்கம்"
+  },
+  "backupsConfirmAllow": {
+    "message": "Screenity பதிவிகளை தொடர்ந்து காப்புகள் உருவாக்க அனுமதிக்க",
+    "description": "காப்பிடுதல் உறுதிப்படுத்துதல் அனுமதிக்க"
+  },
+  "backupsToggle": {
+    "message": "பதிவுகளின் காப்பிடுதல் செய்ய",
+    "description": "காப்பிடுதல் மூலம் வார்த்தை"
+  },
+  "backupPermissionFailTitle": {
+    "message": "பதிவு காப்பிடுதல் அனுமதி முடக்கப்பட்டது",
+    "description": "காப்பிடுதல் அனுமதி தோல்வி தலைப்பு"
+  },
+  "backupPermissionFailDescription": {
+    "message": "உங்கள் பதிவுகளின் உள்நிலை நகல் செய்ய ஒரு கோப்பகத்தை தேர்வு செய்தவில்லை. உங்கள் உலாவியம் அல்லது இயக்கம் பதிப்பின் பதிப்பிக்கு விருப்பம் கோரப்படும், நீங்கள் எப்போதும் பதிவுசெய்து அநுமதிக்க கேட்கப்படலாம். நீங்கள் அநுமதிகளை அனைத்தும் அவாரமாக வழிநடத்துவதை விரும்பின்றிதல் போன்றதான்.",
+    "description": "பூர்வமாக அனுமதி பிழை விளக்கம்"
+  },
+  "recordAudioWarningMacTitle": {
+    "message": "கணினியிலிருந்து ஒலியை பதிவுசெய்ய",
+    "description": "macOS க்கு ஒலியின் எச்சரிக்கை தலைப்பு"
+  },
+  "recordAudioWarningMacDescription": {
+    "message": "macOS-ல், நீங்கள் வரிசைகளிலிருந்து ஒலியை மட்டும் பதிவுசெய்யலாம். 'Chrome வரிசை' விருப்பத்தை தேர்வு செய்து, 'வரிசை ஒலி குணம் பகிரவும்' என்பதை இயக்கின்றதை உறுதிப்படுத்துங்கள்.",
+    "description": "macOS க்கு ஒலியை பதிவுசெய்தல் விருப்பம் தலைப்பு"
+  },
+  "recordAudioWarningOtherTitle": {
+    "message": "கணினியிலிருந்து ஒலியை பதிவுசெய்ய",
+    "description": "பிற கணினி வடிவம் க்கு ஒலியின் எச்சரிக்கை தலைப்பு"
+  },
+  "recordAudioWarningOtherDescription": {
+    "message": "கணினியிலிருந்து ஒலியை பதிவுசெய்ய விரும்பினதால், 'கணினி ஒலியை பகிர்க' விருப்பத்தை செயல்படுத்துக. இந்த விருப்பத்தை காணாதிருக்கின்றார் என்பதை பார்க்கின்றதால், Chrome ஐ புதுப்பிக்கவும் அல்லது வரிசை பதிவு விருப்பம் மாற்றுவதை முயற்சிக்கவும்.",
+    "description": "பிற கணினி வடிவம் க்கு ஒலியின் எச்சரிக்கை தலைப்பு"
+  },
+
+  "maxResolutionLabel": {
+    "message": "அதிசய கருவி",
+    "description": "அமைப்புகள் பட்டியலில் அதிசய கருவி குறியீட்டு"
+  },
+  "maxFPSLabel": {
+    "message": "அதிசய கோட்டிகள் கோட்டிகள்",
+    "description": "அமைப்புகள் பட்டியலில் அதிசய கோட்டிகள் குறியீட்டு"
+  },
+
+  "notEnoughRAM": {
+    "message": "புதிய ரேம் போதுமில்லை",
+    "description": "அமைப்புக்கு அந்த ரேம் போதுமில்லை பதில்"
+  },
+  "resizeWindowLabel": {
+    "message": "சாளரம் பருவமை",
+    "description": "அமைப்புகள் பட்டியலில் சாளரம் பருவமை குறிப்பு"
+  },
+  "screenTooSmallTooltip": {
+    "message": "இந்த திசையுக்கு உயர்வு மிகவும் சிறியது",
+    "description": "அமைப்புகள் பட்டியலில் திசை மிகவும் சிறியது குறிப்பு"
+  },
+  "maxResolutionTooltip": {
+    "message": "உங்கள் சாதனத்தில் இந்த உயர்வில் பதிவு செய்ய முடியாது",
+    "description": "அமைப்புகள் பட்டியலில் அதிசய உயர்வு குறிப்பு"
+  },
+  "permissionsModalReview": {
+    "message": "அனுமதிகளை பரவி",
+    "description": "அனுமதிகளை பரவி பொத்தானை"
+  }
+}

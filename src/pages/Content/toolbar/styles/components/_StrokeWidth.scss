@@ -1,0 +1,31 @@
+@use '../../../styles/_variables' as *;
+
+.stroke-width-item {
+	span {
+		width: 18px;
+		height: 18px;
+		display: block;
+	}
+	div[data-state='on'] {
+
+			background: $color-primary!important;
+
+		svg {
+			color: #FFF!important;
+			fill: #FFF!important;
+		}
+	}
+	div[data-state='off'] {
+		svg {
+			fill: #201F1D;
+		}
+	}
+}
+
+.stroke-icon svg {
+	text-align: center;
+	margin: auto;
+	display: block;
+	width: 100%;
+	height: 100%;
+}

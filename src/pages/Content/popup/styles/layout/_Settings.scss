@@ -1,0 +1,35 @@
+@use '../../../styles/_variables' as *;
+
+.CollapsibleTrigger {
+	margin-top: $spacing-04;
+	font-weight: $font-bold;
+	padding-top: $spacing-02;
+	padding-bottom: $spacing-02;
+	padding-left: $spacing-04;
+	padding-right: $spacing-04;
+	margin-left: auto;
+	margin-right: auto;
+	text-align: center;
+	display: block;
+	border-radius: $container-border-radius;
+}
+.CollapsibleTrigger:focus-visible {
+	box-shadow: $focus-border;
+}
+.CollapsibleLabel {
+	color: $color-text-secondary;
+	font-weight: $font-bold;
+	text-align: center;
+	display: inline-block;
+}
+.CollapsibleLabel img {
+	margin-left: 4px;
+}
+.CollapsibleTrigger:hover {
+	cursor: pointer;
+	background: #FFF;
+}
+.CollapsibleRoot[data-state='open'] > .CollapsibleTrigger > .CollapsibleLabel img {
+	transform: scaleY(-1);
+	margin-bottom: 2px;
+}

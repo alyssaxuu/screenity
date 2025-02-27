@@ -1,0 +1,155 @@
+@use '../../../styles/_variables' as *;
+
+/* reset */
+button {
+  all: unset;
+}
+
+.SwitchRow {
+	width: 100%;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	height: 40px;
+
+	user-select: none;
+	-webkit-user-select: none;
+	-moz-user-select: none;
+	-ms-user-select: none;
+	-o-user-select: none;
+}
+.SwitchRow * {
+	user-select: none;
+	-webkit-user-select: none;
+	-moz-user-select: none;
+	-ms-user-select: none;
+	-o-user-select: none;
+}
+
+.SwitchRoot {
+  width: 34px;
+  height: 22px;
+  background-color: $color-border;
+  border-radius: 9999px;
+  position: relative;
+  -webkit-tap-highlight-color: rgba(0, 0, 0, 0);
+}
+.SwitchRoot:focus {
+  box-shadow: $focus-border;
+}
+.SwitchRoot[data-state='checked'] {
+  background-color: $color-primary;
+}
+.SwitchRoot:hover {
+	cursor: pointer;
+}
+
+.SwitchThumb {
+  display: block;
+  width: 14px;
+  height: 14px;
+  background-color: white;
+  border-radius: 9999px;
+  box-shadow: 0px 1px 10px rgba(0, 0, 0, 0.1);
+  transition: transform 100ms;
+  transform: translateX(4px);
+  will-change: transform;
+}
+.SwitchThumb[data-state='checked'] {
+  transform: translateX(16px);
+}
+
+.Label {
+  color: $color-text-secondary;
+	display: inline-block!important;
+	/* Ellipsis */
+	text-overflow: clip;
+	white-space: nowrap;
+
+	&:hover {
+		text-overflow: clip;
+	}
+}
+
+.ExperimentalLabel {
+	color: $color-text-contrast;
+	font-size: 12px;
+	background-color: $color-primary;
+	border-radius: 15px;
+	padding: 2px 8px;
+	display: inline-block!important;
+	margin-left: 8px;
+}
+
+.labelDropdownWrap {
+	display: inline-block;
+	vertical-align: middle;
+	position: relative;
+	border-radius: $container-border-radius;
+	box-sizing: border-box;
+
+	img {
+		display: inline-block;
+		margin-left: 6px;
+	}
+	.labelDropdown {
+		display: inline-block;
+	}
+	&:hover {
+		cursor: pointer;
+	}
+	&::after {
+		content: '';
+		display: block;
+		position: absolute;
+		top: 0px;
+		left: 0px;
+		width: 100%;
+		height: 100%;
+		border-radius: $container-border-radius;
+		border-left: 8px solid transparent;
+		border-right: 8px solid transparent;
+		border-top: 4px solid transparent;
+		border-bottom: 4px solid transparent;
+		margin-top: -4px;
+		margin-left: -8px;
+	}
+	&:hover::after {
+		border-color: #FFF;
+	}
+	&:hover {
+		background-color: #FFF;
+	}
+}
+.labelDropdownActive {
+	.labelDropdownContent {
+		display: block!important;
+	}
+
+	img {
+		transform: rotate(180deg);
+	}
+}
+.labelDropdownContent {
+	position: absolute;
+	background-color: $color-background;
+	min-width: 160px;
+	box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
+	z-index: 9999999999;
+	border-radius: 15px;
+	padding: 8px 0px;
+	margin-top: 4px;
+	border: 1px solid $color-border;
+	display: none;
+
+	.labelDropdownContentItem {
+		color: $color-text-primary;
+		padding: 12px 16px;
+		text-decoration: none;
+		display: block;
+		&:hover {
+			background-color: $color-light-grey;
+			cursor: pointer;
+		}
+	}
+}

@@ -1,0 +1,60 @@
+@use "../global/variables.scss" as *;
+:root {
+  --plyr-color-main: #3080f8;
+  --plyr-font-family: "Satoshi-Medium", sans-serif;
+}
+
+.videoPlayer {
+  position: absolute;
+  top: 0px;
+  left: 0px;
+  right: 0px;
+  margin: auto;
+  height: 100vh;
+}
+.playerWrap {
+  height: calc(100% - 300px);
+  position: absolute;
+  top: 80px;
+  left: 0px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 32px;
+}
+.plyr {
+  max-width: 900px !important;
+  left: 0px !important;
+  right: 0px !important;
+  margin: 0px !important;
+  top: 0px !important;
+  bottom: 0px !important;
+  position: relative !important;
+  border-radius: 15px !important;
+  width: 90% !important;
+}
+/* Customize progress bar color */
+.plyr__progress--played {
+  background-color: #ff5733 !important; /* Your custom color */
+}
+
+// Max width 900px
+@media (max-width: 900px) {
+  .videoPlayer {
+    height: 100% !important;
+  }
+  .playerWrap {
+    position: relative !important;
+    height: 100% !important;
+    padding-top: 40px !important;
+    padding-bottom: 60px !important;
+    top: 0px !important;
+    position: relative !important;
+  }
+}
+
+/* Customize controls */
+.plyr__controls {
+}

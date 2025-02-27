@@ -1,0 +1,326 @@
+@use '../../../styles/_variables' as *;
+
+/* Radix tabs navigation */
+/* reset */
+button,
+fieldset,
+input {
+  all: unset;
+}
+
+.TabsRoot {
+  width: 100%;
+	margin: auto;
+	flex: 1 1 auto;
+	display: flex;
+  flex-direction: column;
+}
+.TabsList {
+	margin: auto;
+  flex-shrink: 0;
+  display: flex;
+	width: fit-content;
+}
+.TabsTrigger {
+	padding-left: $spacing-04;
+	padding-right: $spacing-04;
+  color: $color-text-secondary;
+  user-select: none;
+	cursor: pointer;
+}
+.TabsTrigger[data-state='active'] {
+  color: $color-text-primary;
+}
+.TabsTrigger:focus-visible {
+  position: relative;
+	box-shadow: $focus-border!important;
+}
+
+/* Content of the Radix tabs */
+.TabsContent {
+ width: 100%;
+ display: block;
+ height: 100%;
+ box-sizing: border-box;
+ flex: 1 1 auto;
+
+ &::after {
+	 content: '';
+	 display: block;
+	 clear: both;
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 30px; /* Set the height of the gradient as per your preference */
+  background: linear-gradient(to bottom, transparent 0%, rgba(255, 255, 255, 0.5) 100%);
+  pointer-events: none; /* Allow content behind the gradient to be clickable */
+ }
+}
+.TabsContent:focus {
+	outline: none;
+}
+.TabsContent:focus-visible {
+	box-shadow: $focus-inner-border;
+}
+.TabsContent[data-state='inactive'] {
+	display: none;
+}
+
+/* Pill animation */
+.pill-anim {
+	position: absolute;
+	height: 32px;
+	top: 0px;
+	bottom: 0px;
+	margin-top: auto;
+	margin-bottom: auto;
+	border-radius: 30px;
+	background: $color-background;
+	box-shadow: $container-shadow-focus;
+	transition: all .2s cubic-bezier(0.250, 0.460, 0.450, 0.940);
+}
+/*
+.TabsList[data-value="record"] {
+	.pill-anim {
+		left: $spacing-03;
+		width: 102px;
+	}
+}
+.TabsList[data-value="dashboard"] {
+	.pill-anim {
+		left: 109px;
+		width: 132px;
+	}
+}
+*/
+
+/* Specific to the top level tabs */
+.TabsRoot.tl {
+	height: calc(100% - 40px);
+	margin-top: 40px;
+}
+.TabsList.tl {
+	border-radius: 30px;
+	background: $color-light-grey;
+	padding: 6px;
+	font-family: $font-bold;
+	position: relative;
+}
+.TabsTrigger.tl {
+	border-radius: 30px;
+	background: transparent;
+	height: 32px;
+	display: flex;
+	align-items: center;
+	padding-left: 16px;
+	padding-right: 17px;
+	z-index: 2;
+	position: relative;
+}
+.TabsTrigger.tl[data-state="inactive"]:hover :before {
+	content: "";
+	position: absolute;
+	display: block;
+	box-sizing: border-box;
+	height: 100%;
+	width: calc(100% - 10px);
+	margin-left: 5px;
+	background: #EDEEF3;
+	z-index: -2;
+	left: 0px;
+	border-radius: $container-border-radius;
+}
+.TabsTriggerIcon {
+	width: 20px;
+	height: 20px;
+	text-align: center;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	border-radius: 30px;
+	margin-right: $spacing-02;
+}
+
+
+/* Specific to recording tab context */
+.recording-ui {
+	width: 100%;
+	flex: 1 1 auto;
+	display: flex;
+	flex-direction: column;
+	height: 100%;
+
+	.TabsRoot {
+		margin-top: $spacing-03;
+	}
+	.TabsList {
+		width: 100%;
+		border-bottom: $container-border;
+		margin: auto;
+		justify-content: center;
+	}
+	.TabsTrigger {
+		padding-top: $spacing-03;
+		padding-bottom: $spacing-04;
+		box-sizing: border-box;
+		position: relative;
+		display: block;
+		padding-left: 16px;
+		padding-right: 16px;
+	}
+	.TabsTrigger:hover {
+		background: $color-light-grey;
+		border-top-right-radius: 15px;
+		border-top-left-radius: 15px;
+	}
+	.TabsTrigger:focus-visible {
+		border-radius: 10px 10px 0px 0px!important;
+	}
+	.TabsTrigger[data-state='active']::after {
+		content: '';
+		display: block;
+		position: absolute;
+		width: 80%;
+		left: 0px;
+		right: 0px;
+		bottom: 0px;
+		margin: auto;
+		height: 2px;
+		border-radius: 30px;
+		background: $color-primary;
+	}
+	.TabsTrigger[data-state='active'] > .TabsTriggerLabel {
+		color: $color-text-primary!important;
+	}
+
+	.TabsTriggerLabel {
+		text-align: center;
+	}
+	.TabsTriggerIcon {
+		width: 20px;
+		height: 20px;
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		text-align: center;
+		margin: auto;
+		margin-bottom: $spacing-03;
+		border-radius: 30px;
+	}
+	.TabsContent {
+		background: $color-light-grey;
+		padding: $spacing-05;
+		border-bottom-left-radius: $container-border-radius;
+		border-bottom-right-radius: $container-border-radius;
+		max-height: calc(95vh - 200px);
+		overflow-y: overlay;
+	}
+	span {
+		display: block;
+	}
+}
+
+
+.video-ui {
+	width: 100%;
+	flex: 1 1 auto;
+	display: flex;
+	flex-direction: column;
+	height: 100%;
+
+	.TabsRoot {
+		margin-top: $spacing-03;
+	}
+	.TabsList {
+		width: 100%;
+		border-bottom: $container-border;
+		margin: auto;
+		justify-content: space-between;
+		padding-left: $spacing-04;
+		padding-right: $spacing-04;
+		box-sizing: border-box;
+	}
+	.TabsTriggerWrap {
+		display: flex!important;
+		align-items: center;
+		flex-direction: row;
+		justify-content: left;
+		position: relative;
+		display: block;
+		box-sizing: border-box;
+	}
+	.TabsTrigger {
+		padding-top: $spacing-03;
+		padding-bottom: $spacing-04;
+		box-sizing: border-box;
+		position: relative;
+		display: block;
+		padding-left: 20px;
+		padding-right: 20px;
+	}
+	.TabsTrigger:hover {
+		background: $color-light-grey;
+		border-top-right-radius: 15px;
+		border-top-left-radius: 15px;
+	}
+	.TabsTrigger:focus-visible {
+		border-radius: 10px 10px 0px 0px!important;
+	}
+	.TabsTrigger[data-state='active']::after {
+		content: '';
+		display: block;
+		position: absolute;
+		width: 80%;
+		left: 0px;
+		right: 0px;
+		bottom: 0px;
+		margin: auto;
+		height: 2px;
+		border-radius: 30px;
+		background: $color-primary;
+	}
+	.TabsTrigger[data-state='active'] > .TabsTriggerLabel {
+		color: $color-text-primary!important;
+	}
+	.TabsTriggerLabel {
+		text-align: center;
+	}
+
+	.TabsContent {
+		background: $color-light-grey;
+		border-bottom-left-radius: $container-border-radius;
+		border-bottom-right-radius: $container-border-radius;
+	}
+	span {
+		display: block;
+	}
+
+	.TabsSort {
+		margin-right: $spacing-04;
+		border-radius: $container-border-radius;
+		padding-left: $spacing-03;
+		padding-right: $spacing-03;
+		padding-top: $spacing-03;
+		padding-bottom: $spacing-03;
+		margin-bottom: 5px;
+	}
+	.TabsSort:hover {
+		cursor: pointer;
+		background: $color-light-grey;
+	}
+	.TabsSortLabel {
+		display: flex;
+    flex-direction: row;
+    justify-content: right;
+    align-items: center;
+		color: $color-text-secondary;
+	}
+	.TabsSortLabel img {
+		margin-left: $spacing-03;
+	}
+	.TabsSort:focus-visible {
+		box-shadow: $focus-border;
+		outline: none!important;
+	}
+}
