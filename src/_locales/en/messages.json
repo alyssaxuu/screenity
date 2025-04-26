@@ -1,10 +1,10 @@
 {
   "extName": {
-    "message": "Screenity - Screen Recorder & Annotation Tool",
+    "message": "BehaveReporter - Screen Recorder & Screenshot Tool",
     "description": "Extension name"
   },
   "extDesc": {
-    "message": "The free and privacy-friendly screen recorder with no limits. Capture, annotate, edit videos and more - all with no sign in needed.",
+    "message": "The free and privacy-friendly screen recorder and screenshot tool with no limits. Capture, annotate, edit videos and more - all with no sign in needed.",
     "description": "Extension description"
   },
   "recordTab": {
@@ -178,6 +178,14 @@
   "toggleCursorOptionsTooltip": {
     "message": "Toggle cursor options",
     "description": "Toggle cursor options tooltip"
+  },
+  "screenshotButtonTooltip": {
+    "message": "Take screenshot",
+    "description": "Take screenshot button tooltip"
+  },
+  "screenshotCapturedToast": {
+    "message": "Screenshot captured!",
+    "description": "Screenshot captured toast message"
   },
   "disableCameraTooltip": {
     "message": "Disable camera",
@@ -640,11 +648,11 @@
     "description": "Paused recording modal title"
   },
   "chromePermissionsModalTitle": {
-    "message": "Screenity doesn't have permission to record your screen",
+    "message": "BehaveReporter doesn't have permission to record your screen",
     "description": "Permission modal title"
   },
   "chromePermissionsModalDescription": {
-    "message": "To enable screen recording, you must grant Screenity permission to capture your screen when prompted.",
+    "message": "To enable screen recording, you must grant BehaveReporter permission to capture your screen when prompted.",
     "description": "Permission modal description"
   },
   "chromePermissionsModalAction": {

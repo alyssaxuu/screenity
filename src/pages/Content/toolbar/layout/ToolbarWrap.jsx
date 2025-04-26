@@ -30,6 +30,7 @@ import {
   DiscardIcon,
   CameraIcon,
   BlurIcon,
+  ScreenshotIcon,
   OnboardingArrow,
   CloseButtonToolbar,
 } from "../components/SVG";
@@ -342,6 +343,22 @@ const ToolbarWrap = () => {
       pipEnded: true,
     }));
   };
+  
+  const takeScreenshot = () => {
+    chrome.tabs.query({ active: true, currentWindow: true }, function(tabs) {
+      const activeTab = tabs[0];
+      chrome.tabs.captureVisibleTab(null, { format: 'png' }, function(dataUrl) {
+        const link = document.createElement('a');
+        link.href = dataUrl;
+        link.download = 'screenshot_' + new Date().toISOString().replace(/:/g, '-') + '.png';
+        link.click();
+        
+        if (contentState.openToast) {
+          contentState.openToast(chrome.i18n.getMessage("screenshotCapturedToast") || "Screenshot captured!");
+        }
+      });
+    });
+  };
 
   return (
     <div>
@@ -532,6 +549,14 @@ const ToolbarWrap = () => {
                   <CameraIcon />
                 </ToolTrigger>
               )}
+            <ToolTrigger
+              type="button"
+              content={chrome.i18n.getMessage("screenshotButtonTooltip")}
+              value="screenshot"
+              onClick={takeScreenshot}
+            >
+              <ScreenshotIcon />
+            </ToolTrigger>
           </Toolbar.ToggleGroup>
         </Toolbar.Root>
       </Rnd>
