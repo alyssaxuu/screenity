@@ -25,16 +25,32 @@ const saveToDrive = async (videoBlob, fileName, sendResponse) => {
               payload = JSON.parse(atob(token.split(".")[1]));
             } catch (err) {
               // Token is invalid, refresh it
-              chrome.identity.getAuthToken(
-                { interactive: true },
-                (newToken) => {
-                  if (chrome.runtime.lastError) {
-                    reject(new Error(chrome.runtime.lastError));
+              const isEdge = navigator.userAgent.includes('Edg');
+              
+              if (isEdge) {
+                // For Edge, use signIn to refresh the token
+                signIn().then((newToken) => {
+                  if (!newToken) {
+                    reject(new Error("Failed to refresh token"));
                   } else {
                     resolve(newToken);
                   }
-                }
-              );
+                }).catch((error) => {
+                  reject(error);
+                });
+              } else {
+                // For Chrome, use the standard method
+                chrome.identity.getAuthToken(
+                  { interactive: true },
+                  (newToken) => {
+                    if (chrome.runtime.lastError) {
+                      reject(new Error(chrome.runtime.lastError));
+                    } else {
+                      resolve(newToken);
+                    }
+                  }
+                );
+              }
               return;
             }
 
@@ -42,16 +58,32 @@ const saveToDrive = async (videoBlob, fileName, sendResponse) => {
             const currentTime = Date.now();
             if (currentTime >= expirationTime) {
               // Token has expired, refresh it
-              chrome.identity.getAuthToken(
-                { interactive: true },
-                (newToken) => {
-                  if (chrome.runtime.lastError) {
-                    reject(new Error(chrome.runtime.lastError));
+              const isEdge = navigator.userAgent.includes('Edg');
+              
+              if (isEdge) {
+                // For Edge, use signIn to refresh the token
+                signIn().then((newToken) => {
+                  if (!newToken) {
+                    reject(new Error("Failed to refresh token"));
                   } else {
                     resolve(newToken);
                   }
-                }
-              );
+                }).catch((error) => {
+                  reject(error);
+                });
+              } else {
+                // For Chrome, use the standard method
+                chrome.identity.getAuthToken(
+                  { interactive: true },
+                  (newToken) => {
+                    if (chrome.runtime.lastError) {
+                      reject(new Error(chrome.runtime.lastError));
+                    } else {
+                      resolve(newToken);
+                    }
+                  }
+                );
+              }
             } else {
               // Token is still valid
               resolve(token);
