@@ -1,42 +1,42 @@
 {
   "extName": {
-    "message": "Screenity - 屏幕錄像和標註工具",
+    "message": "Screenity - 螢幕錄製與標註工具",
     "description": "Extension name"
   },
   "extDesc": {
-    "message": "最佳的免費屏幕錄製工具，無任何限制。捕捉、標註、縮放、模糊、編輯視頻等等 - 無需註冊，保護隱私。",
+    "message": "免費且保護隱私的螢幕錄製工具，沒有任何限制。錄製、標註、編輯影片等等 - 全部無需註冊。",
     "description": "Extension description"
   },
   "recordTab": {
-    "message": "录制",
+    "message": "錄製",
     "description": "Record tab label on popup"
   },
   "videosTab": {
-    "message": "您的视频",
+    "message": "您的影片",
     "description": "Videos tab label on popup"
   },
   "screenType": {
-    "message": "屏幕",
+    "message": "螢幕",
     "description": "Screen recording type label on popup"
   },
   "tabType": {
-    "message": "标签区域",
+    "message": "分頁區域",
     "description": "Tab area recording type label on popup"
   },
   "cameraType": {
-    "message": "摄像头",
+    "message": "攝影機",
     "description": "Camera recording type label on popup"
   },
   "mockupType": {
-    "message": "模型",
+    "message": "Mockup",
     "description": "Mockup recording type label on popup"
   },
   "customAreaRecordingDisabledTitle": {
-    "message": "禁用自定义区域录制",
+    "message": "自訂區域錄製已停用",
     "description": "Custom area recording disabled warning on popup for Chrome version older than 104"
   },
   "customAreaRecordingDisabledDescription": {
-    "message": "更新Chrome版本至110+",
+    "message": "請將 Chrome 更新到 110 版以上",
     "description": "Custom area recording disabled warning description on popup for Chrome version older than 104"
   },
   "customAreaRecordingDisabledAction": {
@@ -44,11 +44,11 @@
     "description": "Custom area recording disabled warning action on popup for Chrome version older than 104"
   },
   "permissionsModalTitle": {
-    "message": "检查您的权限",
+    "message": "請檢查您的權限",
     "description": "Camera / microphone permissions warning modal title"
   },
   "permissionsModalDescription": {
-    "message": "看起来Screenity无法访问您的摄像头或麦克风。请确保通过单击地址栏中的摄像头图标允许访问。",
+    "message": "Screenity 似乎無法存取您的攝影機或麥克風。請確保您點擊位址列當中的相機圖示來允許存取。",
     "description": "Camera / microphone permissions warning modal description"
   },
   "permissionsModalDismiss": {
@@ -56,23 +56,23 @@
     "description": "Camera / microphone permissions warning modal dismiss button"
   },
   "allowCameraAccessButton": {
-    "message": "允许摄像头访问",
+    "message": "允許攝影機存取",
     "description": "Allow camera access button"
   },
   "allowMicrophoneAccessButton": {
-    "message": "允许麦克风访问",
+    "message": "允許麥克風存取",
     "description": "Allow microphone access button"
   },
   "pushToTalkLabel": {
-    "message": "按住说话",
+    "message": "按鍵發話",
     "description": "Push to talk switch label"
   },
   "customAreaLabel": {
-    "message": "设置要录制的区域",
+    "message": "設定要錄製的區域",
     "description": "Custom area switch label"
   },
   "flipCameraLabel": {
-    "message": "翻转摄像头",
+    "message": "翻轉攝影機",
     "description": "Flip camera switch label"
   },
   "backgroundEffectsLabel": {
@@ -80,36 +80,35 @@
     "description": "Background effects switch label"
   },
   "recordButtonLabel": {
-    "message": "开始录制",
+    "message": "開始錄製",
     "description": "Record button label"
   },
   "recordButtonInProgressLabel": {
-    "message": "正在开始录制...",
+    "message": "正在開始...",
     "description": "Record button in progress label"
   },
   "recordButtonNoCameraLabel": {
-    "message": "设置摄像头以录制",
+    "message": "設定要錄製的攝影機",
     "description": "Record button label when in camera mode and no camera is selected"
   },
   "showMoreOptionsLabel": {
-    "message": "显示更多选项",
+    "message": "顯示更多選項",
     "description": "Show more options label"
   },
-
   "systemAudioLabel": {
-    "message": "包括系統音訊",
-    "description": "標籤/系統音訊標籤"
+    "message": "包含系統音訊",
+    "description": "Tab/system audio label"
   },
   "hideToolbarLabel": {
-    "message": "隐藏工具栏",
+    "message": "隱藏工具列",
     "description": "Hide toolbar label"
   },
   "countdownLabel": {
-    "message": "倒计时",
+    "message": "倒數計時",
     "description": "Countdown label"
   },
   "alarmLabel": {
-    "message": "设置时间限制",
+    "message": "設定時間限制",
     "description": "Alarm label"
   },
   "blurTypeLabel": {
@@ -117,27 +116,27 @@
     "description": "Blur background label"
   },
   "noneDropdownLabel": {
-    "message": "无",
+    "message": "無",
     "description": "No device selected"
   },
   "noCameraDropdownLabel": {
-    "message": "无摄像头",
+    "message": "無攝影機",
     "description": "No camera selected"
   },
   "noMicrophoneDropdownLabel": {
-    "message": "无麦克风",
+    "message": "無麥克風",
     "description": "No microphone selected"
   },
   "selectSourceDropdownPlaceholder": {
-    "message": "选择源",
+    "message": "選擇來源",
     "description": "Select source placeholder"
   },
   "offLabel": {
-    "message": "关闭",
+    "message": "關閉",
     "description": "Off label on dropdown"
   },
   "regionWidthLabel": {
-    "message": "宽度",
+    "message": "寬度",
     "description": "Region width label"
   },
   "regionHeightLabel": {
@@ -145,75 +144,75 @@
     "description": "Region height label"
   },
   "addImageToastTitle": {
-    "message": "单击以放置图像",
+    "message": "點擊以放置圖片",
     "description": "Toast that shows when adding a new image"
   },
   "finishRecordingTooltip": {
-    "message": "完成录制",
+    "message": "完成錄製",
     "description": "Finish recording tooltip"
   },
   "restartRecordingTooltip": {
-    "message": "重新开始录制",
+    "message": "重新開始錄製",
     "description": "Restart recording tooltip"
   },
   "pauseRecordingTooltip": {
-    "message": "暂停录制",
+    "message": "暫停錄製",
     "description": "Pause recording tooltip"
   },
   "resumeRecordingTooltip": {
-    "message": "继续录制",
+    "message": "繼續錄製",
     "description": "Resume recording tooltip"
   },
   "cancelRecordingTooltip": {
-    "message": "取消录制",
+    "message": "取消錄製",
     "description": "Cancel recording tooltip"
   },
   "toggleDrawingToolsTooltip": {
-    "message": "切换绘图工具",
+    "message": "切換繪圖工具",
     "description": "Toggle drawing tools tooltip"
   },
   "toggleBlurToolTooltip": {
-    "message": "切换模糊工具",
+    "message": "切換模糊工具",
     "description": "Toggle blur tools tooltip"
   },
   "toggleCursorOptionsTooltip": {
-    "message": "切换光标选项",
+    "message": "切換游標選項",
     "description": "Toggle cursor options tooltip"
   },
   "disableCameraTooltip": {
-    "message": "禁用摄像头",
+    "message": "停用攝影機",
     "description": "Disable camera tooltip"
   },
   "enableCameraTooltip": {
-    "message": "启用摄像头",
+    "message": "啟用攝影機",
     "description": "Enable camera tooltip"
   },
   "noCameraPermissionsTooltip": {
-    "message": "无摄像头权限",
+    "message": "沒有攝影機權限",
     "description": "No camera permissions tooltip"
   },
   "disableMicrophoneTooltip": {
-    "message": "禁用麦克风",
+    "message": "停用麥克風",
     "description": "Disable microphone tooltip"
   },
   "enableMicrophoneTooltip": {
-    "message": "启用麦克风",
+    "message": "啟用麥克風",
     "description": "Enable microphone tooltip"
   },
   "noMicrophonePermissionsTooltip": {
-    "message": "无麦克风权限",
+    "message": "沒有麥克風權限",
     "description": "No microphone permissions tooltip"
   },
   "selectToolTooltip": {
-    "message": "选择工具",
+    "message": "選擇工具",
     "description": "Select tool tooltip"
   },
   "penToolTooltip": {
-    "message": "钢笔工具",
+    "message": "鋼筆工具",
     "description": "Pen tool tooltip"
   },
   "highlighterToolTooltip": {
-    "message": "荧光笔工具",
+    "message": "螢光筆工具",
     "description": "Highlighter tool tooltip"
   },
   "eraserToolTooltip": {
@@ -221,23 +220,23 @@
     "description": "Eraser tool tooltip"
   },
   "textToolTooltip": {
-    "message": "文本工具",
+    "message": "文字工具",
     "description": "Text tool tooltip"
   },
   "shapeToolTooltip": {
-    "message": "形状工具",
+    "message": "形狀工具",
     "description": "Shape tool tooltip"
   },
   "arrowToolTooltip": {
-    "message": "箭头工具",
+    "message": "箭頭工具",
     "description": "Arrow tool tooltip"
   },
   "imageToolTooltip": {
-    "message": "图像工具",
+    "message": "圖片工具",
     "description": "Image tool tooltip"
   },
   "undoTooltip": {
-    "message": "撤销",
+    "message": "復原",
     "description": "Undo tooltip"
   },
   "redoTooltip": {
@@ -245,35 +244,35 @@
     "description": "Redo tooltip"
   },
   "clearCanvasTooltip": {
-    "message": "清空画布",
+    "message": "清除畫布",
     "description": "Clear canvas tooltip"
   },
   "moreColorsTooltip": {
-    "message": "更多颜色",
+    "message": "更多顏色",
     "description": "More colors tooltip"
   },
   "thickStrokeTooltip": {
-    "message": "粗画笔",
+    "message": "粗畫筆",
     "description": "Thick stroke tooltip"
   },
   "mediumStrokeTooltip": {
-    "message": "中画笔",
+    "message": "中畫筆",
     "description": "Medium stroke tooltip"
   },
   "thinStrokeTooltip": {
-    "message": "细画笔",
+    "message": "細畫筆",
     "description": "Thin stroke tooltip"
   },
   "togglePictureinPictureModeTooltip": {
-    "message": "切换画中画模式",
+    "message": "切換子母畫面模式",
     "description": "Toggle picture-in-picture mode tooltip"
   },
   "toggleFillTooltip": {
-    "message": "切换填充",
+    "message": "切換填充",
     "description": "Toggle fill tooltip"
   },
   "drawingModeToast": {
-    "message": "绘图模式",
+    "message": "繪圖模式",
     "description": "Drawing mode toast"
   },
   "blurModeToast": {
@@ -281,79 +280,79 @@
     "description": "Blur mode toast"
   },
   "clearBlurredElementsTooltip": {
-    "message": "清除所有模糊元素",
+    "message": "清除所有模糊的元素",
     "description": "Clear all blurred elements tooltip"
   },
   "highlightClicksTooltip": {
-    "message": "突出显示点击",
+    "message": "突顯點擊",
     "description": "Highlight clicks tooltip"
   },
   "highlightCursorTooltip": {
-    "message": "突出显示光标",
+    "message": "突顯游標",
     "description": "Highlight cursor tooltip"
   },
   "spotlightCursorTooltip": {
-    "message": "聚焦光标",
+    "message": "聚焦游標",
     "description": "Spotlight cursor tooltip"
   },
   "permissionsModalNoShowAgain": {
-    "message": "不再显示",
+    "message": "不要再顯示",
     "description": "Permissions modal dismiss button"
   },
   "restartModalTitle": {
-    "message": "确定要重新开始录制吗？",
+    "message": "您確定要重新開始錄製嗎？",
     "description": "Restart recording modal title"
   },
   "restartModalDescription": {
-    "message": "您当前的视频进度将丢失。",
+    "message": "將會喪失您目前影片的進度。",
     "description": "Restart recording modal description"
   },
   "restartModalRestart": {
-    "message": "重新开始录制",
+    "message": "重新開始錄製",
     "description": "Restart recording modal restart button"
   },
   "restartModalResume": {
-    "message": "继续录制",
+    "message": "繼續錄製",
     "description": "Restart recording modal resume button"
   },
   "discardModalTitle": {
-    "message": "确定要放弃录制吗？",
+    "message": "您確定要捨棄錄影嗎？",
     "description": "Discard recording modal title"
   },
   "discardModalDescription": {
-    "message": "您当前的视频进度将丢失。",
+    "message": "將會喪失您目前影片的進度。",
     "description": "Discard recording modal description"
   },
   "discardModalDiscard": {
-    "message": "放弃录制",
+    "message": "捨棄錄製",
     "description": "Discard recording modal discard button"
   },
   "discardModalResume": {
-    "message": "继续录制",
+    "message": "繼續錄製",
     "description": "Discard recording modal resume button"
   },
   "recorderSelectTitle": {
-    "message": "选择要录制的内容",
+    "message": "選擇您要錄製的內容",
     "description": "Title in recording page"
   },
   "recorderSelectProgressTitle": {
-    "message": "录制中...",
+    "message": "錄製中...",
     "description": "Title in recording page while recording"
   },
   "recorderSelectDescription": {
-    "message": "保持此选项卡打开。一旦保存录制，它将关闭。",
+    "message": "請維持這個分頁開啟。您的錄影完成儲存之後它便會關閉。",
     "description": "Description in recording page"
   },
   "sandboxProgressTitle": {
-    "message": "准备录制中...",
+    "message": "正在準備錄製...",
     "description": "Title in sandbox page while recording / saving"
   },
   "sandboxProgressDescription": {
-    "message": "保持此选项卡打开。录制/保存完成后，它将更新。",
+    "message": "請維持這個分頁開啟。您的錄影就緒後它便會更新並顯示您的錄影。Keep this tab open. It will update with your recording when it's ready.",
     "description": "Description in sandbox page while recording / saving"
   },
   "sandboxEditorMainTitle": {
-    "message": "编辑器",
+    "message": "編輯器",
     "description": "Title in navigation of the sandbox editor page"
   },
   "sandboxEditorCancelButton": {
@@ -361,31 +360,31 @@
     "description": "Cancel button in sandbox editor page"
   },
   "sandboxEditorRevertButton": {
-    "message": "恢复原始状态",
+    "message": "恢復原始狀態",
     "description": "Revert button in sandbox editor page"
   },
   "sandboxEditorResetButton": {
-    "message": "重置",
+    "message": "重設",
     "description": "Reset button in sandbox editor page"
   },
   "sandboxEditorSaveButton": {
-    "message": "保存更改",
+    "message": "儲存變更",
     "description": "Save button in sandbox editor page"
   },
   "sandboxEditorSaveProgressButton": {
-    "message": "保存中...",
+    "message": "儲存中...",
     "description": "Save button in sandbox editor page while saving"
   },
   "sandboxAudioDragAndDrop": {
-    "message": "拖放音频文件",
+    "message": "拖放音訊檔案至此",
     "description": "Drag and drop audio file in sandbox editor page"
   },
   "sandboxAudioOrBrowse": {
-    "message": "或点击浏览",
+    "message": "或是點擊以瀏覽檔案",
     "description": "Or click to browse audio file in sandbox editor page"
   },
   "sandboxAudioSettingsTitle": {
-    "message": "设置",
+    "message": "設定",
     "description": "Audio settings title in sandbox editor page"
   },
   "sandboxAudioVolumeLabel": {
@@ -401,7 +400,7 @@
     "description": "Crop title in sandbox editor page"
   },
   "widthLabel": {
-    "message": "宽度",
+    "message": "寬度",
     "description": "Width label for properties"
   },
   "heightLabel": {
@@ -409,47 +408,47 @@
     "description": "Height label for properties"
   },
   "leftLabel": {
-    "message": "左",
+    "message": "左側",
     "description": "Left label for properties"
   },
   "topLabel": {
-    "message": "顶部",
+    "message": "頂部",
     "description": "Top label for properties"
   },
   "sandboxEditorTrimInfo": {
-    "message": "拖动手柄并使用左侧的按钮编辑所选部分。",
+    "message": "拖曳控制柄然後用左側按鈕來編輯所選範圍。",
     "description": "Info about trimming in sandbox editor"
   },
   "sandboxEditorTrimButton": {
-    "message": "修剪视频",
+    "message": "修剪影片",
     "description": "Trim button in sandbox editor"
   },
   "sandboxEditorTrimProgressButton": {
-    "message": "正在修剪...",
+    "message": "修剪中...",
     "description": "Trim button in sandbox editor while trimming"
   },
   "sandboxEditorCutButton": {
-    "message": "剪切部分",
+    "message": "分割範圍",
     "description": "Cut button in sandbox editor"
   },
   "sandboxEditorCutProgressButton": {
-    "message": "正在剪切...",
+    "message": "分割中...",
     "description": "Cut button in sandbox editor while cutting"
   },
   "sandboxEditorMuteButton": {
-    "message": "静音音频",
+    "message": "靜音音訊",
     "description": "Mute button in sandbox editor"
   },
   "sandboxEditorMuteProgressButton": {
-    "message": "正在静音...",
+    "message": "靜音中...",
     "description": "Mute button in sandbox editor while muting"
   },
   "learnMoreDot": {
-    "message": "了解更多。",
+    "message": "瞭解更多。",
     "description": "Learn more with a dot"
   },
   "undoLabel": {
-    "message": "撤销",
+    "message": "復原",
     "description": "Undo label"
   },
   "redoLabel": {
@@ -457,23 +456,23 @@
     "description": "Redo label"
   },
   "leaveReview": {
-    "message": "留下评论，这有助于我们！",
+    "message": "留下評論，這很有幫助！",
     "description": "Leave a review button"
   },
   "followForUpdates": {
-    "message": "关注获取更新",
+    "message": "跟隨以取得更新資訊",
     "description": "Follow for updates button"
   },
   "offlineLabelTitle": {
-    "message": "您当前处于离线状态",
+    "message": "您目前離線中",
     "description": "Offline label"
   },
   "offlineLabelDescription": {
-    "message": "某些功能在重新连接之前不可用",
+    "message": "有些功能需要連線後才能使用",
     "description": "Offline label description"
   },
   "offlineLabelTryAgain": {
-    "message": "重试",
+    "message": "再試一次",
     "description": "Offline label try again button"
   },
   "updateChromeLabelTitle": {
@@ -481,35 +480,35 @@
     "description": "Update Chrome label"
   },
   "updateChromeLabelDescription": {
-    "message": "更新以访问更多功能",
+    "message": "更新來使用更多功能",
     "description": "Update Chrome label description"
   },
   "learnMoreLabel": {
-    "message": "了解更多",
+    "message": "瞭解更多",
     "description": "Learn more button"
   },
   "overLimitLabelTitle": {
-    "message": "視頻過長，無法在本地處理",
-    "description": "編輯器中超過5分鐘的限制標籤"
+    "message": "影片在裝置上花費太久",
+    "description": "Over 5 minutes limit label in editor"
   },
   "overLimitLabelDescription": {
-    "message": "編輯和MP4格式導出不可用",
-    "description": "編輯器中超過5分鐘的限制描述"
+    "message": "編輯功能與 MP4 匯出無法使用",
+    "description": "Over 5 minutes limit description in editor"
   },
   "videoProcessingLabelTitle": {
-    "message": "视频正在处理中...",
+    "message": "影片正在於本機處理中...",
     "description": "Video processing label in editor"
   },
   "videoProcessingLabelDescription": {
-    "message": "升级以加快编辑速度",
+    "message": "瞭解更多關於更快速的雲端版本的資訊",
     "description": "Video processing description in editor"
   },
   "sandboxEditTitle": {
-    "message": "编辑",
+    "message": "編輯",
     "description": "Edit title in sandbox editor page"
   },
   "noConnectionLabel": {
-    "message": "无连接",
+    "message": "沒有連線",
     "description": "No connection label"
   },
   "notAvailableLabel": {
@@ -517,15 +516,15 @@
     "description": "Not available label"
   },
   "editButtonTitle": {
-    "message": "编辑视频",
+    "message": "編輯影片",
     "description": "Trim label button"
   },
   "editButtonDescription": {
-    "message": "剪辑、裁剪或静音视频",
+    "message": "修剪、分割或靜音影片",
     "description": "Trim label"
   },
   "preparingLabel": {
-    "message": "正在准备视频，请稍候...",
+    "message": "正在準備影片，請稍候...",
     "description": "Preparing label"
   },
   "cropButtonTitle": {
@@ -533,79 +532,79 @@
     "description": "Crop label button"
   },
   "cropButtonDescription": {
-    "message": "裁剪和调整视频大小",
+    "message": "裁剪並調整影片大小",
     "description": "Crop label"
   },
   "addAudioButtonTitle": {
-    "message": "添加音频",
+    "message": "加入音訊",
     "description": "Add audio label button"
   },
   "addAudioButtonDescription": {
-    "message": "上传您自己的音频以添加到视频",
+    "message": "上傳您要加到影片中的音訊",
     "description": "Add audio label"
   },
   "sandboxSaveTitle": {
-    "message": "保存",
+    "message": "儲存",
     "description": "Save title in sandbox editor page"
   },
   "signOutDriveLabel": {
-    "message": "从 Drive 注销",
+    "message": "登出雲端硬碟",
     "description": "Sign out of Google Drive label"
   },
   "savingDriveLabel": {
-    "message": "保存中...",
+    "message": "儲存中...",
     "description": "Saving to Google Drive label"
   },
   "saveDriveButtonTitle": {
-    "message": "保存到 Drive",
+    "message": "儲存到雲端硬碟",
     "description": "Save to Google Drive button"
   },
   "saveDriveButtonDescription": {
-    "message": "将当前版本保存到 Google Drive",
+    "message": "將目前版本儲存到 Google 雲端硬碟",
     "description": "Save to Google Drive label"
   },
   "signInDriveLabel": {
-    "message": "登录并保存到 Drive",
+    "message": "登入並儲存到雲端硬碟",
     "description": "Sign in to Google Drive label"
   },
   "sandboxExportTitle": {
-    "message": "导出",
+    "message": "匯出",
     "description": "Export title in sandbox editor page"
   },
   "downloadingLabel": {
-    "message": "下载中...",
+    "message": "下載中...",
     "description": "Downloading label"
   },
   "downloadWEBMButtonTitle": {
-    "message": "下载为 .webm",
+    "message": "下載成 .webm",
     "description": "Download WEBM button"
   },
   "downloadWEBMButtonDescription": {
-    "message": "导出为 .webm 视频",
+    "message": "匯出成 .webm 影片",
     "description": "Download WEBM label"
   },
   "downloadMP4ButtonTitle": {
-    "message": "下载为 .mp4",
+    "message": "下載成 .mp4",
     "description": "Download MP4 button"
   },
   "downloadMP4ButtonDescription": {
-    "message": "导出为 .mp4 视频（推荐）",
+    "message": "匯出成 .mp4 影片（建議使用）",
     "description": "Download MP4 label"
   },
   "downloadGIFButtonTitle": {
-    "message": "下载为 .gif",
+    "message": "下載成 .gif",
     "description": "Download GIF button"
   },
   "downloadGIFButtonDescription": {
-    "message": "导出为 GIF（最长30秒）",
+    "message": "匯出 GIF 檔（最長 30 秒）",
     "description": "Download GIF label"
   },
   "shareModalSandboxTitle": {
-    "message": "与他人分享您的视频",
+    "message": "與他人分享您的影片",
     "description": "Share modal title in sandbox editor page"
   },
   "shareModalSandboxDescription": {
-    "message": "即将推出！留下您的电子邮件以保持更新，并在分享可用时收到通知。",
+    "message": "即將推出！留下您的電子郵件來獲得最新資訊，並在分享功能發佈時收到通知。",
     "description": "Share modal description in sandbox editor page"
   },
   "shareModalSandboxButton": {
@@ -613,43 +612,43 @@
     "description": "Share modal email placeholder in sandbox editor page"
   },
   "shareSandboxButton": {
-    "message": "分享视频",
+    "message": "分享影片",
     "description": "Share button in sandbox editor page"
   },
   "replaceAudioEditor": {
-    "message": "替换现有音频",
+    "message": "取代現有音訊",
     "description": "Replace audio button in editor"
   },
   "zoomToPointPopup": {
-    "message": "缩放到光标位置",
+    "message": "縮放到游標位置",
     "description": "Zoom to point popup"
   },
   "stayInPagePopup": {
-    "message": "录制时保持在页面中",
+    "message": "錄製時留在頁面中",
     "description": "Stay in page popup"
   },
   "micReminderPopup": {
-    "message": "麦克风已关闭警告",
+    "message": "麥克風關閉警告",
     "description": "Mic reminder popup"
   },
   "helpPopup": {
-    "message": "帮助",
+    "message": "說明",
     "description": "Help popup button"
   },
   "pausedRecordingToast": {
-    "message": "录制已暂停。按播放按钮继续。",
+    "message": "錄製已暫停。請按播放按鈕來繼續。",
     "description": "Paused recording modal title"
   },
   "chromePermissionsModalTitle": {
-    "message": "Screenity 没有权限录制您的屏幕",
+    "message": "Screenity 沒有權限錄製您的螢幕",
     "description": "Permission modal title"
   },
   "chromePermissionsModalDescription": {
-    "message": "为启用屏幕录制，您必须在提示时授予 Screenity 捕获屏幕的权限。",
+    "message": "要啟用螢幕錄製，您必須在向您詢問時提供 Screenity 擷取您的螢幕內容的權限。",
     "description": "Permission modal description"
   },
   "chromePermissionsModalAction": {
-    "message": "启用屏幕录制",
+    "message": "啟用螢幕錄製",
     "description": "Permission modal action"
   },
   "chromePermissionsModalCancel": {
@@ -657,15 +656,15 @@
     "description": "Permission modal cancel"
   },
   "micMutedModalTitle": {
-    "message": "您的麦克风已静音",
+    "message": "您的麥克風已靜音",
     "description": "Microphone muted modal title"
   },
   "micMutedModalDescription": {
-    "message": "要在录制中包含音频，您需要解除麦克风的静音。是否继续不使用音频？",
+    "message": "要在錄影當中包含音訊，您會需要解除麥克風的靜音。還是您要不包含音訊直接繼續操作？",
     "description": "Microphone muted modal description"
   },
   "micMutedModalAction": {
-    "message": "是的，继续",
+    "message": "是，繼續",
     "description": "Microphone muted modal continue"
   },
   "micMutedModalCancel": {
@@ -673,15 +672,15 @@
     "description": "Microphone muted modal cancel"
   },
   "setupTitle": {
-    "message": "在三个简单步骤中开始使用Screenity：",
+    "message": "要開始使用 Screenity 只要三個簡單步驟：",
     "description": "Set up steps title"
   },
   "setupStep1Before": {
-    "message": "1- 点击 ",
+    "message": "1- 點擊 ",
     "description": "Set up step 1, before the icon. It needs a space at the end."
   },
   "setupStep1After": {
-    "message": " 扩展图标",
+    "message": " 擴充功能圖示",
     "description": "Set up step 1, after the icon. It needs a space at the beginning."
   },
   "setupStep2Before": {
@@ -689,67 +688,67 @@
     "description": "Set up step 2, before the icon. It needs a space at the end."
   },
   "setupStep2After": {
-    "message": " 固定图标",
+    "message": " 固定圖示",
     "description": "Set up step 2, after the icon. It needs a space at the beginning."
   },
   "setupStep3Before": {
-    "message": "3- 点击 ",
+    "message": "3- 點擊 ",
     "description": "Set up step 3, before the icon. It needs a space at the end."
   },
   "setupStep3After": {
-    "message": " Screenity图标以启动",
+    "message": " Screenity 圖示來開始使用",
     "description": "Set up step 3, after the icon. It needs a space at the beginning."
   },
   "setupCompleteTitle": {
-    "message": "太棒了！您已经准备好了",
+    "message": "太好了！您已準備就緒",
     "description": "Set up complete title"
   },
   "setupCompleteDescription": {
-    "message": "您现在可以在这里开始录制，或在任何其他标签中。",
+    "message": "您現在可以從這裡開始錄製，也可以從其他任何分頁開始。",
     "description": "Set up complete description"
   },
   "clickHereDrawOnboarding": {
-    "message": "单击此处进行绘制",
+    "message": "點擊此處以開始繪圖",
     "description": "Click here onboarding"
   },
   "countdownMessage": {
-    "message": "放松。单击任何地方停止倒计时。",
+    "message": "放鬆吧。要停止倒數計時點擊任何地方即可。",
     "description": "Countdown message"
   },
   "sandboxEditorTooSmallInfo": {
-    "message": "由于帧之间的间隔，对于短时间范围，编辑可能不准确。",
+    "message": "由於影格之間的間隔，短時間範圍的編輯可能不準確。Edits may be inaccurate for short time ranges due to the intervals between frames.",
     "description": "Info about the editor being too small"
   },
   "processingBannerEditor": {
-    "message": "视频正在处理，播放可能不准确或中断。",
+    "message": "影片處理中，播放可能不準確或被中斷。",
     "description": "Processing banner in editor"
   },
   "croppingInfoTitle": {
-    "message": "裁剪可能需要一些时间",
+    "message": "裁剪可能需要一段時間",
     "description": "Cropping info title"
   },
   "croppingInfoDescription": {
-    "message": "升级以获得更快的处理速度",
+    "message": "升級來獲取更快的處理速度",
     "description": "Cropping info description"
   },
   "micOnToast": {
-    "message": "麦克风已启用",
+    "message": "麥克風已啟用",
     "description": "Microphone enabled toast title"
   },
   "micOffToast": {
-    "message": "麦克风已禁用",
+    "message": "麥克風已停用",
     "description": "Microphone disabled toast title"
   },
   "hideUIAlerts": {
-    "message": "隐藏UI通知",
+    "message": "隱藏介面內通知",
     "description": "Hide UI alerts button"
   },
   "noShowAgain": {
-    "message": "不再显示",
+    "message": "不要再顯示",
     "description": "Don't show again button"
   },
   "toolbarHoverOnly": {
-    "message": "在不使用时隐藏工具栏",
+    "message": "未使用時隱藏工具列",
     "description": "Only show toolbar on hover button"
   },
   "stopRecording": {
@@ -757,284 +756,281 @@
     "description": "Stop recording button in recording screen"
   },
   "updateAnnouncementTitle": {
-    "message": "歡迎使用新版 Screenity！",
-    "description": "現有用戶的更新公告標題"
+    "message": "歡迎來到新版 Screenity！",
+    "description": "Update announcement title for existing users"
   },
   "updateAnnouncementDescription": {
-    "message": "我們進行了設計更新並增加了許多新功能，但請放心，它仍然是您熟悉和喜愛的免費、私密且開源的擴展。",
-    "description": "現有用戶的更新公告描述"
+    "message": "我們為您帶來新的外觀與許多有趣的新功能，但請放心，Screenity 仍然是您所熟悉且喜愛的免費、保護隱私且開源的擴充元件。",
+    "description": "Update announcement description for existing users"
   },
   "updateAnnouncementLearnMore": {
-    "message": "了解有關更新的更多信息。",
-    "description": "現有用戶的更新公告了解更多鏈接"
+    "message": "瞭解關於更新的更多資訊",
+    "description": "Update announcement learn more link for existing users"
   },
   "updateAnnouncementButton": {
     "message": "開始使用",
-    "description": "現有用戶的更新公告按鈕"
+    "description": "Update announcement button for existing users"
   },
   "streamErrorModalTitle": {
-    "message": "啟動錄製時出錯",
-    "description": "流錯誤模態框標題"
+    "message": "開始錄製時發生錯誤",
+    "description": "Stream error modal title"
   },
   "streamErrorModalDescription": {
-    "message": "看起來啟動錄製時出現了錯誤。請重新啟動您的瀏覽器並重試。如果問題仍然存在，請通過 support@screenity.io 與我們聯繫。",
-    "description": "流錯誤模態框描述"
+    "message": "開始錄製時似乎發生了錯誤。請重新開啟您的瀏覽器後再試一次。如果問題還是存在，請寄信到 support@screenity.io 與我們聯繫。",
+    "description": "Stream error modal description"
   },
   "highestQuality": {
     "message": "最高品質",
-    "description": "在彈出視窗中切換到最高品質的標籤"
+    "description": "Highest quality toggle label in popup"
   },
   "restoreRecording": {
-    "message": "還原最近的錄音",
-    "description": "在彈出視窗中還原最近的錄音按鈕"
+    "message": "回復上次的錄影",
+    "description": "Restore last recording button in popup"
   },
   "havingIssuesButton": {
     "message": "遇到問題了嗎？",
-    "description": "編輯器中的問題按鈕"
+    "description": "Having issues button in editor"
   },
   "havingIssuesModalTitle": {
-    "message": "無法查看您的錄影？",
-    "description": "編輯器中的問題模式對話框標題"
+    "message": "看不到您的錄影嗎？",
+    "description": "Having issues modal title in editor"
   },
   "havingIssuesModalDescription": {
-    "message": "如果您已經完成錄製並發現自己在此頁面上看不到您的視頻，您可以嘗試下載原始視頻數據（如果可用）。您還可以聯繫我們並提交錯誤報告。",
-    "description": "編輯器中的問題模式對話框描述"
+    "message": "如果您完成錄製之後來到這個頁面但卻沒看到您的影片，您可以嘗試下載原始影片資料（如果可用的話）。也可以考慮與我們聯絡進行錯誤回報。",
+    "description": "Having issues modal description in editor"
   },
   "havingIssuesModalButton": {
-    "message": "下載原始視頻數據",
-    "description": "編輯器中的問題模式對話框按鈕"
+    "message": "下載原始影片資料",
+    "description": "Having issues modal button in editor"
   },
   "havingIssuesModalButton2": {
-    "message": "報告問題",
-    "description": "編輯器中的問題模式對話框第二個按鈕"
+    "message": "回報問題",
+    "description": "Having issues modal button 2 in editor"
   },
   "noRecordingFound": {
-    "message": "未找到錄製，抱歉 :(",
-    "description": "編輯器中的未找到錄製警告"
+    "message": "沒有找到錄影，不好意思 :(",
+    "description": "No recording found alert in editor"
   },
   "memoryLimitTitle": {
-    "message": "記憶體限制達到",
-    "description": "記憶體限制達到標題"
+    "message": "已達記憶體上限",
+    "description": "Memory limit reached title"
   },
   "memoryLimitDescription": {
-    "message": "您的設備已經用盡了可用記憶體進行錄製，導致錄製自動停止。如果您想要錄製更長時間，可以嘗試降低視頻質量或清理設備上的一些空間。",
-    "description": "記憶體限制達到描述"
+    "message": "您的裝置記憶體已用盡而不足錄製，因此錄製已自動停止。如果您需要錄製更久，可以試着降低影片品質或是在裝置上清出一些空間。Your device has run out of memory to record, so the recording has stopped automatically. If you'd like to record for longer, you can try lowering the quality of the video, or clearing up some space on your device.",
+    "description": "Memory limit reached description"
   },
   "understoodButton": {
-    "message": "知道了",
-    "description": "知道了按鈕"
+    "message": "瞭解",
+    "description": "Understood button"
   },
   "notEnoughSpaceTitle": {
     "message": "空間不足",
-    "description": "空間不足標題"
+    "description": "Not enough space title"
   },
   "notEnoughSpaceDescription": {
-    "message": "Screenity 需要至少 1GB 的空閒空間進行錄製。請釋放設備上的空間並重試。",
-    "description": "空間不足描述"
+    "message": "Screenity 需要至少 1GB 的空間才能錄製。請清出一些空間之後再試一次。",
+    "description": "Not enough space description"
   },
   "clearSpaceButton": {
-    "message": "清除之前的錄製",
-    "description": "清除之前的錄製按鈕"
+    "message": "清除先前的錄影",
+    "description": "Clear previous recordings button"
   },
   "sandboxAdvancedTitle": {
-    "message": "高級",
-    "description": "安全編輯器頁面的高級部分"
+    "message": "進階",
+    "description": "Advanced section in sandbox editor page"
   },
   "rawRecordingButtonTitle": {
-    "message": "下載原始視頻文件",
-    "description": "下載原始錄制按鈕"
+    "message": "下載原始影片檔案",
+    "description": "Download raw recording button"
   },
   "rawRecordingButtonDescription": {
-    "message": "導出原始錄制數據",
-    "description": "下載原始錄制標籤"
+    "message": "匯出原本的錄影資料",
+    "description": "Download raw recording label"
   },
   "troubleshootButtonTitle": {
-    "message": "獲取有關您的錄制的幫助",
-    "description": "故障排除按鈕"
+    "message": "取得關於錄製的說明",
+    "description": "Troubleshoot button"
   },
   "troubleShootButtonDescription": {
-    "message": "恢復您的視頻並解決其他問題",
-    "description": "故障排除標籤"
+    "message": "復原您的影片或解決其它問題",
+    "description": "Troubleshoot label"
   },
   "rawRecordingModalTitle": {
-    "message": "下載原始視頻文件",
-    "description": "原始錄制模態框標題"
+    "message": "下載原始影片檔案",
+    "description": "Raw recording modal title"
   },
   "rawRecordingModalDescription": {
-    "message": "原始視頻文件是由Screenity錄制的原始視頻文件。此視頻未經處理或編輯，因此可能非常大且可能無法在所有設備上播放。如果您在處理後的視頻方面遇到問題，可以使用此文件恢復您的視頻。",
-    "description": "原始錄制模態框描述"
+    "message": "原始影片檔案是 Screenity 錄製時原本所產生的影片檔。這個影片沒有處理過或編輯過，所以可能會非常大或不被所有裝置支援。如果您在使用處理後的影片時有發生問題，您可以使用這個檔案來復原您的影片。",
+    "description": "Raw recording modal description"
   },
   "rawRecordingModalButton": {
     "message": "下載",
-    "description": "原始錄制模態框按鈕"
+    "description": "Raw recording modal button"
   },
   "troubleshootModalTitle": {
-    "message": "下載系統信息和視頻數據並發送進行故障排除",
-    "description": "故障排除模態框標題"
+    "message": "下載系統資訊與影片資料並傳送以進行問題排除",
+    "description": "Troubleshoot modal title"
   },
   "troubleshootModalDescription": {
-    "message": "下載後，請將文件發送至support@screenity.io，並附上任何相關信息。我們將使用這些數據來幫助您解決擴展程序的任何問題，並在可能的情況下恢復您的視頻。",
-    "description": "故障排除模態框描述"
+    "message": "下載之後請將檔案寄到 support@screenity.io，如果有相關的資訊也請包含在信件中。我們會使用該資料幫助您排解使用這個擴充元件的問題，並試著復原您的影片。",
+    "description": "Troubleshoot modal description"
   },
   "troubleshootModalButton": {
     "message": "下載",
-    "description": "故障排除模態框按鈕"
+    "description": "Troubleshoot modal button"
   },
   "overLimitModalTitle": {
-    "message": "影片太長，無法在您的設備上處理",
-    "description": "超過5分鐘限制的模態框標題"
+    "message": "影片在您的裝置上花太長時間處理了",
+    "description": "Over 5 minutes limit modal title"
   },
   "overLimitModalDescription": {
-    "message": "由於Screenity完全私密且在本地運行，它受到您設備硬件的限制。處理這樣長度的影片需要很長時間，而且資源消耗很大。但您仍然可以下載WEBM文件或原始錄制文件，但無法進行編輯和MP4導出。儘管如此，如果您了解風險，仍然可以嘗試處理該影片。",
-    "description": "超過5分鐘限制的模態框描述"
+    "message": "由於 Screenity 完全在本機執行來保護隱私，它也受您的裝置硬體限制。處理這個長度的影片會需要太久，並需要大量電腦資源。不用擔心，您還是可以下載 WEBM 檔案或是原始錄影，只是編輯功能與 MP4 匯出會無法使用。雖然是這樣說，如果您瞭解風險您還是可以決定嘗試處理影片。",
+    "description": "Over 5 minutes limit modal description"
   },
   "overLimitModalButton": {
-    "message": "我理解風險，仍然嘗試",
-    "description": "超過5分鐘限制的模態框按鈕"
+    "message": "我瞭解風險，仍要嘗試",
+    "description": "Over 5 minutes limit modal button"
   },
   "overLimitModalLearnMore": {
-    "message": "了解有關處理長影片的更多信息。",
-    "description": "超過5分鐘限制的模態框了解更多鏈接（帶有句號）"
+    "message": "瞭解更多關於處理長影片的資訊。",
+    "description": "Over 5 minutes limit modal learn more link with a dot"
   },
-
   "recoveryModeTitle": {
     "message": "復原模式",
-    "description": "復原模式標題"
+    "description": "Recovery mode title"
   },
-
   "downloadForTroubleshootingOption": {
-    "message": "下載故障排除資料",
-    "description": "故障排除選項"
+    "message": "下載問題排除用的資料",
+    "description": "Download for troubleshooting option"
   },
   "getHelpNav": {
-    "message": "幫助中心",
-    "description": "幫助導航元素"
+    "message": "說明中心",
+    "description": "Get help nav item"
   },
   "audioWarningTitle": {
-    "message": "錄製網頁音訊",
-    "description": "音訊警告標題"
+    "message": "錄製電腦音訊",
+    "description": "Audio warning title"
   },
   "audioWarningDescription": {
-    "message": "要錄製此網頁的音訊，請使用'$tab$'選項。",
-    "description": "音訊警告說明",
+    "message": "要錄製此頁面的音訊，您需要切換到「$tab$」。",
+    "description": "Audio warning description",
     "placeholders": {
       "tab": {
         "content": "$1",
-        "example": "選項卡區域"
+        "example": "Tab area"
       }
     }
   },
   "extensionNotSupportedTitle": {
-    "message": "頁面不支援擴展功能",
-    "description": "選項卡上不支援擴展功能的標題"
+    "message": "擴充功能在該分頁中不支援",
+    "description": "Extension not supported on tab"
   },
   "extensionNotSupportedDescription": {
-    "message": "Screenity在您之前的選項卡上不受支援。儘管如此，您可以在此開始錄製，然後切換到選項卡，但您的攝像頭和工具欄將不可見。",
-    "description": "選項卡上不支援擴展功能的說明"
+    "message": "Screenity 不支援您先前的分頁。您還是可以從這裡開始錄製然後再切換回該分頁，但是攝影機和工具列會沒辦法顯示。",
+    "description": "Extension not supported on tab description"
   },
   "backupsTitle": {
-    "message": "為Screenity錄製設定本地備份",
-    "description": "備份標題"
+    "message": "為您的 Screenity 錄影建立本機備份",
+    "description": "Backups title"
   },
   "backupsDescription1": {
-    "message": "保留您進行的所有錄製的備份。如果您不設定備份，只有在決定下載它們時才會保存您的錄製。",
-    "description": "備份說明"
+    "message": "為您每個錄影保留副本。如果您不設定備份，您的錄影只會在您選擇下載時才會被儲存。",
+    "description": "Backups description"
   },
   "backupsDescription2": {
-    "message": "如果您試圖保存到下載或其他系統文件夾，則可能需要首先創建一個新文件夾。",
-    "description": "備份說明"
+    "message": "您可能會需要先建立新資料夾才能儲存到《下載》或是其他系統資料夾當中。",
+    "description": "Backups description"
   },
   "backupsSelectFolder": {
-    "message": "選擇文件夾",
-    "description": "選擇文件夾按鈕"
+    "message": "選擇資料夾",
+    "description": "Select a folder button"
   },
   "backupsNotNow": {
-    "message": "現在不",
-    "description": "現在不按鈕"
+    "message": "現在不要",
+    "description": "Not now button"
   },
   "backupsOnTitle": {
-    "message": "您的錄製已本地同步",
-    "description": "已啟用的備份標題"
+    "message": "您的錄製已在本機備份",
+    "description": "Backups on title"
   },
   "backupsOnDescription": {
-    "message": "為了避免每次錄製時都請求權限，我們建議保持此選項卡打開。",
-    "description": "已啟用的備份說明"
+    "message": "要防止每次錄製的時候都被要求權限，我們建議維持這個分頁開啟。",
+    "description": "Backups on description"
   },
   "backupsClose": {
-    "message": "仍然關閉選項卡",
-    "description": "仍然關閉選項卡按鈕"
+    "message": "還是要關閉分頁",
+    "description": "Close tab anyway button"
   },
   "backupsStop": {
-    "message": "停止所有錄製的備份",
-    "description": "停止備份按鈕"
+    "message": "停止備份所有錄影",
+    "description": "Stop backups button"
   },
   "backupsConfirmTitle": {
-    "message": "請重新確認對Screenity本地備份文件夾的訪問權限",
-    "description": "備份確認標題"
+    "message": "請重新確認對於您的 Screenity 本機備份資料夾的存取權",
+    "description": "Backups confirm title"
   },
   "backupsConfirmDescription": {
-    "message": "很抱歉，我們需要再次獲得您的許可，以繼續創建您的錄製的本地副本。不幸的是，每次關閉此選項卡時，我們都需要詢問，這可能會在您關閉瀏覽器或重新啟動計算機時發生。",
-    "description": "備份確認說明"
+    "message": "不好意思，我們需要重新要求您的權限來繼續備份您的錄影。不幸的，每次這個分頁關閉（包含瀏覽器關閉或是電腦重啟）的時候我們都需要再重新詢問權限。",
+    "description": "Backups confirm description"
   },
   "backupsConfirmAllow": {
-    "message": "允許Screenity繼續備份錄製",
-    "description": "備份確認中的允許按鈕"
+    "message": "允許 Screenity 繼續備份錄影",
+    "description": "Backups confirm allow button"
   },
   "backupsToggle": {
-    "message": "備份錄製",
-    "description": "備份切換標籤"
+    "message": "備份錄影",
+    "description": "Backups toggle label"
   },
   "backupPermissionFailTitle": {
-    "message": "未授予備份錄製的權限",
-    "description": "備份權限失敗標題"
+    "message": "未提供權限以備份錄影",
+    "description": "Backup permission fail title"
   },
   "backupPermissionFailDescription": {
-    "message": "您未選擇要創建您的錄製的本地副本的文件夾。根據瀏覽器或操作系統的版本，每次開始錄製時可能會要求您選擇文件夾。您可以再次嘗試或完全禁用備份，如果您不想重複授予權限。",
-    "description": "備份權限失敗說明"
+    "message": "您沒有選擇備份錄影的資料夾。依您的瀏覽器版本或是作業系統，每次開始錄製的時候可能都會請您再次選擇資料夾。您可以再試一次，或是如果不希望一天到晚重複提供權限的話也可以選擇完全停用備份。",
+    "description": "Backup permission fail description"
   },
   "recordAudioWarningMacTitle": {
-    "message": "錄製計算機音訊",
-    "description": "macOS音訊警告標題"
+    "message": "錄製電腦音訊",
+    "description": "Record audio warning title"
   },
   "recordAudioWarningMacDescription": {
-    "message": "在macOS上，您只能錄製選項卡的音訊。請選擇'Chrome選項卡'選項，並確保啟用'同時共享選項卡音訊'選項。",
-    "description": "macOS音訊警告說明"
+    "message": "在 macOS 上，您只能錄製分頁音訊。請選擇「Chrome 分頁」選項然後確保「也分享分頁音訊」有啟用。",
+    "description": "macOS audio warning description"
   },
   "recordAudioWarningOtherTitle": {
-    "message": "錄製計算機音訊",
-    "description": "其他系統音訊警告標題"
+    "message": "錄製電腦音訊",
+    "description": "Record audio warning title"
   },
   "recordAudioWarningOtherDescription": {
-    "message": "如果您想錄製計算機音訊，請確保啟用'共享系統音訊'選項。如果您看不到此選項，請嘗試更新Chrome或切換到選項卡錄製選項。",
-    "description": "其他系統音訊警告說明"
+    "message": "如果您要錄製電腦音訊請確保您啟用「分享系統音訊」選項。如果您沒有看到這個選項，請嘗試更新 Chrome 或是改為使用分頁錄製。",
+    "description": "Other audio warning description"
   },
-
   "maxResolutionLabel": {
-    "message": "最高解析度",
-    "description": "設定選單中的最高解析度標籤"
+    "message": "最大解析度",
+    "description": "Max resolution label in settings menu"
   },
   "maxFPSLabel": {
-    "message": "最高幀率",
-    "description": "設定選單中的最高幀率標籤"
+    "message": "最大幀率",
+    "description": "Max FPS label in settings menu"
   },
   "notEnoughRAM": {
-    "message": "內存不足",
-    "description": "設置選單中的內存不足標籤"
+    "message": "記憶體不足",
+    "description": "Not enough RAM label in settings menu"
   },
   "resizeWindowLabel": {
     "message": "調整視窗大小",
-    "description": "設定選單中的調整視窗大小標籤"
+    "description": "Resize window label in settings menu"
   },
   "screenTooSmallTooltip": {
-    "message": "螢幕尺寸不足以支援此解析度",
-    "description": "設定選單中的螢幕尺寸不足提示"
+    "message": "螢幕太小而無法使用此解析度",
+    "description": "Screen too small tooltip in settings menu"
   },
   "maxResolutionTooltip": {
-    "message": "您的設備無法以此解析度錄製",
-    "description": "設定選單中的最大解析度提示"
+    "message": "您的裝置無法使用此解析度進行錄製",
+    "description": "Maxed out resolution tooltip in settings menu"
   },
   "permissionsModalReview": {
-    "message": "審查權限",
-    "description": "審查權限按鈕"
+    "message": "審閱權限",
+    "description": "Review permissions button"
   }
 }

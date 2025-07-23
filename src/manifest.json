@@ -91,6 +91,7 @@
     "storage",
     "unlimitedStorage",
     "downloads",
+    "desktopCapture",
     "tabs",
     "tabCapture",
     "scripting"

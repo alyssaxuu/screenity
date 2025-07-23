@@ -470,6 +470,28 @@ const ContentState = (props) => {
     }
   }, [contentState, contentStateRef.current]);
 
+  const getDevices = async () => {
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    handleDevicePermissions({
+      success: true,
+      audioinput: devices.filter((device) => device.kind === "audioinput"),
+      videoinput: devices.filter((device) => device.kind === "videoinput"),
+      cameraPermission: devices
+        .filter((device) => device.kind === "videoinput")
+        .some((device) => device.label !== ""),
+      microphonePermission: devices
+        .filter((device) => device.kind === "audioinput")
+        .some((device) => device.label !== ""),
+    });
+  };
+
+  useEffect(() => {
+    navigator.mediaDevices.addEventListener("devicechange", getDevices);
+    return () => {
+      navigator.mediaDevices.removeEventListener("devicechange", getDevices);
+    };
+  }, []);
+
   const handleDevicePermissions = (data) => {
     if (data && data != undefined && data.success) {
       // I need to convert to a regular array of objects
