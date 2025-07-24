@@ -584,11 +584,11 @@
     "description": "Download WEBM label"
   },
   "downloadMP4ButtonTitle": {
-    "message": "Download as .mp4",
+    "message": "Download as .mp4 (recommended)",
     "description": "Download MP4 button"
   },
   "downloadMP4ButtonDescription": {
-    "message": "Export an .mp4 video (recommended)",
+    "message": "Export an .mp4 video",
     "description": "Download MP4 label"
   },
   "downloadGIFButtonTitle": {

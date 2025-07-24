@@ -4,6 +4,7 @@ import styles from "../../styles/player/_RightPanel.module.scss";
 import JSZip from "jszip";
 
 import { ReactSVG } from "react-svg";
+import { formatFileSize } from "../../utils/formatFileSize";
 
 const URL =
   "chrome-extension://" + chrome.i18n.getMessage("@@extension_id") + "/assets/";
@@ -556,6 +557,7 @@ const RightPanel = () => {
                     </div>
                     <div className={styles.buttonDescription}>
                       {chrome.i18n.getMessage("downloadWEBMButtonDescription")}
+                      {contentState.webmFileSize > 0 && ` (${formatFileSize(contentState.webmFileSize)})`}
                     </div>
                   </div>
                   <div className={styles.buttonRight}>
@@ -595,7 +597,8 @@ const RightPanel = () => {
                           !contentState.override)
                       ? chrome.i18n.getMessage("notAvailableLabel")
                       : contentState.mp4ready && !contentState.isFfmpegRunning
-                      ? chrome.i18n.getMessage("downloadMP4ButtonDescription")
+                      ? chrome.i18n.getMessage("downloadMP4ButtonDescription") + 
+                        (contentState.mp4FileSize > 0 ? ` (${formatFileSize(contentState.mp4FileSize)})` : "")
                       : chrome.i18n.getMessage("preparingLabel")}
                   </div>
                 </div>
@@ -623,7 +626,7 @@ const RightPanel = () => {
                       {!contentState.isFfmpegRunning
                         ? chrome.i18n.getMessage(
                             "downloadWEBMButtonDescription"
-                          )
+                          ) + (contentState.webmFileSize > 0 ? ` (${formatFileSize(contentState.webmFileSize)})` : "")
                         : chrome.i18n.getMessage("preparingLabel")}
                     </div>
                   </div>

@@ -72,6 +72,8 @@ const ContentState = (props) => {
     fallback: false,
     chunkCount: 0,
     chunkIndex: 0,
+    webmFileSize: 0,
+    mp4FileSize: 0,
   };
 
   const [contentState, setContentState] = useState(defaultState);
@@ -241,6 +243,7 @@ const ContentState = (props) => {
                 setContentState((prevState) => ({
                   ...prevState,
                   webm: fixedWebm,
+                  webmFileSize: fixedWebm.size,
                   ready: true,
                 }));
                 chrome.runtime.sendMessage({ type: "recording-complete" });
@@ -276,6 +279,7 @@ const ContentState = (props) => {
             setContentState((prevState) => ({
               ...prevState,
               webm: fixedWebm,
+              webmFileSize: fixedWebm.size,
               ready: true,
             }));
             chrome.runtime.sendMessage({ type: "recording-complete" });
@@ -306,6 +310,7 @@ const ContentState = (props) => {
           setContentState((prevState) => ({
             ...prevState,
             webm: blob,
+            webmFileSize: blob.size,
             ready: true,
           }));
           chrome.runtime.sendMessage({ type: "recording-complete" });
@@ -327,6 +332,7 @@ const ContentState = (props) => {
       setContentState((prevState) => ({
         ...prevState,
         webm: blob,
+        webmFileSize: blob.size,
         ready: true,
       }));
       chrome.runtime.sendMessage({ type: "recording-complete" });
@@ -492,6 +498,7 @@ const ContentState = (props) => {
       setContentState((prevContentState) => ({
         ...prevContentState,
         blob: blob,
+        mp4FileSize: blob.size,
         mp4ready: true,
         hasBeenEdited: true,
         isFfmpegRunning: false,
@@ -638,6 +645,7 @@ const ContentState = (props) => {
     setContentState((prevState) => ({
       ...prevState,
       webm: webmVideo,
+      webmFileSize: webmVideo.size,
       ready: true,
     }));
 
