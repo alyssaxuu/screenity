@@ -41,13 +41,13 @@ const Settings = () => {
       open={open}
       onOpenChange={setOpen}
     >
-      <Collapsible.Trigger className="CollapsibleTrigger">
+      {/* <Collapsible.Trigger className="CollapsibleTrigger">
         <div className="CollapsibleLabel">
           ✨ {chrome.i18n.getMessage("showMoreOptionsLabel")}{" "}
           <img src={DropdownIcon} />
         </div>
-      </Collapsible.Trigger>
-      <Collapsible.Content>
+      </Collapsible.Trigger> */}
+      {/* <Collapsible.Content>
         <Switch
           label={chrome.i18n.getMessage("hideToolbarLabel")}
           name="hideUI"
@@ -86,7 +86,7 @@ const Settings = () => {
           value="zoomEnabled"
           experimental={true}
         />
-      </Collapsible.Content>
+      </Collapsible.Content> */}
     </Collapsible.Root>
   );
 };

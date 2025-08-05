@@ -2243,7 +2243,7 @@ button {
   --y: 0%;
   margin-top: 8px;
   filter: drop-shadow(0px 4px 20px rgba(86, 123, 218, 0.5));
-  background: radial-gradient(127.41% 127.78% at var(--x) var(--y), #2BAEF8 23.13%, #3582F6 46.35%, #486DEF 74.48%, #7B9AEA 100%);
+  background: radial-gradient(127.41% 127.78% at var(--x) var(--y), #ff9800 23.13%, #ff9800 46.35%, #ff9800 74.48%, #ff9800 100%);
   transition: --x 0.2s ease-in-out, --y 0.2s ease-in-out;
   animation: 0;
   animation: gradient-animation 15s linear infinite;

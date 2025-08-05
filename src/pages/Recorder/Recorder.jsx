@@ -5,7 +5,7 @@ import Warning from "./warning/Warning";
 
 localforage.config({
   driver: localforage.INDEXEDDB, // or choose another driver
-  name: "screenity", // optional
+  name: "demokraft", // optional
   version: 1, // optional
 });
 

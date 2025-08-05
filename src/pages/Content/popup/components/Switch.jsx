@@ -11,9 +11,10 @@ const Switch = (props) => {
   const [contentState, setContentState] = useContext(contentStateContext);
   const switchRef = useRef(null);
   const [hideToolbarLabel, setHideToolbarLabel] = useState(
-    chrome.i18n.getMessage("hideToolbarLabel")
+    chrome.i18n.getMessage("toolbarHoverOnly")
+    //  chrome.i18n.getMessage("toolbarHoverOnly")
   );
-  const [hideToolbarState, setHideToolbarState] = useState(1);
+  const [hideToolbarState, setHideToolbarState] = useState(3);
 
   useEffect(() => {
     // Check click outside

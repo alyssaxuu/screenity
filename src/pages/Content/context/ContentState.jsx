@@ -677,7 +677,7 @@ const ContentState = (props) => {
     shadowRef: null,
     settingsOpen: false,
     hideUIAlerts: false,
-    toolbarHover: false,
+    toolbarHover: true,
     hideUI: false,
     bigTab: "record",
     askDismiss: true,
@@ -687,7 +687,7 @@ const ContentState = (props) => {
     backupSetup: false,
     openWarning: false,
     hasOpenedBefore: false,
-    qualityValue: "720p",
+    qualityValue: "1080p",
     fpsValue: "30",
   });
   contentStateRef.current = contentState;

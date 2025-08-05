@@ -548,7 +548,7 @@ const SettingsMenu = (props) => {
             </DropdownMenu.Portal>
           </DropdownMenu.Sub>
 					*/}
-          <DropdownMenu.CheckboxItem
+          {/* <DropdownMenu.CheckboxItem
             className="DropdownMenuItem"
             onSelect={(e) => {
               e.preventDefault();
@@ -615,7 +615,7 @@ const SettingsMenu = (props) => {
             }}
           >
             {chrome.i18n.getMessage("downloadForTroubleshootingOption")}
-          </DropdownMenu.Item>
+          </DropdownMenu.Item> */}
         </DropdownMenu.Content>
       </DropdownMenu.Portal>
     </DropdownMenu.Root>

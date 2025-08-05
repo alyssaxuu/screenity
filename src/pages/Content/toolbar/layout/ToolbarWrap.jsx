@@ -150,6 +150,11 @@ const ToolbarWrap = () => {
 
   const handleChange = (value) => {
     setMode(value);
+  setContentState((prevContentState) => ({
+      ...prevContentState,
+  
+    }));
+    
   };
 
   const handleDragStart = (e, d) => {

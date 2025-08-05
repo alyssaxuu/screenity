@@ -1,6 +1,6 @@
 {
   "extName": {
-    "message": "Screenity - Screen Recorder & Annotation Tool",
+    "message": "Demokraft - Screen Recorder & Annotation Tool",
     "description": "Extension name"
   },
   "extDesc": {
@@ -48,7 +48,7 @@
     "description": "Camera / microphone permissions warning modal title"
   },
   "permissionsModalDescription": {
-    "message": "Looks like Screenity can’t access your camera or microphone. Make sure to allow access by clicking on the camera icon in the address bar.",
+    "message": "Looks like Demokraft can’t access your camera or microphone. Make sure to allow access by clicking on the camera icon in the address bar.",
     "description": "Camera / microphone permissions warning modal description"
   },
   "permissionsModalDismiss": {
@@ -640,11 +640,11 @@
     "description": "Paused recording modal title"
   },
   "chromePermissionsModalTitle": {
-    "message": "Screenity doesn't have permission to record your screen",
+    "message": "Demokraft doesn't have permission to record your screen",
     "description": "Permission modal title"
   },
   "chromePermissionsModalDescription": {
-    "message": "To enable screen recording, you must grant Screenity permission to capture your screen when prompted.",
+    "message": "To enable screen recording, you must grant Demokraft permission to capture your screen when prompted.",
     "description": "Permission modal description"
   },
   "chromePermissionsModalAction": {
@@ -672,7 +672,7 @@
     "description": "Microphone muted modal cancel"
   },
   "setupTitle": {
-    "message": "Get started with Screenity in three simple steps:",
+    "message": "Get started with Demokraft in three simple steps:",
     "description": "Set up steps title"
   },
   "setupStep1Before": {
@@ -696,7 +696,7 @@
     "description": "Set up step 3, before the icon. It needs a space at the end."
   },
   "setupStep3After": {
-    "message": " Screenity icon to start",
+    "message": " Demokraft icon to start",
     "description": "Set up step 3, after the icon. It needs a space at the beginning."
   },
   "setupCompleteTitle": {
@@ -756,7 +756,7 @@
     "description": "Stop recording button in recording scren"
   },
   "updateAnnouncementTitle": {
-    "message": "Welcome to the new Screenity!",
+    "message": "Welcome to the new Demokraft!",
     "description": "Update announcement title for existing users"
   },
   "updateAnnouncementDescription": {
@@ -828,7 +828,7 @@
     "description": "Not enough space title"
   },
   "notEnoughSpaceDescription": {
-    "message": "Screenity needs at least 1GB of free space to record. Please free up some space and try again.",
+    "message": "Demokraft needs at least 1GB of free space to record. Please free up some space and try again.",
     "description": "Not enough space description"
   },
   "clearSpaceButton": {
@@ -860,7 +860,7 @@
     "description": "Raw recording modal title"
   },
   "rawRecordingModalDescription": {
-    "message": "The raw video file is the original video file that was recorded by Screenity. This video is not processed or edited, so it may be very large and may not be playable on all devices. If you are having issues with the processed video, you can use this file to recover your video.",
+    "message": "The raw video file is the original video file that was recorded by Demokraft. This video is not processed or edited, so it may be very large and may not be playable on all devices. If you are having issues with the processed video, you can use this file to recover your video.",
     "description": "Raw recording modal description"
   },
   "rawRecordingModalButton": {
@@ -884,7 +884,7 @@
     "description": "Over 5 minutes limit modal title"
   },
   "overLimitModalDescription": {
-    "message": "Since Screenity is completely private and runs locally, it's limited by your device's hardware. Processing a video of this length would take too long, and be very resource intensive. Don't worry, you can still download the WEBM file or the raw recording, but editing and MP4 export are not available. That said, you can still try to process the video anyway, if you understand the risks.",
+    "message": "Since Demokraft is completely private and runs locally, it's limited by your device's hardware. Processing a video of this length would take too long, and be very resource intensive. Don't worry, you can still download the WEBM file or the raw recording, but editing and MP4 export are not available. That said, you can still try to process the video anyway, if you understand the risks.",
     "description": "Over 5 minutes limit modal description"
   },
   "overLimitModalButton": {
@@ -926,11 +926,11 @@
     "description": "Extension not supported on tab"
   },
   "extensionNotSupportedDescription": {
-    "message": "Screenity wasn't supported in your previous tab. You can still start your recording here and switch back to the tab, but your camera and toolbar won't be visible.",
+    "message": "Demokraft wasn't supported in your previous tab. You can still start your recording here and switch back to the tab, but your camera and toolbar won't be visible.",
     "description": "Extension not supported on tab description"
   },
   "backupsTitle": {
-    "message": "Set up a local backup for your Screenity recordings",
+    "message": "Set up a local backup for your Demokraft recordings",
     "description": "Backups title"
   },
   "backupsDescription1": {
@@ -966,7 +966,7 @@
     "description": "Stop backups button"
   },
   "backupsConfirmTitle": {
-    "message": "Please reconfirm access to your local Screenity backup folder",
+    "message": "Please reconfirm access to your local Demokraft backup folder",
     "description": "Backups confirm title"
   },
   "backupsConfirmDescription": {
@@ -974,7 +974,7 @@
     "description": "Backups confirm description"
   },
   "backupsConfirmAllow": {
-    "message": "Allow Screenity to keep backing up recordings",
+    "message": "Allow Demokraft to keep backing up recordings",
     "description": "Backups confirm allow button"
   },
   "backupsToggle": {

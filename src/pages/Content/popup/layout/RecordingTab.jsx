@@ -88,7 +88,7 @@ const RecordingTab = (props) => {
               <span>{chrome.i18n.getMessage("cameraType")}</span>
             </div>
           </Tabs.Trigger>
-          <Tabs.Trigger
+          {/* <Tabs.Trigger
             className="TabsTrigger"
             value="mockup"
             tabIndex={0}
@@ -107,7 +107,7 @@ const RecordingTab = (props) => {
               </div>
               <span>{chrome.i18n.getMessage("MockupType")}</span>
             </div>
-          </Tabs.Trigger>
+          </Tabs.Trigger> */}
         </Tabs.List>
         <Tabs.Content className="TabsContent" value="screen">
           <RecordingType shadowRef={props.shadowRef} />

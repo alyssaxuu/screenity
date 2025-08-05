@@ -32,6 +32,8 @@ const CursorToolbar = (props) => {
             setContentState((prevContentState) => ({
               ...prevContentState,
               cursorMode: value,
+              hideToolbar:true,
+              hideUI:true
             }));
             props.setMode(false);
 

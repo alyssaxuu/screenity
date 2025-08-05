@@ -185,7 +185,7 @@ const RecordingType = (props) => {
         contentState.defaultVideoInput != "none" &&
         contentState.cameraActive && (
           <div>
-            <Switch
+            {/* <Switch
               label={chrome.i18n.getMessage("flipCameraLabel")}
               name="flip-camera"
               value="cameraFlipped"
@@ -195,7 +195,7 @@ const RecordingType = (props) => {
               name="background-effects-active"
               value="backgroundEffectsActive"
             />
-            {contentState.backgroundEffectsActive && <BackgroundEffects />}
+            {contentState.backgroundEffectsActive && <BackgroundEffects />} */}
           </div>
         )}
 

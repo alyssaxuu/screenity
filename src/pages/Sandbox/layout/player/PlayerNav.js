@@ -28,7 +28,7 @@ const PlayerNav = () => {
           aria-label="home"
           className={styles.navLeft}
         >
-          <img src={URL + "editor/logo.svg"} alt="Screenity Logo" />
+          <img src={URL + "editor/logo.svg"} alt="Demokraft Logo" />
         </div>
         <div className={styles.navRight}>
           <button
