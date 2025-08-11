@@ -268,7 +268,7 @@ const RightPanel = () => {
               </div>
             </div>
           )}
-          {!contentState.fallback &&
+          {/* {!contentState.fallback &&
             contentState.updateChrome &&
             !contentState.offline &&
             contentState.duration <= contentState.editLimit && (
@@ -343,8 +343,8 @@ const RightPanel = () => {
                   {chrome.i18n.getMessage("learnMoreLabel")}
                 </div>
               </div>
-            )}
-          {(!contentState.mp4ready || contentState.isFfmpegRunning) &&
+            )} */}
+          {/* {(!contentState.mp4ready || contentState.isFfmpegRunning) &&
             (contentState.duration <= contentState.editLimit ||
               contentState.override) &&
             !contentState.offline &&
@@ -373,9 +373,9 @@ const RightPanel = () => {
                   {chrome.i18n.getMessage("learnMoreLabel")}
                 </div>
               </div>
-            )}
+            )} */}
 
-          <div className={styles.section}>
+          {/* <div className={styles.section}>
             <div className={styles.sectionTitle}>
               {chrome.i18n.getMessage("sandboxEditTitle")}
             </div>
@@ -486,8 +486,8 @@ const RightPanel = () => {
                 </div>
               </div>
             </div>
-          </div>
-          <div className={styles.section}>
+          </div> */}
+          {/* <div className={styles.section}>
             <div className={styles.sectionTitle}>
               {chrome.i18n.getMessage("sandboxSaveTitle")}
             </div>
@@ -532,7 +532,7 @@ const RightPanel = () => {
                 </div>
               </div>
             </div>
-          </div>
+          </div> */}
           <div className={styles.section}>
             <div className={styles.sectionTitle}>
               {chrome.i18n.getMessage("sandboxExportTitle")}
@@ -603,7 +603,7 @@ const RightPanel = () => {
                   <ReactSVG src={URL + "editor/icons/right-arrow.svg"} />
                 </div>
               </div>
-              {!contentState.fallback && (
+              {/* {!contentState.fallback && (
                 <div
                   role="button"
                   className={styles.button}
@@ -631,8 +631,8 @@ const RightPanel = () => {
                     <ReactSVG src={URL + "editor/icons/right-arrow.svg"} />
                   </div>
                 </div>
-              )}
-              <div
+              )} */}
+              {/* <div
                 role="button"
                 className={styles.button}
                 onClick={() => {
@@ -671,12 +671,12 @@ const RightPanel = () => {
                 <div className={styles.buttonRight}>
                   <ReactSVG src={URL + "editor/icons/right-arrow.svg"} />
                 </div>
-              </div>
+              </div> */}
             </div>
           </div>
-          <div className={styles.section}>
+          {/* <div className={styles.section}> */}
             {/* Create an advanced section with a button to send logs and to download raw video file as a backup */}
-            <div className={styles.sectionTitle}>
+            {/* <div className={styles.sectionTitle}>
               {chrome.i18n.getMessage("sandboxAdvancedTitle")}
             </div>
             <div className={styles.buttonWrap}>
@@ -724,8 +724,8 @@ const RightPanel = () => {
                   <ReactSVG src={URL + "editor/icons/right-arrow.svg"} />
                 </div>
               </div>
-            </div>
-          </div>
+            </div> */}
+          {/* </div> */}
         </div>
       )}
     </div>

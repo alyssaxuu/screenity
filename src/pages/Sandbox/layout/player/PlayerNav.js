@@ -30,7 +30,7 @@ const PlayerNav = () => {
         >
           <img src={URL + "editor/logo.svg"} alt="Demokraft Logo" />
         </div>
-        <div className={styles.navRight}>
+        {/* <div className={styles.navRight}>
           <button
             className="button simpleButton blueButton"
             onClick={() => {
@@ -49,7 +49,7 @@ const PlayerNav = () => {
             <ReactSVG src={HeartIcon} />{" "}
             {chrome.i18n.getMessage("followForUpdates")}
           </button>
-        </div>
+        </div> */}
       </div>
     </div>
   );

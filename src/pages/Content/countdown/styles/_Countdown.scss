@@ -25,7 +25,7 @@
 .countdown-overlay {
 	width: 100%;
 	height: 100%;
-	background: rgba(0, 0, 0, 0.5);
+	background: rgb(255, 152, 0);
 	position: absolute;
 	top: 0px;
 	left: 0px;
@@ -72,7 +72,7 @@
   bottom: 0px;
   margin: auto;
   border-radius: 50%;
-	background: radial-gradient(118.30% 119.01% at 35.44% 0.00%, #2BAEF8 23.13%, #3582F6 46.35%, #486DEF 74.48%, #7B9AEA 100%);
+	background: radial-gradient(118.30% 119.01% at 35.44% 0.00%, rgb(255, 152, 0) 23.13%, rgb(255, 152, 0) 46.35%, rgb(255, 152, 0) 74.48%, rgb(255, 152, 0) 100%);
   width: 200px;
   height: 200px;
   transition: all 1.5s ease-in-out;
@@ -92,11 +92,11 @@
   opacity: 1;
 }
 .c2 {
-  background: radial-gradient(118.30% 119.01% at 35.44% 0.00%, #2B96F8 23.13%, #356BF6 64.58%);
+  background: radial-gradient(118.30% 119.01% at 35.44% 0.00%, rgb(255, 152, 0) 23.13%, rgb(255, 152, 0) 64.58%);
 	transform: translate(20px, 20px);
 }
 .c3 {
-  background: radial-gradient(118.30% 119.01% at 35.44% 0.00%, #4884CA 15.30%, #2B89F8 78.83%);
+  background: radial-gradient(118.30% 119.01% at 35.44% 0.00%, rgb(255, 152, 0) 15.30%, rgb(247, 172, 58) 78.83%);
 	transform: translate(-30px, -40px);
 }
 .c3:after {
@@ -112,7 +112,7 @@
   bottom: 0px;
   margin: auto;
   transition: cubic-bezier(0.82, 0.1, 0.24, 0.99) 1.5s;
-  background: #CBE8F7;
+  background: rgb(247, 172, 58);
   z-index: -1;
 }
 .recording-countdown .c2 {
@@ -128,7 +128,7 @@
 	margin: auto;
 	bottom: 20px;
 	border-radius: 30px;
-	border: 2px solid rgba(255, 255, 255, 0.3);
+	border: 2px solid rgb(255, 152, 0);
 	text-align: center;
 	display: block;
 	padding: 10px 20px;

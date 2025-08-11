@@ -659,7 +659,7 @@ const ContentState = (props) => {
     askMicrophone: true,
     recordingShortcut: "⌥⇧W",
     recordingShortcut: "⌥⇧D",
-    cursorMode: "none",
+    cursorMode: "target",
     shape: "rectangle",
     shapeFill: false,
     pushToTalk: false,

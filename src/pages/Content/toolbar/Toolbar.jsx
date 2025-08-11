@@ -5,7 +5,7 @@ import ToolbarWrap from "./layout/ToolbarWrap";
 const Toolbar = () => {
   return (
     <div className="toolbar-page">
-      <ToolbarWrap />
+      {/* <ToolbarWrap /> */}
     </div>
   );
 };

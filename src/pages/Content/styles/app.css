@@ -65,7 +65,7 @@ iframe {
   box-sizing: border-box;
   width: 100%;
   height: 100%;
-  border: 10px solid #3080F8;
+  border: 10px solid rgb(255, 152, 0);
   pointer-events: none;
   transform: scale(1.2);
   opacity: 0;
@@ -367,7 +367,7 @@ iframe {
   background: rgba(56, 126, 247, 0.1);
 }
 .ToolbarModeItem[data-state=on] svg {
-  color: #3080F8;
+  color: rgb(255, 152, 0);
 }
 .ToolbarModeItem[data-state=on]::before {
   transform: translateY(0px) scale(1) !important;
@@ -397,7 +397,7 @@ iframe {
   margin-left: 0;
 }
 .ToolbarToggleItem[data-state=on] {
-  background: radial-gradient(117.41% 117.78% at 35.44% 0%, #2BAEF8 23.13%, #3582F6 46.35%, #486DEF 74.48%, #7B9AEA 100%);
+  background: radial-gradient(117.41% 117.78% at 35.44% 0%, rgb(255, 152, 0) 23.13%, rgb(255, 152, 0) 46.35%, rgb(255, 152, 0) 74.48%, rgb(255, 152, 0) 100%);
   color: #FFF;
 }
 .ToolbarToggleItem[data-state=on] svg {
@@ -773,7 +773,7 @@ body {
 }
 
 .eye-active {
-  background-color: #3080F8 !important;
+  background-color: rgb(255, 152, 0) !important;
 }
 .eye-active svg {
   color: #FFF !important;
@@ -1185,7 +1185,7 @@ body {
   display: block;
 }
 .stroke-width-item div[data-state=on] {
-  background: #3080F8 !important;
+  background: rgb(255, 152, 0) !important;
 }
 .stroke-width-item div[data-state=on] svg {
   color: #FFF !important;
@@ -1495,7 +1495,7 @@ body {
   margin-bottom: 8px;
 }
 .popup-warning .popup-warning-right {
-  color: #3080F8;
+  color: rgb(255, 152, 0);
   font-family: "Satoshi-Medium", sans-serif;
   width: 90px;
 }
@@ -1511,7 +1511,7 @@ body {
 }
 .popup-warning-left svg,
 .popup-warning-right svg {
-  color: #3080F8;
+  color: rgb(255, 152, 0);
 }
 
 .popup-warning-right {
@@ -1534,7 +1534,7 @@ body {
 .permission-button {
   background: rgba(48, 128, 248, 0.1);
   border-radius: 30px;
-  color: #3080F8;
+  color: rgb(255, 152, 0);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1555,7 +1555,7 @@ body {
   cursor: pointer;
 }
 .permission-button svg {
-  color: #3080F8;
+  color: rgb(255, 152, 0);
 }
 
 .HelpSection {
@@ -1703,7 +1703,7 @@ body {
   color: #FFF;
   text-align: center;
   border-radius: 30px;
-  background: radial-gradient(117.41% 117.78% at 35.44% 0%, #2BAEF8 23.13%, #3582F6 46.35%, #486DEF 74.48%, #7B9AEA 100%);
+  background: radial-gradient(117.41% 117.78% at 35.44% 0%, rgb(255, 152, 0) 23.13%, rgb(255, 152, 0) 46.35%, rgb(255, 152, 0) 74.48%, rgb(255, 152, 0) 100%);
   padding: 8px 16px;
 }
 .ModalSoonButton:hover {
@@ -1756,7 +1756,7 @@ body {
 }
 .announcement-description a {
   text-decoration: none !important;
-  color: #3080F8 !important;
+  color: rgb(255, 152, 0) !important;
   cursor: pointer !important;
 }
 
@@ -1768,7 +1768,7 @@ body {
   width: 100%;
   height: 44px;
   border-radius: 30px;
-  background: radial-gradient(117.41% 117.78% at 35.44% 0%, #2BAEF8 23.13%, #3582F6 46.35%, #486DEF 74.48%, #7B9AEA 100%);
+  background: radial-gradient(117.41% 117.78% at 35.44% 0%, rgb(255, 152, 0) 23.13%, rgb(255, 152, 0) 46.35%, rgb(255, 152, 0) 74.48%, rgb(255, 152, 0) 100%);
   color: #FFF;
   font-family: "Satoshi-Medium", sans-serif;
   font-size: 14px;
@@ -1841,7 +1841,7 @@ body {
   right: 12px;
   width: 18px;
   height: 18px;
-  background: #3080F8;
+  background: rgb(255, 152, 0);
   border-radius: 50%;
   display: inline-flex;
   align-items: center;
@@ -2129,7 +2129,7 @@ button {
   right: 12px;
   width: 24px;
   height: 24px;
-  background: #3080F8;
+  background: rgb(255, 152, 0);
   border-radius: 50%;
   display: inline-flex;
   align-items: center;
@@ -2368,7 +2368,7 @@ input {
   margin: auto;
   height: 2px;
   border-radius: 30px;
-  background: #3080F8;
+  background: rgb(255, 152, 0);
 }
 .recording-ui .TabsTrigger[data-state=active] > .TabsTriggerLabel {
   color: #29292F !important;
@@ -2455,7 +2455,7 @@ input {
   margin: auto;
   height: 2px;
   border-radius: 30px;
-  background: #3080F8;
+  background: rgb(255, 152, 0);
 }
 .video-ui .TabsTrigger[data-state=active] > .TabsTriggerLabel {
   color: #29292F !important;
@@ -2539,7 +2539,7 @@ button {
 }
 
 .SwitchRoot[data-state=checked] {
-  background-color: #3080F8;
+  background-color: rgb(255, 152, 0);
 }
 
 .SwitchRoot:hover {
@@ -2576,7 +2576,7 @@ button {
 .ExperimentalLabel {
   color: #FFF;
   font-size: 12px;
-  background-color: #3080F8;
+  background-color: rgb(255, 152, 0);
   border-radius: 15px;
   padding: 2px 8px;
   display: inline-block !important;
@@ -2963,7 +2963,7 @@ button {
   width: 46px;
   height: 46px;
   position: absolute;
-  border: 2px solid #3080F8;
+  border: 2px solid rgb(255, 152, 0);
   box-sizing: border-box;
 }
 .background-effect img {
@@ -2984,7 +2984,7 @@ button {
   width: 46px;
   height: 46px;
   position: absolute;
-  border: 2px solid #3080F8;
+  border: 2px solid rgb(255, 152, 0);
   opacity: 0.5;
   box-sizing: border-box;
 }
@@ -3409,7 +3409,7 @@ button {
   bottom: 0px;
   margin: auto;
   border-radius: 50%;
-  background: radial-gradient(118.3% 119.01% at 35.44% 0%, #2BAEF8 23.13%, #3582F6 46.35%, #486DEF 74.48%, #7B9AEA 100%);
+  background: radial-gradient(118.3% 119.01% at 35.44% 0%, rgb(255, 152, 0) 23.13%, rgb(255, 152, 0) 46.35%, rgb(255, 152, 0) 74.48%, rgb(255, 152, 0) 100%);
   width: 200px;
   height: 200px;
   transition: all 1.5s ease-in-out;
@@ -3431,12 +3431,12 @@ button {
 }
 
 .c2 {
-  background: radial-gradient(118.3% 119.01% at 35.44% 0%, #2B96F8 23.13%, #356BF6 64.58%);
+  background: radial-gradient(118.3% 119.01% at 35.44% 0%, rgb(255, 152, 0) 23.13%, rgb(255, 152, 0) 64.58%);
   transform: translate(20px, 20px);
 }
 
 .c3 {
-  background: radial-gradient(118.3% 119.01% at 35.44% 0%, #4884CA 15.3%, #2B89F8 78.83%);
+  background: radial-gradient(118.3% 119.01% at 35.44% 0%, rgb(255, 152, 0) 15.3%, rgb(255, 152, 0) 78.83%);
   transform: translate(-30px, -40px);
 }
 
@@ -3532,7 +3532,7 @@ button {
   line-height: 1.5;
 }
 .AlertDialogDescription a {
-  color: #3080F8 !important;
+  color: rgb(255, 152, 0) !important;
   font-weight: 600 !important;
   text-decoration: none !important;
   display: inline-block;
@@ -3552,15 +3552,15 @@ button {
 }
 
 .Button.blue {
-  background-color: rgba(48, 128, 248, 0.1);
-  color: #3080F8;
+  background-color:rgb(255, 152, 0);
+  color: rgb(255, 152, 0);
 }
 .Button.blue:hover {
   background-color: rgba(48, 128, 248, 0.15);
   cursor: pointer;
 }
 .Button.blue:focus {
-  box-shadow: 0px 0px 0px 2px rgba(48, 128, 248, 0.5);
+  box-shadow: 0px 0px 0px 2px rgb(255, 152, 0);
 }
 
 .Button.red {
@@ -3909,7 +3909,7 @@ html {
   right: 12px;
   width: 18px;
   height: 18px;
-  background: #3080F8;
+  background: rgb(255, 152, 0);
   border-radius: 50%;
   display: inline-flex;
   align-items: center;

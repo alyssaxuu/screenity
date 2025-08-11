@@ -231,7 +231,7 @@ const RecordingType = (props) => {
       {contentState.microphonePermission && (
         <Dropdown type="mic" shadowRef={props.shadowRef} />
       )}
-      {((contentState.microphonePermission &&
+      {/* {((contentState.microphonePermission &&
         contentState.defaultAudioInput != "none" &&
         contentState.micActive) ||
         (contentState.microphonePermission && contentState.pushToTalk)) && (
@@ -256,7 +256,7 @@ const RecordingType = (props) => {
             value="pushToTalk"
           />
         </div>
-      )}
+      )} */}
       {contentState.recordingType === "region" && cropActive && (
         <div>
           <div className="popup-content-divider"></div>

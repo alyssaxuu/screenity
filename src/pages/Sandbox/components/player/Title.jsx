@@ -90,7 +90,7 @@ const Title = () => {
                 styles={{ display: "inline-block" }}
               />
             </h1>
-            <div
+            {/* <div
               className={styles.shareButton}
               onClick={() => {
                 setShowShare(true);
@@ -101,7 +101,7 @@ const Title = () => {
                 className={styles.shareIcon}
               />
               {chrome.i18n.getMessage("shareSandboxButton")}
-            </div>
+            </div> */}
           </>
         ) : (
           <input
