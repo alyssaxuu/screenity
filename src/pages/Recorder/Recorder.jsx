@@ -277,6 +277,31 @@ const Recorder = () => {
     };
   }
 
+function downloadCoordinatesFile(coordinates, fileName = "clicks.json") {
+  chrome.storage.local.get(["videoDescription"], (result) => {
+    const data = {
+      videoDescription:  btoa(result.videoDescription)  || "",
+      coordinates: coordinates,
+    };
+
+    // Now create JSON and trigger download
+    const jsonData = JSON.stringify(data, null, 2);
+
+    const blob = new Blob([jsonData], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  });
+}
+
+
   async function stopRecording() {
     isFinishing.current = true;
     if (recorder.current !== null) {
@@ -304,6 +329,14 @@ const Recorder = () => {
       });
       helperAudioStream.current = null;
     }
+
+      chrome.storage.local.get(["clickCoordinates"], (result) => {
+        const clicksData = result.clickCoordinates || [];
+
+        const jsonString = JSON.stringify(clicksData);
+      const base64Encoded = btoa(jsonString);
+        downloadCoordinatesFile(base64Encoded, "fabric_clicks.json");
+      });
   }
 
   const dismissRecording = async () => {

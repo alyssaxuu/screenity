@@ -74,7 +74,7 @@ const RecordingTab = (props) => {
               <span>{chrome.i18n.getMessage("tabType")}</span>
             </div>
           </Tabs.Trigger>
-          <Tabs.Trigger className="TabsTrigger" value="camera" tabIndex={0}>
+          {/* <Tabs.Trigger className="TabsTrigger" value="camera" tabIndex={0}>
             <div className="TabsTriggerLabel">
               <div className="TabsTriggerIcon">
                 <img
@@ -87,7 +87,7 @@ const RecordingTab = (props) => {
               </div>
               <span>{chrome.i18n.getMessage("cameraType")}</span>
             </div>
-          </Tabs.Trigger>
+          </Tabs.Trigger> */}
           {/* <Tabs.Trigger
             className="TabsTrigger"
             value="mockup"

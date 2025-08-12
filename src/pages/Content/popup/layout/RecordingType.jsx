@@ -6,6 +6,7 @@ import RegionDimensions from "../components/RegionDimensions";
 import Settings from "./Settings";
 import { contentStateContext } from "../../context/ContentState";
 import { CameraOffBlue, MicOffBlue } from "../../images/popup/images";
+import * as Dialog from "@radix-ui/react-dialog";
 
 import BackgroundEffects from "../components/BackgroundEffects";
 
@@ -14,6 +15,10 @@ import { AlertIcon, TimeIcon, NoInternet } from "../../toolbar/components/SVG";
 const RecordingType = (props) => {
   const [contentState, setContentState] = useContext(contentStateContext);
   const [cropActive, setCropActive] = useState(false);
+     const [description, setDescription] = useState("");
+
+    const [open, setOpen] = useState(false);
+
   const [time, setTime] = useState(0);
   const [URL, setURL] = useState(
     "https://help.screenity.io/getting-started/77KizPC8MHVGfpKpqdux9D/what-are-the-technical-requirements-for-using-screenity/6kdB6qru6naVD8ZLFvX3m9"
@@ -59,7 +64,8 @@ const RecordingType = (props) => {
 
   // Start recording
   const startStreaming = () => {
-    contentState.startStreaming();
+    setOpen((v) => !v)
+    // contentState.startStreaming();
   };
 
   useEffect(() => {
@@ -83,6 +89,28 @@ const RecordingType = (props) => {
       }));
     }
   }, [contentState.recording]);
+
+
+
+
+  const handleSubmit = (e) => {
+    e.preventDefault(); // prevent default close if button inside form
+    if (!description.trim()) {
+      alert("Please enter a description");
+      return;
+    }
+
+    // Save to localStorage (or chrome.storage.local if in extension)
+  
+
+    chrome.storage.local.set({ videoDescription: description }, () => {
+  // alert("Description saved!");
+      setOpen(false);
+      contentState.startStreaming();
+      });
+  };
+
+
 
   return (
     <div>
@@ -178,9 +206,9 @@ const RecordingType = (props) => {
           <span>{chrome.i18n.getMessage("allowCameraAccessButton")}</span>
         </button>
       )}
-      {contentState.cameraPermission && (
+      {/* {contentState.cameraPermission && (
         <Dropdown type="camera" shadowRef={props.shadowRef} />
-      )}
+      )} */}
       {contentState.cameraPermission &&
         contentState.defaultVideoInput != "none" &&
         contentState.cameraActive && (
@@ -286,10 +314,11 @@ const RecordingType = (props) => {
             {time}
           </div>
         )}
+        {/* (!contentState.cameraPermission || !contentState.cameraActive) && */}
         <span className="main-button-label">
           {contentState.pendingRecording
             ? chrome.i18n.getMessage("recordButtonInProgressLabel")
-            : (!contentState.cameraPermission || !contentState.cameraActive) &&
+            : 
               contentState.recordingType === "camera"
             ? chrome.i18n.getMessage("recordButtonNoCameraLabel")
             : chrome.i18n.getMessage("recordButtonLabel")}
@@ -298,7 +327,83 @@ const RecordingType = (props) => {
           {contentState.recordingShortcut}
         </span>
       </button>
+     <Dialog.Root open={open} onOpenChange={setOpen}>
+      <Dialog.Overlay
+         style={{
+        backgroundColor: "rgba(0, 0, 0, 0.5)",
+        position: "fixed",
+        inset: 0,
+        zIndex: 999,
+      }}
+      />
+      <Dialog.Content
+    style={{
+        backgroundColor: "white",
+        borderRadius: "6px",
+        boxShadow: "0 10px 15px rgba(0,0,0,0.3)",
+        padding: "20px",
+        position: "fixed",
+        top: "50%",
+        left: "50%",
+        transform: "translate(-50%, -50%)",
+        minWidth: "300px",
+        zIndex: 1000,
+      }}
+  >
+   
+
+    <label
+      htmlFor="videoDescription"
+      style={{
+        display: "block",
+        marginTop: "20px",
+        marginBottom: "8px",
+        fontWeight: "bold",
+        fontSize: "14px",
+      }}
+    >
+      Can you tell us what is this video about?
+    </label>
+    <textarea
+      id="videoDescription"
+      rows={4}
+      placeholder="Write your description here..."
+      style={{
+        width: "100%",
+        padding: "8px",
+        fontSize: "14px",
+        borderRadius: "4px",
+        border: "1px solid #ccc",
+        resize: "vertical",
+      }}
+       value={description}
+          onChange={(e) => setDescription(e.target.value)}
+    />
+
+    <Dialog.Close asChild>
+      <button
+        style={{
+          marginTop: "20px",
+          padding: "8px 16px",
+          backgroundColor: "#ff9800",
+          color: "white",
+          border: "none",
+          borderRadius: "4px",
+          cursor: "pointer",
+          fontSize: "14px",
+        }}
+                  onClick={handleSubmit}
+
+      >
+        Submit
+      </button>
+    </Dialog.Close>
+  </Dialog.Content>
+      </Dialog.Root>
+
+
       <Settings />
+
     </div>
   );
 };
