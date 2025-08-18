@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 
 // Import all the utils
 import addAudioToVideo from "./utils/addAudioToVideo";

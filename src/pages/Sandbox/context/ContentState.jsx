@@ -360,6 +360,11 @@ const ContentState = (props) => {
     chunkCount.current = contentState.chunkCount;
   }, [contentState.chunkCount]);
 
+
+
+
+
+
   const handleBatch = async (chunks, sendResponse) => {
     // Process chunks with a promise to ensure all async operations are completed
     await Promise.all(
@@ -482,8 +487,106 @@ const ContentState = (props) => {
     };
   }, []);
 
+
+ function base64ToFile(base64, prefix = "video") {
+  const arr = base64.split(",");
+  const mime = arr[0].match(/:(.*?);/)[1];
+  const bstr = atob(arr[1]);
+  let n = bstr.length;
+  const u8arr = new Uint8Array(n);
+  while (n--) {
+    u8arr[n] = bstr.charCodeAt(n);
+  }
+
+  const timestamp = Date.now();
+  const filename = `${prefix}_${timestamp}.mp4`;
+
+  return new File([u8arr], filename, { type: mime });
+}
+
+
+function sendCombinedJsonToBackend() {
+  return new Promise((resolve, reject) => {
+    chrome.storage.local.get(["videoDescription", "clickCoordinates"], (result) => {
+      if (chrome.runtime.lastError) return reject(chrome.runtime.lastError);
+
+      const data = {
+        videoDescription: result.videoDescription || "",
+        clickCoordinates: result.clickCoordinates || []
+      };
+
+      // Convert JSON → string
+      const jsonString = JSON.stringify(data, null, 2);
+
+      // Encode JSON → Base64
+      const base64Json = btoa(jsonString);
+
+      // Create filename
+      const timestamp = Date.now();
+      const fileName = `data_${timestamp}.json`;
+
+      // Create File object
+      const file = new File([base64Json], fileName, { type: "application/json" });
+
+      resolve(file);
+    });
+  });
+}
+
+
+
+
   const onMessage = async (event) => {
+
+
     if (event.data.type === "updated-blob") {
+      chrome.storage.local.get(['SELLER_DETAILS'], async(result) => {
+        if (result.SELLER_DETAILS) {
+          let  ACCESS_TOKEN= result.SELLER_DETAILS?.ACCESS_TOKEN
+          let  SELLER_ID= result.SELLER_DETAILS?.SELLER_ID
+
+          const header= {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${ACCESS_TOKEN}`, // ✅ token here
+          }
+          const body=JSON.stringify({
+            seller_id: SELLER_ID,
+           
+          })
+
+
+      let video= await base64ToFile(event.data.base64);
+
+      let jsonfile=await sendCombinedJsonToBackend()
+      // console.log(jsonfile,"jsonfile")
+ 
+      // let formdata=new FormData();
+      // formdata.append('video',video)
+      // formdata.append('jsonfile',jsonfile)
+
+
+
+
+      
+
+           const response = await fetch("https://devbackend.demokraft.ai/studio/api/v1/studio/videos", {
+          method: "POST",
+          headers: header,
+          body: body,
+        });
+            console.log(response,"responseresponseresponse")
+
+
+
+          // console.log("Seller details found:", result.SELLER_DETAILS?.ACCESS_TOKEN);
+        } else {
+          console.log("No seller details saved yet.");
+        }
+      });
+       
+
+
+
       const base64 = event.data.base64;
       const blob = new Blob([base64ToUint8Array(base64)], {
         type: "video/mp4",

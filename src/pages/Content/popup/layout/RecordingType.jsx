@@ -62,10 +62,15 @@ const RecordingType = (props) => {
     setTime(minutes + ":" + seconds);
   }, [contentState.alarmTime]);
 
-  // Start recording
+// Start recording
   const startStreaming = () => {
-    setOpen((v) => !v)
+    // setOpen((v) => !v)
     // contentState.startStreaming();
+    setContentState((prevContentState) => ({
+        ...prevContentState,
+        VideoAbout: true,
+      }));
+      return <VideoAbout status={true}/>
   };
 
   useEffect(() => {
@@ -177,7 +182,7 @@ const RecordingType = (props) => {
             </div>
           </div>
         )}
-      {!contentState.cameraPermission && (
+      {/* {!contentState.cameraPermission && (
         <button
           className="permission-button"
           onClick={() => {
@@ -205,7 +210,7 @@ const RecordingType = (props) => {
           <img src={CameraOffBlue} />
           <span>{chrome.i18n.getMessage("allowCameraAccessButton")}</span>
         </button>
-      )}
+      )} */}
       {/* {contentState.cameraPermission && (
         <Dropdown type="camera" shadowRef={props.shadowRef} />
       )} */}

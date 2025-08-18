@@ -9,6 +9,7 @@ import Canvas from "./canvas/Canvas";
 import Countdown from "./countdown/Countdown";
 import Modal from "./modal/Modal";
 import Warning from "./warning/Warning";
+import VideoAbout from "../VideoAbout/VideoAbout";
 
 import Region from "./region/Region";
 
@@ -180,6 +181,7 @@ const Wrapper = () => {
               {contentState.recordingType === "region" &&
                 contentState.customRegion && <Region />}
               {shadowRef.current && <Modal shadowRef={shadowRef} />}
+                <VideoAbout />
               <Countdown />
               {contentState.recordingType != "camera" && (
                 <Camera shadowRef={shadowRef} />

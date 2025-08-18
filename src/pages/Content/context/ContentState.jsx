@@ -689,6 +689,7 @@ const ContentState = (props) => {
     hasOpenedBefore: false,
     qualityValue: "1080p",
     fpsValue: "30",
+    VideoAbout:false
   });
   contentStateRef.current = contentState;
 
