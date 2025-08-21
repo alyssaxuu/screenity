@@ -40,8 +40,35 @@ const CursorModes = () => {
 
   // On mouse down, save click coordinate and animate click target
   const mouseDownHandler = (e) => {
-    const clickCoord = { x: e.clientX, y: e.clientY, time: Date.now() };
-    clickCoordinatesRef.current.push(clickCoord);
+   
+
+// On click
+        chrome.storage.local.get("savedTime", (result) => {
+        
+           if (result.savedTime !=undefined) {
+        const savedTime = (result.savedTime/1000); // already a number
+        const diff = (Date.now()/1000) - savedTime; // ms difference
+        console.log("Saved timestamp:", savedTime);
+        console.log("Time difference (ms):", diff);
+          // Save click with only difference
+          const clickCoord = { 
+            x: e.clientX, 
+            y: e.clientY, 
+            time:  diff // store only difference
+          };
+
+          clickCoordinatesRef.current.push(clickCoord);
+             }
+
+
+
+
+
+          // Update savedTime for next click
+          // chrome.storage.local.set({ savedTime: new Date().toISOString() });
+        });
+
+
     saveClickCoordinatesDebounced();
 
     if (modeRef.current === "target" && clickTargetRef.current) {

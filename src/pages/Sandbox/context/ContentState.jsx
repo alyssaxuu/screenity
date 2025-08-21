@@ -72,6 +72,8 @@ const ContentState = (props) => {
     fallback: false,
     chunkCount: 0,
     chunkIndex: 0,
+    videoUploadContentService:false,
+    studio_video_id:null
   };
 
   const [contentState, setContentState] = useState(defaultState);
@@ -541,7 +543,10 @@ function sendCombinedJsonToBackend() {
 
     if (event.data.type === "updated-blob") {
       chrome.storage.local.get(['SELLER_DETAILS'], async(result) => {
-        if (result.SELLER_DETAILS) {
+
+        
+        if (result?.SELLER_DETAILS) {
+
           let  ACCESS_TOKEN= result.SELLER_DETAILS?.ACCESS_TOKEN
           let  SELLER_ID= result.SELLER_DETAILS?.SELLER_ID
 
@@ -551,6 +556,7 @@ function sendCombinedJsonToBackend() {
           }
           const body=JSON.stringify({
             seller_id: SELLER_ID,
+            
            
           })
 
@@ -560,25 +566,47 @@ function sendCombinedJsonToBackend() {
       let jsonfile=await sendCombinedJsonToBackend()
       // console.log(jsonfile,"jsonfile")
  
-      // let formdata=new FormData();
-      // formdata.append('video',video)
-      // formdata.append('jsonfile',jsonfile)
+     
+
+            const response = await fetch("https://devbackend.demokraft.ai/studio/api/v1/studio/videos", {
+              method: "POST",
+              headers: header,
+              body: body,
+            });
+
+            const resultstudion = await response.json(); // parse JSON
+
+            console.log(resultstudion, "full response");
+            console.log(resultstudion.data.studio_video_id, "studio_video_id");
+
+            // if you only need the id
+            const studio_video_id = resultstudion.data.studio_video_id;
+
+             let formdata=new FormData();
+              formdata.append('video',video)
+              formdata.append('jsonfile',jsonfile)
+              formdata.append('studio_video_id',studio_video_id)
+              formdata.append('seller_id',SELLER_ID)
+
+          const responseContentService = await fetch("https://devbackend.demokraft.ai/content/v1/studio", {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${ACCESS_TOKEN}`, // if required
+              // ⚠️ Do NOT set "Content-Type" here
+            },
+            body: formdata,
+          });
+             const resultContent = await responseContentService.json(); // parse JSON
+            if(resultContent?.data){
+                  setContentState((prevState) => ({
+                    ...prevState,
+                      videoUploadContentService:true,
+                      studio_video_id:studio_video_id
+                  }));
+            }
 
 
 
-
-      
-
-           const response = await fetch("https://devbackend.demokraft.ai/studio/api/v1/studio/videos", {
-          method: "POST",
-          headers: header,
-          body: body,
-        });
-            console.log(response,"responseresponseresponse")
-
-
-
-          // console.log("Seller details found:", result.SELLER_DETAILS?.ACCESS_TOKEN);
         } else {
           console.log("No seller details saved yet.");
         }

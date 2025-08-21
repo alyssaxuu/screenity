@@ -40,6 +40,19 @@ const ContentState = (props) => {
   }, []);
 
   const startRecording = useCallback(() => {
+    const savedTime = new Date().getTime(); // store timestamp instead of ISO
+
+      chrome.storage.local.set({ savedTime }, () => {
+        console.log("Time saved!");
+
+        // Verify
+        chrome.storage.local.get("savedTime", (result) => {
+          console.log("Saved time is:", result.savedTime);
+        });
+      });
+
+     
+
     if (contentStateRef.current.alarm) {
       if (contentStateRef.current.alarmTime === 0) {
         setContentState((prevContentState) => ({

@@ -11,6 +11,7 @@ import * as Dialog from "@radix-ui/react-dialog";
 import BackgroundEffects from "../components/BackgroundEffects";
 
 import { AlertIcon, TimeIcon, NoInternet } from "../../toolbar/components/SVG";
+import VideoAbout from "../../../VideoAbout/VideoAbout";
 
 const RecordingType = (props) => {
   const [contentState, setContentState] = useContext(contentStateContext);
