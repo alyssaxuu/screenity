@@ -1,141 +1,135 @@
 import signIn from "./signIn";
 
-// Function to upload a video to Google Drive
-const saveToDrive = async (videoBlob, fileName, sendResponse) => {
-  // Function to get an access token from Chrome storage
-  async function getAuthTokenFromStorage() {
-    return new Promise((resolve, reject) => {
-      chrome.storage.local.get(["token"], async (result) => {
-        if (chrome.runtime.lastError) {
-          reject(new Error(chrome.runtime.lastError));
-        } else {
-          const token = result.token;
-          if (!token || token === null) {
-            // Token is not set, trigger sign-in
-            const newToken = await signIn();
-            if (!newToken || newToken === null) {
-              // Sign-in failed, throw an error
-              reject(new Error("Sign-in failed"));
-            }
-            resolve(newToken);
-          } else {
-            // Token is set, check if it has expired
-            let payload;
-            try {
-              payload = JSON.parse(atob(token.split(".")[1]));
-            } catch (err) {
-              // Token is invalid, refresh it
-              chrome.identity.getAuthToken(
-                { interactive: true },
-                (newToken) => {
-                  if (chrome.runtime.lastError) {
-                    reject(new Error(chrome.runtime.lastError));
-                  } else {
-                    resolve(newToken);
-                  }
-                }
-              );
-              return;
-            }
+// Find or create "Screenity" folder
+const findOrCreateScreenityFolder = async (token) => {
+  const headers = new Headers({
+    Authorization: `Bearer ${token}`,
+    "Content-Type": "application/json",
+  });
 
-            const expirationTime = payload.exp * 1000; // Convert to milliseconds
-            const currentTime = Date.now();
-            if (currentTime >= expirationTime) {
-              // Token has expired, refresh it
-              chrome.identity.getAuthToken(
-                { interactive: true },
-                (newToken) => {
-                  if (chrome.runtime.lastError) {
-                    reject(new Error(chrome.runtime.lastError));
-                  } else {
-                    resolve(newToken);
-                  }
-                }
-              );
-            } else {
-              // Token is still valid
-              resolve(token);
-            }
-          }
-        }
-      });
-    });
-  }
+  const query = encodeURIComponent(
+    `name='Screenity' and mimeType='application/vnd.google-apps.folder' and trashed=false`
+  );
+  const searchRes = await fetch(
+    `https://www.googleapis.com/drive/v3/files?q=${query}&fields=files(id,name)`,
+    { headers }
+  );
+  const result = await searchRes.json();
+  if (result.files?.length) return result.files[0].id;
 
-  return new Promise(async (resolve, reject) => {
-    try {
-      // Get the access token from Chrome storage
-      let token = await getAuthTokenFromStorage();
+  const createRes = await fetch(`https://www.googleapis.com/drive/v3/files`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({
+      name: "Screenity",
+      mimeType: "application/vnd.google-apps.folder",
+    }),
+  });
+  const newFolder = await createRes.json();
+  return newFolder.id;
+};
 
-      if (!token || token === null) {
-        throw new Error("Sign-in failed");
+const getAuthTokenFromStorage = () =>
+  new Promise((resolve, reject) => {
+    chrome.storage.local.get(["token"], async ({ token }) => {
+      if (chrome.runtime.lastError)
+        return reject(new Error(chrome.runtime.lastError));
+
+      const store = (t) => {
+        chrome.storage.local.set({ token: t }, () => resolve(t));
+      };
+
+      // If no token, sign in
+      if (!token) {
+        const newToken = await signIn();
+        return newToken ? store(newToken) : reject(new Error("Sign-in failed"));
       }
 
-      // Upload the video to Google Drive
-      const headers = new Headers({
-        Authorization: `Bearer ${token}`,
-        "Content-Type": videoBlob.type,
-      });
+      // Validate / refresh token
+      try {
+        const payload = JSON.parse(atob(token.split(".")[1]));
+        if (Date.now() >= payload.exp * 1000) {
+          return chrome.identity.getAuthToken(
+            { interactive: true },
+            (newToken) => {
+              if (chrome.runtime.lastError)
+                return reject(new Error(chrome.runtime.lastError));
+              return store(newToken);
+            }
+          );
+        }
+      } catch {
+        return chrome.identity.getAuthToken(
+          { interactive: true },
+          (newToken) => {
+            if (chrome.runtime.lastError)
+              return reject(new Error(chrome.runtime.lastError));
+            return store(newToken);
+          }
+        );
+      }
+      resolve(token);
+    });
+  });
 
-      const uploadResponse = await fetch(
+// Upload to Google Drive in Screenity folder
+const saveToDrive = async (videoBlob, fileName, sendResponse) => {
+  return new Promise(async (resolve, reject) => {
+    try {
+      const token = await getAuthTokenFromStorage();
+      if (!token) throw new Error("Sign-in failed");
+
+      // 1) Upload raw media
+      const uploadRes = await fetch(
         "https://www.googleapis.com/upload/drive/v3/files?uploadType=media",
         {
           method: "POST",
-          headers,
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": videoBlob.type || "application/octet-stream",
+          },
           body: videoBlob,
         }
       );
+      if (!uploadRes.ok) throw new Error(`Upload failed: ${uploadRes.status}`);
+      const { id: fileId } = await uploadRes.json();
+      if (!fileId) throw new Error("No fileId returned");
 
-      if (!uploadResponse.ok) {
-        throw new Error(
-          `Error uploading to Google Drive: ${uploadResponse.status}`
-        );
-      }
+      // 2) Find/create folder
+      const folderId = await findOrCreateScreenityFolder(token);
 
-      const responseData = await uploadResponse.json();
-      const fileId = responseData.id;
-
-      if (!fileId) {
-        throw new Error("File ID is undefined");
-      }
-
-      // Create the metadata for the file
-      const fileMetadata = {
-        name: fileName,
-      };
-
-      // Update the file metadata with the name
-      const metadataResponse = await fetch(
-        `https://www.googleapis.com/drive/v3/files/${fileId}`,
-        {
-          method: "PATCH",
-          headers: new Headers({
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json; charset=UTF-8",
-          }),
-          body: JSON.stringify(fileMetadata),
-        }
+      // 3) Get current parent (so we can remove it when moving)
+      const parentsRes = await fetch(
+        `https://www.googleapis.com/drive/v3/files/${fileId}?fields=parents`,
+        { headers: { Authorization: `Bearer ${token}` } }
       );
+      const parentsData = await parentsRes.json();
+      const oldParents = Array.isArray(parentsData.parents)
+        ? parentsData.parents.join(",")
+        : "";
 
-      if (!metadataResponse.ok) {
-        const errorResponse = await metadataResponse.json();
-        console.error(
-          "Error updating file metadata:",
-          metadataResponse.status,
-          errorResponse.error.message
-        );
-        throw new Error(
-          `Error updating file metadata: ${metadataResponse.status}`
-        );
-      }
+      // 4) Move file into folder + set name
+      const moveUrl =
+        `https://www.googleapis.com/drive/v3/files/${fileId}` +
+        `?addParents=${encodeURIComponent(folderId)}` +
+        (oldParents ? `&removeParents=${encodeURIComponent(oldParents)}` : "");
+
+      const metadataRes = await fetch(moveUrl, {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json; charset=UTF-8",
+        },
+        body: JSON.stringify({ name: fileName }),
+      });
+      if (!metadataRes.ok)
+        throw new Error(`Metadata update failed: ${metadataRes.status}`);
+
       sendResponse({ status: "ok", url: fileId });
-
-      // Open the Google Drive file in a new tab
       chrome.tabs.create({
         url: `https://drive.google.com/file/d/${fileId}/view`,
       });
-
-      resolve(`https://drive.google.com/file/d/${fileId}/view`); // Return the file ID if needed
+      resolve(`https://drive.google.com/file/d/${fileId}/view`);
     } catch (error) {
       console.error("Error uploading to Google Drive:", error.message);
       sendResponse({ status: "ew", url: null });

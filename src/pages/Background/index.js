@@ -38,15 +38,6 @@ const startAfterCountdown = async () => {
 };
 
 const resetActiveTab = async () => {
-  let editor_url = "editor.html";
-
-  // Check if Chrome version is 109 or below
-  if (navigator.userAgent.includes("Chrome/")) {
-    const version = parseInt(navigator.userAgent.match(/Chrome\/([0-9]+)/)[1]);
-    if (version <= 109) {
-      editor_url = "editorfallback.html";
-    }
-  }
   const { activeTab } = await chrome.storage.local.get(["activeTab"]);
 
   // Check if activeTab exists
@@ -244,8 +235,10 @@ const onActivated = async (activeInfo) => {
 
     // Check if region or customRegion is set
     const { region } = await chrome.storage.local.get(["region"]);
+    const { recordingType } = await chrome.storage.local.get(["recordingType"]);
     const { customRegion } = await chrome.storage.local.get(["customRegion"]);
-    if (!region && !customRegion) {
+
+    if (!region && !customRegion && recordingType !== "region") {
       sendMessageTab(activeInfo.tabId, { type: "recording-check" });
     }
   } else if (!recording && !restarting) {
@@ -448,6 +441,7 @@ const sendChunks = async (override = false) => {
     await chunksStore.iterate((value, key) => {
       chunks.push(value);
     });
+    console.log("Retrieved chunks from store", chunks.length);
     handleChunks(chunks, override);
   } catch (error) {
     chrome.runtime.reload();
@@ -489,7 +483,11 @@ const stopRecording = async () => {
           if (tabId === tab.id && changeInfo.status === "complete") {
             chrome.tabs.onUpdated.removeListener(_);
             chrome.storage.local.set({ sandboxTab: tab.id });
-            sendChunks();
+
+            // Get the recording data directly within the sandbox page
+            sendMessageTab(tab.id, {
+              type: "large-recording",
+            });
           }
         });
       }

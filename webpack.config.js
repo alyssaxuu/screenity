@@ -5,7 +5,6 @@ var webpack = require("webpack"),
   CopyWebpackPlugin = require("copy-webpack-plugin"),
   HtmlWebpackPlugin = require("html-webpack-plugin"),
   TerserPlugin = require("terser-webpack-plugin");
-var { CleanWebpackPlugin } = require("clean-webpack-plugin");
 
 const ASSET_PATH = process.env.ASSET_PATH || "/";
 
@@ -107,14 +106,20 @@ var options = {
         ],
       },
       {
-        test: new RegExp(".(" + fileExtensions.join("|") + ")$"),
+        test: /\.(png|jpe?g|gif|svg|eot|otf|ttf|woff2?|mp4|webm|ogg|mp3|wav|m4a|aac)$/i,
         type: "asset/resource",
-        exclude: /node_modules/,
-        // loader: 'file-loader',
-        // options: {
-        //   name: '[name].[ext]',
-        // },
+        generator: { filename: "assets/[name][ext]" },
+        exclude: path.resolve(__dirname, "src/assets"), // <-- important
       },
+      // {
+      //   test: new RegExp(".(" + fileExtensions.join("|") + ")$"),
+      //   type: "asset/resource",
+      //   exclude: /node_modules/,
+      //   // loader: 'file-loader',
+      //   // options: {
+      //   //   name: '[name].[ext]',
+      //   // },
+      // },
       {
         test: /\.html$/,
         loader: "html-loader",
@@ -142,7 +147,6 @@ var options = {
       .concat([".js", ".jsx", ".ts", ".tsx", ".css"]),
   },
   plugins: [
-    new CleanWebpackPlugin({ verbose: false }),
     new webpack.ProgressPlugin(),
     // expose and write the allowed env vars on the compiled bundle
     new webpack.EnvironmentPlugin(["NODE_ENV"]),

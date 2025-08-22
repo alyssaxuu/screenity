@@ -100,8 +100,9 @@ const Sandbox = () => {
 
   useEffect(() => {
     if (contentState.chunkCount > 0) {
-      progress.current = `(${Math.round(
-        (contentState.chunkIndex / contentState.chunkCount) * 100
+      progress.current = `(${Math.min(
+        100,
+        Math.round((contentState.chunkIndex / contentState.chunkCount) * 100)
       )}%)`;
     }
   }, [contentState.chunkIndex, contentState.chunkCount]);

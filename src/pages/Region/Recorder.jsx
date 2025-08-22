@@ -9,12 +9,11 @@ import React, {
 import localforage from "localforage";
 
 localforage.config({
-  driver: localforage.INDEXEDDB, // or choose another driver
-  name: "screenity", // optional
-  version: 1, // optional
+  driver: localforage.INDEXEDDB,
+  name: "screenity",
+  version: 1,
 });
 
-// Get chunks store
 const chunksStore = localforage.createInstance({
   name: "chunks",
 });
@@ -28,6 +27,7 @@ const Recorder = () => {
   const index = useRef(0);
   const lastTimecode = useRef(0);
   const hasChunks = useRef(false);
+  const lastSize = useRef(0);
 
   // Main stream (recording)
   const liveStream = useRef(null);
@@ -53,6 +53,135 @@ const Recorder = () => {
   const recordingRef = useRef();
   const regionRef = useRef();
   const backupRef = useRef(false);
+
+  // Chunk handling system from first file
+  const pending = useRef([]);
+  const draining = useRef(false);
+  const lowStorageAbort = useRef(false);
+  const savedCount = useRef(0);
+
+  const lastEstimateAt = useRef(0);
+  const ESTIMATE_INTERVAL_MS = 5000;
+  const MIN_HEADROOM = 25 * 1024 * 1024;
+  const MAX_PENDING_BYTES = 8 * 1024 * 1024;
+  const pendingBytes = useRef(0);
+
+  async function canFitChunk(byteLength) {
+    const now = performance.now();
+    if (now - lastEstimateAt.current < ESTIMATE_INTERVAL_MS) {
+      return !lowStorageAbort.current;
+    }
+    lastEstimateAt.current = now;
+
+    try {
+      const { usage = 0, quota = 0 } = await navigator.storage.estimate();
+      const remaining = quota - usage;
+      return remaining > MIN_HEADROOM + (byteLength || 0);
+    } catch {
+      return !lowStorageAbort.current;
+    }
+  }
+
+  async function saveChunk(e, i) {
+    const ts = e.timecode ?? 0;
+
+    if (
+      savedCount.current > 0 &&
+      ts === lastTimecode.current &&
+      e.data.size === lastSize.current
+    ) {
+      return false;
+    }
+
+    if (!(await canFitChunk(e.data.size))) {
+      lowStorageAbort.current = true;
+      chrome.storage.local.set({
+        recording: false,
+        restarting: false,
+        tabRecordedID: null,
+        memoryError: true,
+      });
+      chrome.runtime.sendMessage({ type: "stop-recording-tab" });
+      // Reload this iframe
+      window.location.reload();
+      return false;
+    }
+
+    try {
+      await chunksStore.setItem(`chunk_${i}`, {
+        index: i,
+        chunk: e.data,
+        timestamp: ts,
+      });
+    } catch (err) {
+      lowStorageAbort.current = true;
+      chrome.storage.local.set({
+        recording: false,
+        restarting: false,
+        tabRecordedID: null,
+        memoryError: true,
+      });
+      chrome.runtime.sendMessage({ type: "stop-recording-tab" });
+      // Reload this iframe
+      window.location.reload();
+      return false;
+    }
+
+    lastTimecode.current = ts;
+    lastSize.current = e.data.size;
+    savedCount.current += 1;
+
+    if (backupRef.current) {
+      chrome.runtime.sendMessage({ type: "write-file", index: i });
+    }
+    return true;
+  }
+
+  async function drainQueue() {
+    if (draining.current) return;
+    draining.current = true;
+
+    try {
+      while (pending.current.length) {
+        if (lowStorageAbort.current) {
+          pending.current.length = 0;
+          pendingBytes.current = 0;
+          break;
+        }
+
+        const e = pending.current.shift();
+        pendingBytes.current -= e.data.size;
+
+        if (!(await canFitChunk(e.data.size))) {
+          lowStorageAbort.current = true;
+          chrome.storage.local.set({
+            recording: false,
+            restarting: false,
+            tabRecordedID: null,
+            memoryError: true,
+          });
+          chrome.runtime.sendMessage({ type: "stop-recording-tab" });
+          pending.current.length = 0;
+          pendingBytes.current = 0;
+          // Reload this iframe
+          window.location.reload();
+          break;
+        }
+
+        const i = index.current;
+        const saved = await saveChunk(e, i);
+        if (saved) index.current = i + 1;
+      }
+    } finally {
+      draining.current = false;
+    }
+  }
+
+  async function waitForDrain() {
+    while (draining.current || pending.current.length) {
+      await new Promise((r) => setTimeout(r, 10));
+    }
+  }
 
   useEffect(() => {
     window.parent.postMessage(
@@ -86,11 +215,20 @@ const Recorder = () => {
     // Check that a recording is not already in progress
     if (recorder.current !== null) return;
     navigator.storage.persist();
+
+    // Reset all state variables
     isFinishing.current = false;
     sentLast.current = false;
     lastTimecode.current = 0;
-    hasChunks.current = 0;
+    lastSize.current = 0;
+    hasChunks.current = false;
     isFinished.current = false;
+    savedCount.current = 0;
+    pending.current = [];
+    draining.current = false;
+    lowStorageAbort.current = false;
+    pendingBytes.current = 0;
+
     // Check if the stream actually has data in it
     try {
       if (helperVideoStream.current.getVideoTracks().length === 0) {
@@ -99,7 +237,6 @@ const Recorder = () => {
           error: "stream-error",
           why: "No video tracks available",
         });
-
         // Reload this iframe
         window.location.reload();
         return;
@@ -110,7 +247,6 @@ const Recorder = () => {
         error: "stream-error",
         why: JSON.stringify(err),
       });
-
       // Reload this iframe
       window.location.reload();
       return;
@@ -146,12 +282,8 @@ const Recorder = () => {
 
       // List all mimeTypes
       const mimeTypes = [
-        "video/webm;codecs=avc1",
-        "video/webm;codecs=vp8,opus",
         "video/webm;codecs=vp9,opus",
-        "video/webm;codecs=vp9",
-        "video/webm;codecs=vp8",
-        "video/webm;codecs=h264",
+        "video/webm;codecs=vp8,opus",
         "video/webm",
       ];
 
@@ -167,7 +299,6 @@ const Recorder = () => {
           error: "stream-error",
           why: "No supported mimeTypes available",
         });
-
         // Reload this iframe
         window.location.reload();
         return;
@@ -184,7 +315,6 @@ const Recorder = () => {
         error: "stream-error",
         why: JSON.stringify(err),
       });
-
       // Reload this iframe
       window.location.reload();
       return;
@@ -200,9 +330,9 @@ const Recorder = () => {
     recordingRef.current = true;
     isDismissing.current = false;
 
-    // I don't know what the ideal chunk size should be here
+    // Start recording with 1000ms chunks like the first file
     try {
-      recorder.current.start(3000);
+      recorder.current.start(1000);
     } catch (err) {
       chrome.storage.local.set({
         recording: false,
@@ -211,29 +341,33 @@ const Recorder = () => {
         memoryError: true,
       });
       chrome.runtime.sendMessage({ type: "stop-recording-tab" });
-
       // Reload this iframe
       window.location.reload();
       return;
     }
 
-    recorder.current.onstop = async (e) => {
+    recorder.current.onerror = (ev) => {
+      chrome.runtime.sendMessage({
+        type: "recording-error",
+        error: "mediarecorder",
+        why: String(ev?.error || "unknown"),
+      });
+    };
+
+    recorder.current.onstop = async () => {
       regionRef.current = false;
       recordingRef.current = false;
       if (isRestarting.current) return;
+      await waitForDrain();
       if (!isDismissing.current) {
-        setTimeout(() => {
-          if (!sentLast.current) {
-            isFinished.current = true;
-            chrome.runtime.sendMessage({ type: "video-ready" });
-            isFinishing.current = false;
-            lastTimecode.current = 0;
-            hasChunks.current = 0;
-
-            // Reload this iframe
-            window.location.reload();
-          }
-        }, 3000);
+        if (!sentLast.current) {
+          sentLast.current = true;
+          isFinished.current = true;
+          chrome.runtime.sendMessage({ type: "video-ready" });
+          isFinishing.current = false;
+          // Reload this iframe
+          window.location.reload();
+        }
       } else {
         isDismissing.current = false;
       }
@@ -241,10 +375,10 @@ const Recorder = () => {
 
     const checkMaxMemory = () => {
       try {
-        navigator.storage.estimate().then((data) => {
-          const minMemory = 26214400;
-          // Check if there's enough space to keep recording
-          if (data.quota < minMemory) {
+        navigator.storage.estimate().then(({ usage = 0, quota = 0 }) => {
+          const remaining = quota - usage;
+          const minHeadroom = 25 * 1024 * 1024;
+          if (remaining < minHeadroom) {
             chrome.storage.local.set({
               recording: false,
               restarting: false,
@@ -252,7 +386,6 @@ const Recorder = () => {
               memoryError: true,
             });
             chrome.runtime.sendMessage({ type: "stop-recording-tab" });
-
             // Reload this iframe
             window.location.reload();
           }
@@ -263,98 +396,47 @@ const Recorder = () => {
           error: "stream-error",
           why: JSON.stringify(err),
         });
-
         // Reload this iframe
         window.location.reload();
       }
     };
 
-    const handleDataAvailable = async (e) => {
-      if (isRestarting.current) return;
-      if (isDismissing.current) return;
-      if (isFinished.current) return;
-      checkMaxMemory();
-
-      if (e.data.size > 0) {
-        try {
-          const timestamp = e.timecode;
-          if (hasChunks.current === false) {
-            hasChunks.current = true;
-            lastTimecode.current = timestamp;
-          } else if (timestamp < lastTimecode.current) {
-            // This is a duplicate chunk, ignore it
-            return;
-          } else {
-            lastTimecode.current = timestamp;
-          }
-          await chunksStore.setItem(`chunk_${index.current}`, {
-            index: index.current,
-            chunk: e.data,
-            timestamp: timestamp,
-          });
-
-          if (backupRef.current) {
-            chrome.runtime.sendMessage({
-              type: "write-file",
-              index: index.current,
-            });
-          }
-          index.current++;
-        } catch (err) {
+    recorder.current.ondataavailable = (e) => {
+      if (!e || !e.data || !e.data.size) {
+        if (recorder.current && recorder.current.state === "inactive") {
           chrome.storage.local.set({
             recording: false,
             restarting: false,
             tabRecordedID: null,
-            memoryError: true,
           });
           chrome.runtime.sendMessage({ type: "stop-recording-tab" });
-
-          // Reload this iframe
-          window.location.reload();
         }
-      } else {
-        // Check media recorder state
-        try {
-          if (recorder.current.state === "inactive") {
-            chrome.storage.local.set({
-              recording: false,
-              restarting: false,
-              tabRecordedID: null,
-              memoryError: true,
-            });
-            chrome.runtime.sendMessage({ type: "stop-recording-tab" });
-
-            // Reload this iframe
-            window.location.reload();
-          }
-        } catch (err) {
-          chrome.storage.local.set({
-            recording: false,
-            restarting: false,
-            tabRecordedID: null,
-            memoryError: true,
-          });
-          chrome.runtime.sendMessage({ type: "stop-recording-tab" });
-
-          // Reload this iframe
-          window.location.reload();
-        }
+        return;
       }
 
-      if (isFinishing.current) {
-        isFinished.current = true;
-        sentLast.current = true;
-        chrome.runtime.sendMessage({ type: "video-ready" });
-        lastTimecode.current = 0;
-        hasChunks.current = 0;
-
-        // Reload this iframe
-        window.location.reload();
+      if (lowStorageAbort.current) {
+        return;
       }
+
+      if (!hasChunks.current) {
+        hasChunks.current = true;
+        lastTimecode.current = e.timecode ?? 0;
+        lastSize.current = e.data.size;
+      }
+
+      pending.current.push(e);
+      pendingBytes.current += e.data.size;
+      void drainQueue();
     };
 
-    recorder.current.ondataavailable = async (e) => {
-      await handleDataAvailable(e);
+    recorder.current.onpause = () => {
+      lastTimecode.current = 0;
+      lastSize.current = 0;
+    };
+
+    recorder.current.onresume = () => {
+      lastTimecode.current = 0;
+      lastSize.current = 0;
     };
 
     liveStream.current.getVideoTracks()[0].onended = () => {
@@ -382,8 +464,12 @@ const Recorder = () => {
     isFinishing.current = true;
     regionRef.current = false;
 
-    if (recorder.current !== null) {
+    if (recorder.current) {
+      try {
+        recorder.current.requestData();
+      } catch {}
       recorder.current.stop();
+      await waitForDrain();
       recorder.current = null;
     }
 
@@ -449,9 +535,6 @@ const Recorder = () => {
 
     recorder.current = null;
     chrome.runtime.sendMessage({ type: "new-sandbox-page-restart" });
-
-    // Send message to go back to the previously active tab
-    //chrome.runtime.sendMessage({ type: "reset-active-tab-restart" });
   };
 
   async function startAudioStream(id) {
@@ -488,6 +571,7 @@ const Recorder = () => {
 
     return result;
   }
+
   // Set audio input volume
   function setAudioInputVolume(volume) {
     audioInputGain.current.gain.value = volume;
@@ -621,7 +705,6 @@ const Recorder = () => {
             error: "cancel-modal",
             why: "No target",
           });
-
           // Reload this iframe
           window.location.reload();
         }
@@ -631,7 +714,6 @@ const Recorder = () => {
           error: "cancel-modal",
           why: JSON.stringify(err),
         });
-
         // Reload this iframe
         window.location.reload();
       }
@@ -644,11 +726,20 @@ const Recorder = () => {
         error: "cancel-modal",
         why: JSON.stringify(err),
       });
-
       // Reload this iframe
       window.location.reload();
     }
   }
+
+  useEffect(() => {
+    chrome.storage.local.get(["backup"], (result) => {
+      if (result.backup) {
+        backupRef.current = true;
+      } else {
+        backupRef.current = false;
+      }
+    });
+  }, []);
 
   useEffect(() => {
     window.addEventListener("beforeunload", (e) => {

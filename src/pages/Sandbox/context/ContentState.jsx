@@ -10,6 +10,19 @@ import { useEffect } from "react";
 import fixWebmDuration from "fix-webm-duration";
 import { default as fixWebmDurationFallback } from "webm-duration-fix";
 
+import localforage from "localforage";
+
+localforage.config({
+  driver: localforage.INDEXEDDB,
+  name: "screenity", // global DB group
+  version: 1,
+});
+
+const chunksStore = localforage.createInstance({
+  name: "chunks", // the actual DB name
+  storeName: "keyvaluepairs",
+});
+
 export const ContentStateContext = createContext();
 
 const ContentState = (props) => {
@@ -77,6 +90,23 @@ const ContentState = (props) => {
   const [contentState, setContentState] = useState(defaultState);
   const contentStateRef = useRef(contentState);
 
+  const buildBlobFromChunks = async () => {
+    const items = [];
+
+    await chunksStore.ready();
+
+    await chunksStore.iterate((value) => (items.push(value), undefined));
+
+    items.sort((a, b) => (a.timestamp ?? 0) - (b.timestamp ?? 0));
+    const parts = items.map((c) =>
+      c.chunk instanceof Blob ? c.chunk : new Blob([c.chunk])
+    );
+
+    const blob = new Blob(parts, { type: "video/webm" });
+
+    reconstructVideo(blob);
+  };
+
   useEffect(() => {
     contentStateRef.current = contentState;
   }, [contentState]);
@@ -98,6 +128,9 @@ const ContentState = (props) => {
       month: "short",
       day: "numeric",
       year: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true, // or false if you want 24h format
     });
     setContentState((prevState) => ({
       ...prevState,
@@ -196,10 +229,12 @@ const ContentState = (props) => {
     video.src = URL.createObjectURL(contentState.blob);
   }, [contentState.blob]);
 
-  const reconstructVideo = async () => {
-    const blob = new Blob(videoChunks.current, {
-      type: "video/webm; codecs=vp8, opus",
-    });
+  const reconstructVideo = async (withBlob) => {
+    const blob = withBlob
+      ? withBlob
+      : new Blob(videoChunks.current, {
+          type: "video/webm; codecs=vp8, opus",
+        });
 
     const { recordingDuration } = await chrome.storage.local.get(
       "recordingDuration"
@@ -226,6 +261,8 @@ const ContentState = (props) => {
     try {
       if (recordingDuration > 0 && recordingDuration !== null) {
         if (!isWindows10) {
+          // FLAG: Library seems unstable, using fallback for everyone for now
+          // if (false) {
           fixWebmDuration(
             blob,
             recordingDuration,
@@ -424,6 +461,17 @@ const ContentState = (props) => {
     }
   };
 
+  const toBase64 = (blob) => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(blob);
+      reader.onloadend = () => {
+        resolve(reader.result);
+      };
+      reader.onerror = reject;
+    });
+  };
+
   const onChromeMessage = useCallback(
     (request, sender, sendResponse) => {
       const message = request;
@@ -455,6 +503,18 @@ const ContentState = (props) => {
           ffmpegLoaded: true,
           ffmpeg: true,
         }));
+
+        buildBlobFromChunks();
+      } else if (message.type === "large-recording") {
+        setContentState((prevContentState) => ({
+          ...prevContentState,
+          isFfmpegRunning: false,
+          noffmpeg: true,
+          ffmpegLoaded: true,
+          ffmpeg: true,
+        }));
+
+        buildBlobFromChunks();
       } else if (message.type === "fallback-recording") {
         setContentState((prevContentState) => ({
           ...prevContentState,
@@ -609,16 +669,9 @@ const ContentState = (props) => {
 
   // Listen to PostMessage events
   useEffect(() => {
-    window.addEventListener("message", (event) => {
-      onMessage(event);
-    });
-
-    return () => {
-      window.removeEventListener("message", (event) => {
-        onMessage(event);
-      });
-    };
-  }, []);
+    window.addEventListener("message", onMessage);
+    return () => window.removeEventListener("message", onMessage);
+  }, [onMessage]);
 
   const sendMessage = (message) => {
     window.parent.postMessage(message, "*");
@@ -804,63 +857,95 @@ const ContentState = (props) => {
     return true;
   };
 
-  const requestDownload = async (url, type) => {
-    const ext = type;
-    // The title must not have these characters  " : ? ~ < > * |
-    // Replace them with a space
+  const requestDownload = async (url, ext) => {
     const title =
-      contentStateRef.current.title.replace(/[\/\\:?~<>|*]/g, " ") + ext;
+      contentStateRef.current.title.replace(/[\/\\:?~<>|*]/g, " ").trim() + ext;
 
-    // Check if user is on Brave browser
-    if ((navigator.brave && (await navigator.brave.isBrave())) || false) {
-      // Convert URL to base64
-      const response = await fetch(url);
-      const blob = await response.blob();
-      const reader = new FileReader();
-      reader.readAsDataURL(blob);
-      reader.onloadend = function () {
-        chrome.runtime.sendMessage({
-          type: "request-download",
-          base64: reader.result,
-          title: title,
-        });
+    const revoke = () => {
+      try {
         URL.revokeObjectURL(url);
-        return;
-      };
-    } else {
-      chrome.downloads.download({
-        url: url,
-        filename: title,
-        saveAs: true,
-      });
+      } catch {}
+    };
 
-      // Check if download failed
-      chrome.downloads.onChanged.addListener(async (downloadDelta) => {
-        if (
-          downloadDelta.state &&
-          downloadDelta.state.current === "interrupted" &&
-          downloadDelta.error.current != "USER_CANCELED"
-        ) {
-          // Convert URL to base64
-          const response = await fetch(url);
-          const blob = await response.blob();
-          const reader = new FileReader();
-          reader.readAsDataURL(blob);
-          reader.onloadend = function () {
-            chrome.runtime.sendMessage({
-              type: "request-download",
-              base64: reader.result,
-              title: title,
-            });
-          };
-          URL.revokeObjectURL(url);
-          return;
-        } else {
-          URL.revokeObjectURL(url);
-          return;
-        }
+    // Brave fallback: send base64 to background for download
+    if ((navigator.brave && (await navigator.brave.isBrave())) || false) {
+      const resp = await fetch(url);
+      const blob = await resp.blob();
+      await new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          chrome.runtime.sendMessage({
+            type: "request-download",
+            base64: reader.result,
+            title,
+          });
+          revoke();
+          resolve();
+        };
+        reader.readAsDataURL(blob);
       });
+      return;
     }
+
+    // Normal Chrome download – capture the id so we only react to this download
+    const downloadId = await new Promise((resolve, reject) => {
+      chrome.downloads.download(
+        { url, filename: title, saveAs: true },
+        (id) => {
+          if (chrome.runtime.lastError || !id) {
+            reject(chrome.runtime.lastError || new Error("Download failed"));
+          } else {
+            resolve(id);
+          }
+        }
+      );
+    });
+
+    // One-shot listener
+    await new Promise((resolve) => {
+      const handler = async (delta) => {
+        if (delta.id !== downloadId || !delta.state) return;
+
+        const done = () => {
+          chrome.downloads.onChanged.removeListener(handler);
+          revoke();
+          resolve();
+        };
+
+        // If download got interrupted (but not canceled by user), fallback to base64 route
+        if (
+          delta.state.current === "interrupted" &&
+          delta.error?.current !== "USER_CANCELED"
+        ) {
+          try {
+            const resp = await fetch(url);
+            const blob = await resp.blob();
+            await new Promise((res) => {
+              const reader = new FileReader();
+              reader.onloadend = () => {
+                chrome.runtime.sendMessage({
+                  type: "request-download",
+                  base64: reader.result,
+                  title,
+                });
+                res();
+              };
+              reader.readAsDataURL(blob);
+            });
+          } finally {
+            done();
+          }
+        } else if (
+          delta.state.current === "complete" ||
+          delta.state.current === "interrupted"
+        ) {
+          // complete or user canceled
+          done();
+        }
+      };
+
+      chrome.downloads.onChanged.addListener(handler);
+    });
   };
 
   const download = async () => {

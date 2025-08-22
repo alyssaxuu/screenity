@@ -1028,40 +1028,30 @@ const ContentState = (props) => {
 
   // Check if user has enough RAM to record for each quality option
   useEffect(() => {
-    const checkRAM = () => {
-      let width = Math.round(window.screen.width * window.devicePixelRatio);
-      let height = Math.round(window.screen.height * window.devicePixelRatio);
-      const ram = navigator.deviceMemory;
+    const checkQuality = () => {
+      const width = Math.round(window.screen.width * window.devicePixelRatio);
+      const height = Math.round(window.screen.height * window.devicePixelRatio);
+      const ram = Number(navigator.deviceMemory) || 4; // fallback to 4GB if unknown
 
-      // Check if ramValue needs to be updated
-      if (
-        (ram < 2 || width < 1280 || height < 720) &&
-        (contentState.qualityValue === "720p" ||
-          contentState.qualityValue === "4k" ||
-          contentState.qualityValue === "1080p")
-      ) {
-        setContentState((prevContentState) => ({
-          ...prevContentState,
-          qualityValue: "480p",
-        }));
-        chrome.storage.local.set({
-          qualityValue: "480p",
-        });
-      } else if (
-        (ram < 8 || width < 3840 || height < 2160) &&
-        contentState.qualityValue === "4k"
-      ) {
-        setContentState((prevContentState) => ({
-          ...prevContentState,
-          qualityValue: "720p",
-        }));
-        chrome.storage.local.set({
-          qualityValue: "720p",
-        });
+      let suggested = "480p";
+      if (ram >= 8 && width >= 3840 && height >= 2160) {
+        suggested = "4k";
+      } else if (ram >= 4 && width >= 1920 && height >= 1080) {
+        suggested = "1080p";
+      } else if (ram >= 2 && width >= 1280 && height >= 720) {
+        suggested = "720p";
+      }
+
+      if (contentState.qualityValue !== suggested) {
+        setContentState((prev) => ({ ...prev, qualityValue: suggested }));
+        chrome.storage.local.set({ qualityValue: suggested });
       }
     };
-    checkRAM();
-  }, [contentState.qualityValue]);
+
+    checkQuality();
+    window.addEventListener("resize", checkQuality);
+    return () => window.removeEventListener("resize", checkQuality);
+  }, [contentState.qualityValue, setContentState]);
 
   // Check recording start time
   useEffect(() => {

@@ -1,5 +1,3 @@
-// Work in progress - settings for the recording
-
 import React, { useState, useContext, useRef, useEffect } from "react";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 
@@ -38,39 +36,31 @@ const SettingsMenu = (props) => {
   // Check if user has enough RAM to record for each quality option
   useEffect(() => {
     if (width === 0 || height === 0) return;
-    const checkRAM = () => {
-      const ram = navigator.deviceMemory;
 
-      // Check if ramValue needs to be updated
-      if (
-        (ram < 2 || width < 1280 || height < 720) &&
-        (contentState.qualityValue === "720p" ||
-          contentState.qualityValue === "4k" ||
-          contentState.qualityValue === "1080p")
-      ) {
-        setContentState((prevContentState) => ({
-          ...prevContentState,
-          qualityValue: "480p",
-        }));
-        chrome.storage.local.set({
-          qualityValue: "480p",
-        });
-      } else if (
-        (ram < 8 || width < 3840 || height < 2160) &&
-        contentState.qualityValue === "4k"
-      ) {
-        setContentState((prevContentState) => ({
-          ...prevContentState,
-          qualityValue: "720p",
-        }));
-        chrome.storage.local.set({
-          qualityValue: "720p",
-        });
+    const checkSpecs = () => {
+      const ram = navigator.deviceMemory || 4; // assume mid-range if unknown
+      let newQuality = contentState.qualityValue;
+
+      if (ram >= 8 && width >= 3840 && height >= 2160) {
+        newQuality = "4k";
+      } else if (ram >= 4 && width >= 1920 && height >= 1080) {
+        newQuality = "1080p";
+      } else if (ram >= 2 && width >= 1280 && height >= 720) {
+        newQuality = "720p";
+      } else {
+        newQuality = "480p";
+      }
+
+      // Only update if value changes
+      if (newQuality !== contentState.qualityValue) {
+        setContentState((prev) => ({ ...prev, qualityValue: newQuality }));
+        chrome.storage.local.set({ qualityValue: newQuality });
       }
 
       setRAM(ram);
     };
-    checkRAM();
+
+    checkSpecs();
   }, [contentState.qualityValue, width, height]);
 
   const handleTroubleshooting = () => {

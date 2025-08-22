@@ -100,8 +100,11 @@ const Warning = () => {
 					list-style: none;
 					z-index: 2147483647;
 					outline: none;
-					pointer-events: all !important;
+					pointer-events: none;
 				}
+					.WarningViewport:has(.warning-root[data-state="open"]) {
+  pointer-events: all;
+}
 				
 				.warning-root {
 					background-color: #29292F;
