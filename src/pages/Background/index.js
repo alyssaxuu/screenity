@@ -348,6 +348,23 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
   }
 });
 
+
+//
+
+chrome.runtime.onMessage.addListener((message, sender) => {
+    if (message.type === "SAVE_CLICK") {
+        console.log(message.data, "clickData");
+
+        chrome.storage.local.get("clickCoordinates", (result) => {
+            const clicks = result.clickCoordinates || []; // Use the correct key
+            clicks.push(message.data);
+            chrome.storage.local.set({ clickCoordinates: clicks });
+        });
+    }
+});
+
+
+
 function blobToBase64(blob) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -696,6 +713,7 @@ chrome.action.onClicked.addListener(async (tab) => {
         console.log("No COMPANY_ID found in this tab.");
       }
     });
+    
   }
 });
 

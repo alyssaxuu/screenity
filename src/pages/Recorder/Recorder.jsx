@@ -330,13 +330,13 @@ function downloadCoordinatesFile(coordinates, fileName = "clicks.json") {
       helperAudioStream.current = null;
     }
 
-      // chrome.storage.local.get(["clickCoordinates"], (result) => {
-      //   const clicksData = result.clickCoordinates || [];
+      chrome.storage.local.get(["clickCoordinates"], (result) => {
+        const clicksData = result.clickCoordinates || [];
 
-      //   const jsonString = JSON.stringify(clicksData);
-      // const base64Encoded = btoa(jsonString);
-      //   downloadCoordinatesFile(base64Encoded, "fabric_clicks.json");
-      // });
+        const jsonString = JSON.stringify(clicksData);
+      const base64Encoded = btoa(jsonString);
+        downloadCoordinatesFile(base64Encoded, "fabric_clicks.json");
+      });
   }
 
   const dismissRecording = async () => {

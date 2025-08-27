@@ -700,6 +700,7 @@
     "message": " Screenity per començar",
     "description": "Pas 3 de configuració, després de la icona. Necessita un espai al principi."
   },
+  
   "setupCompleteTitle": {
     "message": "Fantàstic! Ja estàs llest",
     "description": "Títol de configuració completada"

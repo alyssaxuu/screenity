@@ -20,17 +20,17 @@ const CursorModes = () => {
   }, [contentState.cursorMode]);
 
   // Save clicks to chrome.storage.local debounced
-  const saveClickCoordinatesDebounced = () => {
-    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-    saveTimeoutRef.current = setTimeout(() => {
-      chrome.storage.local.set(
-        { clickCoordinates: clickCoordinatesRef.current },
-        () => {
-          // console.log("Click coordinates saved:", clickCoordinatesRef.current.length);
-        }
-      );
-    }, 500);
-  };
+  // const saveClickCoordinatesDebounced = () => {
+  //   if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+  //   saveTimeoutRef.current = setTimeout(() => {
+  //     chrome.storage.local.set(
+  //       { clickCoordinates: clickCoordinatesRef.current },
+  //       () => {
+  //         // console.log("Click coordinates saved:", clickCoordinatesRef.current.length);
+  //       }
+  //     );
+  //   }, 500);
+  // };
 
   // On mouse move, update position state for cursor elements (no saving)
   const mouseMoveHandler = (e) => {
@@ -43,33 +43,33 @@ const CursorModes = () => {
    
 
 // On click
-        chrome.storage.local.get("savedTime", (result) => {
-        
-           if (result.savedTime !=undefined) {
-        const savedTime = (result.savedTime/1000); // already a number
-        const diff = (Date.now()/1000) - savedTime; // ms difference
-        console.log("Saved timestamp:", savedTime);
-        console.log("Time difference (ms):", diff);
-          // Save click with only difference
-          const clickCoord = { 
-            x: e.clientX, 
-            y: e.clientY, 
-            time:  diff // store only difference
-          };
+    //  chrome.storage.local.get("savedTime", (result) => {
+    //   if (!result.savedTime) {
+    //     console.log("No start time found, skipping click coordinate.");
+    //     return; // ✅ Do nothing if startTime is not set
+    //   }
 
-          clickCoordinatesRef.current.push(clickCoord);
-             }
+    //   let startTime = result.savedTime / 1000;
+    //   console.log(startTime, "startTimestartTimestartTime");
 
+    //   const currentTime = Date.now() / 1000;
+    //   const clickTime = currentTime - startTime;
 
+    //   const clickCoord = {
+    //     x: e.clientX,
+    //     y: e.clientY,
+    //     time: clickTime
+    //   };
 
+    //   console.log(clickCoord);
 
-
-          // Update savedTime for next click
-          // chrome.storage.local.set({ savedTime: new Date().toISOString() });
-        });
+    //   clickCoordinatesRef.current.push(clickCoord);
+    // });
 
 
-    saveClickCoordinatesDebounced();
+
+
+    // saveClickCoordinatesDebounced();
 
     if (modeRef.current === "target" && clickTargetRef.current) {
       clickTargetRef.current.style.transform = "translate(-50%, -50%) scale(1)";

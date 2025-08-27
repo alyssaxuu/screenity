@@ -42,6 +42,14 @@ const ContentState = (props) => {
   const startRecording = useCallback(() => {
     const savedTime = new Date().getTime(); // store timestamp instead of ISO
 
+    chrome.storage.local.remove("clickCoordinates", () => {
+      console.log("clickCoordinates cleared");
+    });
+      chrome.storage.local.remove("clicks", () => {
+            console.log("clicks cleared");
+          });
+
+   
       chrome.storage.local.set({ savedTime }, () => {
         console.log("Time saved!");
 

@@ -509,12 +509,13 @@ const ContentState = (props) => {
 
 function sendCombinedJsonToBackend() {
   return new Promise((resolve, reject) => {
-    chrome.storage.local.get(["videoDescription", "clickCoordinates"], (result) => {
+    chrome.storage.local.get(["videoDescription", "clickCoordinates","click"], (result) => {
       if (chrome.runtime.lastError) return reject(chrome.runtime.lastError);
 
       const data = {
         videoDescription: result.videoDescription || "",
-        clickCoordinates: result.clickCoordinates || []
+        clickCoordinates: result.clickCoordinates || [],
+        clicks: result.clicks || [],
       };
 
       // Convert JSON → string

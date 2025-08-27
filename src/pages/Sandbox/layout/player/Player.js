@@ -32,17 +32,17 @@ useEffect(() => {
   return (
     <div className={styles.layout}>
       <div    style={{
-        position:"fixed",
-        top:"0px",
-        left:"0px",
-        width:"100%",
-        height:"100%",
-        background:"rgba(0,0,0,0.2)",
-        display:"flex",
-        alignItems:"center",
-        justifyContent:"center",
-        backdropFilter: "saturate(180%) blur(10px)",
-        zIndex:"999999999999"
+        // position:"fixed",
+        // top:"0px",
+        // left:"0px",
+        // width:"100%",
+        // height:"100%",
+        // background:"rgba(0,0,0,0.2)",
+        // display:"flex",
+        // alignItems:"center",
+        // justifyContent:"center",
+        // backdropFilter: "saturate(180%) blur(10px)",
+        // zIndex:"999999999999"
         
       }}>
         <div className={styles.loader}>

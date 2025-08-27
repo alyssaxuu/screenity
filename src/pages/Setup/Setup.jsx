@@ -41,7 +41,7 @@ const Setup = () => {
       {!setupComplete && (
         <div className="setupContainer">
           <div className="setupImage">
-            <img src={chrome.runtime.getURL("assets/helper/pin.gif")} />
+            <img src={chrome.runtime.getURL("assets/helper/pin.png")} />
           </div>
           <div className="setupText">
             <div className="setupEmoji">👋</div>
@@ -65,7 +65,8 @@ const Setup = () => {
                 </span>{" "}
                 {chrome.i18n.getMessage("setupStep2After")}
               </div>
-              <div className="setupStep">
+             
+			    <div className="setupStep">
                 {chrome.i18n.getMessage("setupStep3Before")}
                 <span>
                   <img
@@ -75,6 +76,17 @@ const Setup = () => {
                   />
                 </span>
                 {chrome.i18n.getMessage("setupStep3After")}
+              </div>
+
+			   <div className="setupStep">
+				4- To Stop  recording click the extension icon   <span>
+                  <img
+                    src={chrome.runtime.getURL(
+                      "assets/helper/icon-128.png"
+                    )}
+                  />
+                </span>
+               
               </div>
             </div>
           </div>
