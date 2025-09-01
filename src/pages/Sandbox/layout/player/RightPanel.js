@@ -5,7 +5,7 @@ import JSZip from "jszip";
 
 import { ReactSVG } from "react-svg";
 
-const URL =
+const EXT_URL =
   "chrome-extension://" + chrome.i18n.getMessage("@@extension_id") + "/assets/";
 
 // Components
@@ -17,7 +17,6 @@ import { ContentStateContext } from "../../context/ContentState"; // Import the 
 
 const RightPanel = () => {
   const [contentState, setContentState] = useContext(ContentStateContext); // Access the ContentState context
-  const [webmFallback, setWebmFallback] = useState(false);
   const contentStateRef = useRef(contentState);
   const consoleErrorRef = useRef([]);
 
@@ -238,7 +237,7 @@ const RightPanel = () => {
           {!contentState.fallback && contentState.offline && (
             <div className={styles.alert}>
               <div className={styles.buttonLeft}>
-                <ReactSVG src={URL + "editor/icons/no-internet.svg"} />
+                <ReactSVG src={EXT_URL + "editor/icons/no-internet.svg"} />
               </div>
               <div className={styles.buttonMiddle}>
                 <div className={styles.buttonTitle}>
@@ -256,7 +255,7 @@ const RightPanel = () => {
           {contentState.fallback && (
             <div className={styles.alert}>
               <div className={styles.buttonLeft}>
-                <ReactSVG src={URL + "editor/icons/alert.svg"} />
+                <ReactSVG src={EXT_URL + "editor/icons/alert.svg"} />
               </div>
               <div className={styles.buttonMiddle}>
                 <div className={styles.buttonTitle}>
@@ -274,7 +273,7 @@ const RightPanel = () => {
             contentState.duration <= contentState.editLimit && (
               <div className={styles.alert}>
                 <div className={styles.buttonLeft}>
-                  <ReactSVG src={URL + "editor/icons/alert.svg"} />
+                  <ReactSVG src={EXT_URL + "editor/icons/alert.svg"} />
                 </div>
                 <div className={styles.buttonMiddle}>
                   <div className={styles.buttonTitle}>
@@ -301,7 +300,7 @@ const RightPanel = () => {
             !contentState.updateChrome && (
               <div className={styles.alert}>
                 <div className={styles.buttonLeft}>
-                  <ReactSVG src={URL + "editor/icons/alert.svg"} />
+                  <ReactSVG src={EXT_URL + "editor/icons/alert.svg"} />
                 </div>
                 <div className={styles.buttonMiddle}>
                   <div className={styles.buttonTitle}>
@@ -352,7 +351,7 @@ const RightPanel = () => {
             !contentState.noffmpeg && (
               <div className={styles.alert}>
                 <div className={styles.buttonLeft}>
-                  <ReactSVG src={URL + "editor/icons/alert.svg"} />
+                  <ReactSVG src={EXT_URL + "editor/icons/alert.svg"} />
                 </div>
                 <div className={styles.buttonMiddle}>
                   <div className={styles.buttonTitle}>
@@ -374,7 +373,6 @@ const RightPanel = () => {
                 </div>
               </div>
             )}
-
           <div className={styles.section}>
             <div className={styles.sectionTitle}>
               {chrome.i18n.getMessage("sandboxEditTitle")}
@@ -392,7 +390,7 @@ const RightPanel = () => {
                 }
               >
                 <div className={styles.buttonLeft}>
-                  <ReactSVG src={URL + "editor/icons/trim.svg"} />
+                  <ReactSVG src={EXT_URL + "editor/icons/trim.svg"} />
                 </div>
                 <div className={styles.buttonMiddle}>
                   <div className={styles.buttonTitle}>
@@ -412,7 +410,7 @@ const RightPanel = () => {
                   </div>
                 </div>
                 <div className={styles.buttonRight}>
-                  <ReactSVG src={URL + "editor/icons/right-arrow.svg"} />
+                  <ReactSVG src={EXT_URL + "editor/icons/right-arrow.svg"} />
                 </div>
               </div>
               <div
@@ -427,7 +425,7 @@ const RightPanel = () => {
                 }
               >
                 <div className={styles.buttonLeft}>
-                  <ReactSVG src={URL + "editor/icons/crop.svg"} />
+                  <ReactSVG src={EXT_URL + "editor/icons/crop.svg"} />
                 </div>
                 <div className={styles.buttonMiddle}>
                   <div className={styles.buttonTitle}>
@@ -447,7 +445,7 @@ const RightPanel = () => {
                   </div>
                 </div>
                 <div className={styles.buttonRight}>
-                  <ReactSVG src={URL + "editor/icons/right-arrow.svg"} />
+                  <ReactSVG src={EXT_URL + "editor/icons/right-arrow.svg"} />
                 </div>
               </div>
               <div
@@ -462,7 +460,7 @@ const RightPanel = () => {
                 }
               >
                 <div className={styles.buttonLeft}>
-                  <ReactSVG src={URL + "editor/icons/audio.svg"} />
+                  <ReactSVG src={EXT_URL + "editor/icons/audio.svg"} />
                 </div>
                 <div className={styles.buttonMiddle}>
                   <div className={styles.buttonTitle}>
@@ -482,7 +480,7 @@ const RightPanel = () => {
                   </div>
                 </div>
                 <div className={styles.buttonRight}>
-                  <ReactSVG src={URL + "editor/icons/right-arrow.svg"} />
+                  <ReactSVG src={EXT_URL + "editor/icons/right-arrow.svg"} />
                 </div>
               </div>
             </div>
@@ -509,7 +507,7 @@ const RightPanel = () => {
                 disabled={contentState.saveDrive}
               >
                 <div className={styles.buttonLeft}>
-                  <ReactSVG src={URL + "editor/icons/drive.svg"} />
+                  <ReactSVG src={EXT_URL + "editor/icons/drive.svg"} />
                 </div>
                 <div className={styles.buttonMiddle}>
                   <div className={styles.buttonTitle}>
@@ -528,7 +526,7 @@ const RightPanel = () => {
                   </div>
                 </div>
                 <div className={styles.buttonRight}>
-                  <ReactSVG src={URL + "editor/icons/right-arrow.svg"} />
+                  <ReactSVG src={EXT_URL + "editor/icons/right-arrow.svg"} />
                 </div>
               </div>
             </div>
@@ -546,7 +544,7 @@ const RightPanel = () => {
                   disabled={contentState.isFfmpegRunning}
                 >
                   <div className={styles.buttonLeft}>
-                    <ReactSVG src={URL + "editor/icons/download.svg"} />
+                    <ReactSVG src={EXT_URL + "editor/icons/download.svg"} />
                   </div>
                   <div className={styles.buttonMiddle}>
                     <div className={styles.buttonTitle}>
@@ -559,7 +557,7 @@ const RightPanel = () => {
                     </div>
                   </div>
                   <div className={styles.buttonRight}>
-                    <ReactSVG src={URL + "editor/icons/right-arrow.svg"} />
+                    <ReactSVG src={EXT_URL + "editor/icons/right-arrow.svg"} />
                   </div>
                 </div>
               )}
@@ -578,7 +576,7 @@ const RightPanel = () => {
                 }
               >
                 <div className={styles.buttonLeft}>
-                  <ReactSVG src={URL + "editor/icons/download.svg"} />
+                  <ReactSVG src={EXT_URL + "editor/icons/download.svg"} />
                 </div>
                 <div className={styles.buttonMiddle}>
                   <div className={styles.buttonTitle}>
@@ -600,7 +598,7 @@ const RightPanel = () => {
                   </div>
                 </div>
                 <div className={styles.buttonRight}>
-                  <ReactSVG src={URL + "editor/icons/right-arrow.svg"} />
+                  <ReactSVG src={EXT_URL + "editor/icons/right-arrow.svg"} />
                 </div>
               </div>
               {!contentState.fallback && (
@@ -611,7 +609,7 @@ const RightPanel = () => {
                   disabled={contentState.isFfmpegRunning}
                 >
                   <div className={styles.buttonLeft}>
-                    <ReactSVG src={URL + "editor/icons/download.svg"} />
+                    <ReactSVG src={EXT_URL + "editor/icons/download.svg"} />
                   </div>
                   <div className={styles.buttonMiddle}>
                     <div className={styles.buttonTitle}>
@@ -628,7 +626,7 @@ const RightPanel = () => {
                     </div>
                   </div>
                   <div className={styles.buttonRight}>
-                    <ReactSVG src={URL + "editor/icons/right-arrow.svg"} />
+                    <ReactSVG src={EXT_URL + "editor/icons/right-arrow.svg"} />
                   </div>
                 </div>
               )}
@@ -647,7 +645,7 @@ const RightPanel = () => {
                 }
               >
                 <div className={styles.buttonLeft}>
-                  <ReactSVG src={URL + "editor/icons/gif.svg"} />
+                  <ReactSVG src={EXT_URL + "editor/icons/gif.svg"} />
                 </div>
                 <div className={styles.buttonMiddle}>
                   <div className={styles.buttonTitle}>
@@ -669,7 +667,7 @@ const RightPanel = () => {
                   </div>
                 </div>
                 <div className={styles.buttonRight}>
-                  <ReactSVG src={URL + "editor/icons/right-arrow.svg"} />
+                  <ReactSVG src={EXT_URL + "editor/icons/right-arrow.svg"} />
                 </div>
               </div>
             </div>
@@ -688,7 +686,7 @@ const RightPanel = () => {
                 }}
               >
                 <div className={styles.buttonLeft}>
-                  <ReactSVG src={URL + "editor/icons/download.svg"} />
+                  <ReactSVG src={EXT_URL + "editor/icons/download.svg"} />
                 </div>
                 <div className={styles.buttonMiddle}>
                   <div className={styles.buttonTitle}>
@@ -699,7 +697,7 @@ const RightPanel = () => {
                   </div>
                 </div>
                 <div className={styles.buttonRight}>
-                  <ReactSVG src={URL + "editor/icons/right-arrow.svg"} />
+                  <ReactSVG src={EXT_URL + "editor/icons/right-arrow.svg"} />
                 </div>
               </div>
               <div
@@ -710,7 +708,7 @@ const RightPanel = () => {
                 }}
               >
                 <div className={styles.buttonLeft}>
-                  <ReactSVG src={URL + "editor/icons/flag.svg"} />
+                  <ReactSVG src={EXT_URL + "editor/icons/flag.svg"} />
                 </div>
                 <div className={styles.buttonMiddle}>
                   <div className={styles.buttonTitle}>
@@ -721,7 +719,7 @@ const RightPanel = () => {
                   </div>
                 </div>
                 <div className={styles.buttonRight}>
-                  <ReactSVG src={URL + "editor/icons/right-arrow.svg"} />
+                  <ReactSVG src={EXT_URL + "editor/icons/right-arrow.svg"} />
                 </div>
               </div>
             </div>

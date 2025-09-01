@@ -397,38 +397,35 @@ const ContentState = (props) => {
     chunkCount.current = contentState.chunkCount;
   }, [contentState.chunkCount]);
 
-  const handleBatch = async (chunks, sendResponse) => {
-    // Process chunks with a promise to ensure all async operations are completed
-    await Promise.all(
-      chunks.map(async (chunk) => {
-        if (contentStateRef.current.chunkIndex >= chunkCount.current) {
-          console.warn("Too many chunks received");
-          // Handling for too many chunks
-          return Promise.resolve(); // Resolve early for this case
-        }
+  const handleBatch = (chunks, sendResponse) => {
+    // Process chunks asynchronously, but do not make this function async
+    (async () => {
+      try {
+        await Promise.all(
+          chunks.map(async (chunk) => {
+            if (contentStateRef.current.chunkIndex >= chunkCount.current) {
+              console.warn("Too many chunks received");
+              return; // Skip processing
+            }
 
-        const chunkData = base64ToUint8Array(chunk.chunk);
-        videoChunks.current.push(chunkData);
+            const chunkData = base64ToUint8Array(chunk.chunk);
+            videoChunks.current.push(chunkData);
 
-        // Assuming setContentState doesn't need to be awaited
-        setContentState((prevState) => ({
-          ...prevState,
-          chunkIndex: prevState.chunkIndex + 1,
-        }));
+            setContentState((prevState) => ({
+              ...prevState,
+              chunkIndex: prevState.chunkIndex + 1,
+            }));
+          })
+        );
 
-        return Promise.resolve(); // Resolve after processing each chunk
-      })
-    )
-      .then(() => {
-        // Only send response after all chunks are processed
         sendResponse({ status: "ok" });
-      })
-      .catch((error) => {
+      } catch (error) {
         console.error("Error processing batch", error);
-        // Handle error scenario, possibly notify sender of failure
-      });
+        // Optionally send error back: sendResponse({ status: "error", error })
+      }
+    })();
 
-    return true; // Keep the messaging channel open for the response
+    return true; // Synchronously tell Chrome to keep the port open
   };
 
   // Check Chrome version
@@ -486,7 +483,7 @@ const ContentState = (props) => {
       } else if (message.type === "make-video-tab") {
         makeVideoTab(sendResponse, message);
 
-        return;
+        return true;
       } else if (message.type === "saved-to-drive") {
         setContentState((prevContentState) => ({
           ...prevContentState,
@@ -535,10 +532,15 @@ const ContentState = (props) => {
   );
 
   useEffect(() => {
-    chrome.runtime.onMessage.addListener(onChromeMessage);
+    const messageListener = (message, sender, sendResponse) => {
+      const shouldKeepPortOpen = onChromeMessage(message, sender, sendResponse);
+      return shouldKeepPortOpen === true;
+    };
+
+    chrome.runtime.onMessage.addListener(messageListener);
 
     return () => {
-      chrome.runtime.onMessage.removeListener(onChromeMessage);
+      chrome.runtime.onMessage.removeListener(messageListener);
     };
   }, []);
 
