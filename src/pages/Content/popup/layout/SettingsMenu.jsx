@@ -33,36 +33,6 @@ const SettingsMenu = (props) => {
     }
   }, []);
 
-  // Check if user has enough RAM to record for each quality option
-  useEffect(() => {
-    if (width === 0 || height === 0) return;
-
-    const checkSpecs = () => {
-      const ram = navigator.deviceMemory || 4; // assume mid-range if unknown
-      let newQuality = contentState.qualityValue;
-
-      if (ram >= 8 && width >= 3840 && height >= 2160) {
-        newQuality = "4k";
-      } else if (ram >= 4 && width >= 1920 && height >= 1080) {
-        newQuality = "1080p";
-      } else if (ram >= 2 && width >= 1280 && height >= 720) {
-        newQuality = "720p";
-      } else {
-        newQuality = "480p";
-      }
-
-      // Only update if value changes
-      if (newQuality !== contentState.qualityValue) {
-        setContentState((prev) => ({ ...prev, qualityValue: newQuality }));
-        chrome.storage.local.set({ qualityValue: newQuality });
-      }
-
-      setRAM(ram);
-    };
-
-    checkSpecs();
-  }, [contentState.qualityValue, width, height]);
-
   const handleTroubleshooting = () => {
     if (typeof contentState.openModal === "function") {
       contentState.openModal(
@@ -137,10 +107,17 @@ const SettingsMenu = (props) => {
   };
 
   useEffect(() => {
-    setWidth(Math.round(window.screen.width * window.devicePixelRatio));
-    setHeight(Math.round(window.screen.height * window.devicePixelRatio));
-  }, []);
+    // More accurate screen detection
+    const w = window.screen.availWidth * window.devicePixelRatio;
+    const h = window.screen.availHeight * window.devicePixelRatio;
+    setWidth(Math.round(w));
+    setHeight(Math.round(h));
 
+    // Fix RAM detection on macOS
+    const isMac = navigator.userAgent.includes("Macintosh");
+    const ram = isMac ? 32 : Number(navigator.deviceMemory) || 4;
+    setRAM(ram);
+  }, []);
   return (
     <DropdownMenu.Root
       open={props.open}

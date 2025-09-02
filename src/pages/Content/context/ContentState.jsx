@@ -1028,30 +1028,20 @@ const ContentState = (props) => {
 
   // Check if user has enough RAM to record for each quality option
   useEffect(() => {
-    const checkQuality = () => {
-      const width = Math.round(window.screen.width * window.devicePixelRatio);
-      const height = Math.round(window.screen.height * window.devicePixelRatio);
-      const ram = Number(navigator.deviceMemory) || 4; // fallback to 4GB if unknown
+    const width = Math.round(window.screen.width * window.devicePixelRatio);
+    const height = Math.round(window.screen.height * window.devicePixelRatio);
+    const ram = Number(navigator.deviceMemory) || 4;
 
+    if (!contentState.qualityValue) {
       let suggested = "480p";
-      if (ram >= 8 && width >= 3840 && height >= 2160) {
-        suggested = "4k";
-      } else if (ram >= 4 && width >= 1920 && height >= 1080) {
-        suggested = "1080p";
-      } else if (ram >= 2 && width >= 1280 && height >= 720) {
-        suggested = "720p";
-      }
+      if (ram >= 8 && width >= 3840 && height >= 2160) suggested = "4k";
+      else if (ram >= 4 && width >= 1920 && height >= 1080) suggested = "1080p";
+      else if (ram >= 2 && width >= 1280 && height >= 720) suggested = "720p";
 
-      if (contentState.qualityValue !== suggested) {
-        setContentState((prev) => ({ ...prev, qualityValue: suggested }));
-        chrome.storage.local.set({ qualityValue: suggested });
-      }
-    };
-
-    checkQuality();
-    window.addEventListener("resize", checkQuality);
-    return () => window.removeEventListener("resize", checkQuality);
-  }, [contentState.qualityValue, setContentState]);
+      setContentState((prev) => ({ ...prev, qualityValue: suggested }));
+      chrome.storage.local.set({ qualityValue: suggested });
+    }
+  }, []);
 
   // Check recording start time
   useEffect(() => {
