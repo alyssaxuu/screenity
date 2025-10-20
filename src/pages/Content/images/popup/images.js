@@ -21,7 +21,8 @@ const AudioTabOn = `${URL}/audio-tab-on.svg`;
 const AudioTabOff = `${URL}/audio-tab-off.svg`;
 const MockupTabOn = `${URL}/mockup-tab-on.svg`;
 const MockupTabOff = `${URL}/mockup-tab-off.svg`;
-const TempLogo = `${URL}/temp-logo.png`;
+// const TempLogo = `${URL}/temp-logo.png`;
+const TempLogo = `${URL}/new-logo.svg`;
 const TempFigma = `${URL}/temp/figma.webp`;
 const TempTwitter = `${URL}/temp/twitter.webp`;
 const TempDesignSystem = `${URL}/temp/designsystem.webp`;
@@ -40,6 +41,8 @@ const CameraTabIconOff = `${URL}/camera-tab-icon-off.svg`;
 const CameraOffBlue = `${URL}/camera-off-blue.svg`;
 const MicOffBlue = `${URL}/mic-off-blue.svg`;
 const DropdownGroup = `${URL}/dropdown-group.svg`;
+const PlaceholderThumb = `${URL}/placeholder-thumb.png`;
+const CloseWhiteIcon = `${URL}/close-white.svg`;
 
 export {
   DropdownIcon,
@@ -80,4 +83,6 @@ export {
   CameraOffBlue,
   MicOffBlue,
   DropdownGroup,
+  PlaceholderThumb,
+  CloseWhiteIcon,
 };

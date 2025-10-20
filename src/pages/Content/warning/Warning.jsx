@@ -10,6 +10,7 @@ import {
   AudioIcon,
   CameraCloseIcon,
   NotSupportedIcon,
+  CameraIcon,
 } from "../toolbar/components/SVG";
 
 import * as ToastEl from "@radix-ui/react-toast";
@@ -74,6 +75,7 @@ const Warning = () => {
         <div className="warning-icon">
           {icon === "AudioIcon" && <AudioIcon />}
           {icon === "NotSupportedIcon" && <NotSupportedIcon />}
+          {icon === "CameraIcon" && <CameraIcon />}
         </div>
         <div className="warning-content">
           <ToastEl.Title className="warning-title">{title}</ToastEl.Title>

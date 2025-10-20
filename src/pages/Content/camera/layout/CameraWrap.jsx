@@ -8,7 +8,6 @@ import React, {
 
 import { Rnd } from "react-rnd";
 
-// Context
 import { contentStateContext } from "../../context/ContentState";
 
 import CameraToolbar from "./CameraToolbar";
@@ -39,7 +38,6 @@ const CameraWrap = (props) => {
     const toolbar =
       props.shadowRef.current.shadowRoot.querySelector(".camera-toolbar");
 
-    // Calculate 'r' using the formula we derived earlier
     const c = Math.sqrt(
       Math.pow(circleCenterX - squareBottomRightX, 2) +
         Math.pow(circleCenterY - squareBottomRightY, 2)
@@ -47,11 +45,9 @@ const CameraWrap = (props) => {
     const a = circleRadius / Math.sqrt(2);
     const r = (c + Math.sqrt(c ** 2 + 16 * a ** 2)) / 4;
 
-    // Calculate the handle position
     const x = r - r / Math.sqrt(2);
     const y = r - r / Math.sqrt(2);
 
-    // Position the handle element to the calculated coordinates
     handle.style.bottom = `${y - handle.getBoundingClientRect().width / 2}px`;
     handle.style.right = `${x - handle.getBoundingClientRect().height / 2}px`;
     toolbar.style.top = `${y - toolbar.getBoundingClientRect().width / 2}px`;
@@ -133,11 +129,27 @@ const CameraWrap = (props) => {
     <div
       style={{
         visibility:
-          (contentState.pendingRecording || contentState.recording) &&
-          contentState.surface === "monitor" &&
-          !contentState.pipEnded
+          !contentState.recording && !contentState.pendingRecording
+            ? "visible"
+            : (!contentState.pipEnded &&
+                contentState.surface === "monitor" &&
+                (contentState.pendingRecording || contentState.recording)) ||
+              (contentState.isSubscribed &&
+                (!contentState.instantMode || contentState.multiMode)) ||
+              contentState.onboarding
             ? "hidden"
             : "visible",
+        pointerEvents:
+          !contentState.recording && !contentState.pendingRecording
+            ? "auto"
+            : (!contentState.pipEnded &&
+                contentState.surface === "monitor" &&
+                (contentState.pendingRecording || contentState.recording)) ||
+              (contentState.isSubscribed &&
+                (!contentState.instantMode || contentState.multiMode)) ||
+              contentState.onboarding
+            ? "none"
+            : "auto",
       }}
     >
       <Rnd

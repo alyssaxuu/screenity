@@ -1,4 +1,4 @@
-@use '../../../styles/_variables' as *;
+@use "../../../styles/_variables" as *;
 
 /* reset */
 a,
@@ -7,189 +7,273 @@ button {
 }
 
 iframe {
-	width: 100%;
-	height: 100%;
-	position: fixed;
-	overflow: scroll;
-	z-index: -9999;
-	top: 0px;
-	left: 0px;
-	border: 0px;
-	pointer-events: all!important;
+  width: 100%;
+  height: 100%;
+  position: fixed;
+  overflow: scroll;
+  z-index: -9999;
+  top: 0px;
+  left: 0px;
+  border: 0px;
+  pointer-events: all !important;
 }
 .container {
-	pointer-events: none!important;
+  pointer-events: none !important;
 }
+.visually-hidden-toolbar {
+  opacity: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+  transition: opacity 0.3s ease, visibility 0s linear 0.3s;
+}
+.toolbar-controls {
+  opacity: 0;
+  cursor: pointer;
+  position: absolute;
+  top: -10px;
+  right: -10px;
+  box-sizing: border-box;
+  border-radius: $container-border-radius;
+  border: 1px solid $color-border;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  z-index: 99999999999999;
+  background: rgba(240, 238, 238, 1);
+  backdrop-filter: blur(10px);
+  padding-left: 8px;
+  padding-right: 8px;
+  padding-top: 6px;
+  padding-bottom: 6px;
+  transition: opacity 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  pointer-events: none;
 
+  &.open {
+    opacity: 1 !important;
+    pointer-events: auto;
+  }
+
+  .popup-control {
+    svg {
+      color: $color-icon;
+      margin-bottom: -2px;
+    }
+  }
+}
 .ToolbarBounds {
-	position: fixed;
-	top: 0px;
-	left: 0px;
-	box-sizing: border-box;
-	width: 100%;
-	height: 100%;
-	border: 10px solid $color-primary;
-	pointer-events: none;
-	transform: scale(1.2);
-	opacity: 0;
-	transition: transform .25s cubic-bezier(.61,.11,.08,.96), opacity .25s ease-in-out;
+  position: fixed;
+  top: 0px;
+  left: 0px;
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  border: 10px solid $color-primary;
+  pointer-events: none;
+  transform: scale(1.2);
+  opacity: 0;
+  transition: transform 0.25s cubic-bezier(0.61, 0.11, 0.08, 0.96),
+    opacity 0.25s ease-in-out;
 }
 .ToolbarBounds.ToolbarShake {
-	transform: scale(1);
-	opacity: .4;
+  transform: scale(1);
+  opacity: 0.4;
 }
 
 .react-draggable {
-	pointer-events: all;
+  pointer-events: all;
 }
-.ToolbarShake 
-.react-draggable {
-	width: 100%;
-	height: 100%;
+.ToolbarShake .react-draggable {
+  width: 100%;
+  height: 100%;
 }
 .ToolbarElastic {
-	transition: all .25s cubic-bezier(0.68, -0.55, 0.265, 1.55); 
+  transition: all 0.25s cubic-bezier(0.68, -0.55, 0.265, 1.55);
 }
 .ToolbarShake .ToolbarRoot {
-	animation: subtleshake .9s cubic-bezier(.36,.07,.19,.97) both;
-	animation-iteration-count: infinite!important;
-	background-color: white!important;
+  animation: subtleshake 0.9s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+  animation-iteration-count: infinite !important;
+  background-color: white !important;
 }
 .ToolbarDragging .ToolbarRoot {
-	transform: scale(1.02);
+  transform: scale(1.02);
 
-	&::after {
-		filter: drop-shadow(0px 20px 50px rgba(0, 0, 0, 0.5));
-	}
+  &::after {
+    filter: drop-shadow(0px 20px 50px rgba(0, 0, 0, 0.5));
+  }
 }
 
 // Shake animation for the toolbar
 @keyframes shake {
-  0% { transform: translate(1px, 1px) rotate(0deg); }
-  20% { transform: translate(-3px, 0px) rotate(1deg); }
-  30% { transform: translate(3px, 2px) rotate(0deg); }
-  40% { transform: translate(1px, -1px) rotate(1deg); }
-  50% { transform: translate(-1px, 2px) rotate(-1deg); }
-  60% { transform: translate(-3px, 1px) rotate(0deg); }
-  70% { transform: translate(3px, 1px) rotate(-1deg); }
-  80% { transform: translate(-1px, -1px) rotate(1deg); }
-  90% { transform: translate(1px, 2px) rotate(0deg); }
-  100% { transform: translate(1px, -2px) rotate(-1deg); }
+  0% {
+    transform: translate(1px, 1px) rotate(0deg);
+  }
+  20% {
+    transform: translate(-3px, 0px) rotate(1deg);
+  }
+  30% {
+    transform: translate(3px, 2px) rotate(0deg);
+  }
+  40% {
+    transform: translate(1px, -1px) rotate(1deg);
+  }
+  50% {
+    transform: translate(-1px, 2px) rotate(-1deg);
+  }
+  60% {
+    transform: translate(-3px, 1px) rotate(0deg);
+  }
+  70% {
+    transform: translate(3px, 1px) rotate(-1deg);
+  }
+  80% {
+    transform: translate(-1px, -1px) rotate(1deg);
+  }
+  90% {
+    transform: translate(1px, 2px) rotate(0deg);
+  }
+  100% {
+    transform: translate(1px, -2px) rotate(-1deg);
+  }
 }
 
 // Subtle shake animation, smooth
 @keyframes subtleshake {
-	0% {
-		transform: translate(0px, 0px) rotate(0deg);
-	}
-	10% {
-		transform: translate(-1px, 1px) rotate(1deg);
-	}
-	20% {
-		transform: translate(-1px, -1px) rotate(-1deg);
-	}
-	30% {
-		transform: translate(1px, 0px) rotate(0deg);
-	}
-	40% {
-		transform: translate(-1px, 1px) rotate(-1deg);
-	}
-	50% {
-		transform: translate(1px, -1px) rotate(1deg);
-	}
-	60% {
-		transform: translate(-1px, 1px) rotate(-1deg);
-	}
-	70% {
-		transform: translate(-1px, -1px) rotate(1deg);
-	}
-	80% {
-		transform: translate(1px, 1px) rotate(0deg);
-	}
-	90% {
-		transform: translate(0px, -1px) rotate(-1deg);
-	}
-	100% {
-		transform: translate(-1px, 1px) rotate(1deg);
-	}
+  0% {
+    transform: translate(0px, 0px) rotate(0deg);
+  }
+  10% {
+    transform: translate(-1px, 1px) rotate(1deg);
+  }
+  20% {
+    transform: translate(-1px, -1px) rotate(-1deg);
+  }
+  30% {
+    transform: translate(1px, 0px) rotate(0deg);
+  }
+  40% {
+    transform: translate(-1px, 1px) rotate(-1deg);
+  }
+  50% {
+    transform: translate(1px, -1px) rotate(1deg);
+  }
+  60% {
+    transform: translate(-1px, 1px) rotate(-1deg);
+  }
+  70% {
+    transform: translate(-1px, -1px) rotate(1deg);
+  }
+  80% {
+    transform: translate(1px, 1px) rotate(0deg);
+  }
+  90% {
+    transform: translate(0px, -1px) rotate(-1deg);
+  }
+  100% {
+    transform: translate(-1px, 1px) rotate(1deg);
+  }
 }
 
 .ToolbarTransparent {
-	opacity: 0;
+  opacity: 0;
 
-	&:hover {
-		opacity: 1;
-	}
+  &:hover {
+    opacity: 1;
+  }
+}
+.ToolbarHoverZone {
+  display: inline-block;
+  position: relative;
+
+  // optional: give it a bit of invisible hover padding
+  padding: 4px;
+
+  // if you want to *visually* match the toolbar area only:
+  width: fit-content;
+  height: fit-content;
 }
 
 .ToolbarRoot {
   display: flex;
-	align-items: center;
+  align-items: center;
   padding-left: 10px;
-	transition: opacity .25s cubic-bezier(.61,.11,.08,.96), transform .2s cubic-bezier(.61,.11,.08,.96);
-	min-width: max-content;
-	background-color: white;
-	box-shadow: 0 2px 10px rgba(0, 0, 0, .15);
-	padding-right: 10px;
-	height: 48px;
-	position: absolute;
-	bottom: 20px;
-	left: 20px;
-	border-radius: $container-border-radius;
+  transition: opacity 0.25s cubic-bezier(0.61, 0.11, 0.08, 0.96),
+    transform 0.2s cubic-bezier(0.61, 0.11, 0.08, 0.96);
+  min-width: max-content;
+  background-color: white;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15);
+  padding-right: 10px;
+  height: 48px;
+  position: absolute;
+  bottom: 20px;
+  left: 20px;
+  border-radius: $container-border-radius;
 
-	&::after {
-		content: '';
-		display: block;
-		width: 100%;
-		height: 100%;
-		background: #FFF;
-		z-index: -9999999;
-		position: absolute;
-		left: 0px;
-		top: 0px;
-		border-radius: $container-border-radius;
-		filter: drop-shadow(0px 4px 50px rgba(0, 0, 0, 0.3));
-		transition: filter .2s ease-in-out;
-	}
+  &::after {
+    content: "";
+    display: block;
+    width: 100%;
+    height: 100%;
+    background: #fff;
+    z-index: -9999999;
+    position: absolute;
+    left: 0px;
+    top: 0px;
+    border-radius: $container-border-radius;
+    filter: drop-shadow(0px 4px 50px rgba(0, 0, 0, 0.3));
+    transition: filter 0.2s ease-in-out;
+  }
 }
 
 .ForceTransparent {
-	opacity: 0!important;
+  opacity: 0 !important;
 }
 .ToolbarRecordingControls {
-	display: flex;
-	justify-content: center;
-	align-items: center;
-	background: #F6F7FB;
-	border-radius: $container-border-radius;
-	font-family: $font-medium;
-	height: calc(100% - 12px);
-	padding-left: 2px;
-	padding-right: 2px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: #f6f7fb;
+  border-radius: $container-border-radius;
+  font-family: $font-medium;
+  height: calc(100% - 12px);
+  padding-left: 2px;
+  padding-right: 2px;
 }
 .ToolbarRecordingTime {
-	margin-right: 4px;
-	width: 42px;
-	color: $color-text-primary;
-	font-size: 13px;
-	user-select: none;
-	-webkit-user-select: none;
-	-moz-user-select: none;
-
+  margin-right: 4px;
+  width: 42px;
+  color: $color-text-primary;
+  font-size: 13px;
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+}
+.TimerWarning {
+  color: #ff4c4c; /* or add a pulsing effect */
+  font-weight: bold;
+  animation: pulse 1s infinite alternate;
+}
+@keyframes pulse {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0.6;
+  }
 }
 .ToolbarToggleGroup {
-	display: flex;
-	align-items: center;
+  display: flex;
+  align-items: center;
 }
 .ToolbarToggleWrap {
-	flex: 1 1 auto;
-	align-items: center;
-	justify-content: flex-start;
-	position: relative;
-	flex: 0 0 auto;
-	width: 32px;
-	height: 32px;
-	display: inline-flex;
+  flex: 1 1 auto;
+  align-items: center;
+  justify-content: flex-start;
+  position: relative;
+  flex: 0 0 auto;
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
   line-height: 1;
   align-items: center;
   justify-content: center;
@@ -199,43 +283,42 @@ iframe {
 .ToolbarModeItemSingle,
 .ToolbarLink,
 .ToolbarButton {
-	display: flex;
-	justify-content: center;
-	align-items: center;
-	color: #000;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  color: #000;
   height: 32px;
-	width: 32px;
-	text-align: center;
+  width: 32px;
+  text-align: center;
   font-size: 13px;
   line-height: 1;
-	border-radius: 50%;
-	transition: background-color .25s ease-in-out;
-	background-color: rgba(124, 139, 165, 0);
+  border-radius: 50%;
+  transition: background-color 0.25s ease-in-out;
+  background-color: rgba(124, 139, 165, 0);
 
-	svg {
-		color: $color-icon;
-	}
+  svg {
+    color: $color-icon;
+  }
 
-	&:disabled {
-		opacity: 0.5;
-		cursor: not-allowed!important;
-		background: none!important;
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed !important;
+    background: none !important;
+  }
 
-	}
-
-	&.resume {
-		svg {
-			color: #F7387D!important;
-		}
-	}
+  &.resume {
+    svg {
+      color: #f7387d !important;
+    }
+  }
 }
 .ToolbarToggleItem:hover,
 .ToolbarModeItem:hover,
 .ToolbarModeItemSingle:hover,
 .ToolbarLink:hover,
 .ToolbarButton:hover {
-	cursor: pointer;
-  background-color: rgba(124, 139, 165, 0.1)!important;
+  cursor: pointer;
+  background-color: rgba(124, 139, 165, 0.1) !important;
 }
 .ToolbarToggleItem:focus-visible,
 .ToolbarModeItemSingle:focus-visible,
@@ -247,114 +330,112 @@ iframe {
 }
 
 .ToolbarModeItemSingle {
-	display: flex;
+  display: flex;
   justify-content: center;
-	align-items: center;
-	z-index: 99999;
-	position: relative;
+  align-items: center;
+  z-index: 99999;
+  position: relative;
 
-	&:first-child {
-		margin-left: 0;
-	}
-	&[data-state='on'] {
-		background: rgba(120, 192, 114, 0.1);
+  &:first-child {
+    margin-left: 0;
+  }
+  &[data-state="on"] {
+    background: rgba(120, 192, 114, 0.1);
 
-		svg {
-			color: #78C072;
-		}
+    svg {
+      color: #78c072;
+    }
 
-		&::before {
-			transform: translateY(0px) scale(1)!important;
-			opacity: 1!important;
-		}
-	}
+    &::before {
+      transform: translateY(0px) scale(1) !important;
+      opacity: 1 !important;
+    }
+  }
 }
 
 .ToolbarModeItem {
-	display: flex;
+  display: flex;
   justify-content: center;
-	align-items: center;
-	z-index: 99999;
-	position: relative;
+  align-items: center;
+  z-index: 99999;
+  position: relative;
 
-	&:first-child {
-		margin-left: 0;
-	}
-	&::before {
-		content: '';
-		display: block;
-		width: 100%;
-		height: 50%;
-		border-radius: 80px 80px 0% 0%;
-	box-sizing: border-box;
-		position: absolute;
-		top: -16px;
-		left: 0;
-		z-index: -999999;
-		transition: transform 0.25s cubic-bezier(.61,.11,.08,.96), opacity 0.25s ease-in-out;
-		transform: translateY(5px) scale(0)!important;
-		border-right: 3px solid white;
-		border-top: 9px solid white;
-		border-left: 3px solid white;
-		background-color: transparent;
-		opacity: 0;
-	}
-	&[data-state='on'] {
-		background: rgba(56, 126, 247, 0.1);
+  &:first-child {
+    margin-left: 0;
+  }
+  &::before {
+    content: "";
+    display: block;
+    width: 100%;
+    height: 50%;
+    border-radius: 80px 80px 0% 0%;
+    box-sizing: border-box;
+    position: absolute;
+    top: -16px;
+    left: 0;
+    z-index: -999999;
+    transition: transform 0.25s cubic-bezier(0.61, 0.11, 0.08, 0.96),
+      opacity 0.25s ease-in-out;
+    transform: translateY(5px) scale(0) !important;
+    border-right: 3px solid white;
+    border-top: 9px solid white;
+    border-left: 3px solid white;
+    background-color: transparent;
+    opacity: 0;
+  }
+  &[data-state="on"] {
+    background: rgba(56, 126, 247, 0.1);
 
-		svg {
-			color: $color-primary;
-		}
+    svg {
+      color: $color-primary;
+    }
 
-		&::before {
-			transform: translateY(0px) scale(1)!important;
-			opacity: 1!important;
-		}
-	}
+    &::before {
+      transform: translateY(0px) scale(1) !important;
+      opacity: 1 !important;
+    }
+  }
 }
 
-
 .ToolbarBottom .ToolbarModeItem {
-	&::before {
-		transform: translateY(-5px) scale(.5)!important;
-		bottom: -16px;
-		top: unset!important;
-		border-bottom: 9px solid white!important;
-		border-radius: 0% 0% 80px 80px!important;
-		border-top: none!important
-	}
-	&[data-state='on'] {
-		&::before {
-			transform: translateY(0px) scale(1)!important;
-		}
-	}
+  &::before {
+    transform: translateY(-5px) scale(0.5) !important;
+    bottom: -16px;
+    top: unset !important;
+    border-bottom: 9px solid white !important;
+    border-radius: 0% 0% 80px 80px !important;
+    border-top: none !important;
+  }
+  &[data-state="on"] {
+    &::before {
+      transform: translateY(0px) scale(1) !important;
+    }
+  }
 }
 
 .ToolbarToggleItem {
-	display: flex;
+  display: flex;
   justify-content: center;
-	align-items: center;
-	z-index: 99999;
-	position: relative;
+  align-items: center;
+  z-index: 99999;
+  position: relative;
 
-	&:first-child {
-		margin-left: 0;
-	}
-	&[data-state='on'] {
-		background: $gradient-primary;
-		color: #FFF;
+  &:first-child {
+    margin-left: 0;
+  }
+  &[data-state="on"] {
+    background: $gradient-primary;
+    color: #fff;
 
-		svg {
-			color: #FFF;
-		}
-
-	}
+    svg {
+      color: #fff;
+    }
+  }
 }
-
 
 .ToolbarSeparator {
   width: 1px;
-	height: 19px;
+  height: 19px;
   background-color: $color-border;
   margin: 0 8px;
 }
@@ -372,39 +453,39 @@ iframe {
 }
 
 .ToolbarPaused {
-	position: fixed;
-	top: 0px;
-	left: 0px;
-	width: 100%;
-	height: 100%;
-	box-sizing: border-box;
-	border: 10px solid #F7387D;
-	pointer-events: none;
-	opacity: .5;
+  position: fixed;
+  top: 0px;
+  left: 0px;
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  border: 10px solid #f7387d;
+  pointer-events: none;
+  opacity: 0.5;
 
-	&.hidden {
-		display: none;
-	}
+  &.hidden {
+    display: none;
+  }
 }
 
 .OnboardingArrow {
-	position: absolute;
-	z-index: $z-index-max;
-	width: max-content;
-	display: flex;
-	flex-direction: column;
-	align-items: center;
-	gap: 16px;
-	left: -69px;
-	bottom: 23px;
-	transform: rotate(12deg);
-	pointer-events: none!important;
+  position: absolute;
+  z-index: $z-index-max;
+  width: max-content;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  left: -69px;
+  bottom: 23px;
+  transform: rotate(12deg);
+  pointer-events: none !important;
 }
 .OnboardingText {
-	font-size: 32px;
-	color: $color-icon;
-	font-family: 'Gloria-Hallelujah', sans-serif!important;
+  font-size: 32px;
+  color: $color-icon;
+  font-family: "Gloria-Hallelujah", sans-serif !important;
 }
 .ArrowShape {
-	margin-left: -15px;
+  margin-left: -15px;
 }

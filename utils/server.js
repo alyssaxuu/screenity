@@ -1,29 +1,27 @@
 // Do this as the first thing so that any code reading it knows the right env.
-// process.env.BABEL_ENV = "development";
-// process.env.NODE_ENV = "development";
-process.env.BABEL_ENV = "production";
-process.env.NODE_ENV = "production";
+process.env.BABEL_ENV = "development";
+process.env.NODE_ENV = "development";
 process.env.ASSET_PATH = "/";
 
-const WebpackDevServer = require("webpack-dev-server"),
-  webpack = require("webpack"),
-  config = require("../webpack.config"),
-  env = require("./env"),
-  path = require("path");
-const { custom } = require("../webpack.config");
-const debounce = require("lodash").debounce;
+const WebpackDevServer = require("webpack-dev-server");
+const webpack = require("webpack");
+const config = require("../webpack.config");
+const env = require("./env");
+const path = require("path");
+const { debounce } = require("lodash");
 const SSEStream = require("ssestream").default;
 
-const customOptions = config.custom;
+const customOptions = require("../custom.config");
 
-for (let entryName in config.entry) {
-  if (customOptions.notHMR.indexOf(entryName) === -1) {
+for (const entryName in config.entry) {
+  if (!customOptions.notHMR.includes(entryName)) {
     config.entry[entryName] = [
       "webpack/hot/dev-server.js",
       `webpack-dev-server/client/index.js?hot=true&hostname=localhost&port=${env.PORT}`,
     ].concat(config.entry[entryName]);
   }
 }
+
 if (
   customOptions.enableBackgroundAutoReload ||
   customOptions.enableContentScriptsAutoReload
@@ -35,6 +33,7 @@ if (
     ),
   ].concat(config.entry["background"]);
 }
+
 if (customOptions.enableContentScriptsAutoReload) {
   config.entry["contentScript"] = [
     path.resolve(__dirname, "autoReloadClients/contentScriptClient.js"),
@@ -52,9 +51,9 @@ const compiler = webpack(config);
 const server = new WebpackDevServer(
   {
     https: false,
-    hot: false,
+    hot: false, // We're handling HMR manually
     client: false,
-    compress: false, // if set true, server-sent events will not work!
+    compress: false, // Important: Keep false for SSE to work
     host: "localhost",
     port: env.PORT,
     static: {
@@ -68,9 +67,8 @@ const server = new WebpackDevServer(
       "Access-Control-Allow-Origin": "*",
     },
     allowedHosts: "all",
-    // the following option really matters!
     setupMiddlewares: (middlewares, devServer) => {
-      // if auto-reload is not needed, this middleware is not needed.
+      // Skip middleware setup if auto-reload is disabled
       if (
         !customOptions.enableBackgroundAutoReload &&
         !customOptions.enableContentScriptsAutoReload
@@ -82,19 +80,21 @@ const server = new WebpackDevServer(
         throw new Error("webpack-dev-server is not defined");
       }
 
-      // imagine you are using app.use(path, middleware) in express.
-      // in fact, devServer is an express server.
+      // Add SSE middleware for extension reloading
       middlewares.push({
-        path: "/__server_sent_events__", // you can find this path requested by backgroundClient.js.
+        path: "/__server_sent_events__",
         middleware: (req, res) => {
           const sseStream = new SSEStream(req);
           sseStream.pipe(res);
 
-          sseStream.write("message from webserver.");
+          sseStream.write("Dev server connected");
 
           let closed = false;
 
-          const compileDoneHook = debounce((stats) => {
+          // Debounce compile events to prevent excessive reloads
+          const compileDoneHandler = debounce((stats) => {
+            if (closed || stats.hasErrors()) return;
+
             const { modules } = stats.toJson({ all: false, modules: true });
             const updatedJsModules = modules.filter(
               (module) =>
@@ -102,35 +102,38 @@ const server = new WebpackDevServer(
                 module.moduleType === "javascript/auto"
             );
 
+            // Check which parts of the extension have been updated
             const isBackgroundUpdated = updatedJsModules.some((module) =>
               module.nameForCondition.startsWith(
                 path.resolve(__dirname, "../src/pages/Background")
               )
             );
+
             const isContentScriptsUpdated = updatedJsModules.some((module) =>
               module.nameForCondition.startsWith(
-                path.resolve(__dirname, "../src/pages/ContentScripts")
+                path.resolve(__dirname, "../src/pages/Content")
               )
             );
 
+            // Determine what needs to be reloaded based on changes and config
             const shouldBackgroundReload =
-              !stats.hasErrors() &&
-              isBackgroundUpdated &&
-              customOptions.enableBackgroundAutoReload;
+              isBackgroundUpdated && customOptions.enableBackgroundAutoReload;
+
             const shouldContentScriptsReload =
-              !stats.hasErrors() &&
               isContentScriptsUpdated &&
               customOptions.enableContentScriptsAutoReload;
 
+            // Send appropriate events through SSE
             if (shouldBackgroundReload) {
               sseStream.writeMessage(
                 {
                   event: "background-updated",
-                  data: {}, // "data" key should be reserved though it is empty.
+                  data: {},
                 },
                 "utf-8"
               );
             }
+
             if (shouldContentScriptsReload) {
               sseStream.writeMessage(
                 {
@@ -142,16 +145,14 @@ const server = new WebpackDevServer(
             }
           }, 1000);
 
-          const plugin = (stats) => {
+          // Register plugin with webpack compiler
+          compiler.hooks.done.tap("extension-auto-reload-plugin", (stats) => {
             if (!closed) {
-              compileDoneHook(stats);
+              compileDoneHandler(stats);
             }
-          };
+          });
 
-          // a mini webpack plugin just born!
-          // this plugin will be triggered after each compilation done.
-          compiler.hooks.done.tap("extension-auto-reload-plugin", plugin);
-
+          // Clean up when connection closes
           res.on("close", () => {
             closed = true;
             sseStream.unpipe(res);
@@ -165,6 +166,14 @@ const server = new WebpackDevServer(
   compiler
 );
 
-(async () => {
-  await server.start();
-})();
+const startServer = async () => {
+  try {
+    await server.start();
+    console.log(`Dev server running at http://localhost:${env.PORT}`);
+  } catch (error) {
+    console.error("Failed to start dev server:", error);
+    process.exit(1);
+  }
+};
+
+startServer();

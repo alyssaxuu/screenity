@@ -336,3 +336,248 @@ button {
     background: rgba(110, 118, 132, 0.05);
   }
 }
+.pro-banner {
+  background-color: $color-background;
+  border-top-left-radius: 25px;
+  border-top-right-radius: 25px;
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  min-height: 110px;
+  max-height: 150px;
+  border: 1px solid $color-border;
+  border-bottom: 0 !important;
+  box-sizing: border-box;
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  margin: auto;
+  max-width: 990px;
+  width: 80%;
+  font-size: 13px;
+  padding: 12px;
+  gap: 8px;
+}
+
+.pro-banner-content {
+  display: flex;
+  flex-direction: row;
+  gap: 12px;
+  align-items: center;
+  flex: 1;
+  overflow: hidden;
+  min-height: 0;
+}
+
+.pro-banner-left {
+  height: 100%;
+  width: 80px;
+  min-width: 80px;
+  flex-shrink: 0;
+  overflow: hidden;
+  aspect-ratio: 640 / 480;
+}
+
+.pro-banner-left video {
+  height: 100%;
+  width: 100%;
+  object-fit: cover;
+  border-radius: 6px;
+  display: block;
+}
+
+.pro-banner-right {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  overflow: hidden;
+  flex: 1;
+  min-width: 0;
+}
+
+.pro-banner-title {
+  font-family: $font-bold;
+  color: $color-text-primary;
+  font-size: 13px;
+  line-height: 1.2;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.pro-banner-description {
+  color: $color-text-secondary;
+  font-family: $font-medium;
+  font-size: 13px;
+  line-height: 1.3;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.pro-banner-cta {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  flex-shrink: 0;
+}
+
+.altButton {
+  background: transparent !important;
+  color: $color-text-primary;
+  font-family: $font-bold;
+  height: 37px !important;
+  white-space: nowrap !important;
+  padding: 0 12px;
+  border-radius: 30px;
+  border: 1px solid transparent;
+  font-size: 13px;
+
+  &:hover {
+    background: $color-light-grey !important;
+    cursor: pointer;
+  }
+}
+
+.primaryDarkButton {
+  background: $color-text-primary !important;
+  color: $color-text-contrast !important;
+  height: 37px !important;
+  white-space: nowrap !important;
+  padding: 0 12px;
+  border-radius: 30px;
+  border: none;
+  font-size: 13px;
+  font-family: $font-bold;
+
+  &:hover {
+    background: #000 !important;
+    cursor: pointer;
+  }
+}
+
+@media (max-width: 1400px) {
+  .pro-banner {
+    width: 100%;
+    border-radius: 0px !important;
+    min-height: 100px;
+    max-height: 140px;
+    border-right: none !important;
+  }
+
+  .pro-banner-title,
+  .pro-banner-description {
+    font-size: 12px;
+  }
+
+  .pro-banner-cta {
+    gap: 6px;
+  }
+
+  .altButton,
+  .primaryDarkButton {
+    height: 32px !important;
+    padding: 0 12px;
+    font-size: 12px;
+  }
+}
+
+@media (max-width: 1020px) {
+  .pro-banner {
+    flex-direction: column;
+    justify-content: flex-end;
+  }
+  .pro-banner-cta {
+    width: 100%;
+    justify-content: right;
+    text-align: right;
+  }
+}
+
+@media (max-width: 900px) {
+  .pro-banner {
+    position: fixed;
+    bottom: 0;
+    z-index: 99999999999;
+    flex-direction: row !important;
+    justify-content: center !important;
+  }
+  .pro-banner-cta {
+    width: auto !important;
+    justify-content: center;
+    text-align: center;
+  }
+}
+
+@media (max-width: 300px) {
+  .pro-banner {
+    flex-direction: column;
+    align-items: flex-start;
+    max-width: none;
+    width: 100%;
+    height: auto !important;
+    border-right: none;
+    border-top-left-radius: 12px;
+    border-top-right-radius: 12px;
+    padding: 12px;
+    gap: 10px;
+  }
+
+  .pro-banner-content {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    width: 100%;
+  }
+
+  .pro-banner-left {
+    width: 100%;
+    min-width: 0;
+    height: auto;
+    aspect-ratio: 16 / 9;
+    border-radius: 8px;
+  }
+
+  .pro-banner-left video {
+    width: 100%;
+    height: auto;
+    object-fit: cover;
+    border-radius: 8px;
+  }
+
+  .pro-banner-right {
+    width: 100%;
+    align-items: flex-start;
+  }
+
+  .pro-banner-title,
+  .pro-banner-description {
+    font-size: 12px;
+    -webkit-line-clamp: 2;
+  }
+
+  .pro-banner-cta {
+    width: 100%;
+    justify-content: flex-end;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+
+  .altButton,
+  .primaryDarkButton {
+    height: 32px !important;
+    padding: 0 12px;
+    font-size: 12px;
+    flex: 1;
+    min-width: 100px;
+  }
+}

@@ -85,12 +85,19 @@ const Modal = (props) => {
             {title}
           </AlertDialog.Title>
           <AlertDialog.Description className="AlertDialogDescription">
-            {description}
-            {learnmore && " "}
+            {description.split("\n").map((line, idx) => (
+              <React.Fragment key={idx}>
+                {line}
+                <br />
+              </React.Fragment>
+            ))}
             {learnmore && (
-              <a href={learnMoreLink} target="_blank">
-                {learnmore}
-              </a>
+              <>
+                {" "}
+                <a href={learnMoreLink} target="_blank">
+                  {learnmore}
+                </a>
+              </>
             )}
           </AlertDialog.Description>
           {image && (

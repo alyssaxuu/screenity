@@ -1,244 +1,177 @@
-import React, { useEffect, useState, useRef } from "react";
-import Background from "./modules/Background";
+import React, { useEffect, useRef, useState } from "react";
+import Background from "./components/Background";
+import { useCameraContext } from "./context/CameraContext";
+import { getCameraStream, stopCameraStream } from "./utils/cameraUtils";
+import { setupHandlers } from "./messaging/handlers";
 
 const Camera = () => {
-  const [backgroundEffects, setBackgroundEffects] = useState(false);
-  const backgroundEffectsRef = useRef(false);
-  const streamRef = useRef(null);
-  const videoRef = useRef(null);
-  const [imageDataState, setImageDataState] = useState(null);
-  const [pipMode, setPipMode] = useState(false);
-  const recordingTypeRef = useRef("screen"); // "camera" or "screen"
-  const [isCameraMode, setIsCameraMode] = useState(false);
+  const [loadingStates, setLoadingStates] = useState({
+    recordingType: true,
+    backgroundEffects: true,
+    videoElement: true,
+    modelLoading: false,
+  });
+  const {
+    width,
+    height,
+    pipMode,
+    setPipMode,
+    backgroundEffects,
+    setBackgroundEffects,
+    imageDataState,
+    recordingTypeRef,
+    setWidth,
+    setHeight,
+    captureFrame,
+    videoRef,
+    streamRef,
+    offScreenCanvasRef,
+    offScreenCanvasContextRef,
+    isModelLoaded,
+    isCameraMode,
+    setIsCameraMode,
+  } = useCameraContext();
 
-  // Offscreen canvas for getting video frame
-  const offScreenCanvasRef = useRef(null);
-  const offScreenCanvasContextRef = useRef(null);
+  // Helper function to update loading states
+  const updateLoadingState = (key, value) => {
+    setLoadingStates((prev) => ({ ...prev, [key]: value }));
+  };
 
+  // Calculate if anything is still loading
+  const isLoading = Object.values(loadingStates).some((state) => state);
+
+  // Ensure the offScreenCanvas is created exactly once
   useEffect(() => {
-    offScreenCanvasRef.current = document.createElement("canvas");
+    if (!offScreenCanvasRef.current) {
+      offScreenCanvasRef.current = document.createElement("canvas");
+    }
   }, []);
 
-  const getCameraStream = (constraints) => {
-    navigator.mediaDevices
-      .getUserMedia(constraints)
-      .then((stream) => {
-        streamRef.current = stream;
-
-        const video = videoRef.current;
-        video.srcObject = stream;
-        video.onloadedmetadata = () => {
-          video.play().catch(() => {});
-
-          const canvas = offScreenCanvasRef.current;
-          canvas.width = video.videoWidth || 1280;
-          canvas.height = video.videoHeight || 720;
-          offScreenCanvasContextRef.current = canvas.getContext("2d");
-          requestAnimationFrame(captureFrame);
-        };
-      })
-      .catch(() => {
-        // Error getting camera stream
-      });
-  };
-
-  const stopCameraStream = () => {
-    if (!streamRef.current) return;
-    streamRef.current.getTracks().forEach((track) => track.stop());
-    streamRef.current = null;
-    if (videoRef.current) videoRef.current.srcObject = null;
-  };
-
+  // Initialize message listener
   useEffect(() => {
-    backgroundEffectsRef.current = backgroundEffects;
-  }, [backgroundEffects]);
-
-  const captureFrame = () => {
-    if (
-      backgroundEffectsRef.current &&
-      offScreenCanvasContextRef.current &&
-      offScreenCanvasRef.current
-    ) {
-      const video = videoRef.current;
-      offScreenCanvasContextRef.current.drawImage(
-        video,
-        0,
-        0,
-        offScreenCanvasRef.current.width,
-        offScreenCanvasRef.current.height
-      );
-      setImageDataState(
-        offScreenCanvasContextRef.current.getImageData(
-          0,
-          0,
-          offScreenCanvasRef.current.width,
-          offScreenCanvasRef.current.height
-        )
-      );
-    }
-    requestAnimationFrame(captureFrame);
-  };
-
-  useEffect(() => {
-    chrome.runtime.onMessage.addListener(function (
-      request,
-      sender,
-      sendResponse
-    ) {
-      if (request.type === "switch-camera") {
-        if (request.id !== "none") {
-          stopCameraStream();
-          setTimeout(() => {
-            getCameraStream({
-              video: { deviceId: { exact: request.id } },
-            });
-          }, 2000);
-        }
-      } else if (request.type === "background-effects-active") {
-        setBackgroundEffects(true);
-      } else if (request.type === "background-effects-inactive") {
-        setBackgroundEffects(false);
-      } else if (request.type === "camera-only-update") {
-        // show native camera aspect inside the iframe
-        recordingTypeRef.current = "camera";
-        setIsCameraMode(true);
-      } else if (request.type === "screen-update") {
-        // fill the square bubble, but don't stretch
-        recordingTypeRef.current = "screen";
-        setIsCameraMode(false);
-      } else if (request.type === "toggle-pip") {
-        if (document.pictureInPictureElement) {
-          document.exitPictureInPicture();
-        } else {
-          try {
-            videoRef.current.requestPictureInPicture().catch(() => {
-              setPipMode(false);
-              chrome.runtime.sendMessage({ type: "pip-ended" });
-            });
-          } catch (error) {
-            setPipMode(false);
-            chrome.runtime.sendMessage({ type: "pip-ended" });
-          }
-        }
-      } else if (request.type === "set-surface") {
-        if (request.surface === "monitor") {
-          try {
-            videoRef.current.requestPictureInPicture().catch(() => {
-              setPipMode(false);
-              chrome.runtime.sendMessage({ type: "pip-ended" });
-            });
-          } catch (error) {
-            setPipMode(false);
-            chrome.runtime.sendMessage({ type: "pip-ended" });
-          }
-        }
-      } else if (request.type === "camera-toggled-toolbar") {
-        if (request.active) {
-          stopCameraStream();
-          setTimeout(() => {
-            getCameraStream({
-              video: { deviceId: { exact: request.id } },
-            });
-          }, 2000);
-          setPipMode(false);
-        }
-      } else if (
-        request.type === "stop-recording" ||
-        request.type === "dismiss-recording"
-      ) {
-        if (document.pictureInPictureElement) {
-          document.exitPictureInPicture();
-        }
-      }
+    setupHandlers({
+      setLoading: updateLoadingState,
     });
   }, []);
 
-  // Check chrome local storage
   useEffect(() => {
     chrome.storage.local.get(["recordingType"], (result) => {
-      const mode = result.recordingType === "camera" ? "camera" : "screen";
-      recordingTypeRef.current = mode;
-      setIsCameraMode(mode === "camera");
+      recordingTypeRef.current =
+        result.recordingType === "camera" ? "camera" : "screen";
+      updateLoadingState("recordingType", false);
+      setIsCameraMode(recordingTypeRef.current === "camera");
     });
   }, []);
 
   useEffect(() => {
     chrome.storage.local.get(["backgroundEffectsActive"], (result) => {
-      setBackgroundEffects(result.backgroundEffectsActive);
-    });
-  }, []);
-
-  useEffect(() => {
-    chrome.storage.local.get(["defaultVideoInput"], (result) => {
-      if (result.defaultVideoInput !== "none") {
-        getCameraStream({
-          video: { deviceId: { exact: result.defaultVideoInput } },
-        });
-      } else {
-        getCameraStream({ video: true });
+      if (result.backgroundEffectsActive !== undefined) {
+        setBackgroundEffects(result.backgroundEffectsActive);
       }
+
+      if (!result.backgroundEffectsActive) {
+        updateLoadingState("modelLoading", false);
+      }
+
+      updateLoadingState("backgroundEffects", false);
     });
   }, []);
 
-  // Detect when Pip mode switches
   useEffect(() => {
-    const handleEnterPip = () => {
-      setPipMode(true);
-      chrome.runtime.sendMessage({ type: "pip-started" });
-    };
-    const handleLeavePip = () => {
-      setPipMode(false);
-      chrome.runtime.sendMessage({ type: "pip-ended" });
-    };
+    if (backgroundEffects && !isModelLoaded) {
+      updateLoadingState("modelLoading", true);
+    } else if (!backgroundEffects || isModelLoaded) {
+      updateLoadingState("modelLoading", false);
+    }
+  }, [backgroundEffects, isModelLoaded]);
 
-    const v = videoRef.current;
-    if (!v) return;
-    v.addEventListener("enterpictureinpicture", handleEnterPip);
-    v.addEventListener("leavepictureinpicture", handleLeavePip);
+  useEffect(() => {
+    if (!videoRef.current || streamRef.current?.active) return;
+
+    updateLoadingState("videoElement", true);
+
+    chrome.storage.local.get(["defaultVideoInput"], (result) => {
+      const constraints =
+        result.defaultVideoInput !== "none"
+          ? { video: { deviceId: { exact: result.defaultVideoInput } } }
+          : { video: true };
+
+      getCameraStream(
+        constraints,
+        streamRef,
+        videoRef,
+        offScreenCanvasRef,
+        offScreenCanvasContextRef,
+        {
+          onStart: () => updateLoadingState("videoElement", true),
+          onFinish: () => updateLoadingState("videoElement", false),
+        }
+      );
+    });
+  }, [videoRef.current]); // Will run once when videoRef is set
+
+  // Handle PiP events
+  const handleEnterPip = () => {
+    setPipMode(true);
+    chrome.runtime.sendMessage({ type: "pip-started" });
+  };
+
+  const handleLeavePip = () => {
+    setPipMode(false);
+    chrome.runtime.sendMessage({ type: "pip-ended" });
+  };
+
+  useEffect(() => {
+    if (!videoRef.current) {
+      console.warn("Video element not ready for PiP events.");
+      return;
+    }
+
+    const video = videoRef.current;
+    if (!video) return;
+    video.addEventListener("enterpictureinpicture", handleEnterPip);
+    video.addEventListener("leavepictureinpicture", handleLeavePip);
+
     return () => {
-      v.removeEventListener("enterpictureinpicture", handleEnterPip);
-      v.removeEventListener("leavepictureinpicture", handleLeavePip);
+      video.removeEventListener("enterpictureinpicture", handleEnterPip);
+      video.removeEventListener("leavepictureinpicture", handleLeavePip);
     };
-  }, []);
+  }, [videoRef]);
 
   return (
     <div style={{ width: "100%", height: "100%", overflow: "hidden" }}>
       {backgroundEffects && <Background frame={imageDataState} />}
-
       <video
-        ref={videoRef}
         style={{
-          // always fill the iframe; object-fit decides behavior
-          width: "100%",
+          // height: height,
+          // width: width,
           height: "100%",
+          width: "100%",
           position: "absolute",
           top: "50%",
           left: "50%",
           transform: "translate(-50%, -50%)",
-          margin: "auto",
           zIndex: 99,
           display: !backgroundEffects ? "block" : "none",
-          // key line: no stretching in square mode; preserve AR in camera mode
           objectFit: isCameraMode ? "contain" : "cover",
           objectPosition: "50% 50%",
         }}
+        ref={videoRef}
         playsInline
         muted
-      />
+      ></video>
 
-      {recordingTypeRef.current !== "camera" && (
+      {isLoading && (
         <div
           style={{
             width: "100%",
             height: "100%",
             backgroundColor: "#CBD0D8",
-            zIndex: 9,
+            zIndex: 999,
             position: "absolute",
             top: 0,
             left: 0,
-            margin: "auto",
             display: "flex",
-            alignContent: "center",
             alignItems: "center",
             justifyContent: "center",
           }}
@@ -256,12 +189,10 @@ const Camera = () => {
             position: "absolute",
             top: 0,
             left: 0,
-            margin: "auto",
             zIndex: 999,
           }}
         />
       )}
-
       <style>
         {`.loader {
   font-size: 10px;

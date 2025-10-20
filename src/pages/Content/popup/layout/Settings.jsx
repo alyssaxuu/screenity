@@ -71,6 +71,7 @@ const Settings = () => {
         />
         {contentState.recordingType != "region" &&
           contentState.recordingType != "camera" &&
+          !contentState.isSubscribed &&
           (chromeVersion === null || chromeVersion >= 109) && (
             <Switch
               label={chrome.i18n.getMessage("stayInPagePopup")}
@@ -78,14 +79,20 @@ const Settings = () => {
               value="offscreenRecording"
             />
           )}
-        <Switch
-          label={
-            chrome.i18n.getMessage("zoomToPointPopup") + " (" + shortcut + ")"
-          }
-          name="zoomEnabled"
-          value="zoomEnabled"
-          experimental={true}
-        />
+        {contentState.recordingType != "camera" &&
+          !contentState.isSubscribed && (
+            <Switch
+              label={
+                chrome.i18n.getMessage("zoomToPointPopup") +
+                " (" +
+                shortcut +
+                ")"
+              }
+              name="zoomEnabled"
+              value="zoomEnabled"
+              experimental={true}
+            />
+          )}
       </Collapsible.Content>
     </Collapsible.Root>
   );

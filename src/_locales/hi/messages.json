@@ -601,16 +601,20 @@
     "description": "GIF डाउनलोड लेबल"
   },
   "shareModalSandboxTitle": {
-    "message": "अपने वीडियो को अन्यों के साथ साझा करें",
-    "description": "सैंडबॉक्स संपादक पृष्ठ में साझा करें शीर्षक"
+    "message": "क्या आप अपनी रिकॉर्डिंग बेहतर करना चाहते हैं?",
+    "description": "Share modal title in sandbox editor page"
   },
   "shareModalSandboxDescription": {
-    "message": "जल्द ही! साझा करने के लिए अपडेट रहने और जानकारी मिलने के लिए अपना ईमेल छोड़ें।",
-    "description": "सैंडबॉक्स संपादक पृष्ठ में साझा करें विवरण"
+    "message": "क्लाउड शेयरिंग, ज़ूम, टेम्पलेट्स पाएं... और एक प्राइवेसी-फ्रेंडली टूल को सपोर्ट करें जिसे एक इंडी डेव ने बनाया है ❤️",
+    "description": "Share modal description in sandbox editor page"
   },
   "shareModalSandboxButton": {
-    "message": "वेटलिस्ट में शामिल हों",
-    "description": "सैंडबॉक्स संपादक पृष्ठ में साझा करें ईमेल प्लेसहोल्डर"
+    "message": "Pro के बारे में जानें",
+    "description": "Share modal email placeholder in sandbox editor page"
+  },
+  "shareModalSandboxLogin": {
+    "message": "पहले से अकाउंट है? लॉग इन करें",
+    "description": "Share modal login link in sandbox editor page"
   },
   "shareSandboxButton": {
     "message": "वीडियो साझा करें",
@@ -1037,5 +1041,357 @@
   "permissionsModalReview": {
     "message": "अनुमतियों की समीक्षा करें",
     "description": "अनुमतियों की समीक्षा करने का बटन"
+  },
+  "recordButtonMultiLabel": {
+    "message": "एक और रिकॉर्डिंग जोड़ें",
+    "description": "Record button label (multi mode)"
+  },
+  "recorderSetupTitle": {
+    "message": "तैयारी की जा रही है...",
+    "description": "Title in recording page while setting up project before countdown starts"
+  },
+  "recorderSetupDescription": {
+    "message": "थोड़ा रुकिए! आपकी रिकॉर्डिंग तैयार की जा रही है।",
+    "description": "Description in recording page before countdown starts"
+  },
+  "reopenToolbarToast": {
+    "message": "टूलबार छुपा हुआ है। पॉपअप विकल्पों में फिर से सक्षम करें।",
+    "description": "Toast message explaining to reopen the toolbar in the popup options"
+  },
+  "loginButtonLabel": {
+    "message": "लॉग इन करें या साइन अप करें",
+    "description": "Login button label in popup settings menu"
+  },
+  "logoutButtonLabel": {
+    "message": "लॉग आउट करें",
+    "description": "Logout button label in popup settings menu"
+  },
+  "loggedOutToastTitle": {
+    "message": "आप लॉग आउट हो चुके हैं",
+    "description": "Toast message shown when the user logs out"
+  },
+  "storageLimitReachedTitle": {
+    "message": "स्टोरेज सीमा पूरी हो गई है",
+    "description": "Modal message shown when the storage limit is reached"
+  },
+  "storageLimitReachedDescription": {
+    "message": "आपने अपनी पूरी 50 GB स्टोरेज का उपयोग कर लिया है। कृपया रिकॉर्डिंग जारी रखने के लिए पुराने वीडियो या सीन हटाएं।",
+    "description": "Modal description shown when the storage limit is reached"
+  },
+  "manageStorageButtonLabel": {
+    "message": "स्टोरेज प्रबंधित करें",
+    "description": "Button label to manage storage in the popup settings menu"
+  },
+  "closeModalLabel": {
+    "message": "बंद करें",
+    "description": "Agnostic close modal button label"
+  },
+  "storageCheckFailTitle": {
+    "message": "स्टोरेज जांच नहीं हो सकी",
+    "description": "Title shown when the storage check fails"
+  },
+  "storageCheckFailAuthDescription": {
+    "message": "आपकी स्टोरेज जांचने में समस्या हुई। कृपया दोबारा लॉग इन करें और रिकॉर्डिंग आज़माएं।",
+    "description": "Description shown when the storage check fails due to authentication"
+  },
+  "storageCheckFailDescription": {
+    "message": "हम आपकी स्टोरेज कोटा सत्यापित नहीं कर सके। कुछ सेकंड में दोबारा प्रयास करें या पेज रीफ़्रेश करें।",
+    "description": "Description shown when the storage check fails"
+  },
+  "retryButtonLabel": {
+    "message": "फिर से प्रयास करें",
+    "description": "Agnostic button label to try again"
+  },
+  "addedToMultiToast": {
+    "message": "सीन को Multi रिकॉर्डिंग में जोड़ा गया",
+    "description": "Toast message shown when a scene is added to multi-recording"
+  },
+  "readyRecordSceneToast": {
+    "message": "अपने वीडियो में नया सीन रिकॉर्ड करने के लिए तैयार",
+    "description": "Toast message shown when the user is in an existing project and ready to record a new scene"
+  },
+  "reachingRecordingLimitToast": {
+    "message": "रिकॉर्डिंग 90 मिनट की सीमा के करीब है, यह जल्द ही बंद हो जाएगी",
+    "description": "Toast message shown when the recording is reaching the 90 minute limit"
+  },
+  "recordingLimitReachedToast": {
+    "message": "90 मिनट की सीमा के कारण रिकॉर्डिंग बंद हो गई",
+    "description": "Toast message shown when the recording limit is reached"
+  },
+  "tabRecordingDisabledToast": {
+    "message": "इस पेज पर टैब रिकॉर्डिंग अक्षम है। स्क्रीन रिकॉर्डिंग पर स्विच किया गया।",
+    "description": "Toast message shown when tab recording is disabled on a page"
+  },
+  "projectRecordingCancelledToast": {
+    "message": "वीडियो रिकॉर्डिंग रद्द कर दी गई",
+    "description": "Toast message shown when the user cancels project recording"
+  },
+  "copiedToClipboardToast": {
+    "message": "लिंक क्लिपबोर्ड पर कॉपी किया गया",
+    "description": "Toast message shown when link has been copied to clipboard"
+  },
+  "failedToCopyToClipboardToast": {
+    "message": "लिंक कॉपी करने में विफल",
+    "description": "Toast message shown when failed to copy link to clipboard"
+  },
+  "newestSortLabel": {
+    "message": "नवीनतम",
+    "description": "Label for the newest sort option"
+  },
+  "oldestSortLabel": {
+    "message": "सबसे पुराने",
+    "description": "Label for the oldest sort option"
+  },
+  "allVideosHeading": {
+    "message": "सभी वीडियो",
+    "description": "Heading for the all videos section in the popup"
+  },
+  "noVideosFound": {
+    "message": "कोई वीडियो नहीं मिला",
+    "description": "Message shown when no videos are found in the popup"
+  },
+  "loadingVideosLabel": {
+    "message": "वीडियो लोड हो रहे हैं...",
+    "description": "Label shown when videos are loading in the popup"
+  },
+  "goToDashboardButtonLabel": {
+    "message": "डैशबोर्ड पर जाएं",
+    "description": "Button label to go to the dashboard in the popup"
+  },
+  "welcomePopupTitle": {
+    "message": "Screenity में आपका स्वागत है",
+    "description": "Title for the welcome popup shown to new users"
+  },
+  "welcomePopupDescriptionTop": {
+    "message": "कोई विज्ञापन नहीं। कोई ट्रैकिंग नहीं। कोई सीमा नहीं।",
+    "description": "Description for the welcome popup shown to new users"
+  },
+  "welcomePopupDescriptionBottom": {
+    "message": "बस रिकॉर्ड दबाएँ।",
+    "description": "Description for the welcome popup shown to new users"
+  },
+  "welcomePopupCTA": {
+    "message": "इसे मुफ्त में इस्तेमाल करें — साइन अप की ज़रूरत नहीं!",
+    "description": "Call to action button for the welcome popup shown to new users"
+  },
+  "welcomePopupCloudTitle": {
+    "message": "अपने वीडियो से और ज़्यादा करना चाहते हैं?",
+    "description": "Title for the cloud storage feature in the welcome popup"
+  },
+  "welcomePopupCloudFeature1": {
+    "message": "क्लाउड स्टोरेज, लिंक के साथ वीडियो साझा करें",
+    "description": "Feature 1 for the cloud storage in the welcome popup"
+  },
+  "welcomePopupCloudFeature2": {
+    "message": "कई क्लिप को एक कहानी में जोड़ें",
+    "description": "Feature 2 for the cloud storage in the welcome popup"
+  },
+  "welcomePopupCloudFeature3": {
+    "message": "क्लिक पर स्मार्ट ज़ूम (या अपना जोड़ें!)",
+    "description": "Feature 3 for the cloud storage in the welcome popup"
+  },
+  "welcomePopupCloudFeature4": {
+    "message": "टेम्पलेट, कैप्शन, लेआउट जोड़ें...",
+    "description": "Feature 4 for the cloud storage in the welcome popup"
+  },
+  "welcomePopupCloudFeature5": {
+    "message": "कस्टम बैकग्राउंड और मॉकअप",
+    "description": "Feature 5 for the cloud storage in the welcome popup"
+  },
+  "welcomePopupCloudCTA": {
+    "message": "🔓 अतिरिक्त सुविधाएँ अनलॉक करें",
+    "description": "Call to action button for the cloud storage feature in the welcome popup"
+  },
+  "welcomePopupSupport": {
+    "message": "+ एक सोलो इंडी मेकर के विकास को सपोर्ट करें!",
+    "description": "Message for supporting the indie maker in the welcome popup"
+  },
+  "accountSettingsOption": {
+    "message": "अकाउंट सेटिंग्स",
+    "description": "Label for the account settings option in the popup"
+  },
+  "supportSettingsOption": {
+    "message": "सहायता",
+    "description": "Label for the support option in the popup"
+  },
+  "inactiveSubscriptionTitle": {
+    "message": "आपकी Pro सदस्यता सक्रिय नहीं है",
+    "description": "Title shown when the user's subscription is inactive"
+  },
+  "inactiveSubscriptionDescription": {
+    "message": "आपकी Screenity Pro सदस्यता सक्रिय नहीं है।",
+    "description": "Description shown when the user's subscription is inactive"
+  },
+  "inactiveSubscriptionReactivation": {
+    "message": "कृपया एक्सेस फिर से शुरू करने के लिए पुनः सक्रिय करें।",
+    "description": "Message prompting the user to reactivate their subscription"
+  },
+  "inactiveSubscriptionDeletionWarning": {
+    "message": "आपके वीडियो और डेटा को स्थायी रूप से हटाया जाएगा ",
+    "description": "Warning message about the deletion of videos and data"
+  },
+  "manageSubscriptionButton": {
+    "message": "अपनी सदस्यता प्रबंधित करें",
+    "description": "Button to manage the user's subscription"
+  },
+  "inactiveSubscriptionFreeVersion": {
+    "message": "क्या आप मुफ्त संस्करण का उपयोग जारी रखना चाहते हैं?",
+    "description": "Message prompting the user to continue using the free version"
+  },
+  "downgradeToFreeButton": {
+    "message": "लॉग आउट करें और डाउनग्रेड करें",
+    "description": "Button to log out and downgrade to the free version"
+  },
+  "loggedOutTitle": {
+    "message": "आप लॉग आउट हो चुके हैं",
+    "description": "Title shown when the user is logged out"
+  },
+  "loggedOutDescription": {
+    "message": "अपनी रिकॉर्डिंग को अकाउंट से सिंक रखने और प्रीमियम फीचर्स का उपयोग जारी रखने के लिए, दोबारा लॉग इन करना होगा।",
+    "description": "Description shown when the user is logged out"
+  },
+  "logBackInButton": {
+    "message": "दोबारा लॉग इन करें",
+    "description": "Button to log back in after being logged out"
+  },
+  "loggedOutFreeVersion": {
+    "message": "आप बिना अकाउंट के एक्सटेंशन का उपयोग कर सकते हैं — लेकिन आपकी रिकॉर्डिंग सेव नहीं होगी और बाद में पुनः प्राप्त नहीं की जा सकेगी।",
+    "description": "Message shown when the user is logged out and using the free version"
+  },
+  "continueWithoutLogin": {
+    "message": "लॉगिन के बिना जारी रखें",
+    "description": "Button to continue using the extension without logging in"
+  },
+  "instantRecordingModeLabel": {
+    "message": "तत्काल रिकॉर्डिंग मोड",
+    "description": "Label for the instant recording mode"
+  },
+  "instantRecordingModeTooltip": {
+    "message": "तत्काल डाउनलोड, लेकिन कैमरा और लेआउट बाद में संपादन योग्य नहीं होंगे।",
+    "description": "Tooltip for the instant recording mode"
+  },
+  "instantRecordingModeTitle": {
+    "message": "तत्काल रिकॉर्डिंग मोड",
+    "description": "Title for the instant recording mode"
+  },
+  "instantRecordingModeDescription": {
+    "message": "यह सब कुछ एक वीडियो में रिकॉर्ड करता है ताकि तुरंत डाउनलोड और साझा किया जा सके। आप बाद में कैमरा लेआउट नहीं बदल सकेंगी, लेकिन अन्य संपादन संभव हैं।",
+    "description": "Description for the instant recording mode"
+  },
+  "instantRecordingModeAction": {
+    "message": "समझ गई",
+    "description": "Action button for the instant recording mode"
+  },
+  "tabRecordingDisabledTooltip": {
+    "message": "इस पेज पर टैब रिकॉर्डिंग अक्षम है",
+    "description": "Tooltip shown when tab recording is disabled on a page"
+  },
+  "addingToLabel": {
+    "message": "इसमें जोड़ रहे हैं: ",
+    "description": "Label shown when a scene is being recorded to a project"
+  },
+  "multiLabel": {
+    "message": "Multi",
+    "description": "Label for the multi-recording mode"
+  },
+  "finishLabelMulti": {
+    "message": "समाप्त करें",
+    "description": "Label for the finish multi-recording button"
+  },
+  "welcomeProTitle": {
+    "message": "अपनी रिकॉर्डिंग से और अधिक करना चाहती हैं?",
+    "description": "Title for the welcome Pro popup"
+  },
+  "welcomeProDescription": {
+    "message": "अपने वीडियो क्लाउड में सेव करने, लिंक के साथ साझा करने और एडवांस एडिटिंग फीचर्स एक्सेस करने के लिए साइन इन करें।",
+    "description": "Description for the welcome Pro popup"
+  },
+  "welcomeProButton": {
+    "message": "पेड फीचर्स अनलॉक करने के लिए साइन इन करें",
+    "description": "Button to sign in to Screenity Pro"
+  },
+  "welcomeProSupport": {
+    "message": "एक सोलो इंडी मेकर के विकास को सपोर्ट करें",
+    "description": "Message for supporting the indie maker in the welcome Pro popup"
+  },
+  "unlockMoreFeatures": {
+    "message": "और अधिक फीचर्स अनलॉक करें",
+    "description": "Button to unlock more features in the editor"
+  },
+  "shareUnlockButton": {
+    "message": "साझा करने के लिए साइन इन करें (pro)",
+    "description": "Button to sign in to share in the editor"
+  },
+  "proBannerTitle": {
+    "message": "क्लाउड शेयरिंग, मल्टी-सीन एडिटिंग, ऑटो ज़ूम, कैप्शन और बहुत कुछ अनलॉक करें",
+    "description": "Pro banner title in the editor"
+  },
+  "proBannerDescription": {
+    "message": "Screenity हमेशा मुफ्त, ओपन-सोर्स और विज्ञापन मुक्त रहेगा। Pro क्लाउड और इन्फ्रास्ट्रक्चर लागत को कवर करता है और एक सोलो इंडी डेव का समर्थन करता है! ❤️",
+    "description": "Pro banner description in the editor"
+  },
+  "proBannerAltButton": {
+    "message": "फिर से न दिखाएं",
+    "description": "Pro banner don't show again button in the editor"
+  },
+  "proBannerButton": {
+    "message": "आज़माएं",
+    "description": "Pro banner button in the editor"
+  },
+  "multiRecordingModeTitle": {
+    "message": "मल्टी मोड",
+    "description": "Title for the multi-recording mode modal"
+  },
+  "multiRecordingModeDescription": {
+    "message": "एक के बाद एक कई सीन रिकॉर्ड करें — जैसे आपकी स्क्रीन, कैमरा या दोनों। यह कई टेक लेने, व्यू बदलने या रिकॉर्डिंग को हिस्सों में बाँटने के लिए बेहतरीन है। जब आप समाप्त कर लें, तो सभी सीन को एक ही वीडियो में जोड़ने के लिए 'Finish' पर क्लिक करें।",
+    "description": "Description for the multi-recording mode modal"
+  },
+  "noSubscriptionYetTitle": {
+    "message": "शुरू करने के लिए Pro सक्रिय करें",
+    "description": "Title shown when the user has no active subscription"
+  },
+  "noSubscriptionYetDescription": {
+    "message": "Pro सुविधाओं का उपयोग करने के लिए सदस्यता लें।",
+    "description": "Message prompting the user to subscribe to reactivate their Pro features"
+  },
+  "upgradeToProButton": {
+    "message": "Pro सदस्यता लें",
+    "description": "Button to upgrade to Pro"
+  },
+  "hostBannerTitle": {
+    "message": "क्या आप लोकली Screenity का इस्तेमाल कर रहे हैं? भविष्य के विकास में मदद करें!",
+    "description": "एडिटर में सेल्फ-होस्ट बैनर का शीर्षक"
+  },
+  "hostBannerDescription": {
+    "message": "Screenity एक अकेली इंडी डेवलपर द्वारा बनाया गया है। सेल्फ-होस्टिंग पूरी तरह मुफ्त है, लेकिन अगर यह आपके काम आया हो, तो Pro के ज़रिए समर्थन देने पर विचार करें ❤️",
+    "description": "एडिटर में सेल्फ-होस्ट बैनर का विवरण"
+  },
+  "welcomeBackPopupTitle": {
+    "message": "स्क्रीनिटी में वापस स्वागत है",
+    "description": "वापसी करने वाले उपयोगकर्ताओं को दिखाए जाने वाले वेलकम पॉपअप का शीर्षक"
+  },
+  "welcomeBackProTitle": {
+    "message": "✨ नया: अपनी रिकॉर्डिंग को अगले स्तर पर ले जाएं",
+    "description": "वेलकम पॉपअप में क्लाउड स्टोरेज फीचर का शीर्षक"
+  },
+  "welcomeBackProDescription": {
+    "message": "Screenity Pro एक वैकल्पिक नया प्लेटफ़ॉर्म है जहाँ आप अपने वीडियो क्लाउड में सेव कर सकते हैं, लिंक के ज़रिए शेयर कर सकते हैं, और ज़रूरत पड़ने पर एडवांस्ड एडिटिंग टूल्स का इस्तेमाल कर सकते हैं।",
+    "description": "वेलकम पॉपअप में क्लाउड स्टोरेज फीचर का विवरण"
+  },
+  "welcomeBackProCTA": {
+    "message": "Screenity Pro के बारे में और जानें",
+    "description": "वेलकम पॉपअप में क्लाउड फीचर के लिए कॉल-टू-एक्शन बटन"
+  },
+  "welcomeToProTitleModal": {
+    "message": "Screenity Pro में आपका स्वागत है",
+    "description": "Pro वेलकम मोडल का शीर्षक"
+  },
+  "welcomeToProDescriptionModal": {
+    "message": "रिकॉर्डिंग शुरू करने के लिए सब कुछ तैयार है! कुछ बातों का ध्यान रखें:\n\n- रिकॉर्डिंग के दौरान कैमरा बबल गायब हो सकता है, यह सामान्य है। इसे बैकग्राउंड में अलग से कैप्चर किया जाता है ताकि आप बाद में इसे कहीं भी रख सकें।\n- ज़ूम केवल Chrome टैब्स में क्लिक करने पर अपने आप बनते हैं — यह ब्राउज़र की सीमा है। आप रिकॉर्डिंग के बाद मैन्युअली ज़ूम जोड़ सकते हैं।\n- त्वरित रिकॉर्डिंग और तुरंत डाउनलोड के लिए Instant Mode का उपयोग करें। ध्यान रखें कि इसमें एडिटिंग के विकल्प सीमित होते हैं: कोई बैकग्राउंड्स, लेआउट्स या एडवांस टूल्स नहीं।",
+    "description": "Pro वेलकम मोडल का विवरण"
+  },
+  "welcomeToProActionModal": {
+    "message": "ठीक है",
+    "description": "Pro वेलकम मोडल का एक्शन बटन"
   }
 }

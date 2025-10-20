@@ -1,16 +1,22 @@
 import React from "react";
-import { render } from "react-dom";
+import { createRoot } from "react-dom/client";
 
 import Sandbox from "./Sandbox";
-
 import ContentState from "./context/ContentState";
 
-// Render at the end of the body of any website
-render(
-  <ContentState>
-    <Sandbox />
-  </ContentState>,
-  window.document.querySelector("#app-container")
-);
+// Find the container to render into
+const container = window.document.querySelector("#app-container");
 
-if (module.hot) module.hot.accept();
+if (container) {
+  const root = createRoot(container);
+  root.render(
+    <ContentState>
+      <Sandbox />
+    </ContentState>
+  );
+}
+
+// Hot Module Replacement
+if (module.hot) {
+  module.hot.accept();
+}

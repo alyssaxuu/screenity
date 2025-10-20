@@ -9,6 +9,7 @@ const URL = "/assets/";
 
 const StarIcon = URL + "editor/icons/help-nav.svg";
 const HeartIcon = URL + "editor/icons/heart.svg";
+const UnlockIcon = URL + "editor/icons/unlock.svg";
 
 const PlayerNav = () => {
   const [contentState, setContentState] = useContext(ContentStateContext); // Access the ContentState context
@@ -43,11 +44,12 @@ const PlayerNav = () => {
           <button
             className="button primaryButton"
             onClick={() => {
-              chrome.runtime.sendMessage({ type: "follow-twitter" });
+              chrome.runtime.sendMessage({ type: "pricing" });
             }}
           >
-            <ReactSVG src={HeartIcon} />{" "}
-            {chrome.i18n.getMessage("followForUpdates")}
+            <ReactSVG src={UnlockIcon} />{" "}
+            {chrome.i18n.getMessage("unlockMoreFeatures") ||
+              "Unlock more features"}
           </button>
         </div>
       </div>

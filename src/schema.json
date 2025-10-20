@@ -1,0 +1,9 @@
+{
+  "type": "object",
+  "properties": {
+    "skipSetup": {
+      "type": "boolean",
+      "description": "If true, prevents setup.html from opening on install."
+    }
+  }
+}

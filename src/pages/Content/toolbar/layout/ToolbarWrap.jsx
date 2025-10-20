@@ -1,4 +1,10 @@
-import React, { useLayoutEffect, useEffect, useContext, useRef } from "react";
+import React, {
+  useLayoutEffect,
+  useEffect,
+  useContext,
+  useState,
+  useRef,
+} from "react";
 import * as Toolbar from "@radix-ui/react-toolbar";
 
 import { Rnd } from "react-rnd";
@@ -11,6 +17,8 @@ import BlurToolbar from "./BlurToolbar";
 // Components
 import ToolTrigger from "../components/ToolTrigger";
 import Toast from "../components/Toast";
+
+import { CloseIconPopup } from "../components/SVG";
 
 // Context
 import { contentStateContext } from "../../context/ContentState";
@@ -39,6 +47,7 @@ const ToolbarWrap = () => {
   const [contentState, setContentState, t, setT] =
     useContext(contentStateContext);
   const [mode, setMode] = React.useState("");
+  const [hovering, setHovering] = React.useState(false);
   const DragRef = React.useRef(null);
   const ToolbarRef = React.useRef(null);
   const [side, setSide] = React.useState("ToolbarTop");
@@ -49,6 +58,7 @@ const ToolbarWrap = () => {
   const [timestamp, setTimestamp] = React.useState("00:00");
   const [transparent, setTransparent] = React.useState(false);
   const [forceTransparent, setForceTransparent] = React.useState("");
+  const [visuallyHidden, setVisuallyHidden] = useState(false);
   const timeRef = React.useRef("");
 
   useEffect(() => {
@@ -97,9 +107,10 @@ const ToolbarWrap = () => {
   useEffect(() => {
     if (!isNaN(t)) {
       setTimer(t);
-      const hours = Math.floor(t / 3600);
-      const minutes = Math.floor((t % 3600) / 60);
-      const seconds = t % 60;
+      const clampedT = Math.max(0, t); // prevent negative values
+      const hours = Math.floor(clampedT / 3600);
+      const minutes = Math.floor((clampedT % 3600) / 60);
+      const seconds = clampedT % 60;
 
       // Determine the timestamp format based on the total duration (t)
       let newTimestamp =
@@ -377,13 +388,69 @@ const ToolbarWrap = () => {
             " " +
             transparent +
             " " +
-            forceTransparent
+            forceTransparent +
+            (visuallyHidden ? " visually-hidden-toolbar" : "")
           }
           ref={ToolbarRef}
+          onMouseOver={() => {
+            setHovering(true);
+          }}
+          onMouseLeave={() => {
+            setHovering(false);
+          }}
         >
           <ToolTrigger grab type="button" content="">
             <GrabIcon />
           </ToolTrigger>
+          {!contentState.recording && (
+            <div
+              className={`popup-controls toolbar-controls ${
+                hovering ? "open" : ""
+              }`}
+              onClick={() => {
+                // Show the toast first
+                if (contentState.openToast) {
+                  contentState.openToast(
+                    chrome.i18n.getMessage("reopenToolbarToast"),
+                    () => {}
+                  );
+                }
+
+                // Visually hide the toolbar
+                setVisuallyHidden(true);
+
+                setContentState((prev) => ({
+                  ...prev,
+
+                  drawingMode: false,
+                  blurMode: false,
+                }));
+                // After toast finishes (~3s), apply real hiding logic
+                setTimeout(() => {
+                  setContentState((prev) => ({
+                    ...prev,
+                    hideToolbar: true,
+                    drawingMode: false,
+                    blurMode: false,
+                    hideUIAlerts: false,
+                    toolbarHover: false,
+                    hideUI: true,
+                  }));
+
+                  chrome.storage.local.set({
+                    hideToolbar: true,
+                    hideUIAlerts: false,
+                    toolbarHover: false,
+                    hideUI: true,
+                  });
+                }, 3000); // match your toast duration
+              }}
+            >
+              <div className="popup-control popup-close">
+                <CloseIconPopup />
+              </div>
+            </div>
+          )}
           <div className={"ToolbarRecordingControls"}>
             <ToolTrigger
               type="button"
@@ -395,7 +462,12 @@ const ToolbarWrap = () => {
             >
               <StopIcon width="20" height="20" />
             </ToolTrigger>
-            <div className="ToolbarRecordingTime" ref={timeRef}>
+            <div
+              className={`ToolbarRecordingTime ${
+                contentState.timeWarning ? "TimerWarning" : ""
+              }`}
+              ref={timeRef}
+            >
               {timestamp}
             </div>
             <ToolTrigger
@@ -511,6 +583,7 @@ const ToolbarWrap = () => {
             <MicToggle />
             {(!contentState.cameraActive ||
               contentState.defaultVideoInput === "none") &&
+              (!contentState.isSubscribed || !contentState.recording) &&
               contentState.recordingType != "camera-only" && (
                 <ToolTrigger
                   type="button"

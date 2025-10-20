@@ -1,6 +1,5 @@
 import React, { useEffect, useContext, useRef, useState } from "react";
 
-// Context
 import { contentStateContext } from "../../context/ContentState";
 
 const CameraWrap = (props) => {

@@ -52,6 +52,7 @@ const BackgroundEffects = () => {
             className="background-effect"
             value={image}
             aria-label="Background image"
+            key={index}
           >
             <img src={image} alt="background" />
           </ToggleGroup.Item>

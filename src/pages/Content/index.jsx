@@ -1,5 +1,5 @@
 import React from "react";
-import { render } from "react-dom";
+import { createRoot } from "react-dom/client";
 import Content from "./Content";
 
 // Check if screenity-ui already exists, if so, remove it
@@ -11,4 +11,6 @@ if (existingRoot) {
 const root = document.createElement("div");
 root.id = "screenity-ui";
 document.body.appendChild(root);
-render(<Content />, root);
+
+const appRoot = createRoot(root);
+appRoot.render(<Content />);

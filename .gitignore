@@ -6,5 +6,9 @@ yarn-error.log*
 node_modules/
 .DS_Store
 .vscode/
-node_modules
-src/pages/Background/modules/gapi.json
+.env
+.env.local
+.env.development
+.env.production
+.env.*.local
+build/

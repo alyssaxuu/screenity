@@ -1449,7 +1449,7 @@ body {
   position: relative;
   /* Blur the background */
 }
-.video-ui:before {
+/* .video-ui:before {
   content: "";
   position: absolute;
   -webkit-backdrop-filter: blur(5px);
@@ -1460,7 +1460,7 @@ body {
   height: 100%;
   background: rgba(255, 255, 255, 0.5);
   z-index: 999;
-}
+} */
 
 .videos-list {
   padding-bottom: 10px !important;

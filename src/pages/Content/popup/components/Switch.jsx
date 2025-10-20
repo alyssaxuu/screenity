@@ -7,6 +7,17 @@ import { DropdownIcon } from "../../images/popup/images";
 // Context
 import { contentStateContext } from "../../context/ContentState";
 
+export const BaseSwitch = ({ value, checked, onChange }) => (
+  <S.Root
+    className="SwitchRoot"
+    id={value}
+    checked={checked}
+    onCheckedChange={onChange}
+  >
+    <S.Thumb className="SwitchThumb" />
+  </S.Root>
+);
+
 const Switch = (props) => {
   const [contentState, setContentState] = useContext(contentStateContext);
   const switchRef = useRef(null);
@@ -167,7 +178,10 @@ const Switch = (props) => {
             id={props.value}
             ref={switchRef}
             checked={contentState[props.value]}
+            disabled={props.disabled}
             onCheckedChange={(checked) => {
+              if (props.disabled) return;
+
               setContentState((prevContentState) => ({
                 ...prevContentState,
                 [props.value]: checked,
@@ -227,6 +241,10 @@ const Switch = (props) => {
                     micActive: true,
                   }));
                 }
+              }
+
+              if (typeof props.onChange === "function") {
+                props.onChange(checked);
               }
             }}
           >

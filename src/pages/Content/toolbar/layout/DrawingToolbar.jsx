@@ -50,6 +50,10 @@ import { contentStateContext } from "../../context/ContentState";
 const DrawingToolbar = (props) => {
   const [contentState, setContentState] = useContext(contentStateContext);
   const [tool, setTool] = useState("");
+  const contentStateRef = useRef(contentState);
+  useEffect(() => {
+    contentStateRef.current = contentState;
+  }, [contentState]);
 
   const imageFileInput = useRef(null);
 
@@ -80,7 +84,8 @@ const DrawingToolbar = (props) => {
           e.target.result,
           contentState,
           setContentState,
-          saveCanvas
+          saveCanvas,
+          contentStateRef.current
         );
 
         imageFileInput.current.value = "";

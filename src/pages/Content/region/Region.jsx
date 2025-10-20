@@ -123,6 +123,22 @@ const ResizableBox = () => {
     setCropTarget();
   }, []);
 
+  useEffect(() => {
+    const parent = parentRef.current;
+    if (!parent) return;
+
+    const handleContextMenu = (e) => {
+      if (e.target.className.includes("resize-handle")) {
+        e.preventDefault();
+      }
+    };
+
+    parent.addEventListener("contextmenu", handleContextMenu);
+    return () => {
+      parent.removeEventListener("contextmenu", handleContextMenu);
+    };
+  }, []);
+
   return (
     <div
       style={{
@@ -224,7 +240,8 @@ const ResizableBox = () => {
           style={{
             width: "100%",
             height: "100%",
-            border: recordingRef.current ? "none" : "2px dashed #D9D9D9",
+            outline: recordingRef.current ? "none" : "2px dashed #D9D9D9",
+            outlineOffset: "2px", // Pushes it inside the box to avoid it being visible in recordings
             boxShadow: "0 0 0 9999px rgba(0, 0, 0, 0.2)",
             borderRadius: "5px",
             zIndex: 2,

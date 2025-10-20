@@ -1,5 +1,5 @@
 import React, { useContext, useEffect, useState, useRef, useMemo } from "react";
-import Plyr from "plyr-react";
+import { default as Plyr } from "plyr-react";
 import "plyr-react/plyr.css";
 import { ContentStateContext } from "../../context/ContentState"; // Import the ContentState context
 

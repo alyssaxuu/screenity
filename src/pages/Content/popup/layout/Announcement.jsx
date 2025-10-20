@@ -18,7 +18,7 @@ const Announcement = (props) => {
     }
   }, []);
   return (
-    <div className="announcement">
+    <div className="welcome">
       <div className="announcement-wrap">
         <div className="announcement-hero">
           <img src={chrome.runtime.getURL("assets/helper/hero.png")} />

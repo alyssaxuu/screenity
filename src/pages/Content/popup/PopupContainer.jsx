@@ -16,6 +16,8 @@ import {
   ProfilePic,
 } from "../images/popup/images";
 
+import Welcome from "./layout/Welcome";
+
 import { Rnd } from "react-rnd";
 
 import {
@@ -31,6 +33,8 @@ import VideosTab from "./layout/VideosTab";
 // Layouts
 import Announcement from "./layout/Announcement";
 import SettingsMenu from "./layout/SettingsMenu";
+import InactiveSubscription from "./layout/InactiveSubscription";
+import LoggedOut from "./layout/LoggedOut";
 
 // Context
 import { contentStateContext } from "../context/ContentState";
@@ -46,63 +50,131 @@ const PopupContainer = (props) => {
   const [shake, setShake] = React.useState("");
   const [dragging, setDragging] = React.useState("");
   const [onboarding, setOnboarding] = useState(false);
+  const [showProSplash, setShowProSplash] = useState(false);
   const [open, setOpen] = useState(false);
   const recordTabRef = useRef(null);
   const videoTabRef = useRef(null);
   const pillRef = useRef(null);
   const [URL, setURL] = useState("https://help.screenity.io/");
+  const isCloudBuild = process.env.SCREENITY_ENABLE_CLOUD_FEATURES === "true";
 
   useEffect(() => {
     // Check chrome storage
-    chrome.storage.local.get(["updatingFromOld"], function (result) {
-      if (result.updatingFromOld) {
-        setOnboarding(true);
+    chrome.storage.local.get(
+      ["onboarding", "showProSplash"],
+      function (result) {
+        if (result.onboarding) {
+          setOnboarding(true);
+          setContentState((prevContentState) => ({
+            ...prevContentState,
+            onboarding: true,
+          }));
+        }
+        if (result.showProSplash) {
+          setShowProSplash(true);
+          setContentState((prevContentState) => ({
+            ...prevContentState,
+            showProSplash: true,
+          }));
+        }
       }
-    });
+    );
   }, []);
 
   useEffect(() => {
+    if (contentState.isLoggedIn) {
+      setOnboarding(false);
+      setShowProSplash(false);
+    } else {
+      setOnboarding(contentState.onboarding);
+      setShowProSplash(contentState.showProSplash);
+    }
+  }, [
+    contentState.isLoggedIn,
+    contentState.onboarding,
+    contentState.showProSplash,
+  ]);
+
+  useEffect(() => {
     const locale = chrome.i18n.getMessage("@@ui_locale");
+
+    // Default URL
+    let baseURL = "https://help.screenity.io/";
+
+    // If logged in, switch to Tally with prefilled params
+    if (contentState?.isLoggedIn && contentState?.screenityUser) {
+      const { name, email } = contentState.screenityUser;
+      const query = new URLSearchParams({
+        extension: "true",
+        name,
+        email,
+      });
+      baseURL = `https://tally.so/r/310MNg?${query.toString()}`;
+    }
+
+    // If non-English locale, wrap with Google Translate
     if (!locale.includes("en")) {
       setURL(
-        `https://translate.google.com/translate?sl=en&tl=${locale}&u=https://help.screenity.io/`
+        `https://translate.google.com/translate?sl=en&tl=${locale}&u=${encodeURIComponent(
+          baseURL
+        )}`
       );
+    } else {
+      setURL(baseURL);
     }
-  }, []);
+  }, [contentState]);
 
   const onValueChange = (tab) => {
     setTab(tab);
-    if (tab === "record") {
+
+    if (contentState.isLoggedIn && contentState.isSubscribed === false) {
+      setBadge(
+        "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='32' height='32'><text x='0' y='24' font-size='28'>⚠️</text></svg>"
+      );
+    } else if (tab === "record" && !contentState.isLoggedIn) {
       setBadge(TempLogo);
     } else {
-      setBadge(ProfilePic);
+      const avatar = contentState?.screenityUser?.avatar;
+      setBadge(avatar || ProfilePic);
     }
+
     setContentState((prevContentState) => ({
       ...prevContentState,
       bigTab: tab,
     }));
   };
-
   useEffect(() => {
     setTab(contentState.bigTab);
   }, []);
 
   useEffect(() => {
-    if (!recordTabRef.current) return;
-    if (!videoTabRef.current) return;
-    if (!pillRef.current) return;
-
-    if (tab === "record") {
-      pillRef.current.style.left = recordTabRef.current.offsetLeft + "px";
-      pillRef.current.style.width =
-        recordTabRef.current.getBoundingClientRect().width + "px";
+    if (contentState.isLoggedIn && contentState.isSubscribed === false) {
+      setBadge(
+        "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='32' height='32'><text x='0' y='24' font-size='28'>⚠️</text></svg>"
+      );
+    } else if (tab === "record" && !contentState.isLoggedIn) {
+      setBadge(TempLogo);
     } else {
-      pillRef.current.style.left = videoTabRef.current.offsetLeft + "px";
-
-      pillRef.current.style.width =
-        videoTabRef.current.getBoundingClientRect().width + "px";
+      const avatar = contentState?.screenityUser?.avatar;
+      setBadge(avatar || ProfilePic);
     }
-  }, [tab, recordTabRef.current, videoTabRef.current, pillRef.current]);
+  }, [
+    contentState.isLoggedIn,
+    contentState.isSubscribed,
+    contentState.wasLoggedIn,
+    tab,
+  ]);
+
+  useLayoutEffect(() => {
+    if (!recordTabRef.current || !videoTabRef.current || !pillRef.current)
+      return;
+
+    const tabRef =
+      tab === "record" ? recordTabRef.current : videoTabRef.current;
+
+    pillRef.current.style.left = `${tabRef.offsetLeft}px`;
+    pillRef.current.style.width = `${tabRef.getBoundingClientRect().width}px`;
+  }, [tab]);
 
   useEffect(() => {
     contentStateRef.current = contentState;
@@ -269,6 +341,28 @@ const PopupContainer = (props) => {
     handleDrop(null, { x: x, y: y });
   }, []);
 
+  useEffect(() => {
+    requestAnimationFrame(() => {
+      const tabRef =
+        contentState.bigTab === "record"
+          ? recordTabRef.current
+          : videoTabRef.current;
+
+      if (tabRef && pillRef.current) {
+        pillRef.current.style.left = `${tabRef.offsetLeft}px`;
+        pillRef.current.style.width = `${
+          tabRef.getBoundingClientRect().width
+        }px`;
+      }
+    });
+  }, [
+    contentState.isLoggedIn,
+    contentState.bigTab,
+    contentState.wasLoggedIn,
+    contentState.onboarding,
+    pillRef.current,
+  ]);
+
   return (
     <div
       style={{
@@ -331,16 +425,121 @@ const PopupContainer = (props) => {
               <CloseIconPopup />
             </div>
           </div>
-          <div className="popup-cutout">
-            <img src={badge} />
+          <div className="popup-cutout drag-area">
+            {contentState.isLoggedIn && contentState.isSubscribed === false ? (
+              <div
+                style={{
+                  fontSize: "34px",
+                }}
+              >
+                ⚠️
+              </div>
+            ) : (
+              <img
+                src={badge}
+                crossOrigin="anonymous"
+                style={{
+                  width:
+                    tab === "record" && !contentState.isLoggedIn
+                      ? "90%"
+                      : "100%",
+                  height:
+                    tab === "record" && !contentState.isLoggedIn
+                      ? "90%"
+                      : "100%",
+                  filter:
+                    tab === "record" && !contentState.isLoggedIn
+                      ? "drop-shadow(rgba(86, 123, 218, 0.35) 0px 4px 11px) drop-shadow(rgba(53, 87, 98, 0.2) 0px 4px 10px)"
+                      : "none",
+                  userSelect: "none",
+                  pointerEvents: "none",
+                }}
+                draggable={false}
+                referrerPolicy="no-referrer"
+              />
+            )}
           </div>
           <div className="popup-nav"></div>
           <div className="popup-content">
-            {onboarding && <Announcement setOnboarding={setOnboarding} />}
-            {!onboarding && (
+            {isCloudBuild &&
+            contentState.isSubscribed === false &&
+            contentState.isLoggedIn === true ? (
+              <InactiveSubscription
+                subscription={contentState.proSubscription}
+                hasSubscribedBefore={contentState.hasSubscribedBefore}
+                onManageClick={() => {
+                  const type = contentState.hasSubscribedBefore
+                    ? "handle-reactivate"
+                    : "handle-upgrade";
+                  chrome.runtime.sendMessage({ type });
+                }}
+                onDowngradeClick={async () => {
+                  chrome.runtime.sendMessage({ type: "handle-logout" });
+                  setContentState((prev) => ({
+                    ...prev,
+                    isLoggedIn: false,
+                    isSubscribed: false,
+                    screenityUser: null,
+                    proSubscription: null,
+                    wasLoggedIn: false,
+                    bigTab: "record",
+                  }));
+                  contentState.openToast(
+                    chrome.i18n.getMessage("loggedOutToastTitle"),
+                    () => {},
+                    2000
+                  );
+                }}
+              />
+            ) : isCloudBuild && (onboarding || showProSplash) ? (
+              <Welcome
+                setOnboarding={setOnboarding}
+                setContentState={setContentState}
+                isBack={showProSplash}
+                clearBack={() => {
+                  setContentState((prev) => ({
+                    ...prev,
+                    showProSplash: false,
+                  }));
+                  chrome.storage.local.set({ showProSplash: false });
+                  setShowProSplash(false);
+                }}
+              />
+            ) : isCloudBuild &&
+              !contentState.isLoggedIn &&
+              contentState.wasLoggedIn ? (
+              <LoggedOut
+                onManageClick={() => {
+                  // Log back in
+                  chrome.runtime.sendMessage({ type: "handle-login" });
+                }}
+                onDowngradeClick={() => {
+                  chrome.storage.local.set({ wasLoggedIn: false });
+                  setContentState((prev) => ({
+                    ...prev,
+                    isLoggedIn: false,
+                    wasLoggedIn: false,
+                    bigTab: "record", // Ensure UI state sync
+                  }));
+                  setTab("record"); // Switch immediately
+
+                  chrome.runtime.sendMessage({ type: "handle-logout" });
+
+                  requestAnimationFrame(() => {
+                    if (recordTabRef.current && pillRef.current) {
+                      const tabRef = recordTabRef.current;
+                      pillRef.current.style.left = `${tabRef.offsetLeft}px`;
+                      pillRef.current.style.width = `${
+                        tabRef.getBoundingClientRect().width
+                      }px`;
+                    }
+                  });
+                }}
+              />
+            ) : (
               <Tabs.Root
                 className="TabsRoot tl"
-                defaultValue="record"
+                value={tab}
                 onValueChange={onValueChange}
               >
                 <Tabs.List
@@ -387,7 +586,7 @@ const PopupContainer = (props) => {
                   <RecordingTab shadowRef={props.shadowRef} />
                 </Tabs.Content>
                 <Tabs.Content className="TabsContent tl" value="dashboard">
-                  <VideosTab />
+                  <VideosTab shadowRef={props.shadowRef} />
                 </Tabs.Content>
               </Tabs.Root>
             )}

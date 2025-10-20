@@ -1,18 +1,62 @@
 import { fabric } from "fabric";
 
-const ImageTool = (canvas, src, toolSettings, setToolSettings, saveCanvas) => {
-  // Show image placeholder (semi transparent ghost image following cursor) to allow user to place image on canvas (source is in the image argument), drag to resize
+const ImageTool = (
+  canvas,
+  src,
+  toolSettings,
+  setToolSettings,
+  saveCanvas,
+  contentState
+) => {
   const image = new Image();
   let fabricImage = null;
+
   image.src = src;
 
-  setToolSettings({ ...toolSettings, tool: "select", isAddingImage: true });
+  const state = {
+    isPlacing: true,
+  };
 
-  // Make all objects unselectable
-  canvas.forEachObject((obj) => {
-    obj.selectable = false;
-    canvas.renderAll();
-  });
+  const cleanup = () => {
+    state.isPlacing = false;
+    canvas.off("mouse:move", onMouseMove);
+    canvas.off("mouse:down", onMouseDown);
+    canvas.off("mouse:up", onMouseUp);
+  };
+
+  const onMouseMove = (o) => {
+    if (!fabricImage || !state.isPlacing) return;
+    const pointer = canvas.getPointer(o.e);
+    fabricImage.set({ left: pointer.x, top: pointer.y });
+    fabricImage.setCoords();
+    canvas.requestRenderAll();
+  };
+
+  const onMouseDown = () => {
+    if (!fabricImage || !state.isPlacing) return;
+    state.isPlacing = false;
+
+    fabricImage.set({
+      opacity: 1,
+      selectable: true,
+    });
+    fabricImage.setCoords();
+
+    canvas.setActiveObject(fabricImage);
+    canvas.requestRenderAll();
+
+    saveCanvas(toolSettings, setToolSettings);
+    setToolSettings({ ...toolSettings, tool: "select", isAddingImage: false });
+
+    // Make other objects selectable again
+    canvas.forEachObject((obj) => {
+      obj.selectable = true;
+    });
+
+    cleanup();
+  };
+
+  const onMouseUp = () => {};
 
   image.onload = () => {
     fabricImage = new fabric.Image(image);
@@ -22,104 +66,52 @@ const ImageTool = (canvas, src, toolSettings, setToolSettings, saveCanvas) => {
       originX: "left",
       originY: "top",
       strokeUniform: true,
-      angle: 0,
       fill: "transparent",
+      angle: 0,
       noScaleCache: false,
       opacity: 0.5,
       selectable: false,
     });
-    canvas.add(fabricImage);
-    canvas.renderAll();
 
-    // Scale image to max width or height of 500px
+    // Scale down
     const maxWidth = 500;
     const maxHeight = 500;
     const width = fabricImage.width;
     const height = fabricImage.height;
     const ratio = Math.min(maxWidth / width, maxHeight / height);
-    fabricImage.set({ scaleX: ratio, scaleY: ratio });
-    canvas.renderAll();
+    fabricImage.scale(ratio);
 
-    toolSettings.openToast(chrome.i18n.getMessage("addImageToastTitle"), () => {
-      canvas.remove(fabricImage);
-      canvas.renderAll();
-      fabricImage = null;
-      setToolSettings({ ...toolSettings, isAddingImage: false });
+    canvas.add(fabricImage);
+    canvas.bringToFront(fabricImage);
+    canvas.requestRenderAll();
 
-      // Make all objects selectable
-      canvas.forEachObject((obj) => {
-        obj.selectable = true;
-      });
-    });
-  };
-
-  let isDown = false;
-
-  // Mouse move
-  const onMouseMove = (o) => {
-    if (!fabricImage) return;
-
-    //if (!isDown) {
-    // Show ghost image following cursor, drag to resize, click to place
-    var pointer = canvas.getPointer(o.e);
-    fabricImage.set({
-      left: pointer.x,
-      top: pointer.y,
-    });
-    fabricImage.setCoords();
-    canvas.renderAll();
-    //} else {
-    //  // Rescale image based on mouse position
-    //  var pointer = canvas.getPointer(o.e);
-    //  const width = pointer.x - fabricImage.left;
-    //   const height = pointer.y - fabricImage.top;
-    //   const ratio = Math.min(
-    //     width / fabricImage.width,
-    //     height / fabricImage.height
-    //   );
-    //   fabricImage.set({ scaleX: ratio, scaleY: ratio });
-    //   canvas.renderAll();
-    // }
-  };
-
-  const onMouseDown = (o) => {
-    if (!fabricImage) return;
-    isDown = true;
-    // Disable canvas selection
-    canvas.selection = false;
-    canvas.renderAll();
-  };
-
-  const onMouseUp = (o) => {
-    if (!fabricImage) return;
-    isDown = false;
-    fabricImage.set({
-      opacity: 1,
-      selectable: true,
-    });
-    fabricImage.setCoords();
-    canvas.renderAll();
-    saveCanvas(toolSettings, setToolSettings);
-    setToolSettings({ ...toolSettings, tool: "select", isAddingImage: false });
-    canvas.setActiveObject(fabricImage);
-    canvas.renderAll();
-    // Make all objects selectable
+    // Make other objects unselectable
     canvas.forEachObject((obj) => {
-      obj.selectable = true;
+      obj.selectable = false;
     });
-    canvas.renderAll();
-    fabricImage = null;
-  };
 
-  canvas.on("mouse:move", onMouseMove);
-  canvas.on("mouse:down", onMouseDown);
-  canvas.on("mouse:up", onMouseUp);
+    canvas.on("mouse:move", onMouseMove);
+    canvas.on("mouse:down", onMouseDown);
+    canvas.on("mouse:up", onMouseUp);
+
+    // Open toast cancel handler
+    contentState.openToast(chrome.i18n.getMessage("addImageToastTitle"), () => {
+      if (fabricImage) {
+        canvas.remove(fabricImage);
+        canvas.requestRenderAll();
+      }
+      setToolSettings({
+        ...toolSettings,
+        tool: "select",
+        isAddingImage: false,
+      });
+      canvas.forEachObject((obj) => (obj.selectable = true));
+      cleanup();
+    });
+  };
 
   return {
-    removeEventListeners: () => {
-      canvas.off("mouse:move", onMouseMove);
-      canvas.off("mouse:down", onMouseDown);
-    },
+    removeEventListeners: cleanup,
   };
 };
 

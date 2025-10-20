@@ -1,9 +1,22 @@
+// src/index.js
 import React from "react";
-import { render } from "react-dom";
-
+import { createRoot } from "react-dom/client";
+import CameraProvider from "./context/CameraContext";
 import Camera from "./Camera";
 
-// Render at the end of the body of any website
-render(<Camera />, window.document.querySelector("#app-container"));
+// Find the container to render into
+const container = window.document.querySelector("#app-container");
 
-if (module.hot) module.hot.accept();
+if (container) {
+  const root = createRoot(container);
+  root.render(
+    <CameraProvider>
+      <Camera />
+    </CameraProvider>
+  );
+}
+
+// Hot Module Replacement
+if (import.meta.webpackHot) {
+  import.meta.webpackHot.accept();
+}

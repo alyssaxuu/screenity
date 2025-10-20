@@ -601,16 +601,20 @@
     "description": "Label Unduh GIF"
   },
   "shareModalSandboxTitle": {
-    "message": "Bagikan video Anda dengan orang lain",
-    "description": "Judul modal Bagikan di halaman editor Sandbox"
+    "message": "Siap tingkatkan rekamanmu?",
+    "description": "Share modal title in sandbox editor page"
   },
   "shareModalSandboxDescription": {
-    "message": "Segera hadir! Tinggalkan email Anda untuk tetap diperbarui dan mendapatkan pemberitahuan saat berbagi tersedia.",
-    "description": "Deskripsi modal Bagikan di halaman editor Sandbox"
+    "message": "Bagikan ke cloud, gunakan zoom, template... dan dukung alat ramah privasi buatan seorang developer indie! ❤️",
+    "description": "Share modal description in sandbox editor page"
   },
   "shareModalSandboxButton": {
-    "message": "Gabung dalam daftar tunggu",
-    "description": "Kotak masuk modal Bagikan di halaman editor Sandbox"
+    "message": "Pelajari tentang Pro",
+    "description": "Share modal email placeholder in sandbox editor page"
+  },
+  "shareModalSandboxLogin": {
+    "message": "Sudah punya akun? Masuk",
+    "description": "Share modal login link in sandbox editor page"
   },
   "shareSandboxButton": {
     "message": "Bagikan video",
@@ -1037,5 +1041,357 @@
   "permissionsModalReview": {
     "message": "Ulasan Izin",
     "description": "Tombol Ulasan Izin"
+  },
+  "recordButtonMultiLabel": {
+    "message": "Tambah rekaman lain",
+    "description": "Record button label (multi mode)"
+  },
+  "recorderSetupTitle": {
+    "message": "Sedang menyiapkan...",
+    "description": "Title in recording page while setting up project before countdown starts"
+  },
+  "recorderSetupDescription": {
+    "message": "Tunggu sebentar! Rekamanmu sedang disiapkan.",
+    "description": "Description in recording page before countdown starts"
+  },
+  "reopenToolbarToast": {
+    "message": "Toolbar disembunyikan. Aktifkan kembali di pengaturan popup.",
+    "description": "Toast message explaining to reopen the toolbar in the popup options"
+  },
+  "loginButtonLabel": {
+    "message": "Masuk atau daftar",
+    "description": "Login button label in popup settings menu"
+  },
+  "logoutButtonLabel": {
+    "message": "Keluar",
+    "description": "Logout button label in popup settings menu"
+  },
+  "loggedOutToastTitle": {
+    "message": "Kamu telah keluar",
+    "description": "Toast message shown when the user logs out"
+  },
+  "storageLimitReachedTitle": {
+    "message": "Batas penyimpanan tercapai",
+    "description": "Modal message shown when the storage limit is reached"
+  },
+  "storageLimitReachedDescription": {
+    "message": "Kamu telah menggunakan seluruh 50 GB penyimpanan. Hapus video atau adegan lama untuk melanjutkan merekam.",
+    "description": "Modal description shown when the storage limit is reached"
+  },
+  "manageStorageButtonLabel": {
+    "message": "Kelola penyimpanan",
+    "description": "Button label to manage storage in the popup settings menu"
+  },
+  "closeModalLabel": {
+    "message": "Tutup",
+    "description": "Agnostic close modal button label"
+  },
+  "storageCheckFailTitle": {
+    "message": "Gagal memeriksa penyimpanan",
+    "description": "Title shown when the storage check fails"
+  },
+  "storageCheckFailAuthDescription": {
+    "message": "Terjadi masalah saat memeriksa penyimpanan. Silakan masuk kembali dan coba rekam lagi.",
+    "description": "Description shown when the storage check fails due to authentication"
+  },
+  "storageCheckFailDescription": {
+    "message": "Kami tidak dapat memverifikasi kuota penyimpananmu. Coba lagi beberapa detik lagi atau muat ulang halaman.",
+    "description": "Description shown when the storage check fails"
+  },
+  "retryButtonLabel": {
+    "message": "Coba lagi",
+    "description": "Agnostic button label to try again"
+  },
+  "addedToMultiToast": {
+    "message": "Adegan ditambahkan ke multi-recording",
+    "description": "Toast message shown when a scene is added to multi-recording"
+  },
+  "readyRecordSceneToast": {
+    "message": "Siap merekam adegan baru dalam videomu",
+    "description": "Toast message shown when the user is in an existing project and ready to record a new scene"
+  },
+  "reachingRecordingLimitToast": {
+    "message": "Rekaman mendekati batas 90 menit, akan segera berhenti",
+    "description": "Toast message shown when the recording is reaching the 90 minute limit"
+  },
+  "recordingLimitReachedToast": {
+    "message": "Rekaman dihentikan karena batas 90 menit",
+    "description": "Toast message shown when the recording limit is reached"
+  },
+  "tabRecordingDisabledToast": {
+    "message": "Rekaman tab dinonaktifkan di halaman ini. Beralih ke rekaman layar.",
+    "description": "Toast message shown when tab recording is disabled on a page"
+  },
+  "projectRecordingCancelledToast": {
+    "message": "Rekaman video dibatalkan",
+    "description": "Toast message shown when the user cancels project recording"
+  },
+  "copiedToClipboardToast": {
+    "message": "Tautan disalin ke clipboard",
+    "description": "Toast message shown when link has been copied to clipboard"
+  },
+  "failedToCopyToClipboardToast": {
+    "message": "Gagal menyalin tautan",
+    "description": "Toast message shown when failed to copy link to clipboard"
+  },
+  "newestSortLabel": {
+    "message": "Terbaru",
+    "description": "Label for the newest sort option"
+  },
+  "oldestSortLabel": {
+    "message": "Terlama",
+    "description": "Label for the oldest sort option"
+  },
+  "allVideosHeading": {
+    "message": "Semua video",
+    "description": "Heading for the all videos section in the popup"
+  },
+  "noVideosFound": {
+    "message": "Tidak ada video ditemukan",
+    "description": "Message shown when no videos are found in the popup"
+  },
+  "loadingVideosLabel": {
+    "message": "Memuat video...",
+    "description": "Label shown when videos are loading in the popup"
+  },
+  "goToDashboardButtonLabel": {
+    "message": "Ke dashboard",
+    "description": "Button label to go to the dashboard in the popup"
+  },
+  "welcomePopupTitle": {
+    "message": "Selamat datang di Screenity",
+    "description": "Title for the welcome popup shown to new users"
+  },
+  "welcomePopupDescriptionTop": {
+    "message": "Tanpa iklan. Tanpa pelacakan. Tanpa batas.",
+    "description": "Description for the welcome popup shown to new users"
+  },
+  "welcomePopupDescriptionBottom": {
+    "message": "Langsung rekam.",
+    "description": "Description for the welcome popup shown to new users"
+  },
+  "welcomePopupCTA": {
+    "message": "Gunakan gratis — tanpa perlu daftar!",
+    "description": "Call to action button for the welcome popup shown to new users"
+  },
+  "welcomePopupCloudTitle": {
+    "message": "Ingin melakukan lebih banyak dengan videomu?",
+    "description": "Title for the cloud storage feature in the welcome popup"
+  },
+  "welcomePopupCloudFeature1": {
+    "message": "Penyimpanan cloud, bagikan video dengan tautan",
+    "description": "Feature 1 for the cloud storage in the welcome popup"
+  },
+  "welcomePopupCloudFeature2": {
+    "message": "Gabungkan beberapa klip jadi satu cerita",
+    "description": "Feature 2 for the cloud storage in the welcome popup"
+  },
+  "welcomePopupCloudFeature3": {
+    "message": "Zoom pintar saat klik (atau tambahkan sendiri!)",
+    "description": "Feature 3 for the cloud storage in the welcome popup"
+  },
+  "welcomePopupCloudFeature4": {
+    "message": "Tambahkan template, teks, tata letak...",
+    "description": "Feature 4 for the cloud storage in the welcome popup"
+  },
+  "welcomePopupCloudFeature5": {
+    "message": "Latar belakang dan mockup khusus",
+    "description": "Feature 5 for the cloud storage in the welcome popup"
+  },
+  "welcomePopupCloudCTA": {
+    "message": "🔓 Buka fitur tambahan",
+    "description": "Call to action button for the cloud storage feature in the welcome popup"
+  },
+  "welcomePopupSupport": {
+    "message": "+ Dukung pengembangan oleh pembuat indie tunggal!",
+    "description": "Message for supporting the indie maker in the welcome popup"
+  },
+  "accountSettingsOption": {
+    "message": "Pengaturan akun",
+    "description": "Label for the account settings option in the popup"
+  },
+  "supportSettingsOption": {
+    "message": "Dukungan",
+    "description": "Label for the support option in the popup"
+  },
+  "inactiveSubscriptionTitle": {
+    "message": "Langganan Pro kamu tidak aktif",
+    "description": "Title shown when the user's subscription is inactive"
+  },
+  "inactiveSubscriptionDescription": {
+    "message": "Langganan Screenity Pro kamu tidak aktif.",
+    "description": "Description shown when the user's subscription is inactive"
+  },
+  "inactiveSubscriptionReactivation": {
+    "message": "Aktifkan kembali untuk melanjutkan akses.",
+    "description": "Message prompting the user to reactivate their subscription"
+  },
+  "inactiveSubscriptionDeletionWarning": {
+    "message": "Video dan datamu akan dihapus secara permanen pada ",
+    "description": "Warning message about the deletion of videos and data"
+  },
+  "manageSubscriptionButton": {
+    "message": "Kelola langgananmu",
+    "description": "Button to manage the user's subscription"
+  },
+  "inactiveSubscriptionFreeVersion": {
+    "message": "Ingin tetap menggunakan versi gratis?",
+    "description": "Message prompting the user to continue using the free version"
+  },
+  "downgradeToFreeButton": {
+    "message": "Keluar dan turunkan versi",
+    "description": "Button to log out and downgrade to the free version"
+  },
+  "loggedOutTitle": {
+    "message": "Kamu telah keluar",
+    "description": "Title shown when the user is logged out"
+  },
+  "loggedOutDescription": {
+    "message": "Untuk menyinkronkan rekamanmu dan mengakses fitur premium, kamu perlu masuk kembali.",
+    "description": "Description shown when the user is logged out"
+  },
+  "logBackInButton": {
+    "message": "Masuk kembali",
+    "description": "Button to log back in after being logged out"
+  },
+  "loggedOutFreeVersion": {
+    "message": "Kamu tetap bisa menggunakan ekstensi tanpa akun - tapi rekamanmu tidak akan disimpan dan tidak bisa dipulihkan.",
+    "description": "Message shown when the user is logged out and using the free version"
+  },
+  "continueWithoutLogin": {
+    "message": "Lanjut tanpa login",
+    "description": "Button to continue using the extension without logging in"
+  },
+  "instantRecordingModeLabel": {
+    "message": "Mode rekam instan",
+    "description": "Label for the instant recording mode"
+  },
+  "instantRecordingModeTooltip": {
+    "message": "Unduh instan, tapi kamera dan tata letak tidak bisa diedit nanti.",
+    "description": "Tooltip for the instant recording mode"
+  },
+  "instantRecordingModeTitle": {
+    "message": "Mode rekam instan",
+    "description": "Title for the instant recording mode"
+  },
+  "instantRecordingModeDescription": {
+    "message": "Semua direkam dalam satu video untuk unduhan dan berbagi instan. Tata letak kamera tidak bisa diubah nanti, tapi pengeditan lainnya tetap bisa.",
+    "description": "Description for the instant recording mode"
+  },
+  "instantRecordingModeAction": {
+    "message": "Mengerti",
+    "description": "Action button for the instant recording mode"
+  },
+  "tabRecordingDisabledTooltip": {
+    "message": "Rekaman tab dinonaktifkan di halaman ini",
+    "description": "Tooltip shown when tab recording is disabled on a page"
+  },
+  "addingToLabel": {
+    "message": "Menambahkan ke: ",
+    "description": "Label shown when a scene is being recorded to a project"
+  },
+  "multiLabel": {
+    "message": "Multi",
+    "description": "Label for the multi-recording mode"
+  },
+  "finishLabelMulti": {
+    "message": "Selesai",
+    "description": "Label for the finish multi-recording button"
+  },
+  "welcomeProTitle": {
+    "message": "Ingin melakukan lebih banyak dengan rekamanmu?",
+    "description": "Title for the welcome Pro popup"
+  },
+  "welcomeProDescription": {
+    "message": "Masuk untuk menyimpan video ke cloud, berbagi dengan tautan, dan akses fitur editing lanjutan.",
+    "description": "Description for the welcome Pro popup"
+  },
+  "welcomeProButton": {
+    "message": "Masuk untuk membuka fitur berbayar",
+    "description": "Button to sign in to Screenity Pro"
+  },
+  "welcomeProSupport": {
+    "message": "Dukung pengembangan oleh pembuat indie tunggal",
+    "description": "Message for supporting the indie maker in the welcome Pro popup"
+  },
+  "unlockMoreFeatures": {
+    "message": "Buka lebih banyak fitur",
+    "description": "Button to unlock more features in the editor"
+  },
+  "shareUnlockButton": {
+    "message": "Masuk untuk berbagi (pro)",
+    "description": "Button to sign in to share in the editor"
+  },
+  "proBannerTitle": {
+    "message": "Buka berbagi cloud, editing multi-adegan, zoom otomatis, teks & lainnya",
+    "description": "Pro banner title in the editor"
+  },
+  "proBannerDescription": {
+    "message": "Screenity akan selalu gratis, open-source, dan tanpa iklan. Pro membantu menutupi biaya cloud & infrastruktur, serta mendukung pengembangan oleh developer indie tunggal! ❤️",
+    "description": "Pro banner description in the editor"
+  },
+  "proBannerAltButton": {
+    "message": "Jangan tampilkan lagi",
+    "description": "Pro banner don't show again button in the editor"
+  },
+  "proBannerButton": {
+    "message": "Coba sekarang",
+    "description": "Pro banner button in the editor"
+  },
+  "multiRecordingModeTitle": {
+    "message": "Mode Multi",
+    "description": "Title for the multi-recording mode modal"
+  },
+  "multiRecordingModeDescription": {
+    "message": "Rekam beberapa adegan—layar, kamera, atau keduanya—secara berurutan. Cocok untuk mengambil beberapa ulangan, mengganti tampilan, atau membagi rekaman menjadi beberapa bagian. Setelah selesai, klik Selesai untuk membuka editor dengan semua adegan digabungkan dalam satu video.",
+    "description": "Description for the multi-recording mode modal"
+  },
+  "noSubscriptionYetTitle": {
+    "message": "Aktifkan Pro untuk memulai",
+    "description": "Title shown when the user has no active subscription"
+  },
+  "noSubscriptionYetDescription": {
+    "message": "Berlangganan untuk mengakses fitur Pro.",
+    "description": "Message prompting the user to subscribe to reactivate their Pro features"
+  },
+  "upgradeToProButton": {
+    "message": "Langganan Pro",
+    "description": "Button to upgrade to Pro"
+  },
+  "hostBannerTitle": {
+    "message": "Menikmati Screenity secara lokal? Bantu dukung pengembangannya!",
+    "description": "Judul banner self-host di editor"
+  },
+  "hostBannerDescription": {
+    "message": "Screenity dibuat oleh seorang pengembang indie perempuan. Hosting sendiri gratis, tapi jika kamu merasa terbantu, pertimbangkan untuk mendukung lewat Pro ❤️",
+    "description": "Deskripsi banner self-host di editor"
+  },
+  "welcomeBackPopupTitle": {
+    "message": "Selamat datang kembali di Screenity",
+    "description": "Judul pop-up sambutan yang ditampilkan untuk pengguna yang kembali"
+  },
+  "welcomeBackProTitle": {
+    "message": "✨ Baru: Tingkatkan rekamanmu ke level berikutnya",
+    "description": "Judul fitur penyimpanan cloud di pop-up sambutan"
+  },
+  "welcomeBackProDescription": {
+    "message": "Screenity Pro adalah platform opsional baru untuk menyimpan video ke cloud, membagikannya lewat tautan, dan membuka alat pengeditan lanjutan — jika dan saat kamu membutuhkannya.",
+    "description": "Deskripsi fitur penyimpanan cloud di pop-up sambutan"
+  },
+  "welcomeBackProCTA": {
+    "message": "Pelajari lebih lanjut tentang Screenity Pro",
+    "description": "Tombol ajakan bertindak untuk fitur penyimpanan cloud di pop-up sambutan"
+  },
+  "welcomeToProTitleModal": {
+    "message": "Selamat datang di Screenity Pro",
+    "description": "Judul modal sambutan Pro"
+  },
+  "welcomeToProDescriptionModal": {
+    "message": "Kamu siap untuk mulai merekam! Beberapa hal yang perlu diingat:\n\n- Gelembung kamera mungkin menghilang saat merekam, ini normal. Kamera direkam secara terpisah di latar belakang, jadi kamu bisa memposisikannya sesuka hati nanti.\n- Zoom hanya dibuat otomatis saat kamu mengeklik di tab Chrome — ini adalah batasan dari browser. Kamu tetap bisa menambahkan zoom secara manual setelah merekam.\n- Untuk rekaman cepat dengan unduhan instan, coba Mode Instan. Tapi ingat, pilihan pengeditannya terbatas: tidak ada latar belakang, tata letak, atau penyesuaian lanjutan.",
+    "description": "Deskripsi modal sambutan Pro"
+  },
+  "welcomeToProActionModal": {
+    "message": "Mengerti",
+    "description": "Tombol aksi di modal sambutan Pro"
   }
 }

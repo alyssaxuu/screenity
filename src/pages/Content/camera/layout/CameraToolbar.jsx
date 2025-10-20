@@ -1,12 +1,11 @@
 import React, { useState, useEffect, useContext } from "react";
 
 import * as Toolbar from "@radix-ui/react-toolbar";
-// Tooltip
+
 import TooltipWrap from "../../toolbar/components/TooltipWrap";
 
 import { CameraCloseIcon, Pip } from "../../toolbar/components/SVG";
 
-// Context
 import { contentStateContext } from "../../context/ContentState";
 
 const CameraToolbar = () => {

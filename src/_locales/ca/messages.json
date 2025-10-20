@@ -601,16 +601,20 @@
     "description": "Etiqueta de descàrrega de GIF"
   },
   "shareModalSandboxTitle": {
-    "message": "Comparteix els teus vídeos amb un enllaç",
-    "description": "Títol del modal de compartir a la pàgina de l'editor de proves"
+    "message": "Preparat per millorar les teves gravacions?",
+    "description": "Share modal title in sandbox editor page"
   },
   "shareModalSandboxDescription": {
-    "message": "Properament! Deixa el teu correu electrònic per estar informat i rebre notificacions quan estigui disponible.",
-    "description": "Descripció del modal de compartir a la pàgina de l'editor de proves"
+    "message": "Comparteix al núvol, fes zooms, usa plantilles... i dona suport a una desenvolupadora indie que respecta la teva privadesa ❤️",
+    "description": "Share modal description in sandbox editor page"
   },
   "shareModalSandboxButton": {
-    "message": "Apunta't a la llista d'espera",
-    "description": "Missatge de correu electrònic del modal de compartir a la pàgina de l'editor de proves"
+    "message": "Més info sobre Pro",
+    "description": "Share modal email placeholder in sandbox editor page"
+  },
+  "shareModalSandboxLogin": {
+    "message": "Ja tens compte? Inicia sessió",
+    "description": "Share modal login link in sandbox editor page"
   },
   "shareSandboxButton": {
     "message": "Comparteix",
@@ -1036,5 +1040,357 @@
   "permissionsModalReview": {
     "message": "Revisar permisos",
     "description": "Botó de revisar permisos"
+  },
+  "recordButtonMultiLabel": {
+    "message": "Afegeix una altra gravació",
+    "description": "Record button label (multi mode)"
+  },
+  "recorderSetupTitle": {
+    "message": "Preparant-ho tot...",
+    "description": "Title in recording page while setting up project before countdown starts"
+  },
+  "recorderSetupDescription": {
+    "message": "Espera un moment, estem preparant la teva gravació.",
+    "description": "Description in recording page before countdown starts"
+  },
+  "reopenToolbarToast": {
+    "message": "Barra d'eines amagada. Torna a activar-la a les opcions del.",
+    "description": "Toast message explaining to reopen the toolbar in the popup options"
+  },
+  "loginButtonLabel": {
+    "message": "Inicia sessió o registra't",
+    "description": "Login button label in popup settings menu"
+  },
+  "logoutButtonLabel": {
+    "message": "Tanca la sessió",
+    "description": "Logout button label in popup settings menu"
+  },
+  "loggedOutToastTitle": {
+    "message": "Has tancat la sessió",
+    "description": "Toast message shown when the user logs out"
+  },
+  "storageLimitReachedTitle": {
+    "message": "Has arribat al límit d'emmagatzematge",
+    "description": "Modal message shown when the storage limit is reached"
+  },
+  "storageLimitReachedDescription": {
+    "message": "Has utilitzat els 50 GB d'emmagatzematge. Elimina projectes o escenes antics per continuar gravant.",
+    "description": "Modal description shown when the storage limit is reached"
+  },
+  "manageStorageButtonLabel": {
+    "message": "Gestiona l'emmagatzematge",
+    "description": "Button label to manage storage in the popup settings menu"
+  },
+  "closeModalLabel": {
+    "message": "Tanca",
+    "description": "Agnostic close modal button label"
+  },
+  "storageCheckFailTitle": {
+    "message": "No s'ha pogut comprovar l'emmagatzematge",
+    "description": "Title shown when the storage check fails"
+  },
+  "storageCheckFailAuthDescription": {
+    "message": "Hi ha hagut un problema en comprovar l'emmagatzematge. Torna a iniciar sessió i intenta gravar de nou.",
+    "description": "Description shown when the storage check fails due to authentication"
+  },
+  "storageCheckFailDescription": {
+    "message": "No hem pogut verificar la teva quota d'emmagatzematge. Torna-ho a provar d'aquí uns segons o actualitza la pàgina.",
+    "description": "Description shown when the storage check fails"
+  },
+  "retryButtonLabel": {
+    "message": "Torna-ho a provar",
+    "description": "Agnostic button label to try again"
+  },
+  "addedToMultiToast": {
+    "message": "Escena afegida a la gravació Multi",
+    "description": "Toast message shown when a scene is added to multi-recording"
+  },
+  "readyRecordSceneToast": {
+    "message": "Preparat per gravar una nova escena al teu projecte",
+    "description": "Toast message shown when the user is in an existing project and ready to record a new scene"
+  },
+  "reachingRecordingLimitToast": {
+    "message": "La gravació s'apropa al límit de 90 minuts, s'aturarà aviat",
+    "description": "Toast message shown when the recording is reaching the 90 minute limit"
+  },
+  "recordingLimitReachedToast": {
+    "message": "Gravació aturada pel límit de 90 minuts",
+    "description": "Toast message shown when the recording limit is reached"
+  },
+  "tabRecordingDisabledToast": {
+    "message": "La gravació de pestanyes està desactivada en aquesta pàgina. S'ha activat la gravació de pantalla per defecte.",
+    "description": "Toast message shown when tab recording is disabled on a page"
+  },
+  "projectRecordingCancelledToast": {
+    "message": "Gravació del projecte cancel·lada",
+    "description": "Toast message shown when the user cancels project recording"
+  },
+  "copiedToClipboardToast": {
+    "message": "Enllaç copiat al porta-retalls",
+    "description": "Toast message shown when link has been copied to clipboard"
+  },
+  "failedToCopyToClipboardToast": {
+    "message": "No s'ha pogut copiar l'enllaç",
+    "description": "Toast message shown when failed to copy link to clipboard"
+  },
+  "newestSortLabel": {
+    "message": "Més recents",
+    "description": "Label for the newest sort option"
+  },
+  "oldestSortLabel": {
+    "message": "Més antics",
+    "description": "Label for the oldest sort option"
+  },
+  "allVideosHeading": {
+    "message": "Tots els vídeos",
+    "description": "Heading for the all videos section in the popup"
+  },
+  "noVideosFound": {
+    "message": "No s'han trobat vídeos",
+    "description": "Message shown when no videos are found in the popup"
+  },
+  "loadingVideosLabel": {
+    "message": "Carregant vídeos...",
+    "description": "Label shown when videos are loading in the popup"
+  },
+  "goToDashboardButtonLabel": {
+    "message": "Ves al panell de control",
+    "description": "Button label to go to the dashboard in the popup"
+  },
+  "welcomePopupTitle": {
+    "message": "Benvingut a Screenity",
+    "description": "Title for the welcome popup shown to new users"
+  },
+  "welcomePopupDescriptionTop": {
+    "message": "Sense anuncis. Sense seguiment. Sense límits.",
+    "description": "Description for the welcome popup shown to new users"
+  },
+  "welcomePopupDescriptionBottom": {
+    "message": "Grava, simplement.",
+    "description": "Description for the welcome popup shown to new users"
+  },
+  "welcomePopupCTA": {
+    "message": "Fes-ho servir gratis — no cal registrar-se!",
+    "description": "Call to action button for the welcome popup shown to new users"
+  },
+  "welcomePopupCloudTitle": {
+    "message": "Vols fer més amb els teus vídeos?",
+    "description": "Title for the cloud storage feature in the welcome popup"
+  },
+  "welcomePopupCloudFeature1": {
+    "message": "Emmagatzematge al núvol, comparteix amb un enllaç",
+    "description": "Feature 1 for the cloud storage in the welcome popup"
+  },
+  "welcomePopupCloudFeature2": {
+    "message": "Combina diversos clips com capítols en una història",
+    "description": "Feature 2 for the cloud storage in the welcome popup"
+  },
+  "welcomePopupCloudFeature3": {
+    "message": "Zooms intel·ligents amb clic (o afegeix els teus!)",
+    "description": "Feature 3 for the cloud storage in the welcome popup"
+  },
+  "welcomePopupCloudFeature4": {
+    "message": "Afegeix plantilles, subtítols, mockups...",
+    "description": "Feature 4 for the cloud storage in the welcome popup"
+  },
+  "welcomePopupCloudFeature5": {
+    "message": "Fons i distribució de càmera personalitzats",
+    "description": "Feature 5 for the cloud storage in the welcome popup"
+  },
+  "welcomePopupCloudCTA": {
+    "message": "🔓 Desbloqueja funcions extres",
+    "description": "Call to action button for the cloud storage feature in the welcome popup"
+  },
+  "welcomePopupSupport": {
+    "message": "+ Dona suport al desenvolupament independent!",
+    "description": "Message for supporting the indie maker in the welcome popup"
+  },
+  "accountSettingsOption": {
+    "message": "Configuració del compte",
+    "description": "Label for the account settings option in the popup"
+  },
+  "supportSettingsOption": {
+    "message": "Suport",
+    "description": "Label for the support option in the popup"
+  },
+  "inactiveSubscriptionTitle": {
+    "message": "Subscripció Pro inactiva",
+    "description": "Title shown when the user's subscription is inactive"
+  },
+  "inactiveSubscriptionDescription": {
+    "message": "La teva subscripció a Screenity Pro està inactiva.",
+    "description": "Description shown when the user's subscription is inactive"
+  },
+  "inactiveSubscriptionReactivation": {
+    "message": "Reactiva-la per tornar-hi a accedir.",
+    "description": "Message prompting the user to reactivate their subscription"
+  },
+  "inactiveSubscriptionDeletionWarning": {
+    "message": "Els teus vídeos i dades s'eliminaran definitivament el ",
+    "description": "Warning message about the deletion of videos and data"
+  },
+  "manageSubscriptionButton": {
+    "message": "Gestiona la teva subscripció",
+    "description": "Button to manage the user's subscription"
+  },
+  "inactiveSubscriptionFreeVersion": {
+    "message": "Vols continuar utilitzant la versió gratuïta?",
+    "description": "Message prompting the user to continue using the free version"
+  },
+  "downgradeToFreeButton": {
+    "message": "Tanca la sessió i baixa de pla",
+    "description": "Button to log out and downgrade to the free version"
+  },
+  "loggedOutTitle": {
+    "message": "Has tancat la sessió",
+    "description": "Title shown when the user is logged out"
+  },
+  "loggedOutDescription": {
+    "message": "Per mantenir les teves gravacions sincronitzades i accedir a funcions Pro, cal que iniciïs sessió de nou.",
+    "description": "Description shown when the user is logged out"
+  },
+  "logBackInButton": {
+    "message": "Torna a iniciar sessió",
+    "description": "Button to log back in after being logged out"
+  },
+  "loggedOutFreeVersion": {
+    "message": "Pots continuar utilitzant l'extensió sense compte, però les gravacions no es guardaran ni es podran recuperar més tard.",
+    "description": "Message shown when the user is logged out and using the free version"
+  },
+  "continueWithoutLogin": {
+    "message": "Continua sense iniciar sessió",
+    "description": "Button to continue using the extension without logging in"
+  },
+  "instantRecordingModeLabel": {
+    "message": "Mode de gravació instantani",
+    "description": "Label for the instant recording mode"
+  },
+  "instantRecordingModeTooltip": {
+    "message": "Descarrega immediata, però la distribució de la càmera no es podrà editar un cop la gravació hagi començat.",
+    "description": "Tooltip for the instant recording mode"
+  },
+  "instantRecordingModeTitle": {
+    "message": "Mode de gravació instantani",
+    "description": "Title for the instant recording mode"
+  },
+  "instantRecordingModeDescription": {
+    "message": "Aquest mode grava tot en un sol vídeo per descarregar i compartir a l'instant. No podràs modificar la distribució de la càmera, però podràs fer altres tipus d'edicions.",
+    "description": "Description for the instant recording mode"
+  },
+  "instantRecordingModeAction": {
+    "message": "Entès",
+    "description": "Action button for the instant recording mode"
+  },
+  "tabRecordingDisabledTooltip": {
+    "message": "La gravació de pestanyes està desactivada en aquesta pàgina",
+    "description": "Tooltip shown when tab recording is disabled on a page"
+  },
+  "addingToLabel": {
+    "message": "Afegint a: ",
+    "description": "Label shown when a scene is being recorded to a project"
+  },
+  "multiLabel": {
+    "message": "Multi",
+    "description": "Label for the multi-recording mode"
+  },
+  "finishLabelMulti": {
+    "message": "Finalitza",
+    "description": "Label for the finish multi-recording button"
+  },
+  "welcomeProTitle": {
+    "message": "Vols fer més amb les teves gravacions?",
+    "description": "Title for the welcome Pro popup"
+  },
+  "welcomeProDescription": {
+    "message": "Inicia sessió per guardar els vídeos al núvol, compartir amb enllaç i accedir a funcions avançades d'edició.",
+    "description": "Description for the welcome Pro popup"
+  },
+  "welcomeProButton": {
+    "message": "Inicia sessió per desbloquejar funcions Pro",
+    "description": "Button to sign in to Screenity Pro"
+  },
+  "welcomeProSupport": {
+    "message": "Dona suport a la desenvolupadora independent!",
+    "description": "Message for supporting the indie maker in the welcome Pro popup"
+  },
+  "unlockMoreFeatures": {
+    "message": "Desbloqueja més funcions",
+    "description": "Button to unlock more features in the editor"
+  },
+  "shareUnlockButton": {
+    "message": "Inicia sessió per compartir (pro)",
+    "description": "Button to sign in to share in the editor"
+  },
+  "proBannerTitle": {
+    "message": "Desbloqueja emmagatzematge al núvol, edició multi-escena, zooms automàtics, subtítols i més",
+    "description": "Pro banner title in the editor"
+  },
+  "proBannerDescription": {
+    "message": "Screenity sempre serà gratuït, de codi obert i sense anuncis. Pro ajuda a cobrir costos de núvol i infraestructura, i dona suport a una desenvolupadora independent! ❤️",
+    "description": "Pro banner description in the editor"
+  },
+  "proBannerAltButton": {
+    "message": "No ho mostris més",
+    "description": "Pro banner don't show again button in the editor"
+  },
+  "proBannerButton": {
+    "message": "Prova-ho",
+    "description": "Pro banner button in the editor"
+  },
+  "multiRecordingModeTitle": {
+    "message": "Mode Multi",
+    "description": "Title for the multi-recording mode modal"
+  },
+  "multiRecordingModeDescription": {
+    "message": "Grava múltiples escenes, com la pantalla, la càmera o totes dues, una rere l'altra. És ideal per fer diverses preses, canviar de vista o dividir la gravació en parts. Quan acabis, fes clic a Finalitza per obrir l'editor amb totes les escenes combinades en un sol vídeo.",
+    "description": "Description for the multi-recording mode modal"
+  },
+  "noSubscriptionYetTitle": {
+    "message": "Activa Pro per començar",
+    "description": "Title shown when the user has no active subscription"
+  },
+  "noSubscriptionYetDescription": {
+    "message": "Subscriu-te per accedir a les funcions Pro.",
+    "description": "Message prompting the user to subscribe to reactivate their Pro features"
+  },
+  "upgradeToProButton": {
+    "message": "Subscriu-te a Pro",
+    "description": "Button to upgrade to Pro"
+  },
+  "hostBannerTitle": {
+    "message": "Gaudeixes de Screenity localment? Dona suport al seu futur!",
+    "description": "Títol del bàner d'autoallotjament a l'editor"
+  },
+  "hostBannerDescription": {
+    "message": "Screenity està creada per una desenvolupadora indie. Autoallotjar és gratuït, però si et resulta útil, considera donar-hi suport amb Pro ❤️",
+    "description": "Descripció del bàner d'autoallotjament a l'editor"
+  },
+  "welcomeBackPopupTitle": {
+    "message": "Benvingut de nou a Screenity",
+    "description": "Títol del popup de benvinguda mostrat als usuaris que tornen"
+  },
+  "welcomeBackProTitle": {
+    "message": "✨ Novetat: Porta les teves gravacions al següent nivell",
+    "description": "Títol per a la funció d'emmagatzematge al núvol en el popup de benvinguda"
+  },
+  "welcomeBackProDescription": {
+    "message": "Screenity Pro és una nova plataforma opcional per desar vídeos al núvol, compartir-los amb un enllaç i desbloquejar eines avançades d’edició, si i quan les necessitis.",
+    "description": "Descripció de la funció d'emmagatzematge al núvol en el popup de benvinguda"
+  },
+  "welcomeBackProCTA": {
+    "message": "Descobreix Screenity Pro",
+    "description": "Botó de crida a l'acció per a la funció d'emmagatzematge al núvol en el popup de benvinguda"
+  },
+  "welcomeToProTitleModal": {
+    "message": "Benvingut a Screenity Pro",
+    "description": "Títol del modal de benvinguda a Pro"
+  },
+  "welcomeToProDescriptionModal": {
+    "message": "Ja ho tens tot a punt per començar a gravar! Tingues en compte aquestes coses:\n\n- La bombolla de la càmera pot desaparèixer durant la gravació; és normal. Es grava per separat en segon pla perquè la puguis col·locar on vulguis més endavant.\n- Els zooms només es creen automàticament quan es fa clic dins de pestanyes de Chrome, per una limitació del navegador. Sempre pots afegir-ne més manualment després de gravar.\n- Per a gravacions ràpides amb descàrrega instantània, prova el Mode Instantani. Només tingues en compte que les opcions d’edició són limitades: sense fons, disposicions ni ajustaments avançats.",
+    "description": "Descripció del modal de benvinguda a Pro"
+  },
+  "welcomeToProActionModal": {
+    "message": "Entès",
+    "description": "Botó d’acció del modal de benvinguda a Pro"
   }
 }

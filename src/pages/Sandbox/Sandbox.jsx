@@ -17,16 +17,6 @@ const Sandbox = () => {
   const parentRef = useRef(null);
   const progress = useRef("");
 
-  // Check when going offline (listener)
-  // useEffect(() => {
-  //   window.addEventListener("offline", () => {
-  //     setContentState((prevState) => ({
-  //       ...prevState,
-  //       offline: true,
-  //     }));
-  //   });
-  // }, []);
-
   const getChromeVersion = () => {
     var raw = navigator.userAgent.match(/Chrom(e|ium)\/([0-9]+)\./);
 
@@ -107,6 +97,18 @@ const Sandbox = () => {
     }
   }, [contentState.chunkIndex, contentState.chunkCount]);
 
+  useEffect(() => {
+    // Check if we need to show support banner
+    chrome.runtime.sendMessage({ type: "check-banner-support" }, (response) => {
+      if (response && response.bannerSupport) {
+        setContentState((prev) => ({
+          ...prev,
+          bannerSupport: true,
+        }));
+      }
+    });
+  }, []);
+
   return (
     <div ref={parentRef}>
       <Modal />
@@ -140,20 +142,6 @@ const Sandbox = () => {
                     chrome.i18n.getMessage("havingIssuesModalButton2"),
                     () => {
                       chrome.runtime.sendMessage({ type: "restore-recording" });
-                      // chrome.runtime.sendMessage(
-                      //   {
-                      //     type: "check-restore",
-                      //   },
-                      //   (response) => {
-                      //     if (response.restore) {
-                      //       chrome.runtime.sendMessage({
-                      //         type: "indexed-db-download",
-                      //       });
-                      //     } else {
-                      //       alert(chrome.i18n.getMessage("noRecordingFound"));
-                      //     }
-                      //   }
-                      // );
                     },
                     () => {
                       chrome.runtime.sendMessage({ type: "report-bug" });

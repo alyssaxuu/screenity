@@ -8,12 +8,9 @@ localforage.config({
   version: 1,
 });
 
-// Get chunks store
 const chunksStore = localforage.createInstance({
   name: "chunks",
 });
-
-// Get localDirectory store
 const localDirectoryStore = localforage.createInstance({
   name: "localDirectory",
 });
@@ -142,12 +139,9 @@ const Backup = () => {
 
     let directoryHandle = directoryPicker;
 
-    // Check if the selected directory is the "Screenity recordings" folder
     if (directoryPicker.name === "Screenity Recordings") {
-      // Use the selected directory directly
       directoryHandle = directoryPicker;
     } else {
-      // If not, create the "Screenity recordings" folder within it
       directoryHandle = await directoryPicker.getDirectoryHandle(
         "Screenity Recordings",
         { create: true }
@@ -163,7 +157,7 @@ const Backup = () => {
   const localSaving = async (prompt = true) => {
     waitWrite.current = false;
     closeRequest.current = false;
-    // Check if user gesture has happened with UserActivation API
+
     if (!navigator.userActivation.isActive) {
       chrome.runtime.sendMessage({ type: "focus-this-tab" });
       return;
@@ -173,7 +167,6 @@ const Backup = () => {
       localDirectoryStore.clear();
     }
 
-    // Check if the FileSystem API is available
     if ("showDirectoryPicker" in window) {
       localDirectoryStore.getItem("directoryHandle").then(async (directory) => {
         if (directory) {

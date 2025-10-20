@@ -5,6 +5,7 @@ import styles from "../../styles/player/_Content.module.scss";
 import VideoPlayer from "../../components/player/VideoPlayer";
 import CropperWrap from "../../components/editor/CropperWrap";
 import HelpButton from "../../components/player/HelpButton";
+import ProBanner from "../../components/global/ProBanner";
 
 // Context
 import { ContentStateContext } from "../../context/ContentState"; // Import the ContentState context
@@ -19,6 +20,7 @@ const Content = () => {
         {contentState.mode === "crop" && <CropperWrap />}
       </div>
       <HelpButton />
+      {contentState.bannerSupport && <ProBanner />}
     </div>
   );
 };

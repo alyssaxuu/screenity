@@ -601,16 +601,20 @@
     "description": "Download GIF label"
   },
   "shareModalSandboxTitle": {
-    "message": "Поділіться своїми відео з іншими",
+    "message": "Готовий покращити свої записи?",
     "description": "Share modal title in sandbox editor page"
   },
   "shareModalSandboxDescription": {
-    "message": "Скоро! Залиште свою електронну адресу, щоб бути в курсі та отримувати сповіщення, коли буде доступно обмін",
+    "message": "Хмарне поширення, зуми, шаблони... і підтримка інструменту від інді-розробниці, яка поважає твою приватність ❤️",
     "description": "Share modal description in sandbox editor page"
   },
   "shareModalSandboxButton": {
-    "message": "Приєднуйтесь до списку очікування",
+    "message": "Дізнатися більше про Pro",
     "description": "Share modal email placeholder in sandbox editor page"
+  },
+  "shareModalSandboxLogin": {
+    "message": "Вже маєш акаунт? Увійти",
+    "description": "Share modal login link in sandbox editor page"
   },
   "shareSandboxButton": {
     "message": "Поділитися відео",
@@ -1035,5 +1039,349 @@
   "permissionsModalReview": {
     "message": "Переглянути дозволи",
     "description": "Кнопка перегляду дозволів"
+  },
+  "recordButtonMultiLabel": {
+    "message": "Додати ще один запис",
+    "description": "Record button label (multi mode)"
+  },
+  "recorderSetupTitle": {
+    "message": "Готуємо все до старту...",
+    "description": "Title in recording page while setting up project before countdown starts"
+  },
+  "recorderSetupDescription": {
+    "message": "Зачекайте! Ваш запис готується.",
+    "description": "Description in recording page before countdown starts"
+  },
+  "reopenToolbarToast": {
+    "message": "Панель інструментів приховано. Увімкніть її в налаштуваннях спливаючого вікна.",
+    "description": "Toast message explaining to reopen the toolbar in the popup options"
+  },
+  "loginButtonLabel": {
+    "message": "Увійти або зареєструватися",
+    "description": "Login button label in popup settings menu"
+  },
+  "logoutButtonLabel": {
+    "message": "Вийти",
+    "description": "Logout button label in popup settings menu"
+  },
+  "loggedOutToastTitle": {
+    "message": "Ви вийшли з облікового запису",
+    "description": "Toast message shown when the user logs out"
+  },
+  "storageLimitReachedTitle": {
+    "message": "Досягнуто межі сховища",
+    "description": "Modal message shown when the storage limit is reached"
+  },
+  "storageLimitReachedDescription": {
+    "message": "Ви використали всі 50 ГБ сховища. Видаліть старі відео або сцени, щоб продовжити запис.",
+    "description": "Modal description shown when the storage limit is reached"
+  },
+  "manageStorageButtonLabel": {
+    "message": "Керувати сховищем",
+    "description": "Button label to manage storage in the popup settings menu"
+  },
+  "closeModalLabel": {
+    "message": "Закрити",
+    "description": "Agnostic close modal button label"
+  },
+  "storageCheckFailTitle": {
+    "message": "Не вдалося перевірити сховище",
+    "description": "Title shown when the storage check fails"
+  },
+  "storageCheckFailAuthDescription": {
+    "message": "Сталася помилка під час перевірки сховища. Увійдіть знову та спробуйте записати.",
+    "description": "Description shown when the storage check fails due to authentication"
+  },
+  "storageCheckFailDescription": {
+    "message": "Не вдалося перевірити квоту сховища. Спробуйте ще раз за кілька секунд або оновіть сторінку.",
+    "description": "Description shown when the storage check fails"
+  },
+  "retryButtonLabel": {
+    "message": "Спробувати ще раз",
+    "description": "Agnostic button label to try again"
+  },
+  "addedToMultiToast": {
+    "message": "Сцену додано до Multi-запису",
+    "description": "Toast message shown when a scene is added to multi-recording"
+  },
+  "readyRecordSceneToast": {
+    "message": "Готово до запису нової сцени у відео",
+    "description": "Toast message shown when the user is in an existing project and ready to record a new scene"
+  },
+  "reachingRecordingLimitToast": {
+    "message": "Запис наближається до 90-хвилинної межі, незабаром завершиться",
+    "description": "Toast message shown when the recording is reaching the 90 minute limit"
+  },
+  "recordingLimitReachedToast": {
+    "message": "Запис зупинено через 90-хвилинне обмеження",
+    "description": "Toast message shown when the recording limit is reached"
+  },
+  "tabRecordingDisabledToast": {
+    "message": "Запис вкладки вимкнено на цій сторінці. Перемкнено на запис екрана.",
+    "description": "Toast message shown when tab recording is disabled on a page"
+  },
+  "projectRecordingCancelledToast": {
+    "message": "Запис відео скасовано",
+    "description": "Toast message shown when the user cancels project recording"
+  },
+  "copiedToClipboardToast": {
+    "message": "Посилання скопійовано в буфер обміну",
+    "description": "Toast message shown when link has been copied to clipboard"
+  },
+  "failedToCopyToClipboardToast": {
+    "message": "Не вдалося скопіювати посилання",
+    "description": "Toast message shown when failed to copy link to clipboard"
+  },
+  "newestSortLabel": {
+    "message": "Останні",
+    "description": "Label for the newest sort option"
+  },
+  "oldestSortLabel": {
+    "message": "Найстаріші",
+    "description": "Label for the oldest sort option"
+  },
+  "allVideosHeading": {
+    "message": "Усі відео",
+    "description": "Heading for the all videos section in the popup"
+  },
+  "noVideosFound": {
+    "message": "Відео не знайдено",
+    "description": "Message shown when no videos are found in the popup"
+  },
+  "loadingVideosLabel": {
+    "message": "Завантаження відео...",
+    "description": "Label shown when videos are loading in the popup"
+  },
+  "goToDashboardButtonLabel": {
+    "message": "Перейти до панелі",
+    "description": "Button label to go to the dashboard in the popup"
+  },
+  "welcomePopupTitle": {
+    "message": "Ласкаво просимо до Screenity",
+    "description": "Title for the welcome popup shown to new users"
+  },
+  "welcomePopupDescriptionTop": {
+    "message": "Без реклами. Без стеження. Без обмежень.",
+    "description": "Description for the welcome popup shown to new users"
+  },
+  "welcomePopupDescriptionBottom": {
+    "message": "Просто натисніть «Запис».",
+    "description": "Description for the welcome popup shown to new users"
+  },
+  "welcomePopupCTA": {
+    "message": "Користуйтесь безкоштовно — без реєстрації!",
+    "description": "Call to action button for the welcome popup shown to new users"
+  },
+  "welcomePopupCloudTitle": {
+    "message": "Хочете зробити більше зі своїми відео?",
+    "description": "Title for the cloud storage feature in the welcome popup"
+  },
+  "welcomePopupCloudFeature1": {
+    "message": "Хмарне сховище, діліться відео через посилання",
+    "description": "Feature 1 for the cloud storage in the welcome popup"
+  },
+  "welcomePopupCloudFeature2": {
+    "message": "Об’єднуйте кілька кліпів в одну історію",
+    "description": "Feature 2 for the cloud storage in the welcome popup"
+  },
+  "welcomePopupCloudFeature3": {
+    "message": "Розумне масштабування при кліку (або додайте своє!)",
+    "description": "Feature 3 for the cloud storage in the welcome popup"
+  },
+  "welcomePopupCloudFeature4": {
+    "message": "Шаблони, субтитри, макети...",
+    "description": "Feature 4 for the cloud storage in the welcome popup"
+  },
+  "welcomePopupCloudFeature5": {
+    "message": "Користувацькі фони та макети",
+    "description": "Feature 5 for the cloud storage in the welcome popup"
+  },
+  "welcomePopupCloudCTA": {
+    "message": "🔓 Відкрити додаткові функції",
+    "description": "Call to action button for the cloud storage feature in the welcome popup"
+  },
+  "welcomePopupSupport": {
+    "message": "+ Підтримайте розробку від інді-розробниці!",
+    "description": "Message for supporting the indie maker in the welcome popup"
+  },
+  "accountSettingsOption": {
+    "message": "Налаштування облікового запису",
+    "description": "Label for the account settings option in the popup"
+  },
+  "supportSettingsOption": {
+    "message": "Підтримка",
+    "description": "Label for the support option in the popup"
+  },
+  "inactiveSubscriptionTitle": {
+    "message": "Ваша підписка Pro неактивна",
+    "description": "Title shown when the user's subscription is inactive"
+  },
+  "inactiveSubscriptionDescription": {
+    "message": "Ваша підписка на Screenity Pro неактивна.",
+    "description": "Description shown when the user's subscription is inactive"
+  },
+  "inactiveSubscriptionReactivation": {
+    "message": "Будь ласка, активуйте знову, щоб відновити доступ.",
+    "description": "Message prompting the user to reactivate their subscription"
+  },
+  "inactiveSubscriptionDeletionWarning": {
+    "message": "Ваші відео та дані будуть остаточно видалені ",
+    "description": "Warning message about the deletion of videos and data"
+  },
+  "manageSubscriptionButton": {
+    "message": "Керувати підпискою",
+    "description": "Button to manage the user's subscription"
+  },
+  "inactiveSubscriptionFreeVersion": {
+    "message": "Хочете продовжити користування безкоштовною версією?",
+    "description": "Message prompting the user to continue using the free version"
+  },
+  "downgradeToFreeButton": {
+    "message": "Вийти та перейти на безкоштовну версію",
+    "description": "Button to log out and downgrade to the free version"
+  },
+  "loggedOutTitle": {
+    "message": "Ви вийшли з облікового запису",
+    "description": "Title shown when the user is logged out"
+  },
+  "loggedOutDescription": {
+    "message": "Щоб синхронізувати записи з обліковим записом та отримати доступ до преміум-функцій, увійдіть знову.",
+    "description": "Description shown when the user is logged out"
+  },
+  "logBackInButton": {
+    "message": "Увійти знову",
+    "description": "Button to log back in after being logged out"
+  },
+  "loggedOutFreeVersion": {
+    "message": "Ви можете користуватися розширенням без облікового запису — але ваші записи не зберігатимуться і не можуть бути відновлені.",
+    "description": "Message shown when the user is logged out and using the free version"
+  },
+  "continueWithoutLogin": {
+    "message": "Продовжити без входу",
+    "description": "Button to continue using the extension without logging in"
+  },
+  "instantRecordingModeLabel": {
+    "message": "Режим миттєвого запису",
+    "description": "Label for the instant recording mode"
+  },
+  "instantRecordingModeTooltip": {
+    "message": "Миттєве завантаження, але камеру та макет не можна буде змінити пізніше.",
+    "description": "Tooltip for the instant recording mode"
+  },
+  "instantRecordingModeTitle": {
+    "message": "Режим миттєвого запису",
+    "description": "Title for the instant recording mode"
+  },
+  "instantRecordingModeDescription": {
+    "message": "Це записує все в одне відео для миттєвого завантаження та поширення. Розташування камери не можна буде змінити, але інші правки будуть доступні.",
+    "description": "Description for the instant recording mode"
+  },
+  "instantRecordingModeAction": {
+    "message": "Зрозуміло",
+    "description": "Action button for the instant recording mode"
+  },
+  "tabRecordingDisabledTooltip": {
+    "message": "Запис вкладки вимкнено на цій сторінці",
+    "description": "Tooltip shown when tab recording is disabled on a page"
+  },
+  "addingToLabel": {
+    "message": "Додається до: ",
+    "description": "Label shown when a scene is being recorded to a project"
+  },
+  "multiLabel": {
+    "message": "Multi",
+    "description": "Label for the multi-recording mode"
+  },
+  "finishLabelMulti": {
+    "message": "Завершити",
+    "description": "Label for the finish multi-recording button"
+  },
+  "welcomeProTitle": {
+    "message": "Хочете зробити більше зі своїми записами?",
+    "description": "Title for the welcome Pro popup"
+  },
+  "welcomeProDescription": {
+    "message": "Увійдіть, щоб зберігати відео в хмарі, ділитися посиланням і редагувати з розширеними функціями.",
+    "description": "Description for the welcome Pro popup"
+  },
+  "welcomeProButton": {
+    "message": "Увійти, щоб відкрити платні функції",
+    "description": "Button to sign in to Screenity Pro"
+  },
+  "welcomeProSupport": {
+    "message": "Підтримайте розробку від інді-розробниці",
+    "description": "Message for supporting the indie maker in the welcome Pro popup"
+  },
+  "unlockMoreFeatures": {
+    "message": "Відкрити більше функцій",
+    "description": "Button to unlock more features in the editor"
+  },
+  "shareUnlockButton": {
+    "message": "Увійти, щоб поділитися (pro)",
+    "description": "Button to sign in to share in the editor"
+  },
+  "proBannerTitle": {
+    "message": "Відкрийте хмарне поширення, багатосценове редагування, автозуми, субтитри та інше",
+    "description": "Pro banner title in the editor"
+  },
+  "proBannerDescription": {
+    "message": "Screenity завжди буде безкоштовним, з відкритим кодом та без реклами. Pro покриває витрати на хмару та інфраструктуру й підтримує інді-розробницю! ❤️",
+    "description": "Pro banner description in the editor"
+  },
+  "proBannerAltButton": {
+    "message": "Більше не показувати",
+    "description": "Pro banner don't show again button in the editor"
+  },
+  "proBannerButton": {
+    "message": "Спробувати",
+    "description": "Pro banner button in the editor"
+  },
+  "multiRecordingModeTitle": {
+    "message": "Режим Multi",
+    "description": "Title for the multi-recording mode modal"
+  },
+  "multiRecordingModeDescription": {
+    "message": "Записуйте кілька сцен — екран, камеру або обидва варіанти — одну за одною. Це чудово підходить для кількох дублів, зміни ракурсу або поділу запису на частини. Коли завершите, натисніть «Готово», щоб відкрити редактор з усіма сценами, об’єднаними в одне відео.",
+    "description": "Description for the multi-recording mode modal"
+  },
+  "noSubscriptionYetTitle": {
+    "message": "Активуйте Pro, щоб почати",
+    "description": "Title shown when the user has no active subscription"
+  },
+  "noSubscriptionYetDescription": {
+    "message": "Оформіть підписку, щоб отримати доступ до функцій Pro.",
+    "description": "Message prompting the user to subscribe to reactivate their Pro features"
+  },
+  "upgradeToProButton": {
+    "message": "Підписатися на Pro",
+    "description": "Button to upgrade to Pro"
+  },
+  "welcomeBackPopupTitle": {
+    "message": "З поверненням до Screenity",
+    "description": "Заголовок для вікна привітання для користувачів, які повернулися"
+  },
+  "welcomeBackProTitle": {
+    "message": "✨ Нове: Виведіть свої записи на новий рівень",
+    "description": "Заголовок для функції хмарного зберігання у вікні привітання"
+  },
+  "welcomeBackProDescription": {
+    "message": "Screenity Pro — це нова додаткова платформа для збереження відео в хмарі, спільного доступу за посиланням та розблокування розширених інструментів редагування, коли і якщо вони вам потрібні.",
+    "description": "Опис функції хмарного зберігання у вікні привітання"
+  },
+  "welcomeBackProCTA": {
+    "message": "Дізнатися більше про Screenity Pro",
+    "description": "Кнопка заклику до дії для функції хмарного зберігання у вікні привітання"
+  },
+  "welcomeToProTitleModal": {
+    "message": "Ласкаво просимо до Screenity Pro",
+    "description": "Заголовок вікна привітання у Pro"
+  },
+  "welcomeToProDescriptionModal": {
+    "message": "Усе готово для початку запису! Ось кілька речей, про які варто пам’ятати:\n\n- Під час запису бульбашка з камерою може зникати — це нормально. Вона записується окремо у фоновому режимі, тож пізніше ви зможете розмістити її як завгодно.\n- Збільшення створюються автоматично лише при кліках у вкладках Chrome — це обмеження браузера. Ви завжди можете додати збільшення вручну після запису.\n- Для швидких записів зі миттєвим завантаженням спробуйте Режим «Миттєво». Просто пам’ятайте, що можливості редагування обмежені: без фону, макетів або розширених налаштувань.",
+    "description": "Опис вікна привітання у Pro"
+  },
+  "welcomeToProActionModal": {
+    "message": "Зрозуміло",
+    "description": "Кнопка дії у вікні привітання Pro"
   }
 }

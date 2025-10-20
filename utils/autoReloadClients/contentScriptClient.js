@@ -1,16 +1,22 @@
 const logger = (msg) => {
-  console.log(`[CSC] ${msg}`);
+  console.log(`[Content Script] ${msg}`);
 };
 
-logger("content script client up.");
+logger("Initialized reload listener");
 
-chrome.runtime.onMessage.addListener((request, _sender, sendResp) => {
+// Listen for reload messages from background script
+chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
   const shouldReload =
     request.from === "backgroundClient" && request.action === "reload-yourself";
+
   if (shouldReload) {
-    sendResp({ from: "contentScriptClient", action: "yes-sir" });
-    // wait 100ms for extension reload.
-    logger("page will reload to reload content script...");
-    setTimeout(() => window.location.reload(), 100);
+    logger("Received reload request from background");
+    sendResponse({ from: "contentScriptClient", action: "acknowledged" });
+
+    // Short delay before reload to ensure response is sent
+    setTimeout(() => {
+      logger("Reloading page...");
+      window.location.reload();
+    }, 100);
   }
 });

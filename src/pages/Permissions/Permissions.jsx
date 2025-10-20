@@ -10,6 +10,22 @@ const Recorder = () => {
     );
   }, []);
 
+  useEffect(() => {
+    const handleDeviceChange = () => {
+      // Recheck permissions and enumerate devices
+      checkPermissions();
+    };
+
+    navigator.mediaDevices.addEventListener("devicechange", handleDeviceChange);
+
+    return () => {
+      navigator.mediaDevices.removeEventListener(
+        "devicechange",
+        handleDeviceChange
+      );
+    };
+  }, []);
+
   const checkPermissions = async () => {
     // Individually check the camera and microphone permissions using the Permissions API. Then enumerate devices respectively.
     try {
@@ -54,7 +70,6 @@ const Recorder = () => {
     }
   };
 
-  // Enumerate devices
   const enumerateDevices = async (camGranted = true, micGranted = true) => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({

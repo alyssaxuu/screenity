@@ -19,17 +19,18 @@ const Toast = () => {
   const triggerRef = useRef(trigger);
   const openRef = useRef(open);
   const contentStateRef = useRef(contentState);
+  const [toastDuration, setToastDuration] = useState(2000);
 
   useEffect(() => {
     contentStateRef.current = contentState;
   }, [contentState]);
 
-  const openToast = useCallback((title, action) => {
+  const openToast = useCallback((title, action, durationMs = 2000) => {
     if (contentStateRef.current.hideUI) return;
-    //if (contentState.hideToolbar && contentState.hideUI) return;
     setTitle(title);
     setOpen(true);
     setTrigger(() => action);
+    setToastDuration(durationMs);
   });
 
   useEffect(() => {
@@ -59,7 +60,7 @@ const Toast = () => {
   }, [trigger]);
 
   return (
-    <ToastEl.Provider swipeDirection="down" duration={2000}>
+    <ToastEl.Provider swipeDirection="down" duration={toastDuration}>
       <ToastEl.Root
         className="ToastRoot"
         open={open}

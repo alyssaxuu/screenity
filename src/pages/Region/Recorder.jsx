@@ -14,6 +14,7 @@ localforage.config({
   version: 1,
 });
 
+// Get chunks store
 const chunksStore = localforage.createInstance({
   name: "chunks",
 });
@@ -54,7 +55,6 @@ const Recorder = () => {
   const regionRef = useRef();
   const backupRef = useRef(false);
 
-  // Chunk handling system from first file
   const pending = useRef([]);
   const draining = useRef(false);
   const lowStorageAbort = useRef(false);
@@ -215,8 +215,6 @@ const Recorder = () => {
     // Check that a recording is not already in progress
     if (recorder.current !== null) return;
     navigator.storage.persist();
-
-    // Reset all state variables
     isFinishing.current = false;
     sentLast.current = false;
     lastTimecode.current = 0;
@@ -228,7 +226,6 @@ const Recorder = () => {
     draining.current = false;
     lowStorageAbort.current = false;
     pendingBytes.current = 0;
-
     // Check if the stream actually has data in it
     try {
       if (helperVideoStream.current.getVideoTracks().length === 0) {
@@ -237,6 +234,7 @@ const Recorder = () => {
           error: "stream-error",
           why: "No video tracks available",
         });
+
         // Reload this iframe
         window.location.reload();
         return;
@@ -247,6 +245,7 @@ const Recorder = () => {
         error: "stream-error",
         why: JSON.stringify(err),
       });
+
       // Reload this iframe
       window.location.reload();
       return;
@@ -282,8 +281,12 @@ const Recorder = () => {
 
       // List all mimeTypes
       const mimeTypes = [
-        "video/webm;codecs=vp9,opus",
+        "video/webm;codecs=avc1",
         "video/webm;codecs=vp8,opus",
+        "video/webm;codecs=vp9,opus",
+        "video/webm;codecs=vp9",
+        "video/webm;codecs=vp8",
+        "video/webm;codecs=h264",
         "video/webm",
       ];
 
@@ -299,6 +302,7 @@ const Recorder = () => {
           error: "stream-error",
           why: "No supported mimeTypes available",
         });
+
         // Reload this iframe
         window.location.reload();
         return;
@@ -315,6 +319,7 @@ const Recorder = () => {
         error: "stream-error",
         why: JSON.stringify(err),
       });
+
       // Reload this iframe
       window.location.reload();
       return;
@@ -330,7 +335,6 @@ const Recorder = () => {
     recordingRef.current = true;
     isDismissing.current = false;
 
-    // Start recording with 1000ms chunks like the first file
     try {
       recorder.current.start(1000);
     } catch (err) {
@@ -341,6 +345,7 @@ const Recorder = () => {
         memoryError: true,
       });
       chrome.runtime.sendMessage({ type: "stop-recording-tab" });
+
       // Reload this iframe
       window.location.reload();
       return;
@@ -386,6 +391,7 @@ const Recorder = () => {
               memoryError: true,
             });
             chrome.runtime.sendMessage({ type: "stop-recording-tab" });
+
             // Reload this iframe
             window.location.reload();
           }
@@ -396,6 +402,7 @@ const Recorder = () => {
           error: "stream-error",
           why: JSON.stringify(err),
         });
+
         // Reload this iframe
         window.location.reload();
       }
@@ -431,7 +438,6 @@ const Recorder = () => {
 
     recorder.current.onpause = () => {
       lastTimecode.current = 0;
-      lastSize.current = 0;
     };
 
     recorder.current.onresume = () => {
@@ -534,7 +540,10 @@ const Recorder = () => {
     }
 
     recorder.current = null;
-    chrome.runtime.sendMessage({ type: "new-sandbox-page-restart" });
+    chrome.runtime.sendMessage({ type: "reset-active-tab-restart" });
+
+    // Send message to go back to the previously active tab
+    //chrome.runtime.sendMessage({ type: "reset-active-tab-restart" });
   };
 
   async function startAudioStream(id) {
@@ -571,7 +580,6 @@ const Recorder = () => {
 
     return result;
   }
-
   // Set audio input volume
   function setAudioInputVolume(volume) {
     audioInputGain.current.gain.value = volume;
@@ -705,6 +713,7 @@ const Recorder = () => {
             error: "cancel-modal",
             why: "No target",
           });
+
           // Reload this iframe
           window.location.reload();
         }
@@ -714,6 +723,7 @@ const Recorder = () => {
           error: "cancel-modal",
           why: JSON.stringify(err),
         });
+
         // Reload this iframe
         window.location.reload();
       }
@@ -726,6 +736,7 @@ const Recorder = () => {
         error: "cancel-modal",
         why: JSON.stringify(err),
       });
+
       // Reload this iframe
       window.location.reload();
     }

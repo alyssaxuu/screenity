@@ -1,19 +1,22 @@
 const querystring = require("querystring");
 
 const logger = (msg) => {
-  console.log(`[BGC] ${msg}`);
+  console.log(`[Background] ${msg}`);
 };
 
-logger("background client up.");
+logger("Initializing auto-reload client");
 
-logger("connecting to SSE service...");
+// Parse port from query string
 const port = querystring.parse(__resourceQuery.slice(1)).port;
+
+// Connect to SSE endpoint
 const es = new EventSource(`http://localhost:${port}/__server_sent_events__`);
 
+// Handle connection events
 es.addEventListener(
   "open",
   () => {
-    logger("SSE service connected!");
+    logger("Connected to dev server");
   },
   false
 );
@@ -22,43 +25,74 @@ es.addEventListener(
   "error",
   (event) => {
     if (event.target.readyState === 0) {
-      console.error("[BGC] you need to open devServer first!");
+      console.error(
+        "[Background] Dev server connection failed - is it running?"
+      );
     } else {
-      console.error(event);
+      console.error("[Background] SSE error:", event);
     }
   },
   false
 );
 
-es.addEventListener("background-updated", () => {
-  logger("received 'background-updated' event from SSE service.");
-  logger("extension will reload to reload background...");
-  chrome.runtime.reload(); // reload extension to reload background.
-});
+// Handle background script update events
+es.addEventListener(
+  "background-updated",
+  () => {
+    logger("Background script updated, reloading extension...");
+    chrome.runtime.reload();
+  },
+  false
+);
 
+// Handle content script update events
 es.addEventListener(
   "content-scripts-updated",
   () => {
-    logger("received 'content-scripts-updated' event from SSE service.");
-    chrome.tabs.query({}, (tabs) => {
-      tabs.forEach((tab) => {
-        chrome.tabs.sendMessage(
-          tab.id,
-          {
-            from: "backgroundClient",
-            action: "reload-yourself",
-          },
-          (res) => {
-            if (chrome.runtime.lastError && !res) return;
+    logger("Content scripts updated, notifying tabs...");
 
-            const { from, action } = res;
-            if (from === "contentScriptClient" && action === "yes-sir") {
-              es.close();
-              logger("extension will reload to update content scripts...");
-              chrome.runtime.reload();
-            }
+    // Query all tabs to send reload messages
+    chrome.tabs.query({}, (tabs) => {
+      const reloadPromises = tabs.map((tab) => {
+        return new Promise((resolve) => {
+          try {
+            chrome.tabs.sendMessage(
+              tab.id,
+              { from: "backgroundClient", action: "reload-yourself" },
+              (response) => {
+                // Handle any runtime errors from sendMessage
+                if (chrome.runtime.lastError) {
+                  // Tab might not have content script running, ignore error
+                  resolve(false);
+                  return;
+                }
+
+                if (response && response.from === "contentScriptClient") {
+                  logger(`Tab ${tab.id} acknowledged reload request`);
+                  resolve(true);
+                } else {
+                  resolve(false);
+                }
+              }
+            );
+          } catch (err) {
+            logger(`Error sending message to tab ${tab.id}: ${err.message}`);
+            resolve(false);
           }
-        );
+        });
+      });
+
+      // Wait for all tabs to respond or timeout
+      Promise.all(reloadPromises).then((results) => {
+        const successCount = results.filter(Boolean).length;
+        logger(`${successCount}/${tabs.length} tabs acknowledged reload`);
+
+        // Only reload extension if we got at least one successful tab response
+        if (successCount > 0) {
+          logger("Reloading extension to apply content script changes");
+          es.close();
+          chrome.runtime.reload();
+        }
       });
     });
   },

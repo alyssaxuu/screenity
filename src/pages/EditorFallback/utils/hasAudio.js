@@ -24,7 +24,6 @@ const hasAudio = async (videoBlob) => {
               resolve(false);
             };
 
-            // Start playing the video
             videoElement.play();
           };
         } catch (error) {

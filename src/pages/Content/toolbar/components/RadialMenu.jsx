@@ -25,6 +25,7 @@ const RadialMenu = (props) => {
   const [open, setOpen] = useState(false);
   const [eyeDropperActive, setEyeDropperActive] = useState(false);
   const [override, setOverride] = useState("");
+  const [renderColorWheel, setRenderColorWheel] = useState(false);
 
   useEffect(() => {
     // Check if hideUI is set
@@ -47,6 +48,12 @@ const RadialMenu = (props) => {
   useEffect(() => {
     if (!open) {
       setFullWheel(false);
+      setRenderColorWheel(false);
+    } else {
+      const timeout = setTimeout(() => {
+        setRenderColorWheel(true);
+      }, 50);
+      return () => clearTimeout(timeout);
     }
   }, [open]);
 
@@ -184,11 +191,13 @@ const RadialMenu = (props) => {
                     </TooltipWrap>
                   );
                 })}
-                <ColorWheel
-                  fullwheel={fullwheel}
-                  open={open}
-                  setFullWheel={setFullWheel}
-                />
+                {renderColorWheel && (
+                  <ColorWheel
+                    fullwheel={fullwheel}
+                    open={open}
+                    setFullWheel={setFullWheel}
+                  />
+                )}
               </ToggleGroup.Root>
             </div>
           </div>

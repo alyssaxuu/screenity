@@ -1,9 +1,16 @@
-import React from 'react';
-import { render } from 'react-dom';
+import React from "react";
+import { createRoot } from "react-dom/client";
+import Recorder from "./Recorder";
 
-import Recorder from './Recorder';
+// Find the container to render into
+const container = window.document.querySelector("#app-container");
 
-// Render at the end of the body of any website
-render(<Recorder />, window.document.querySelector('#app-container'));
+if (container) {
+  const root = createRoot(container);
+  root.render(<Recorder />);
+}
 
-if (module.hot) module.hot.accept();
+// Hot Module Replacement
+if (module.hot) {
+  module.hot.accept();
+}

@@ -601,16 +601,20 @@
     "description": "Метка скачивания GIF"
   },
   "shareModalSandboxTitle": {
-    "message": "Поделитесь вашими видео с другими",
-    "description": "Заголовок модального окна для песочницы"
+    "message": "Готов улучшить свои записи?",
+    "description": "Share modal title in sandbox editor page"
   },
   "shareModalSandboxDescription": {
-    "message": "Скоро! Оставьте свой адрес электронной почты, чтобы быть в курсе и получать уведомления о доступности функции обмена.",
-    "description": "Описание модального окна для песочницы"
+    "message": "Облачный доступ, зум, шаблоны... и поддержка инструмента от инди-разработчицы, уважающей твою приватность ❤️",
+    "description": "Share modal description in sandbox editor page"
   },
   "shareModalSandboxButton": {
-    "message": "Присоединиться к списку ожидания",
-    "description": "Заглушка для адреса электронной почты в модальном окне для песочницы"
+    "message": "Узнать больше о Pro",
+    "description": "Share modal email placeholder in sandbox editor page"
+  },
+  "shareModalSandboxLogin": {
+    "message": "Уже есть аккаунт? Войти",
+    "description": "Share modal login link in sandbox editor page"
   },
   "shareSandboxButton": {
     "message": "Поделиться видео",
@@ -1036,5 +1040,357 @@
   "permissionsModalReview": {
     "message": "Просмотреть разрешения",
     "description": "Кнопка просмотра разрешений"
+  },
+  "recordButtonMultiLabel": {
+    "message": "Добавить ещё одну запись",
+    "description": "Record button label (multi mode)"
+  },
+  "recorderSetupTitle": {
+    "message": "Готовим всё...",
+    "description": "Title in recording page while setting up project before countdown starts"
+  },
+  "recorderSetupDescription": {
+    "message": "Подождите немного! Ваша запись готовится.",
+    "description": "Description in recording page before countdown starts"
+  },
+  "reopenToolbarToast": {
+    "message": "Панель инструментов скрыта. Включите её снова в настройках расширения.",
+    "description": "Toast message explaining to reopen the toolbar in the popup options"
+  },
+  "loginButtonLabel": {
+    "message": "Войти или зарегистрироваться",
+    "description": "Login button label in popup settings menu"
+  },
+  "logoutButtonLabel": {
+    "message": "Выйти",
+    "description": "Logout button label in popup settings menu"
+  },
+  "loggedOutToastTitle": {
+    "message": "Вы вышли из аккаунта",
+    "description": "Toast message shown when the user logs out"
+  },
+  "storageLimitReachedTitle": {
+    "message": "Достигнут лимит хранилища",
+    "description": "Modal message shown when the storage limit is reached"
+  },
+  "storageLimitReachedDescription": {
+    "message": "Вы использовали все 50 ГБ хранилища. Удалите старые видео или сцены, чтобы продолжить запись.",
+    "description": "Modal description shown when the storage limit is reached"
+  },
+  "manageStorageButtonLabel": {
+    "message": "Управление хранилищем",
+    "description": "Button label to manage storage in the popup settings menu"
+  },
+  "closeModalLabel": {
+    "message": "Закрыть",
+    "description": "Agnostic close modal button label"
+  },
+  "storageCheckFailTitle": {
+    "message": "Не удалось проверить хранилище",
+    "description": "Title shown when the storage check fails"
+  },
+  "storageCheckFailAuthDescription": {
+    "message": "Произошла ошибка при проверке хранилища. Пожалуйста, войдите заново и попробуйте снова.",
+    "description": "Description shown when the storage check fails due to authentication"
+  },
+  "storageCheckFailDescription": {
+    "message": "Не удалось проверить ваш лимит хранилища. Попробуйте снова через несколько секунд или обновите страницу.",
+    "description": "Description shown when the storage check fails"
+  },
+  "retryButtonLabel": {
+    "message": "Попробовать снова",
+    "description": "Agnostic button label to try again"
+  },
+  "addedToMultiToast": {
+    "message": "Сцена добавлена в Multi-запись",
+    "description": "Toast message shown when a scene is added to multi-recording"
+  },
+  "readyRecordSceneToast": {
+    "message": "Готовы записать новую сцену в видео",
+    "description": "Toast message shown when the user is in an existing project and ready to record a new scene"
+  },
+  "reachingRecordingLimitToast": {
+    "message": "Запись приближается к лимиту 90 минут, скоро завершится",
+    "description": "Toast message shown when the recording is reaching the 90 minute limit"
+  },
+  "recordingLimitReachedToast": {
+    "message": "Запись остановлена из-за лимита 90 минут",
+    "description": "Toast message shown when the recording limit is reached"
+  },
+  "tabRecordingDisabledToast": {
+    "message": "Запись вкладки отключена на этой странице. Переключено на запись экрана.",
+    "description": "Toast message shown when tab recording is disabled on a page"
+  },
+  "projectRecordingCancelledToast": {
+    "message": "Запись видео отменена",
+    "description": "Toast message shown when the user cancels project recording"
+  },
+  "copiedToClipboardToast": {
+    "message": "Ссылка скопирована в буфер",
+    "description": "Toast message shown when link has been copied to clipboard"
+  },
+  "failedToCopyToClipboardToast": {
+    "message": "Не удалось скопировать ссылку",
+    "description": "Toast message shown when failed to copy link to clipboard"
+  },
+  "newestSortLabel": {
+    "message": "Новые",
+    "description": "Label for the newest sort option"
+  },
+  "oldestSortLabel": {
+    "message": "Старые",
+    "description": "Label for the oldest sort option"
+  },
+  "allVideosHeading": {
+    "message": "Все видео",
+    "description": "Heading for the all videos section in the popup"
+  },
+  "noVideosFound": {
+    "message": "Видео не найдены",
+    "description": "Message shown when no videos are found in the popup"
+  },
+  "loadingVideosLabel": {
+    "message": "Загрузка видео...",
+    "description": "Label shown when videos are loading in the popup"
+  },
+  "goToDashboardButtonLabel": {
+    "message": "Перейти в панель",
+    "description": "Button label to go to the dashboard in the popup"
+  },
+  "welcomePopupTitle": {
+    "message": "Добро пожаловать в Screenity",
+    "description": "Title for the welcome popup shown to new users"
+  },
+  "welcomePopupDescriptionTop": {
+    "message": "Без рекламы. Без слежки. Без ограничений.",
+    "description": "Description for the welcome popup shown to new users"
+  },
+  "welcomePopupDescriptionBottom": {
+    "message": "Просто нажмите «Запись».",
+    "description": "Description for the welcome popup shown to new users"
+  },
+  "welcomePopupCTA": {
+    "message": "Бесплатно — без регистрации!",
+    "description": "Call to action button for the welcome popup shown to new users"
+  },
+  "welcomePopupCloudTitle": {
+    "message": "Хотите больше возможностей для видео?",
+    "description": "Title for the cloud storage feature in the welcome popup"
+  },
+  "welcomePopupCloudFeature1": {
+    "message": "Облачное хранилище, делитесь ссылкой на видео",
+    "description": "Feature 1 for the cloud storage in the welcome popup"
+  },
+  "welcomePopupCloudFeature2": {
+    "message": "Объединяйте клипы в единую историю",
+    "description": "Feature 2 for the cloud storage in the welcome popup"
+  },
+  "welcomePopupCloudFeature3": {
+    "message": "Умные увеличения при клике (или добавьте свои!)",
+    "description": "Feature 3 for the cloud storage in the welcome popup"
+  },
+  "welcomePopupCloudFeature4": {
+    "message": "Добавляйте шаблоны, подписи, макеты...",
+    "description": "Feature 4 for the cloud storage in the welcome popup"
+  },
+  "welcomePopupCloudFeature5": {
+    "message": "Пользовательские фоны и мокапы",
+    "description": "Feature 5 for the cloud storage in the welcome popup"
+  },
+  "welcomePopupCloudCTA": {
+    "message": "🔓 Открыть дополнительные функции",
+    "description": "Call to action button for the cloud storage feature in the welcome popup"
+  },
+  "welcomePopupSupport": {
+    "message": "+ Поддержите разработку от инди-разработчицы!",
+    "description": "Message for supporting the indie maker in the welcome popup"
+  },
+  "accountSettingsOption": {
+    "message": "Настройки аккаунта",
+    "description": "Label for the account settings option in the popup"
+  },
+  "supportSettingsOption": {
+    "message": "Поддержка",
+    "description": "Label for the support option in the popup"
+  },
+  "inactiveSubscriptionTitle": {
+    "message": "Ваша подписка Pro неактивна",
+    "description": "Title shown when the user's subscription is inactive"
+  },
+  "inactiveSubscriptionDescription": {
+    "message": "Ваша подписка Screenity Pro неактивна.",
+    "description": "Description shown when the user's subscription is inactive"
+  },
+  "inactiveSubscriptionReactivation": {
+    "message": "Пожалуйста, активируйте снова, чтобы продолжить использование.",
+    "description": "Message prompting the user to reactivate their subscription"
+  },
+  "inactiveSubscriptionDeletionWarning": {
+    "message": "Ваши видео и данные будут безвозвратно удалены ",
+    "description": "Warning message about the deletion of videos and data"
+  },
+  "manageSubscriptionButton": {
+    "message": "Управление подпиской",
+    "description": "Button to manage the user's subscription"
+  },
+  "inactiveSubscriptionFreeVersion": {
+    "message": "Хотите продолжить использовать бесплатную версию?",
+    "description": "Message prompting the user to continue using the free version"
+  },
+  "downgradeToFreeButton": {
+    "message": "Выйти и перейти на бесплатную версию",
+    "description": "Button to log out and downgrade to the free version"
+  },
+  "loggedOutTitle": {
+    "message": "Вы вышли из аккаунта",
+    "description": "Title shown when the user is logged out"
+  },
+  "loggedOutDescription": {
+    "message": "Чтобы сохранить записи в аккаунте и получить доступ к функциям Pro, войдите снова.",
+    "description": "Description shown when the user is logged out"
+  },
+  "logBackInButton": {
+    "message": "Войти снова",
+    "description": "Button to log back in after being logged out"
+  },
+  "loggedOutFreeVersion": {
+    "message": "Вы можете продолжать использовать расширение без аккаунта — но ваши записи не будут сохранены и не смогут быть восстановлены позже.",
+    "description": "Message shown when the user is logged out and using the free version"
+  },
+  "continueWithoutLogin": {
+    "message": "Продолжить без входа",
+    "description": "Button to continue using the extension without logging in"
+  },
+  "instantRecordingModeLabel": {
+    "message": "Мгновенный режим записи",
+    "description": "Label for the instant recording mode"
+  },
+  "instantRecordingModeTooltip": {
+    "message": "Мгновенное скачивание, но камеру и макет потом нельзя будет изменить.",
+    "description": "Tooltip for the instant recording mode"
+  },
+  "instantRecordingModeTitle": {
+    "message": "Мгновенный режим записи",
+    "description": "Title for the instant recording mode"
+  },
+  "instantRecordingModeDescription": {
+    "message": "Всё записывается в одно видео для мгновенной загрузки и публикации. Расположение камеры изменить будет нельзя, но другие правки возможны.",
+    "description": "Description for the instant recording mode"
+  },
+  "instantRecordingModeAction": {
+    "message": "Поняла",
+    "description": "Action button for the instant recording mode"
+  },
+  "tabRecordingDisabledTooltip": {
+    "message": "Запись вкладки отключена на этой странице",
+    "description": "Tooltip shown when tab recording is disabled on a page"
+  },
+  "addingToLabel": {
+    "message": "Добавление в: ",
+    "description": "Label shown when a scene is being recorded to a project"
+  },
+  "multiLabel": {
+    "message": "Multi",
+    "description": "Label for the multi-recording mode"
+  },
+  "finishLabelMulti": {
+    "message": "Завершить",
+    "description": "Label for the finish multi-recording button"
+  },
+  "welcomeProTitle": {
+    "message": "Хотите больше от своих записей?",
+    "description": "Title for the welcome Pro popup"
+  },
+  "welcomeProDescription": {
+    "message": "Войдите, чтобы сохранить видео в облако, делиться ссылкой и использовать расширенное редактирование.",
+    "description": "Description for the welcome Pro popup"
+  },
+  "welcomeProButton": {
+    "message": "Войти, чтобы открыть платные функции",
+    "description": "Button to sign in to Screenity Pro"
+  },
+  "welcomeProSupport": {
+    "message": "Поддержите разработку от инди-разработчицы",
+    "description": "Message for supporting the indie maker in the welcome Pro popup"
+  },
+  "unlockMoreFeatures": {
+    "message": "Открыть больше функций",
+    "description": "Button to unlock more features in the editor"
+  },
+  "shareUnlockButton": {
+    "message": "Войти, чтобы поделиться (pro)",
+    "description": "Button to sign in to share in the editor"
+  },
+  "proBannerTitle": {
+    "message": "Доступ к облачному обмену, редактированию сцен, автоувеличению, подписям и другим функциям",
+    "description": "Pro banner title in the editor"
+  },
+  "proBannerDescription": {
+    "message": "Screenity всегда будет бесплатным, с открытым кодом и без рекламы. Pro покрывает облачные и серверные расходы и поддерживает инди-разработку! ❤️",
+    "description": "Pro banner description in the editor"
+  },
+  "proBannerAltButton": {
+    "message": "Больше не показывать",
+    "description": "Pro banner don't show again button in the editor"
+  },
+  "proBannerButton": {
+    "message": "Попробовать",
+    "description": "Pro banner button in the editor"
+  },
+  "multiRecordingModeTitle": {
+    "message": "Режим Multi",
+    "description": "Title for the multi-recording mode modal"
+  },
+  "multiRecordingModeDescription": {
+    "message": "Записывайте несколько сцен — экран, камеру или оба варианта — одну за другой. Отлично подходит для нескольких дублей, смены ракурса или разбивки записи на части. Когда закончите, нажмите «Готово», чтобы открыть редактор со всеми сценами, объединёнными в одно видео.",
+    "description": "Description for the multi-recording mode modal"
+  },
+  "noSubscriptionYetTitle": {
+    "message": "Активируйте Pro, чтобы начать",
+    "description": "Title shown when the user has no active subscription"
+  },
+  "noSubscriptionYetDescription": {
+    "message": "Оформите подписку, чтобы получить доступ к функциям Pro.",
+    "description": "Message prompting the user to subscribe to reactivate their Pro features"
+  },
+  "upgradeToProButton": {
+    "message": "Оформить подписку на Pro",
+    "description": "Button to upgrade to Pro"
+  },
+  "hostBannerTitle": {
+    "message": "Нравится пользоваться Screenity локально? Поддержите дальнейшую разработку!",
+    "description": "Заголовок баннера о самостоятельном хостинге в редакторе"
+  },
+  "hostBannerDescription": {
+    "message": "Screenity разработана независимой разработчицей. Самостоятельный хостинг бесплатен, но если вам полезен этот инструмент, подумайте о поддержке через Pro ❤️",
+    "description": "Описание баннера о самостоятельном хостинге в редакторе"
+  },
+  "welcomeBackPopupTitle": {
+    "message": "С возвращением в Screenity",
+    "description": "Заголовок приветственного окна для возвращающихся пользователей"
+  },
+  "welcomeBackProTitle": {
+    "message": "✨ Новое: Хотите больше, чем просто запись?",
+    "description": "Заголовок для функции облачного хранилища в приветственном окне"
+  },
+  "welcomeBackProDescription": {
+    "message": "Screenity Pro — это новая дополнительная платформа для сохранения видео в облаке, обмена по ссылке и использования расширенных инструментов редактирования — если и когда они вам понадобятся.",
+    "description": "Описание функции облачного хранилища в приветственном окне"
+  },
+  "welcomeBackProCTA": {
+    "message": "Узнать больше о Screenity Pro",
+    "description": "Кнопка призыва к действию для функции облачного хранилища в приветственном окне"
+  },
+  "welcomeToProTitleModal": {
+    "message": "Добро пожаловать в Screenity Pro",
+    "description": "Заголовок приветственного окна Pro"
+  },
+  "welcomeToProDescriptionModal": {
+    "message": "Вы готовы начать запись! Вот несколько моментов, которые стоит учитывать:\n\n- Пузырёк с камерой может исчезнуть во время записи — это нормально. Он записывается отдельно в фоновом режиме, чтобы вы могли позже разместить его где угодно.\n- Увеличения автоматически создаются только при кликах внутри вкладок Chrome — это ограничение браузера. Вы всегда можете добавить дополнительные увеличения вручную после записи.\n- Для быстрых записей с мгновенным скачиванием используйте Мгновенный режим. Учтите, что возможности редактирования в нём ограничены: нет фонов, макетов и продвинутых настроек.",
+    "description": "Описание приветственного окна Pro"
+  },
+  "welcomeToProActionModal": {
+    "message": "Понятно",
+    "description": "Кнопка действия в приветственном окне Pro"
   }
 }

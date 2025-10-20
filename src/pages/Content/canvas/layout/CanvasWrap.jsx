@@ -1,16 +1,10 @@
 import React, { useEffect, useRef, useContext } from "react";
 import { fabric } from "fabric";
 
-// Context
 import { contentStateContext } from "../../context/ContentState";
 
-// Components
-import TextToolbar from "./TextToolbar";
-
-// Canvas setup
 import CustomControls from "../modules/CustomControls";
 
-// Canvas tools
 import ArrowTool from "../modules/ArrowTool";
 import EraserTool from "../modules/EraserTool";
 import ShapeTool from "../modules/ShapeTool";
@@ -18,7 +12,6 @@ import TextTool from "../modules/TextTool";
 import PenTool from "../modules/PenTool";
 import SelectTool from "../modules/SelectTool";
 
-// Canvas utils
 import {
   undoCanvas,
   redoCanvas,
@@ -47,7 +40,6 @@ const CanvasWrap = (props) => {
     });
     fabricRef.current = canvas;
 
-    // Get context
     canvas.getContext("2d", { willReadFrequently: true });
 
     // Set width and height of canvas to full size of document
@@ -75,7 +67,6 @@ const CanvasWrap = (props) => {
     );
   }, []);
 
-  // Update canvas dimensions + panning on window resize
   useEffect(() => {
     if (!fabricRef.current) return;
 

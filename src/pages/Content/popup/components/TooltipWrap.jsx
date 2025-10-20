@@ -44,8 +44,13 @@ const TooltipWrap = (props) => {
                 }
                 style={{
                   display: override === "override" ? "none" : "block",
+                  whiteSpace: "pre-line",
+                  maxWidth: "240px",
+                  lineHeight: "1.4",
+                  ...props.tooltipStyle,
                 }}
-                side={"left"}
+                side={props.side || "left"}
+                sideOffset={props.sideOffset || 8}
               >
                 {props.content}
               </Tooltip.Content>

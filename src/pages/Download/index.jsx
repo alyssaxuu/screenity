@@ -1,9 +1,16 @@
 import React from "react";
-import { render } from "react-dom";
-
+import { createRoot } from "react-dom/client";
 import Download from "./Download";
 
-// Render at the end of the body of any website
-render(<Download />, window.document.querySelector("#app-container"));
+// Find the container to render into
+const container = window.document.querySelector("#app-container");
 
-if (module.hot) module.hot.accept();
+if (container) {
+  const root = createRoot(container);
+  root.render(<Download />);
+}
+
+// Hot Module Replacement
+if (module.hot) {
+  module.hot.accept();
+}

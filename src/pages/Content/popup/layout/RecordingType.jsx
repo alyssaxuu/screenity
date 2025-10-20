@@ -6,10 +6,14 @@ import RegionDimensions from "../components/RegionDimensions";
 import Settings from "./Settings";
 import { contentStateContext } from "../../context/ContentState";
 import { CameraOffBlue, MicOffBlue } from "../../images/popup/images";
+import TooltipWrap from "../components/TooltipWrap";
 
 import BackgroundEffects from "../components/BackgroundEffects";
 
 import { AlertIcon, TimeIcon, NoInternet } from "../../toolbar/components/SVG";
+
+const CLOUD_FEATURES_ENABLED =
+  process.env.SCREENITY_ENABLE_CLOUD_FEATURES === "true";
 
 const RecordingType = (props) => {
   const [contentState, setContentState] = useContext(contentStateContext);
@@ -190,12 +194,20 @@ const RecordingType = (props) => {
               name="flip-camera"
               value="cameraFlipped"
             />
-            <Switch
-              label={chrome.i18n.getMessage("backgroundEffectsLabel")}
-              name="background-effects-active"
-              value="backgroundEffectsActive"
-            />
-            {contentState.backgroundEffectsActive && <BackgroundEffects />}
+            {(!contentState.isLoggedIn || contentState.instantMode) && (
+              <div style={{ pointerEvents: "auto" }}>
+                <Switch
+                  label={chrome.i18n.getMessage("backgroundEffectsLabel")}
+                  name="background-effects-active"
+                  value="backgroundEffectsActive"
+                />
+              </div>
+            )}
+
+            {contentState.backgroundEffectsActive &&
+              (!contentState.isLoggedIn || contentState.instantMode) && (
+                <BackgroundEffects />
+              )}
           </div>
         )}
 
@@ -231,7 +243,8 @@ const RecordingType = (props) => {
       {contentState.microphonePermission && (
         <Dropdown type="mic" shadowRef={props.shadowRef} />
       )}
-      {((contentState.microphonePermission &&
+      {((!contentState.isLoggedIn &&
+        contentState.microphonePermission &&
         contentState.defaultAudioInput != "none" &&
         contentState.micActive) ||
         (contentState.microphonePermission && contentState.pushToTalk)) && (
@@ -240,7 +253,7 @@ const RecordingType = (props) => {
             style={{
               width: "100%",
               height: "30px",
-              zIndex: 9999999999,
+              zIndex: 999999,
               position: "relative",
             }}
             allow="camera; microphone"
@@ -268,6 +281,66 @@ const RecordingType = (props) => {
           {contentState.customRegion && <RegionDimensions />}
         </div>
       )}
+      {contentState.isLoggedIn &&
+        !contentState.recordingToScene &&
+        CLOUD_FEATURES_ENABLED && (
+          <>
+            <div className="popup-content-divider"></div>
+            <TooltipWrap
+              content={
+                chrome.i18n.getMessage("instantRecordingModeTooltip") ||
+                "Instant download, but camera and layout won’t be editable later."
+              }
+              side="bottom"
+              sideOffset={2}
+            >
+              <div style={{ pointerEvents: "auto" }}>
+                <Switch
+                  label={
+                    chrome.i18n.getMessage("instantRecordingModeLabel") ||
+                    "Instant recording mode"
+                  }
+                  name="instantMode"
+                  value="instantMode"
+                  onChange={async (checked) => {
+                    if (checked) {
+                      contentState.openModal(
+                        chrome.i18n.getMessage("instantRecordingModeTitle") ||
+                          "Instant recording mode",
+                        chrome.i18n.getMessage(
+                          "instantRecordingModeDescription"
+                        ) ||
+                          "This records everything into one video for instant download and sharing. You won’t be able to change the camera layout afterward, but other edits are still possible.",
+                        chrome.i18n.getMessage("instantRecordingModeAction") ||
+                          "Got it",
+                        chrome.i18n.getMessage("permissionsModalDismiss") ||
+                          "Dismiss",
+                        () => {},
+                        () => {},
+                        null,
+                        "",
+                        "",
+                        true,
+                        false
+                      );
+                    } else {
+                      // Turn off background effects in chrome.storage
+                      chrome.storage.local.set({
+                        backgroundEffectsActive: false,
+                      });
+
+                      // Update in memory
+                      setContentState((prev) => ({
+                        ...prev,
+                        backgroundEffectsActive: false,
+                      }));
+                    }
+                  }}
+                />
+              </div>
+            </TooltipWrap>
+          </>
+        )}
       <button
         role="button"
         className="main-button recording-button"
@@ -292,6 +365,8 @@ const RecordingType = (props) => {
             : (!contentState.cameraPermission || !contentState.cameraActive) &&
               contentState.recordingType === "camera"
             ? chrome.i18n.getMessage("recordButtonNoCameraLabel")
+            : contentState.multiMode && contentState.multiSceneCount > 0
+            ? chrome.i18n.getMessage("recordButtonMultiLabel")
             : chrome.i18n.getMessage("recordButtonLabel")}
         </span>
         <span className="main-button-shortcut">

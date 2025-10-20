@@ -1,4 +1,3 @@
-// first, import all you need
 import React, { useRef, useEffect, useCallback, useState } from "react";
 
 import * as bodySegmentation from "@tensorflow-models/body-segmentation";
@@ -8,7 +7,6 @@ import "@tensorflow/tfjs-core";
 import "@mediapipe/selfie_segmentation";
 
 const Background = (props) => {
-  // Canvases
   const offScreenCanvasRef = useRef(null);
   const offScreenCanvasContextRef = useRef(null);
   const canvasRef = useRef(null);
@@ -18,38 +16,32 @@ const Background = (props) => {
 
   const segmenterRef = useRef(null);
 
-  // Variables to track frame rendering
   const latestImageDataRef = useRef(null);
   const frameRequestedRef = useRef(false);
   const blurRef = useRef(false);
   const effectRef = useRef(null);
 
   useEffect(() => {
-    // Offscreen canvas
     offScreenCanvasRef.current = document.createElement("canvas");
     offScreenCanvasContextRef.current = offScreenCanvasRef.current.getContext(
       "2d",
       { willReadFrequently: true }
     );
 
-    // Canvas
     canvasContextRef.current = canvasRef.current.getContext("2d", {
       willReadFrequently: true,
     });
 
-    // Bottom canvas
     bottomCanvasContextRef.current = bottomCanvasRef.current.getContext("2d", {
       willReadFrequently: true,
     });
   }, []);
 
-  // Track window size
   const [windowSize, setWindowSize] = useState({
     width: innerWidth,
     height: innerHeight,
   });
 
-  // Check if window size has changed, if so re-render Effect canvas
   useEffect(() => {
     const handleResize = () => {
       setWindowSize({
@@ -77,7 +69,6 @@ const Background = (props) => {
   }, []);
 
   useEffect(() => {
-    // Event listener (extension messaging)
     chrome.runtime.onMessage.addListener(function (
       request,
       sender,
@@ -152,7 +143,6 @@ const Background = (props) => {
     requestFrameRender();
   }, [props.frame]);
 
-  // Function to handle rendering updates using requestAnimationFrame
   const requestFrameRender = useCallback(() => {
     if (!frameRequestedRef.current) {
       frameRequestedRef.current = true;
@@ -163,11 +153,10 @@ const Background = (props) => {
     }
   }, [frameRequestedRef.current]);
 
-  // Function to handle frame rendering
   const renderFrame = async () => {
     try {
-      if (!latestImageDataRef.current) return; // No new frame to render
-      if (!segmenterRef.current) return; // Model not loaded yet
+      if (!latestImageDataRef.current) return;
+      if (!segmenterRef.current) return;
 
       segmentPerson(latestImageDataRef.current);
     } catch (error) {
@@ -179,10 +168,10 @@ const Background = (props) => {
     try {
       if (!blurRef.current && !effectRef.current) return;
       if (!latestImageDataRef.current) return;
-      if (!segmenterRef.current) return; // Model not loaded yet
+      if (!segmenterRef.current) return;
 
       const people = await segmenterRef.current.segmentPeople(img);
-      if (people.length === 0) return; // No people in the frame
+      if (people.length === 0) return;
 
       const width = people[0].mask.mask.width;
       const height = people[0].mask.mask.height;
@@ -217,7 +206,6 @@ const Background = (props) => {
         flipHorizontal
       );
 
-      // Prevent redundant rendering
       latestImageDataRef.current = null;
     } catch (error) {
       console.error(error);
@@ -227,7 +215,6 @@ const Background = (props) => {
   const renderEffect = async (img, people, width, height) => {
     try {
       const ratio = img.width / img.height;
-      // Render new image data
       const foregroundColor = { r: 0, g: 0, b: 0, a: 0 };
       const backgroundColor = { r: 0, g: 0, b: 0, a: 255 };
       const drawContour = false;
@@ -245,12 +232,11 @@ const Background = (props) => {
 
       maskImg.onload = async () => {
         const opacity = 0;
-        const edgeBlurAmount = 10; // Number of pixels to blur between person and background
+        const edgeBlurAmount = 10;
 
         canvasRef.current.width = innerHeight * ratio;
         canvasRef.current.height = innerHeight;
 
-        // Render in canvas
         await bodySegmentation.drawMask(
           offScreenCanvasRef.current,
           img,
@@ -272,11 +258,9 @@ const Background = (props) => {
         );
         offScreenCanvasContextRef.current.restore();
 
-        // Set canvas size
         canvasRef.current.width = innerHeight * ratio;
         canvasRef.current.height = innerHeight;
 
-        // Render offscreen canvas to canvas
         canvasContextRef.current.drawImage(
           offScreenCanvasRef.current,
           0,
@@ -289,7 +273,6 @@ const Background = (props) => {
           canvasRef.current.height
         );
 
-        // Prevent redundant rendering
         latestImageDataRef.current = null;
       };
     } catch (error) {

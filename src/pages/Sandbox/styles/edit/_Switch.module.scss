@@ -17,6 +17,10 @@
   -webkit-tap-highlight-color: rgba(0, 0, 0, 0);
   border: none !important;
 }
+.SwitchRoot[disabled] {
+  opacity: 0.5;
+  cursor: not-allowed !important;
+}
 .SwitchRoot:focus {
   box-shadow: $focus-border;
 }

@@ -70,6 +70,11 @@
   font-family: $font-medium;
   font-size: $font-size-normal;
 }
+.ToolbarDragging .popup-container {
+  transform: scale(1.02);
+
+  filter: drop-shadow(0px 20px 50px rgba(0, 0, 0, 0.4)) !important;
+}
 
 /* Recording popup parent */
 .popup-container {
@@ -82,11 +87,6 @@
   pointer-events: all;
   transition: transform 0.25s cubic-bezier(0.61, 0.11, 0.08, 0.96),
     filter 0.2s cubic-bezier(0.61, 0.11, 0.08, 0.96);
-}
-.ToolbarDragging .popup-container {
-  transform: scale(1.02);
-
-  filter: drop-shadow(0px 20px 50px rgba(0, 0, 0, 0.4)) !important;
 }
 .popup-container::before {
   content: "";
@@ -112,6 +112,7 @@
   top: 0px;
   left: 0px;
 }
+
 /*
 .popup-shape {
 	width: 100%;

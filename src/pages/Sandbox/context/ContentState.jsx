@@ -85,6 +85,7 @@ const ContentState = (props) => {
     fallback: false,
     chunkCount: 0,
     chunkIndex: 0,
+    bannerSupport: false,
   };
 
   const [contentState, setContentState] = useState(defaultState);
@@ -130,7 +131,7 @@ const ContentState = (props) => {
       year: "numeric",
       hour: "numeric",
       minute: "2-digit",
-      hour12: true, // or false if you want 24h format
+      hour12: true,
     });
     setContentState((prevState) => ({
       ...prevState,
@@ -261,8 +262,6 @@ const ContentState = (props) => {
     try {
       if (recordingDuration > 0 && recordingDuration !== null) {
         if (!isWindows10) {
-          // FLAG: Library seems unstable, using fallback for everyone for now
-          // if (false) {
           fixWebmDuration(
             blob,
             recordingDuration,
@@ -411,6 +410,7 @@ const ContentState = (props) => {
             const chunkData = base64ToUint8Array(chunk.chunk);
             videoChunks.current.push(chunkData);
 
+            // Assuming setContentState doesn't need to be awaited
             setContentState((prevState) => ({
               ...prevState,
               chunkIndex: prevState.chunkIndex + 1,
@@ -421,11 +421,10 @@ const ContentState = (props) => {
         sendResponse({ status: "ok" });
       } catch (error) {
         console.error("Error processing batch", error);
-        // Optionally send error back: sendResponse({ status: "error", error })
       }
     })();
 
-    return true; // Synchronously tell Chrome to keep the port open
+    return true; // Keep the messaging channel open for the response
   };
 
   // Check Chrome version
@@ -478,6 +477,8 @@ const ContentState = (props) => {
           chunkCount: message.count,
           override: message.override,
         }));
+      } else if (message.type === "ping") {
+        sendResponse({ status: "ready" });
       } else if (message.type === "new-chunk-tab") {
         return handleBatch(message.chunks, sendResponse);
       } else if (message.type === "make-video-tab") {
@@ -520,6 +521,11 @@ const ContentState = (props) => {
           noffmpeg: true,
           ffmpegLoaded: true,
           ffmpeg: true,
+        }));
+      } else if (message.type === "banner-support") {
+        setContentState((prevContentState) => ({
+          ...prevContentState,
+          bannerSupport: true,
         }));
       }
     },

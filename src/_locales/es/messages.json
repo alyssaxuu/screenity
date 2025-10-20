@@ -601,16 +601,20 @@
     "description": "Etiqueta de descargar GIF"
   },
   "shareModalSandboxTitle": {
-    "message": "Comparte tus videos con un enlace",
-    "description": "Título del modal de compartir en la página del editor de pruebas"
+    "message": "¿Listo para mejorar tus grabaciones?",
+    "description": "Share modal title in sandbox editor page"
   },
   "shareModalSandboxDescription": {
-    "message": "¡Próximamente! Deja tu correo electrónico para mantenerte actualizado y recibir notificaciones cuando esté disponible.",
-    "description": "Descripción del modal de compartir en la página del editor de pruebas"
+    "message": "Comparte en la nube, usa zooms, plantillas... y apoya a una dev indie que cuida tu privacidad ❤️",
+    "description": "Share modal description in sandbox editor page"
   },
   "shareModalSandboxButton": {
-    "message": "Únete a la lista de espera",
-    "description": "Espacio reservado para el correo electrónico en el modal de compartir en la página del editor de pruebas"
+    "message": "Ver más sobre Pro",
+    "description": "Share modal email placeholder in sandbox editor page"
+  },
+  "shareModalSandboxLogin": {
+    "message": "¿Ya tienes cuenta? Inicia sesión",
+    "description": "Share modal login link in sandbox editor page"
   },
   "shareSandboxButton": {
     "message": "Compartir video",
@@ -1036,5 +1040,357 @@
   "permissionsModalReview": {
     "message": "Revisar permisos",
     "description": "Botón de revisar permisos"
+  },
+  "recordButtonMultiLabel": {
+    "message": "Añadir otra grabación",
+    "description": "Record button label (multi mode)"
+  },
+  "recorderSetupTitle": {
+    "message": "Preparando todo...",
+    "description": "Title in recording page while setting up project before countdown starts"
+  },
+  "recorderSetupDescription": {
+    "message": "Espera un momento, estamos preparando tu grabación.",
+    "description": "Description in recording page before countdown starts"
+  },
+  "reopenToolbarToast": {
+    "message": "Barra de herramientas oculta. Reactívala desde las opciones.",
+    "description": "Toast message explaining to reopen the toolbar in the popup options"
+  },
+  "loginButtonLabel": {
+    "message": "Inicia sesión o regístrate",
+    "description": "Login button label in popup settings menu"
+  },
+  "logoutButtonLabel": {
+    "message": "Cerrar sesión",
+    "description": "Logout button label in popup settings menu"
+  },
+  "loggedOutToastTitle": {
+    "message": "Sesión cerrada",
+    "description": "Toast message shown when the user logs out"
+  },
+  "storageLimitReachedTitle": {
+    "message": "Has alcanzado el límite de almacenamiento",
+    "description": "Modal message shown when the storage limit is reached"
+  },
+  "storageLimitReachedDescription": {
+    "message": "Has usado los 50 GB de almacenamiento. Elimina vídeos o escenas antiguas para seguir grabando.",
+    "description": "Modal description shown when the storage limit is reached"
+  },
+  "manageStorageButtonLabel": {
+    "message": "Gestionar almacenamiento",
+    "description": "Button label to manage storage in the popup settings menu"
+  },
+  "closeModalLabel": {
+    "message": "Cerrar",
+    "description": "Agnostic close modal button label"
+  },
+  "storageCheckFailTitle": {
+    "message": "No se pudo comprobar el almacenamiento",
+    "description": "Title shown when the storage check fails"
+  },
+  "storageCheckFailAuthDescription": {
+    "message": "Hubo un problema al comprobar el almacenamiento. Inicia sesión de nuevo e intenta grabar otra vez.",
+    "description": "Description shown when the storage check fails due to authentication"
+  },
+  "storageCheckFailDescription": {
+    "message": "No se pudo verificar tu cuota de almacenamiento. Vuelve a intentarlo en unos segundos o actualiza la página.",
+    "description": "Description shown when the storage check fails"
+  },
+  "retryButtonLabel": {
+    "message": "Volver a intentar",
+    "description": "Agnostic button label to try again"
+  },
+  "addedToMultiToast": {
+    "message": "Escena añadida a la grabación Multi",
+    "description": "Toast message shown when a scene is added to multi-recording"
+  },
+  "readyRecordSceneToast": {
+    "message": "Listo para grabar una nueva escena en tu vídeo",
+    "description": "Toast message shown when the user is in an existing project and ready to record a new scene"
+  },
+  "reachingRecordingLimitToast": {
+    "message": "La grabación se acerca al límite de 90 minutos, se detendrá pronto",
+    "description": "Toast message shown when the recording is reaching the 90 minute limit"
+  },
+  "recordingLimitReachedToast": {
+    "message": "Grabación detenida por alcanzar el límite de 90 minutos",
+    "description": "Toast message shown when the recording limit is reached"
+  },
+  "tabRecordingDisabledToast": {
+    "message": "La grabación de pestañas está desactivada en esta página. Se ha activado la grabación de pantalla por defecto.",
+    "description": "Toast message shown when tab recording is disabled on a page"
+  },
+  "projectRecordingCancelledToast": {
+    "message": "Grabación del vídeo cancelada",
+    "description": "Toast message shown when the user cancels project recording"
+  },
+  "copiedToClipboardToast": {
+    "message": "Enlace copiado al portapapeles",
+    "description": "Toast message shown when link has been copied to clipboard"
+  },
+  "failedToCopyToClipboardToast": {
+    "message": "No se pudo copiar el enlace",
+    "description": "Toast message shown when failed to copy link to clipboard"
+  },
+  "newestSortLabel": {
+    "message": "Más recientes",
+    "description": "Label for the newest sort option"
+  },
+  "oldestSortLabel": {
+    "message": "Más antiguos",
+    "description": "Label for the oldest sort option"
+  },
+  "allVideosHeading": {
+    "message": "Todos los vídeos",
+    "description": "Heading for the all videos section in the popup"
+  },
+  "noVideosFound": {
+    "message": "No se han encontrado vídeos",
+    "description": "Message shown when no videos are found in the popup"
+  },
+  "loadingVideosLabel": {
+    "message": "Cargando vídeos...",
+    "description": "Label shown when videos are loading in the popup"
+  },
+  "goToDashboardButtonLabel": {
+    "message": "Ir al panel de control",
+    "description": "Button label to go to the dashboard in the popup"
+  },
+  "welcomePopupTitle": {
+    "message": "Bienvenida a Screenity",
+    "description": "Title for the welcome popup shown to new users"
+  },
+  "welcomePopupDescriptionTop": {
+    "message": "Sin anuncios. Sin seguimiento. Sin límites.",
+    "description": "Description for the welcome popup shown to new users"
+  },
+  "welcomePopupDescriptionBottom": {
+    "message": "Graba, simplemente.",
+    "description": "Description for the welcome popup shown to new users"
+  },
+  "welcomePopupCTA": {
+    "message": "Úsalo gratis — ¡sin registro!",
+    "description": "Call to action button for the welcome popup shown to new users"
+  },
+  "welcomePopupCloudTitle": {
+    "message": "¿Quieres hacer más con tus vídeos?",
+    "description": "Title for the cloud storage feature in the welcome popup"
+  },
+  "welcomePopupCloudFeature1": {
+    "message": "Almacenamiento en la nube, comparte con enlace",
+    "description": "Feature 1 for the cloud storage in the welcome popup"
+  },
+  "welcomePopupCloudFeature2": {
+    "message": "Combina varios clips como capítulos en una historia",
+    "description": "Feature 2 for the cloud storage in the welcome popup"
+  },
+  "welcomePopupCloudFeature3": {
+    "message": "Zooms inteligentes con clic (¡o añade los tuyos!)",
+    "description": "Feature 3 for the cloud storage in the welcome popup"
+  },
+  "welcomePopupCloudFeature4": {
+    "message": "Añade plantillas, subtítulos, mockups...",
+    "description": "Feature 4 for the cloud storage in the welcome popup"
+  },
+  "welcomePopupCloudFeature5": {
+    "message": "Fondos y disposición de cámara personalizados",
+    "description": "Feature 5 for the cloud storage in the welcome popup"
+  },
+  "welcomePopupCloudCTA": {
+    "message": "🔓 Desbloquea funciones extra",
+    "description": "Call to action button for the cloud storage feature in the welcome popup"
+  },
+  "welcomePopupSupport": {
+    "message": "+ ¡Apoya el desarrollo independiente!",
+    "description": "Message for supporting the indie maker in the welcome popup"
+  },
+  "accountSettingsOption": {
+    "message": "Configuración de cuenta",
+    "description": "Label for the account settings option in the popup"
+  },
+  "supportSettingsOption": {
+    "message": "Soporte",
+    "description": "Label for the support option in the popup"
+  },
+  "inactiveSubscriptionTitle": {
+    "message": "Suscripción Pro inactiva",
+    "description": "Title shown when the user's subscription is inactive"
+  },
+  "inactiveSubscriptionDescription": {
+    "message": "Tu suscripción a Screenity Pro está inactiva.",
+    "description": "Description shown when the user's subscription is inactive"
+  },
+  "inactiveSubscriptionReactivation": {
+    "message": "Reactívala para volver a acceder.",
+    "description": "Message prompting the user to reactivate their subscription"
+  },
+  "inactiveSubscriptionDeletionWarning": {
+    "message": "Tus vídeos y datos se eliminarán definitivamente el ",
+    "description": "Warning message about the deletion of videos and data"
+  },
+  "manageSubscriptionButton": {
+    "message": "Gestionar suscripción",
+    "description": "Button to manage the user's subscription"
+  },
+  "inactiveSubscriptionFreeVersion": {
+    "message": "¿Quieres seguir usando la versión gratuita?",
+    "description": "Message prompting the user to continue using the free version"
+  },
+  "downgradeToFreeButton": {
+    "message": "Cerrar sesión y cambiar a versión gratuita",
+    "description": "Button to log out and downgrade to the free version"
+  },
+  "loggedOutTitle": {
+    "message": "Sesión cerrada",
+    "description": "Title shown when the user is logged out"
+  },
+  "loggedOutDescription": {
+    "message": "Para mantener tus grabaciones sincronizadas y acceder a funciones Pro, inicia sesión de nuevo.",
+    "description": "Description shown when the user is logged out"
+  },
+  "logBackInButton": {
+    "message": "Iniciar sesión de nuevo",
+    "description": "Button to log back in after being logged out"
+  },
+  "loggedOutFreeVersion": {
+    "message": "Puedes seguir usando la extensión sin cuenta, pero las grabaciones no se guardarán ni se podrán recuperar más adelante.",
+    "description": "Message shown when the user is logged out and using the free version"
+  },
+  "continueWithoutLogin": {
+    "message": "Continuar sin iniciar sesión",
+    "description": "Button to continue using the extension without logging in"
+  },
+  "instantRecordingModeLabel": {
+    "message": "Modo de grabación instantánea",
+    "description": "Label for the instant recording mode"
+  },
+  "instantRecordingModeTooltip": {
+    "message": "Descarga inmediata, pero no se podrá editar la disposición de la cámara una vez empezada la grabación.",
+    "description": "Tooltip for the instant recording mode"
+  },
+  "instantRecordingModeTitle": {
+    "message": "Modo de grabación instantánea",
+    "description": "Title for the instant recording mode"
+  },
+  "instantRecordingModeDescription": {
+    "message": "Este modo graba todo en un solo vídeo para descargar y compartir al instante. No podrás modificar la disposición de la cámara, pero sí hacer otras ediciones.",
+    "description": "Description for the instant recording mode"
+  },
+  "instantRecordingModeAction": {
+    "message": "Entendido",
+    "description": "Action button for the instant recording mode"
+  },
+  "tabRecordingDisabledTooltip": {
+    "message": "La grabación de pestañas está desactivada en esta página",
+    "description": "Tooltip shown when tab recording is disabled on a page"
+  },
+  "addingToLabel": {
+    "message": "Añadiendo a: ",
+    "description": "Label shown when a scene is being recorded to a project"
+  },
+  "multiLabel": {
+    "message": "Multi",
+    "description": "Label for the multi-recording mode"
+  },
+  "finishLabelMulti": {
+    "message": "Finalizar",
+    "description": "Label for the finish multi-recording button"
+  },
+  "welcomeProTitle": {
+    "message": "¿Quieres hacer más con tus grabaciones?",
+    "description": "Title for the welcome Pro popup"
+  },
+  "welcomeProDescription": {
+    "message": "Inicia sesión para guardar los vídeos en la nube, compartir con enlace y acceder a funciones avanzadas de edición.",
+    "description": "Description for the welcome Pro popup"
+  },
+  "welcomeProButton": {
+    "message": "Inicia sesión para desbloquear funciones Pro",
+    "description": "Button to sign in to Screenity Pro"
+  },
+  "welcomeProSupport": {
+    "message": "¡Apoya a la desarrolladora independiente!",
+    "description": "Message for supporting the indie maker in the welcome Pro popup"
+  },
+  "unlockMoreFeatures": {
+    "message": "Desbloquea más funciones",
+    "description": "Button to unlock more features in the editor"
+  },
+  "shareUnlockButton": {
+    "message": "Inicia sesión para compartir (pro)",
+    "description": "Button to sign in to share in the editor"
+  },
+  "proBannerTitle": {
+    "message": "Desbloquea almacenamiento en la nube, edición multi-escena, zooms automáticos, subtítulos y más",
+    "description": "Pro banner title in the editor"
+  },
+  "proBannerDescription": {
+    "message": "Screenity siempre será gratuito, de código abierto y sin anuncios. Pro ayuda a cubrir los costes de nube e infraestructura, y apoya a una desarrolladora independiente ❤️",
+    "description": "Pro banner description in the editor"
+  },
+  "proBannerAltButton": {
+    "message": "No mostrar más",
+    "description": "Pro banner don't show again button in the editor"
+  },
+  "proBannerButton": {
+    "message": "Pruébalo",
+    "description": "Pro banner button in the editor"
+  },
+  "multiRecordingModeTitle": {
+    "message": "Modo Multi",
+    "description": "Title for the multi-recording mode modal"
+  },
+  "multiRecordingModeDescription": {
+    "message": "Graba varias escenas, como tu pantalla, cámara o ambas, una tras otra. Es ideal para hacer varias tomas, cambiar de vista o dividir tu grabación en partes. Al terminar, haz clic en Finalizar para abrir el editor con todas tus escenas combinadas en un solo video.",
+    "description": "Description for the multi-recording mode modal"
+  },
+  "noSubscriptionYetTitle": {
+    "message": "Activa Pro para empezar",
+    "description": "Title shown when the user has no active subscription"
+  },
+  "noSubscriptionYetDescription": {
+    "message": "Suscríbete para acceder a las funciones Pro.",
+    "description": "Message prompting the user to subscribe to reactivate their Pro features"
+  },
+  "upgradeToProButton": {
+    "message": "Suscríbete a Pro",
+    "description": "Button to upgrade to Pro"
+  },
+  "hostBannerTitle": {
+    "message": "¿Disfrutas de Screenity localmente? ¡Apoya su desarrollo futuro!",
+    "description": "Título del banner de autoalojamiento en el editor"
+  },
+  "hostBannerDescription": {
+    "message": "Screenity está creada por una desarrolladora indie. Autoalojarlo es gratis, pero si te resulta útil, considera apoyarla con Pro ❤️",
+    "description": "Descripción del banner de autoalojamiento en el editor"
+  },
+  "welcomeBackPopupTitle": {
+    "message": "Bienvenido de nuevo a Screenity",
+    "description": "Título para el popup de bienvenida mostrado a los usuarios que regresan"
+  },
+  "welcomeBackProTitle": {
+    "message": "✨ Novedad: Lleva tus grabaciones al siguiente nivel",
+    "description": "Título para la función de almacenamiento en la nube en el popup de bienvenida"
+  },
+  "welcomeBackProDescription": {
+    "message": "Screenity Pro es una nueva plataforma opcional para guardar videos en la nube, compartirlos con un enlace y desbloquear herramientas avanzadas de edición, si y cuando las necesites.",
+    "description": "Descripción de la función de almacenamiento en la nube en el popup de bienvenida"
+  },
+  "welcomeBackProCTA": {
+    "message": "Conoce más sobre Screenity Pro",
+    "description": "Botón de llamada a la acción para la función de almacenamiento en la nube en el popup de bienvenida"
+  },
+  "welcomeToProTitleModal": {
+    "message": "Bienvenido a Screenity Pro",
+    "description": "Título del modal de bienvenida a Pro"
+  },
+  "welcomeToProDescriptionModal": {
+    "message": "¡Todo listo para empezar a grabar! Ten en cuenta lo siguiente:\n\n- La burbuja de la cámara puede desaparecer durante la grabación; es normal. Se captura por separado en segundo plano para que puedas colocarla donde quieras más tarde.\n- Los zooms solo se crean automáticamente al hacer clic dentro de pestañas de Chrome, por una limitación del navegador. Siempre puedes añadir más zooms manualmente después de grabar.\n- Para grabaciones rápidas con descarga instantánea, prueba el Modo Instantáneo. Solo recuerda que las opciones de edición son limitadas: sin fondos, diseños ni ajustes avanzados.",
+    "description": "Descripción del modal de bienvenida a Pro"
+  },
+  "welcomeToProActionModal": {
+    "message": "Entendido",
+    "description": "Botón de acción del modal de bienvenida a Pro"
   }
 }
