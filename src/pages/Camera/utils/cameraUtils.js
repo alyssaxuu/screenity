@@ -181,7 +181,7 @@ export const surfaceHandler = async (request, videoRef) => {
 
     const shouldEnterPip =
       (request.surface === "monitor" && (!isSubscribed || instantMode)) ||
-      (request.surface !== "monitor" && (isSubscribed || instantMode));
+      (request.surface !== "monitor" && isSubscribed && !instantMode);
 
     if (shouldEnterPip && videoRef.current) {
       await videoRef.current.requestPictureInPicture();
