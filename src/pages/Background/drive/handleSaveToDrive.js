@@ -53,21 +53,19 @@ const getAuthTokenFromStorage = async () => {
       try {
         payload = JSON.parse(atob(token.split(".")[1]));
       } catch {
-        chrome.identity.getAuthToken({ interactive: true }, (newToken) => {
-          if (chrome.runtime.lastError)
-            reject(new Error(chrome.runtime.lastError));
-          else resolve(newToken);
-        });
+        // Token is invalid, sign in again
+        const newToken = await signIn();
+        if (!newToken) reject(new Error("Sign-in failed"));
+        else resolve(newToken);
         return;
       }
 
       const exp = payload.exp * 1000;
       if (Date.now() >= exp) {
-        chrome.identity.getAuthToken({ interactive: true }, (newToken) => {
-          if (chrome.runtime.lastError)
-            reject(new Error(chrome.runtime.lastError));
-          else resolve(newToken);
-        });
+        // Token is expired, sign in again
+        const newToken = await signIn();
+        if (!newToken) reject(new Error("Sign-in failed"));
+        else resolve(newToken);
       } else {
         resolve(token);
       }
@@ -80,46 +78,53 @@ const saveToDrive = async (videoBlob, fileName) => {
     const token = await getAuthTokenFromStorage();
     if (!token) throw new Error("Sign-in failed");
 
-    // Upload the raw media
+    const folderId = await findOrCreateScreenityFolder(token);
+
+    const metadata = {
+      name: fileName,
+      parents: [folderId],
+    };
+
+    const boundary = "-------314159265358979323846";
+    const delimiter = `\r\n--${boundary}\r\n`;
+    const close_delim = `\r\n--${boundary}--`;
+
+    const reader = new FileReader();
+
+    const base64Data = await new Promise((resolve) => {
+      reader.onload = (e) => resolve(e.target.result.split(",")[1]);
+      reader.readAsDataURL(videoBlob);
+    });
+
+    const multipartBody =
+      delimiter +
+      `Content-Type: application/json; charset=UTF-8\r\n\r\n` +
+      JSON.stringify(metadata) +
+      delimiter +
+      `Content-Type: ${videoBlob.type}\r\n` +
+      `Content-Transfer-Encoding: base64\r\n\r\n` +
+      base64Data +
+      close_delim;
+
     const uploadResponse = await fetch(
-      "https://www.googleapis.com/upload/drive/v3/files?uploadType=media",
+      "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart",
       {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,
-          "Content-Type": videoBlob.type,
+          "Content-Type": `multipart/related; boundary=${boundary}`,
         },
-        body: videoBlob,
+        body: multipartBody,
       }
     );
 
-    if (!uploadResponse.ok)
+    if (!uploadResponse.ok) {
       throw new Error(`Upload failed: ${uploadResponse.status}`);
+    }
 
     const { id: fileId } = await uploadResponse.json();
-    if (!fileId) throw new Error("File ID is undefined");
+    if (!fileId) throw new Error("File ID missing after upload");
 
-    // Add metadata and move to folder
-    const folderId = await findOrCreateScreenityFolder(token);
-    const metadataResponse = await fetch(
-      `https://www.googleapis.com/drive/v3/files/${fileId}`,
-      {
-        method: "PATCH",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json; charset=UTF-8",
-        },
-        body: JSON.stringify({
-          name: fileName,
-          parents: [folderId],
-        }),
-      }
-    );
-
-    if (!metadataResponse.ok)
-      throw new Error(`Metadata update failed: ${metadataResponse.status}`);
-
-    // Open the file in Drive
     chrome.tabs.create({
       url: `https://drive.google.com/file/d/${fileId}/view`,
     });
