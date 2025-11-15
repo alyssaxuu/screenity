@@ -80,8 +80,8 @@ const CropperWrap = () => {
           grid: true,
         }}
         defaultSize={{
-          width: contentState.width,
-          height: contentState.height,
+          width: contentState.width || undefined,
+          height: contentState.height || undefined,
         }}
         backgroundWrapperClassName="CropperBackgroundWrapper"
         width={contentState.width}

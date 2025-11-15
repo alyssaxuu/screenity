@@ -85,13 +85,14 @@ const Recorder = () => {
   async function saveChunk(e, i) {
     const ts = e.timecode ?? 0;
 
-    if (
-      savedCount.current > 0 &&
-      ts === lastTimecode.current &&
-      e.data.size === lastSize.current
-    ) {
-      return false;
-    }
+    // FLAG: disabled duplicate chunk check due to issues with some devices
+    // if (
+    //   savedCount.current > 0 &&
+    //   ts === lastTimecode.current &&
+    //   e.data.size === lastSize.current
+    // ) {
+    //   return false;
+    // }
 
     if (!(await canFitChunk(e.data.size))) {
       lowStorageAbort.current = true;
@@ -251,7 +252,7 @@ const Recorder = () => {
       return;
     }
 
-    chunksStore.clear();
+    await chunksStore.clear();
 
     try {
       const { qualityValue } = await chrome.storage.local.get(["qualityValue"]);
@@ -360,21 +361,23 @@ const Recorder = () => {
     };
 
     recorder.current.onstop = async () => {
+      try {
+        recorder.current.requestData();
+      } catch {}
+
       regionRef.current = false;
       recordingRef.current = false;
+
       if (isRestarting.current) return;
+
       await waitForDrain();
-      if (!isDismissing.current) {
-        if (!sentLast.current) {
-          sentLast.current = true;
-          isFinished.current = true;
-          chrome.runtime.sendMessage({ type: "video-ready" });
-          isFinishing.current = false;
-          // Reload this iframe
-          window.location.reload();
-        }
-      } else {
-        isDismissing.current = false;
+
+      if (!sentLast.current) {
+        sentLast.current = true;
+        isFinished.current = true;
+        chrome.runtime.sendMessage({ type: "video-ready" });
+        isFinishing.current = false;
+        window.location.reload();
       }
     };
 
@@ -408,7 +411,7 @@ const Recorder = () => {
       }
     };
 
-    recorder.current.ondataavailable = (e) => {
+    recorder.current.ondataavailable = async (e) => {
       if (!e || !e.data || !e.data.size) {
         if (recorder.current && recorder.current.state === "inactive") {
           chrome.storage.local.set({
@@ -433,6 +436,15 @@ const Recorder = () => {
 
       pending.current.push(e);
       pendingBytes.current += e.data.size;
+
+      if (pendingBytes.current > MAX_PENDING_BYTES) {
+        try {
+          recorder.current.pause();
+          await drainQueue();
+          recorder.current.resume();
+        } catch {}
+      }
+
       void drainQueue();
     };
 
@@ -455,6 +467,20 @@ const Recorder = () => {
       chrome.runtime.sendMessage({ type: "stop-recording-tab" });
     };
 
+    const vTrack = liveStream.current.getVideoTracks()[0];
+    if (vTrack) {
+      vTrack.oninactive = () => {
+        chrome.runtime.sendMessage({ type: "stop-recording-tab" });
+      };
+    }
+
+    const aTrack = helperAudioStream.current?.getAudioTracks()[0];
+    if (aTrack) {
+      aTrack.oninactive = () => {
+        chrome.runtime.sendMessage({ type: "stop-recording-tab" });
+      };
+    }
+
     helperVideoStream.current.getVideoTracks()[0].onended = () => {
       regionRef.current = false;
       chrome.storage.local.set({
@@ -474,7 +500,13 @@ const Recorder = () => {
       try {
         recorder.current.requestData();
       } catch {}
-      recorder.current.stop();
+
+      try {
+        if (recorder.current.state !== "inactive") {
+          recorder.current.stop();
+        }
+      } catch {}
+
       await waitForDrain();
       recorder.current = null;
     }

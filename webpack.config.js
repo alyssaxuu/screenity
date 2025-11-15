@@ -39,11 +39,18 @@ const entryPoints = {
   editor: path.join(__dirname, "src", "pages", "Editor", "index.jsx"),
   region: path.join(__dirname, "src", "pages", "Region", "index.jsx"),
   download: path.join(__dirname, "src", "pages", "Download", "index.jsx"),
-  editorfallback: path.join(
+  editorwebcodecs: path.join(
     __dirname,
     "src",
     "pages",
-    "EditorFallback",
+    "EditorWebCodecs",
+    "index.jsx"
+  ),
+  editorviewer: path.join(
+    __dirname,
+    "src",
+    "pages",
+    "EditorViewer",
     "index.jsx"
   ),
   backup: path.join(__dirname, "src", "pages", "Backup", "index.jsx"),
@@ -56,11 +63,23 @@ const htmlPlugins = Object.keys(entryPoints)
       return null;
     }
 
+    // Map entry names to folder names (for multi-word entries)
+    const folderNameMap = {
+      cloudrecorder: "CloudRecorder",
+      recorderoffscreen: "RecorderOffscreen",
+      editorwebcodecs: "EditorWebCodecs",
+      editorviewer: "EditorViewer",
+    };
+
+    const folderName =
+      folderNameMap[entryName] ||
+      entryName.charAt(0).toUpperCase() + entryName.slice(1);
+
     const templatePath = path.join(
       __dirname,
       "src",
       "pages",
-      entryName.charAt(0).toUpperCase() + entryName.slice(1),
+      folderName,
       "index.html"
     );
 

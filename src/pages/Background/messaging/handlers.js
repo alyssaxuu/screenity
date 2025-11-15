@@ -94,8 +94,8 @@ export const setupHandlers = () => {
   registerMessage("start-recording", (message) => startRecording(message));
   registerMessage("restarted", (message) => restartActiveTab(message));
 
-  registerMessage("new-chunk", (message) => {
-    newChunk(message);
+  registerMessage("new-chunk", (message, sender, sendResponse) => {
+    newChunk(message, sendResponse);
     return true;
   });
 
@@ -104,9 +104,11 @@ export const setupHandlers = () => {
     async (message, sender) => await handleGetStreamingData(message, sender)
   );
   registerMessage("cancel-recording", (message) => cancelRecording(message));
-  registerMessage("stop-recording-tab", (message) =>
-    handleStopRecordingTab(message)
-  );
+  registerMessage("stop-recording-tab", (message, sendResponse) => {
+    handleStopRecordingTab(message);
+    sendResponse({ ok: true });
+    return true;
+  });
   registerMessage("restart-recording-tab", (message) =>
     handleRestartRecordingTab(message)
   );
@@ -214,10 +216,11 @@ export const setupHandlers = () => {
   );
   registerMessage("get-platform-info", async () => await getPlatformInfo());
   registerMessage("restore-recording", (message) => restoreRecording(message));
-  registerMessage(
-    "check-restore",
-    async (sendResponse) => await checkRestore(sendResponse)
-  );
+  registerMessage("check-restore", async (message, sender, sendResponse) => {
+    const response = await checkRestore();
+    sendResponse(response);
+    return true;
+  });
   registerMessage(
     "check-capture-permissions",
     async (message, sender, sendResponse) => {
@@ -891,5 +894,21 @@ export const setupHandlers = () => {
     if (!CLOUD_FEATURES_ENABLED)
       return { success: false, message: "Cloud features disabled" };
     return await loginWithWebsite();
+  });
+  registerMessage("sync-recording-state", async (message, sendResponse) => {
+    const { recording, paused, recordingStartTime, pendingRecording } =
+      await chrome.storage.local.get([
+        "recording",
+        "paused",
+        "recordingStartTime",
+        "pendingRecording",
+      ]);
+    sendResponse({
+      recording: Boolean(recording),
+      paused: Boolean(paused),
+      recordingStartTime: recordingStartTime || null,
+      pendingRecording: Boolean(pendingRecording),
+    });
+    return true;
   });
 };

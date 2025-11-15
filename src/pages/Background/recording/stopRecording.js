@@ -3,6 +3,7 @@ import { discardOffscreenDocuments } from "../offscreen/discardOffscreenDocument
 import { sendMessageRecord } from "./sendMessageRecord";
 import { sendChunks } from "./sendChunks";
 import { waitForContentScript } from "../utils/waitForContentScript";
+import { supportsWebCodecs } from "../utils/featureDetection";
 
 export const stopRecording = async () => {
   chrome.action.setIcon({ path: "assets/icon-34.png" });
@@ -27,12 +28,15 @@ export const stopRecording = async () => {
 
   chrome.storage.local.set({ recordingStartTime: 0 });
 
+  // Check if browser supports WebCodecs for Mediabunny
+  const hasWebCodecs = supportsWebCodecs();
+
   if (isSubscribed) {
     chrome.alarms.clear("recording-alarm");
     discardOffscreenDocuments();
-  } else if (duration > maxDuration) {
-    // Open fallback editor
-    chrome.tabs.create({ url: "editorfallback.html", active: true }, (tab) => {
+  } else if (hasWebCodecs) {
+    // Use Mediabunny (editorwebcodecs.html) when WebCodecs is supported
+    chrome.tabs.create({ url: "editorwebcodecs.html", active: true }, (tab) => {
       chrome.tabs.onUpdated.addListener(function _(
         tabId,
         changeInfo,
@@ -43,7 +47,35 @@ export const stopRecording = async () => {
           chrome.storage.local.set({ sandboxTab: tab.id });
           waitForContentScript(tab.id)
             .then(() => {
-              sendMessageTab(tab.id, { type: "large-recording" });
+              // Use fallback-recording for WebCodecs flow
+              sendMessageTab(tab.id, { type: "fallback-recording" });
+            })
+            .catch((err) => {
+              console.error(
+                "❌ Failed to wait for content script:",
+                err.message
+              );
+            });
+        }
+      });
+    });
+
+    chrome.runtime.sendMessage({ type: "turn-off-pip" });
+  } else if (duration > maxDuration) {
+    // Fallback for large recordings without WebCodecs - use viewer mode
+
+    chrome.tabs.create({ url: "editorviewer.html", active: true }, (tab) => {
+      chrome.tabs.onUpdated.addListener(function _(
+        tabId,
+        changeInfo,
+        updatedTab
+      ) {
+        if (tabId === tab.id && changeInfo.status === "complete") {
+          chrome.tabs.onUpdated.removeListener(_);
+          chrome.storage.local.set({ sandboxTab: tab.id });
+          waitForContentScript(tab.id)
+            .then(() => {
+              sendMessageTab(tab.id, { type: "viewer-recording" });
             })
             .catch((err) => {
               console.error(
@@ -57,7 +89,7 @@ export const stopRecording = async () => {
 
     chrome.runtime.sendMessage({ type: "turn-off-pip" });
   } else {
-    // Open normal editor
+    // Use FFmpeg (editor.html) for browsers without WebCodecs
     chrome.tabs.create({ url: "editor.html", active: true }, (tab) => {
       chrome.tabs.onUpdated.addListener(function _(
         tabId,

@@ -38,8 +38,15 @@ const AudioUI = (props) => {
       return;
     }
 
-    contentState.addAudio(contentState.blob, file, contentState.volume);
+    // Use rawBlob (webm from recovery) if blob (mp4) is not available yet
+    const videoBlob =
+      contentState.blob || contentState.rawBlob || contentState.webm;
+    //contentState.addAudio(videoBlob, file, contentState.volume);
     setAudio(file);
+    setContentState((prev) => ({
+      ...prev,
+      pendingAudio: file,
+    }));
   };
 
   const handleVolume = (e) => {
@@ -58,14 +65,6 @@ const AudioUI = (props) => {
       ...prevContentState,
       volume: parseFloat(value) / 100,
     }));
-  };
-
-  const updateAudio = async () => {
-    setContentState((prevContentState) => ({
-      ...prevContentState,
-      blob: prevBlob.current,
-    }));
-    contentState.addAudio(prevBlob.current, audio, contentState.volume);
   };
 
   return (
@@ -164,13 +163,13 @@ const AudioUI = (props) => {
           </Slider.Root>
         </div>
         <Switch />
-        <button
+        {/* <button
           className={["button", "primaryButton", styles.updateButton].join(" ")}
           onClick={updateAudio}
           disabled={contentState.isFfmpegRunning || !audio}
         >
           {chrome.i18n.getMessage("sandboxAudioUpdateButton")}
-        </button>
+        </button> */}
       </div>
     </div>
   );

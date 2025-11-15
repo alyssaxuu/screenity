@@ -12,9 +12,14 @@ import { checkAuthStatus } from "../utils/checkAuthStatus";
 const CLOUD_FEATURES_ENABLED =
   process.env.SCREENITY_ENABLE_CLOUD_FEATURES === "true";
 
+const getState = () => contentStateRef.current;
+
 export const setupHandlers = () => {
   // Initialize message router
-  messageRouter();
+  if (!window.__screenityHandlersInitialized) {
+    messageRouter();
+    window.__screenityHandlersInitialized = true;
+  }
 
   // Register content message handlers
   registerMessage("time", (message) => {
@@ -45,7 +50,9 @@ export const setupHandlers = () => {
       pendingRecording: true,
     }));
 
-    if (contentStateRef.current.countdown) {
+    const state = getState();
+
+    if (state.countdown) {
       // Start countdown
       setContentState((prev) => ({
         ...prev,
@@ -55,14 +62,15 @@ export const setupHandlers = () => {
       }));
     } else {
       // Start recording immediately if countdown is disabled
-      if (!contentStateRef.current.countdownCancelled) {
-        contentStateRef.current.startRecordingAfterCountdown();
+      if (!state.countdownCancelled) {
+        state.startRecordingAfterCountdown();
       }
     }
   });
 
   registerMessage("stop-recording-tab", () => {
-    if (!contentStateRef.current.recording) return;
+    const state = getState();
+    if (!state.recording) return;
 
     chrome.storage.local.set({ recording: false });
     setContentState((prev) => ({
@@ -75,10 +83,11 @@ export const setupHandlers = () => {
   });
 
   registerMessage("recording-ended", () => {
+    const state = getState();
     if (
-      !contentStateRef.current.showPopup
+      !state.showPopup
       // &&
-      // !contentStateRef.current.pendingRecording
+      // !state.pendingRecording
     ) {
       setContentState((prev) => ({
         ...prev,
@@ -100,7 +109,15 @@ export const setupHandlers = () => {
   });
 
   registerMessage("start-stream", () => {
-    if (contentStateRef.current.recording) return;
+    const state = getState();
+    if (
+      state.preparingRecording ||
+      state.pendingRecording ||
+      state.recording ||
+      state.pipEnded
+    ) {
+      return;
+    }
 
     setContentState((prev) => ({
       ...prev,
@@ -108,13 +125,10 @@ export const setupHandlers = () => {
       showPopup: true,
     }));
 
-    if (contentStateRef.current.recordingType !== "camera") {
-      contentStateRef.current.startStreaming();
-    } else if (
-      contentStateRef.current.defaultVideoInput !== "none" &&
-      contentStateRef.current.cameraActive
-    ) {
-      contentStateRef.current.startStreaming();
+    if (state.recordingType !== "camera") {
+      state.startStreaming();
+    } else if (state.defaultVideoInput !== "none" && state.cameraActive) {
+      state.startStreaming();
     }
   });
 
@@ -136,14 +150,16 @@ export const setupHandlers = () => {
   });
 
   registerMessage("cancel-recording", () => {
-    contentStateRef.current.dismissRecording();
+    const state = getState();
+    state.dismissRecording();
   });
 
   registerMessage("pause-recording", () => {
-    if (contentStateRef.current.paused) {
-      contentStateRef.current.resumeRecording();
+    const state = getState();
+    if (state.paused) {
+      state.resumeRecording();
     } else {
-      contentStateRef.current.pauseRecording();
+      state.pauseRecording();
     }
   });
 
@@ -155,10 +171,8 @@ export const setupHandlers = () => {
   });
 
   registerMessage("pip-ended", () => {
-    if (
-      contentStateRef.current.recording ||
-      contentStateRef.current.pendingRecording
-    ) {
+    const state = getState();
+    if (state.recording || state.pendingRecording) {
       setContentState((prev) => ({
         ...prev,
         pipEnded: true,
@@ -167,10 +181,8 @@ export const setupHandlers = () => {
   });
 
   registerMessage("pip-started", () => {
-    if (
-      contentStateRef.current.recording ||
-      contentStateRef.current.pendingRecording
-    ) {
+    const state = getState();
+    if (state.recording || state.pendingRecording) {
       setContentState((prev) => ({
         ...prev,
         pipEnded: false,
@@ -194,31 +206,33 @@ export const setupHandlers = () => {
   });
 
   registerMessage("stream-error", () => {
-    contentStateRef.current.openModal(
+    const state = getState();
+    state.openModal(
       chrome.i18n.getMessage("streamErrorModalTitle"),
       chrome.i18n.getMessage("streamErrorModalDescription"),
       chrome.i18n.getMessage("permissionsModalDismiss"),
       null,
       () => {
-        contentStateRef.current.dismissRecording();
+        state.dismissRecording();
       },
       () => {
-        contentStateRef.current.dismissRecording();
+        state.dismissRecording();
       }
     );
   });
 
   registerMessage("backup-error", () => {
-    contentStateRef.current.openModal(
+    const state = getState();
+    state.openModal(
       chrome.i18n.getMessage("backupPermissionFailTitle"),
       chrome.i18n.getMessage("backupPermissionFailDescription"),
       chrome.i18n.getMessage("permissionsModalDismiss"),
       null,
       () => {
-        contentStateRef.current.dismissRecording();
+        state.dismissRecording();
       },
       () => {
-        contentStateRef.current.dismissRecording();
+        state.dismissRecording();
       }
     );
   });
@@ -231,11 +245,10 @@ export const setupHandlers = () => {
       setTimer(time);
     }
 
+    const state = getState();
+
     if (!message.force) {
-      if (
-        !contentStateRef.current.showExtension &&
-        !contentStateRef.current.recording
-      ) {
+      if (!state.showExtension && !state.recording) {
         updateFromStorage(true, sender.id);
       }
     } else {
@@ -265,11 +278,9 @@ export const setupHandlers = () => {
     updateFromStorage(false, message.senderId);
 
     setTimeout(() => {
-      if (contentStateRef.current.openToast) {
-        contentStateRef.current.openToast(
-          chrome.i18n.getMessage("addedToMultiToast"),
-          () => {}
-        );
+      const state = getState();
+      if (state.openToast) {
+        state.openToast(chrome.i18n.getMessage("addedToMultiToast"), () => {});
       }
     }, 1000);
   });
@@ -288,41 +299,51 @@ export const setupHandlers = () => {
     updateFromStorage(false, message.senderId);
 
     setTimeout(() => {
-      contentStateRef.current.openToast(
-        chrome.i18n.getMessage("readyRecordSceneToast"),
-        () => {}
-      );
+      const state = getState();
+      if (state.openToast) {
+        state.openToast(
+          chrome.i18n.getMessage("readyRecordSceneToast"),
+          () => {}
+        );
+      }
     }, 1000);
   });
 
   registerMessage("time-warning", () => {
     // Only trigger when actively recording
-    if (contentStateRef.current.recording && !contentStateRef.current.paused) {
+    const state = getState();
+
+    if (state.recording && !state.paused) {
       setContentState((prev) => ({
         ...prev,
         timeWarning: true,
       }));
 
-      contentStateRef.current.openToast(
-        chrome.i18n.getMessage("reachingRecordingLimitToast"),
-        () => {},
-        5000
-      );
+      if (state.openToast) {
+        state.openToast(
+          chrome.i18n.getMessage("reachingRecordingLimitToast"),
+          () => {},
+          5000
+        );
+      }
     }
   });
   registerMessage("time-stopped", () => {
+    const state = getState();
     // Only trigger when actively recording
-    if (contentStateRef.current.recording && !contentStateRef.current.paused) {
+    if (state.recording && !state.paused) {
       setContentState((prev) => ({
         ...prev,
         timeWarning: false,
       }));
 
-      contentStateRef.current.openToast(
-        chrome.i18n.getMessage("recordingLimitReachedToast"),
-        () => {},
-        5000
-      );
+      if (state.openToast) {
+        state.openToast(
+          chrome.i18n.getMessage("recordingLimitReachedToast"),
+          () => {},
+          5000
+        );
+      }
     }
   });
 

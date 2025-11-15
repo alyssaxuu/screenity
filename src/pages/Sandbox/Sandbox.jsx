@@ -41,6 +41,7 @@ const Sandbox = () => {
   useEffect(() => {
     if (!contentState.blob || !contentState.ffmpeg) return;
     if (contentState.frame) return;
+    // Frame extraction now works in fallback mode using Canvas API
     contentState.getFrame();
   }, [contentState.blob, contentState.ffmpeg]);
 
@@ -108,6 +109,21 @@ const Sandbox = () => {
       }
     });
   }, []);
+
+  // Regenerate frame when entering crop mode to reflect current blob
+  useEffect(() => {
+    if (
+      contentState.mode === "crop" &&
+      contentState.getFrame &&
+      contentState.blob &&
+      contentState.ffmpeg
+    ) {
+      // Small delay to ensure state updates have propagated
+      setTimeout(() => {
+        contentState.getFrame();
+      }, 50);
+    }
+  }, [contentState.mode]);
 
   return (
     <div ref={parentRef}>

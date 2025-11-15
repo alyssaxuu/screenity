@@ -39,12 +39,11 @@
   border-radius: 9999px;
   box-shadow: 0px 1px 10px rgba(0, 0, 0, 0.1);
   transition: transform 100ms;
-  transform: translateX(2px);
+  transform: translateX(4px);
   will-change: transform;
-  margin-left: -5px;
 }
 .SwitchThumb[data-state="checked"] {
-  transform: translateX(15px);
+  transform: translateX(16px);
 }
 
 .Label {

@@ -10,9 +10,26 @@ export async function getThumbnailFromBlob(blob, seekTo = 0.1) {
     const url = URL.createObjectURL(blob);
     video.src = url;
 
-    video.onloadedmetadata = () => {
-      const targetTime = Math.min(seekTo, video.duration - 0.01);
+    let timeoutId = setTimeout(() => {
+      URL.revokeObjectURL(url);
+      reject(new Error("Thumbnail timed out"));
+    }, 2000);
 
+    const cleanup = () => {
+      clearTimeout(timeoutId);
+      URL.revokeObjectURL(url);
+    };
+
+    video.onerror = () => {
+      cleanup();
+      reject(new Error("Failed to load video for thumbnail"));
+    };
+
+    video.onloadedmetadata = () => {
+      if (video.duration === Infinity) {
+        video.currentTime = 0;
+      }
+      const targetTime = Math.min(seekTo, video.duration - 0.01);
       video.currentTime = targetTime;
     };
 
@@ -26,21 +43,13 @@ export async function getThumbnailFromBlob(blob, seekTo = 0.1) {
 
       canvas.toBlob(
         (thumbnailBlob) => {
-          URL.revokeObjectURL(url);
-          if (thumbnailBlob) {
-            resolve(thumbnailBlob);
-          } else {
-            reject(new Error("Failed to create thumbnail blob"));
-          }
+          cleanup();
+          if (thumbnailBlob) resolve(thumbnailBlob);
+          else reject(new Error("Failed to create thumbnail blob"));
         },
         "image/jpeg",
         0.8
       );
-    };
-
-    video.onerror = (err) => {
-      URL.revokeObjectURL(url);
-      reject(new Error("Failed to load video for thumbnail"));
     };
   });
 }
@@ -233,8 +242,8 @@ export default class BunnyTusUploader {
     }
 
     // Wait for current queue to finish processing these chunks
-    if (this.queueProcessingPromise) {
-      await this.queueProcessingPromise;
+    if (this.queuedBytes > 10 * 1024 * 1024) {
+      await this.waitForPendingUploads();
     }
 
     if (!this._hasExtractedMeta && chunk.size > 128 * 1024) {
@@ -242,7 +251,17 @@ export default class BunnyTusUploader {
         const blob = new Blob([chunk], { type: "video/webm" });
 
         if (this.metadata.type === "screen") {
-          this.metaThumbnail = await getThumbnailFromBlob(blob);
+          const thumbPromise = getThumbnailFromBlob(blob);
+
+          // Add timeout safety
+          const safeThumbnail = await Promise.race([
+            thumbPromise,
+            new Promise((_, reject) =>
+              setTimeout(() => reject("thumbnail-timeout"), 1500)
+            ),
+          ]);
+
+          this.metaThumbnail = safeThumbnail;
         }
 
         this._hasExtractedMeta = true;
@@ -257,16 +276,21 @@ export default class BunnyTusUploader {
     const now = Math.floor(Date.now() / 1000);
     if (this.expires - now < this.TOKEN_REFRESH_THRESHOLD) {
       await this.refreshTusAuth();
+
+      if (this.isProcessingQueue) {
+        this.pause();
+        this.resume();
+      }
     }
   }
-
   async uploadChunk(chunk) {
+    if (this.isFinalizing) return;
     const data = new Uint8Array(await chunk.arrayBuffer());
 
     for (let attempt = 0; attempt <= this.MAX_RETRIES; attempt++) {
       try {
-        // Use current offset atomically to prevent race conditions
         const currentOffset = this.offset;
+        this.offset += data.length;
 
         const res = await fetch(this.uploadUrl, {
           method: "PATCH",
@@ -331,9 +355,7 @@ export default class BunnyTusUploader {
                 const serverOffset = parseInt(
                   headRes.headers.get("Upload-Offset") || "0"
                 );
-                console.log(
-                  `📊 Server offset: ${serverOffset}, Local offset was: ${this.offset}`
-                );
+
                 this.offset = serverOffset;
 
                 // Retry with corrected offset

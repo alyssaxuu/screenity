@@ -79,6 +79,7 @@ const ContentState = (props) => {
     hasBeenEdited: false,
     dragInteracted: false,
     noffmpeg: false,
+    processingProgress: 0, // Progress percentage (0-100) for current operation
     openModal: null,
     rawBlob: null,
     override: false,
@@ -86,6 +87,7 @@ const ContentState = (props) => {
     chunkCount: 0,
     chunkIndex: 0,
     bannerSupport: false,
+    backupBlob: null,
   };
 
   const [contentState, setContentState] = useState(defaultState);
@@ -149,6 +151,31 @@ const ContentState = (props) => {
       window.onbeforeunload = null;
     }
   }, [contentState.saved]);
+
+  const createBackup = () => {
+    setContentState((prev) => ({
+      ...prev,
+      backupBlob: prev.blob,
+    }));
+  };
+
+  const restoreBackup = () => {
+    setContentState((prev) => ({
+      ...prev,
+      blob: prev.backupBlob || prev.blob,
+      mode: "player",
+      start: 0,
+      end: 1,
+      backupBlob: null,
+    }));
+  };
+
+  const clearBackup = () => {
+    setContentState((prev) => ({
+      ...prev,
+      backupBlob: null,
+    }));
+  };
 
   const addToHistory = useCallback(() => {
     setContentState((prevState) => ({
@@ -266,8 +293,8 @@ const ContentState = (props) => {
             blob,
             recordingDuration,
             async (fixedWebm) => {
+              // Skip conversion only if Chrome is outdated or recording exceeds edit limit
               if (
-                contentStateRef.current.fallback ||
                 contentStateRef.current.updateChrome ||
                 contentStateRef.current.noffmpeg ||
                 (contentStateRef.current.duration >
@@ -301,8 +328,8 @@ const ContentState = (props) => {
             type: "video/webm; codecs=vp8, opus",
           });
 
+          // Skip conversion only if Chrome is outdated or recording exceeds edit limit
           if (
-            contentStateRef.current.fallback ||
             contentStateRef.current.updateChrome ||
             contentStateRef.current.noffmpeg ||
             (contentStateRef.current.duration >
@@ -331,8 +358,8 @@ const ContentState = (props) => {
         }
       } else {
         /// Skip fixing duration
+        // Skip conversion only if Chrome is outdated or recording exceeds edit limit
         if (
-          contentStateRef.current.fallback ||
           contentStateRef.current.updateChrome ||
           contentStateRef.current.noffmpeg ||
           (contentStateRef.current.duration >
@@ -403,7 +430,6 @@ const ContentState = (props) => {
         await Promise.all(
           chunks.map(async (chunk) => {
             if (contentStateRef.current.chunkIndex >= chunkCount.current) {
-              console.warn("Too many chunks received");
               return; // Skip processing
             }
 
@@ -496,32 +522,73 @@ const ContentState = (props) => {
         setContentState((prevContentState) => ({
           ...prevContentState,
           fallback: true,
+          noffmpeg: false, // Pretending FFmpeg is loaded (using Mediabunny)
           isFfmpegRunning: false,
-          noffmpeg: true,
-          ffmpegLoaded: true,
-          ffmpeg: true,
+          editLimit: 3600, // Set high edit limit (1 hour) for recovery mode
         }));
 
-        buildBlobFromChunks();
+        buildBlobFromChunks()
+          .then(() => {
+            sendResponse({ status: "ok" });
+          })
+          .catch((error) => {
+            sendResponse({ status: "error", error: error.message });
+          });
+
+        return true; // Keep message port open for async response
       } else if (message.type === "large-recording") {
         setContentState((prevContentState) => ({
           ...prevContentState,
+          noffmpeg: false,
           isFfmpegRunning: false,
-          noffmpeg: true,
-          ffmpegLoaded: true,
-          ffmpeg: true,
+          editLimit: 0,
         }));
 
-        buildBlobFromChunks();
+        buildBlobFromChunks()
+          .then(() => {
+            sendResponse({ status: "ok" });
+          })
+          .catch((error) => {
+            sendResponse({ status: "error", error: error.message });
+          });
+
+        return true; // Keep message port open for async response
       } else if (message.type === "fallback-recording") {
         setContentState((prevContentState) => ({
           ...prevContentState,
           fallback: true,
+          noffmpeg: false,
           isFfmpegRunning: false,
-          noffmpeg: true,
-          ffmpegLoaded: true,
-          ffmpeg: true,
+          editLimit: 3600,
         }));
+
+        buildBlobFromChunks()
+          .then(() => {
+            sendResponse({ status: "ok" });
+          })
+          .catch((error) => {
+            sendResponse({ status: "error", error: error.message });
+          });
+
+        return true;
+      } else if (message.type === "viewer-recording") {
+        setContentState((prevContentState) => ({
+          ...prevContentState,
+          fallback: true,
+          noffmpeg: true, // No FFmpeg
+          isFfmpegRunning: false,
+          editLimit: 0, // No editing allowed
+        }));
+
+        buildBlobFromChunks()
+          .then(() => {
+            sendResponse({ status: "ok" });
+          })
+          .catch((error) => {
+            sendResponse({ status: "error", error: error.message });
+          });
+
+        return true;
       } else if (message.type === "banner-support") {
         setContentState((prevContentState) => ({
           ...prevContentState,
@@ -553,12 +620,27 @@ const ContentState = (props) => {
   const onMessage = async (event) => {
     if (event.data.type === "updated-blob") {
       const base64 = event.data.base64;
-      const blob = new Blob([base64ToUint8Array(base64)], {
-        type: "video/mp4",
-      });
+      // const blob = new Blob([base64ToUint8Array(base64)], {
+      //   type: "video/mp4",
+      // });
+      const blob = base64ToUint8Array(base64);
 
-      setContentState((prevContentState) => ({
-        ...prevContentState,
+      const wasCropping = contentState.cropping;
+      const isTopLevel = event.data.topLevel === true;
+      const isFromAudio = event.data.fromAudio === true;
+
+      if (isFromAudio) {
+        sendMessage({
+          type: "reencode-video",
+          blob,
+          duration: contentState.duration,
+          topLevel: isTopLevel,
+        });
+        return;
+      }
+
+      setContentState((prev) => ({
+        ...prev,
         blob: blob,
         mp4ready: true,
         hasBeenEdited: true,
@@ -568,19 +650,24 @@ const ContentState = (props) => {
         cutting: false,
         muting: false,
         cropping: false,
+        processingProgress: 0,
+        hasTempChanges: !isTopLevel,
+
+        ...(prev.fromCropper && { mode: "player", fromCropper: false }),
+        ...(prev.fromAudio && { mode: "player", fromAudio: false }),
       }));
 
-      // Get duration of video blob
       const video = document.createElement("video");
       video.preload = "metadata";
       video.onloadedmetadata = async () => {
-        setContentState((prevState) => ({
-          ...prevState,
+        setContentState((prev) => ({
+          ...prev,
           duration: video.duration,
           width: video.videoWidth,
           height: video.videoHeight,
           start: 0,
           end: 1,
+          ...(wasCropping && { top: 0, left: 0 }),
         }));
 
         if (event.data.addToHistory) {
@@ -590,20 +677,21 @@ const ContentState = (props) => {
         URL.revokeObjectURL(video.src);
         video.remove();
       };
+
       video.src = URL.createObjectURL(blob);
 
-      // Check if originalBlob is null, if so, set it to the blob
-      if (!contentState.originalBlob) {
-        setContentState((prevContentState) => ({
-          ...prevContentState,
+      if (!contentState.originalBlob && isTopLevel) {
+        setContentState((prev) => ({
+          ...prev,
           originalBlob: blob,
         }));
       }
     } else if (event.data.type === "download-mp4") {
       const base64 = event.data.base64;
-      const blob = new Blob([base64ToUint8Array(base64)], {
-        type: "video/mp4",
-      });
+      // const blob = new Blob([base64ToUint8Array(base64)], {
+      //   type: "video/mp4",
+      // });
+      const blob = base64ToUint8Array(base64);
       // Download the blob
       const url = URL.createObjectURL(blob);
       requestDownload(url, ".mp4");
@@ -615,9 +703,10 @@ const ContentState = (props) => {
       }));
     } else if (event.data.type === "download-gif") {
       const base64 = event.data.base64;
-      const blob = new Blob([base64ToUint8Array(base64)], {
-        type: "image/gif",
-      });
+      // const blob = new Blob([base64ToUint8Array(base64)], {
+      //   type: "image/gif",
+      // });
+      const blob = base64ToUint8Array(base64);
       // Download the blob
       const url = URL.createObjectURL(blob);
       requestDownload(url, ".gif");
@@ -668,9 +757,42 @@ const ContentState = (props) => {
     } else if (event.data.type === "crop-update") {
       setContentState((prevContentState) => ({
         ...prevContentState,
-        mode: "player",
+        mode: "crop",
+        cropping: false,
+        isFfmpegRunning: false,
+        processingProgress: 0,
         start: 0,
         end: 1,
+        fromCropper: false,
+      }));
+
+      setTimeout(() => {
+        if (contentState.getFrame) {
+          contentState.getFrame();
+        }
+      }, 100);
+    } else if (event.data.type === "ffmpeg-progress") {
+      const pct = Math.min(100, Math.max(0, Math.round(event.data.progress)));
+
+      setContentState((prevContentState) => ({
+        ...prevContentState,
+        processingProgress: pct,
+      }));
+    } else if (event.data.type === "download-webm") {
+      const base64 = event.data.base64;
+      // const blob = new Blob([base64ToUint8Array(base64)], {
+      //   type: "video/webm",
+      // });
+      const blob = base64ToUint8Array(base64);
+
+      const url = URL.createObjectURL(blob);
+      await requestDownload(url, ".webm");
+
+      setContentState((prevState) => ({
+        ...prevState,
+        saved: true,
+        isFfmpegRunning: false,
+        downloadingWEBM: false,
       }));
     }
   };
@@ -686,15 +808,19 @@ const ContentState = (props) => {
   };
 
   const getBlob = async () => {
+    // Skip conversion only if Chrome is outdated or recording exceeds edit limit
     if (
-      contentState.fallback ||
       contentState.noffmpeg ||
       (contentState.duration > contentState.editLimit && !contentState.override)
-    )
+    ) {
       return;
-    const webmVideo = new Blob([base64ToUint8Array(contentState.base64)], {
-      type: "video/webm",
-    });
+    }
+
+    // const webmVideo = new Blob([base64ToUint8Array(contentState.base64)], {
+    //   type: "video/webm",
+    // });
+
+    const webmVideo = base64ToUint8Array(contentState.base64);
 
     setContentState((prevState) => ({
       ...prevState,
@@ -708,7 +834,16 @@ const ContentState = (props) => {
       !contentState.updateChrome &&
       (contentState.duration <= contentState.editLimit || contentState.override)
     ) {
-      sendMessage({ type: "base64-to-blob", base64: contentState.base64 });
+      // Set isFfmpegRunning to true when starting conversion
+      setContentState((prevState) => ({
+        ...prevState,
+        isFfmpegRunning: true,
+      }));
+      sendMessage({
+        type: "base64-to-blob",
+        base64: contentState.base64,
+        topLevel: true,
+      });
     }
 
     chrome.runtime.sendMessage({ type: "recording-complete" });
@@ -743,18 +878,22 @@ const ContentState = (props) => {
     )
       return;
 
-    setContentState((prevState) => ({
-      ...prevState,
+    const sourceBlob = videoBlob || contentState.blob || contentState.webm;
+
+    setContentState((prev) => ({
+      ...prev,
       isFfmpegRunning: true,
+      processingProgress: 0,
     }));
 
     sendMessage({
       type: "add-audio-to-video",
-      blob: videoBlob,
+      blob: sourceBlob,
       audio: audioBlob,
       duration: contentState.duration,
       volume: volume,
       replaceAudio: contentState.replaceAudio,
+      topLevel: false,
     });
   };
 
@@ -766,63 +905,56 @@ const ContentState = (props) => {
     )
       return;
 
-    if (cut) {
-      setContentState((prevState) => ({
-        ...prevState,
-        cutting: true,
-      }));
-    } else {
-      setContentState((prevState) => ({
-        ...prevState,
-        trimming: true,
-      }));
-    }
+    const sourceBlob = contentState.blob;
 
-    setContentState((prevState) => ({
-      ...prevState,
+    setContentState((prev) => ({
+      ...prev,
       isFfmpegRunning: true,
+      processingProgress: 0,
+      [cut ? "cutting" : "trimming"]: true,
     }));
 
     sendMessage({
       type: "cut-video",
-      blob: contentState.blob,
+      blob: sourceBlob,
       startTime: contentState.start * contentState.duration,
       endTime: contentState.end * contentState.duration,
-      cut: cut,
+      cut,
       duration: contentState.duration,
       encode: false,
+      topLevel: false,
     });
   };
 
   const handleMute = async () => {
-    if (contentState.isFfmpegRunning || contentState.muting) {
-      return;
-    }
+    if (contentState.isFfmpegRunning) return;
     if (
       contentState.duration > contentState.editLimit &&
       !contentState.override
     )
       return;
 
-    setContentState((prevState) => ({
-      ...prevState,
+    const sourceBlob = contentState.blob;
+
+    setContentState((prev) => ({
+      ...prev,
       muting: true,
       isFfmpegRunning: true,
+      processingProgress: 0,
     }));
 
     sendMessage({
       type: "mute-video",
-      blob: contentState.blob,
+      blob: sourceBlob,
       startTime: contentState.start * contentState.duration,
       endTime: contentState.end * contentState.duration,
       duration: contentState.duration,
+      topLevel: false,
     });
   };
 
   const handleCrop = async (x, y, width, height) => {
-    if (contentState.isFfmpegRunning || contentState.cropping) {
-      return;
-    }
+    if (contentState.isFfmpegRunning || contentState.cropping) return;
     if (
       contentState.duration > contentState.editLimit &&
       !contentState.override
@@ -833,33 +965,41 @@ const ContentState = (props) => {
       ...prevState,
       cropping: true,
       isFfmpegRunning: true,
+      processingProgress: 0,
     }));
+
+    const sourceBlob = contentState.blob;
 
     sendMessage({
       type: "crop-video",
-      blob: contentState.blob,
-      x: x,
-      y: y,
-      width: width,
-      height: height,
+      blob: sourceBlob,
+      x,
+      y,
+      width,
+      height,
+      topLevel: false,
     });
 
     return true;
   };
 
-  const handleReencode = async () => {
+  const handleReencode = async (topLevel = false) => {
     if (contentState.isFfmpegRunning) return;
+
+    const sourceBlob = contentState.blob;
 
     setContentState((prevState) => ({
       ...prevState,
       isFfmpegRunning: true,
       reencoding: true,
+      processingProgress: 0, // Reset progress
     }));
 
     sendMessage({
       type: "reencode-video",
-      blob: contentState.blob,
+      blob: sourceBlob,
       duration: contentState.duration,
+      topLevel,
     });
 
     return true;
@@ -909,7 +1049,6 @@ const ContentState = (props) => {
       );
     });
 
-    // One-shot listener
     await new Promise((resolve) => {
       const handler = async (delta) => {
         if (delta.id !== downloadId || !delta.state) return;
@@ -979,7 +1118,27 @@ const ContentState = (props) => {
   };
 
   const downloadWEBM = async () => {
-    if (contentState.isFfmpegRunning || contentState.downloadingWEBM) {
+    if (contentState.isFfmpegRunning || contentState.downloadingWEBM) return;
+
+    const sourceBlob = contentState.blob || contentState.webm;
+
+    if (!sourceBlob) {
+      return;
+    }
+
+    const hasFFmpeg = contentState.ffmpegLoaded && !contentState.noffmpeg;
+    const isAlreadyWebm = sourceBlob.type === "video/webm";
+
+    if (!hasFFmpeg || isAlreadyWebm) {
+      const url = URL.createObjectURL(sourceBlob);
+      await requestDownload(url, ".webm");
+
+      setContentState((prevState) => ({
+        ...prevState,
+        downloadingWEBM: false,
+        isFfmpegRunning: false,
+        saved: true,
+      }));
       return;
     }
 
@@ -987,10 +1146,16 @@ const ContentState = (props) => {
       ...prevState,
       downloadingWEBM: true,
       isFfmpegRunning: true,
+      processingProgress: 0,
     }));
 
-    const url = URL.createObjectURL(contentState.webm);
-    requestDownload(url, ".webm");
+    sendMessage({
+      type: "to-webm",
+      blob: sourceBlob,
+      duration: contentState.duration,
+    });
+
+    await waitForUpdatedBlob();
 
     setContentState((prevState) => ({
       ...prevState,
@@ -1022,7 +1187,18 @@ const ContentState = (props) => {
     sendMessage({ type: "load-ffmpeg" });
   };
 
-  // Include all functions in the context
+  const waitForUpdatedBlob = () => {
+    return new Promise((resolve) => {
+      const handler = (event) => {
+        if (event.data?.type === "updated-blob") {
+          window.removeEventListener("message", handler);
+          resolve();
+        }
+      };
+      window.addEventListener("message", handler);
+    });
+  };
+
   contentState.undo = undo;
   contentState.redo = redo;
   contentState.addToHistory = addToHistory;
@@ -1036,6 +1212,10 @@ const ContentState = (props) => {
   contentState.downloadWEBM = downloadWEBM;
   contentState.addAudio = addAudio;
   contentState.loadFFmpeg = loadFFmpeg;
+  contentState.waitForUpdatedBlob = waitForUpdatedBlob;
+  contentState.createBackup = createBackup;
+  contentState.restoreBackup = restoreBackup;
+  contentState.clearBackup = clearBackup;
 
   return (
     <ContentStateContext.Provider value={[contentState, setContentState]}>

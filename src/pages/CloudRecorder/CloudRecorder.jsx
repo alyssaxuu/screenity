@@ -307,6 +307,18 @@ const CloudRecorder = () => {
   const restartRecording = async () => {
     isRestarting.current = true;
     await dismissRecording(true);
+    await stopAllRecorders();
+    screenChunks.current = [];
+    cameraChunks.current = [];
+    audioChunks.current = [];
+    index.current = 0;
+    lastTimecode.current = 0;
+
+    if (IS_IFRAME_CONTEXT && !target.current) {
+      sendRecordingError("No crop target for restart.");
+      return;
+    }
+
     uploadersInitialized.current = await initializeUploaders();
     if (!uploadersInitialized.current) {
       sendRecordingError("Failed to re-initialize uploaders on restart.");
@@ -352,6 +364,9 @@ const CloudRecorder = () => {
       if (cameraStream.current) {
         cameraUploader.current = new BunnyTusUploader();
         const track = cameraStream.current.getVideoTracks()[0];
+        if (track?.readyState === "ended") {
+          throw new Error("Camera track has ended");
+        }
         const { width, height } = track.getSettings();
         await cameraUploader.current.initialize(projectId, {
           title: "Camera Recording",
@@ -489,6 +504,11 @@ const CloudRecorder = () => {
             if (uploadersInitialized.current && screenUploader.current) {
               try {
                 if (screenUploader.current?.isPaused) return;
+                if (screenUploader.current.queuedBytes > 15 * 1024 * 1024) {
+                  await screenUploader.current
+                    .waitForPendingUploads?.()
+                    .catch(() => {});
+                }
                 await screenUploader.current.write(blob);
                 consecutiveScreenFailures.current = 0; // Reset on success
               } catch (uploadErr) {
@@ -798,6 +818,24 @@ const CloudRecorder = () => {
       console.warn("❌ Transcription failed:", err);
     }
   };
+
+  useEffect(() => {
+    const onHide = () => {
+      // Only finalize if an active recording really exists
+      const hasActiveRecorder =
+        screenRecorder.current?.state === "recording" ||
+        cameraRecorder.current?.state === "recording" ||
+        audioRecorder.current?.state === "recording";
+
+      if (hasActiveRecorder && !sentLast.current) {
+        console.warn("⚠️ Recorder page hiding — finalizing");
+        stopRecording(true);
+      }
+    };
+
+    window.addEventListener("pagehide", onHide);
+    return () => window.removeEventListener("pagehide", onHide);
+  }, []);
 
   const createSceneOrHandleMultiMode = async (
     uploadMeta,

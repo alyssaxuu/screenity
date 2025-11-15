@@ -70,7 +70,10 @@ const TrimUI = (props) => {
           >
             <ReactSVG src={TrimIcon} />
             {contentState.trimming
-              ? chrome.i18n.getMessage("sandboxEditorTrimProgressButton")
+              ? chrome.i18n.getMessage("sandboxEditorTrimProgressButton") +
+                (contentState.processingProgress > 0
+                  ? ` ${contentState.processingProgress}%`
+                  : "")
               : chrome.i18n.getMessage("sandboxEditorTrimButton")}
           </button>
           <button
@@ -83,7 +86,10 @@ const TrimUI = (props) => {
           >
             <ReactSVG src={RemoveIcon} />
             {contentState.cutting
-              ? chrome.i18n.getMessage("sandboxEditorCutProgressButton")
+              ? chrome.i18n.getMessage("sandboxEditorCutProgressButton") +
+                (contentState.processingProgress > 0
+                  ? ` ${contentState.processingProgress}%`
+                  : "")
               : chrome.i18n.getMessage("sandboxEditorCutButton")}
           </button>
           <button
@@ -93,7 +99,10 @@ const TrimUI = (props) => {
           >
             <ReactSVG src={MuteIcon} />
             {contentState.muting
-              ? chrome.i18n.getMessage("sandboxEditorMuteProgressButton")
+              ? chrome.i18n.getMessage("sandboxEditorMuteProgressButton") +
+                (contentState.processingProgress > 0
+                  ? ` ${contentState.processingProgress}%`
+                  : "")
               : chrome.i18n.getMessage("sandboxEditorMuteButton")}
           </button>
         </div>

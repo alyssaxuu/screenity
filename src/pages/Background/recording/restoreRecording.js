@@ -1,39 +1,40 @@
 import { sendMessageTab } from "../tabManagement";
 import { chunksStore } from "./chunkHandler";
-import { sendChunks } from "./sendChunks";
+import { supportsWebCodecs } from "../utils/featureDetection";
 
-export const checkRestore = async (sendResponse) => {
+export const checkRestore = async () => {
   const chunks = [];
   await chunksStore.iterate((value, key) => {
     chunks.push(value);
   });
 
   if (chunks.length === 0) {
-    sendResponse({ restore: false, chunks: [] });
-    return;
+    return { restore: false, chunks: [] };
   }
-  sendResponse({ restore: true });
+  return { restore: true };
 };
 
 export const restoreRecording = async () => {
-  let editorUrl = "editorfallback.html";
+  const hasWebCodecs = supportsWebCodecs();
 
-  // Check if Chrome version is 109 or below
-  if (navigator.userAgent.includes("Chrome/")) {
-    const version = parseInt(navigator.userAgent.match(/Chrome\/([0-9]+)/)[1]);
-    if (version > 109) {
-      editorUrl = "editor.html";
-    }
+  let editorUrl, messageType;
+
+  if (hasWebCodecs) {
+    editorUrl = "editorwebcodecs.html";
+    messageType = "restore-recording";
+  } else {
+    editorUrl = "editorviewer.html";
+    messageType = "viewer-recording";
   }
 
-  // Retrieve stored chunks
   const chunks = [];
   await chunksStore.iterate((value) => {
     chunks.push(value);
   });
 
-  // If there are no chunks, return early
-  if (chunks.length === 0) return;
+  if (chunks.length === 0) {
+    return;
+  }
 
   // Create the editor tab
   chrome.tabs.create(
@@ -49,13 +50,14 @@ export const restoreRecording = async () => {
       await new Promise((resolve) => {
         chrome.tabs.onUpdated.addListener(function listener(tabId, info) {
           if (info.status === "complete" && tabId === tab.id) {
-            sendMessageTab(tab.id, {
-              type: "restore-recording",
-            });
+            chrome.tabs.onUpdated.removeListener(listener);
 
-            // Send stored chunks
-            sendChunks();
-            resolve();
+            setTimeout(() => {
+              sendMessageTab(tab.id, {
+                type: messageType,
+              });
+              resolve();
+            }, 2000);
           }
         });
       });

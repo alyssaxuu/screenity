@@ -201,6 +201,22 @@ const CropUI = (props) => {
             />
             <span>px</span>
           </div>
+          {/* <button
+            className={["button", "primaryButton", styles.updateButton].join(
+              " "
+            )}
+            onClick={() => {
+              contentState.handleCrop(
+                contentState.left,
+                contentState.top,
+                contentState.width,
+                contentState.height
+              );
+            }}
+            disabled={contentState.isFfmpegRunning}
+          >
+            {chrome.i18n.getMessage("sandboxCropUpdateButton") || "Update crop"}
+          </button> */}
         </div>
       </div>
     </div>

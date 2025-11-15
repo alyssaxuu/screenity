@@ -106,7 +106,7 @@ const ContentState = (props) => {
 
     // This cannot be triggered from here because the user might not have the page focused
     //chrome.runtime.sendMessage({ type: "start-recording" });
-  }, [contentStateRef.current]);
+  }, []);
 
   const restartRecording = useCallback(() => {
     chrome.storage.local.set({ recording: false, restarting: true });
@@ -137,7 +137,26 @@ const ContentState = (props) => {
         paused: false,
       }));
     }, 100);
-  }, [contentStateRef.current]);
+  }, []);
+
+  useEffect(() => {
+    (async () => {
+      let realSupport = false;
+
+      if ("VideoEncoder" in window) {
+        try {
+          const support = await VideoEncoder.isConfigSupported({
+            codec: "vp8",
+            width: 16,
+            height: 16,
+          });
+          realSupport = support.supported;
+        } catch {}
+      }
+
+      chrome.storage.local.set({ realWebCodecsSupport: realSupport });
+    })();
+  }, []);
 
   const stopRecording = useCallback(() => {
     chrome.runtime.sendMessage({ type: "clear-recording-alarm" });
@@ -166,7 +185,14 @@ const ContentState = (props) => {
       element.classList.remove("screenity-blur");
     });
     setTimer(0);
-    chrome.runtime.sendMessage({ type: "stop-recording-tab" });
+    chrome.runtime.sendMessage({ type: "stop-recording-tab" }, (res) => {
+      if (!res || res.ok !== true) {
+        console.warn("Stop command not acknowledged, retrying…");
+        setTimeout(() => {
+          chrome.runtime.sendMessage({ type: "stop-recording-tab" });
+        }, 200);
+      }
+    });
     // Play beep sound at 50% volume
     const audio = new Audio(chrome.runtime.getURL("/assets/sounds/beep.mp3"));
     audio.volume = 0.5;
@@ -838,6 +864,13 @@ const ContentState = (props) => {
     audio.volume = 0.5;
     audio.play();
   };
+
+  useEffect(() => {
+    chrome.runtime.sendMessage({ type: "sync-recording-state" }, (state) => {
+      if (!state) return;
+      setContentState((prev) => ({ ...prev, ...state }));
+    });
+  }, []);
 
   useEffect(() => {
     if (!CLOUD_FEATURES_ENABLED) return;

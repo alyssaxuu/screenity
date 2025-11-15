@@ -6,9 +6,6 @@ import base64ToBlob from "./utils/base64toBlob";
 import blobToArrayBuffer from "./utils/blobToArrayBuffer";
 import cropVideo from "./utils/cropVideo";
 import cutVideo from "./utils/cutVideo";
-import fetchFile from "./utils/fetchFile";
-import generateThumbstrips from "./utils/generateThumbstrips";
-import getAudio from "./utils/getAudio";
 import getFrame from "./utils/getFrame";
 import hasAudio from "./utils/hasAudio";
 import muteVideo from "./utils/muteVideo";
@@ -35,7 +32,16 @@ const Sandbox = () => {
       // Initialize ffmpeg.js
       ffmpegInstance.current = createFFmpeg({
         log: false,
-        progress: (params) => {},
+        progress: (params) => {
+          // Send progress updates to parent window
+          if (params.ratio && params.ratio >= 0) {
+            const percentage = Math.min(Math.round(params.ratio * 100), 100);
+            sendMessage({
+              type: "ffmpeg-progress",
+              progress: percentage,
+            });
+          }
+        },
         corePath: "assets/vendor/ffmpeg-core.js",
       });
       await ffmpegInstance.current.load();
@@ -94,7 +100,7 @@ const Sandbox = () => {
           message.replaceAudio
         );
         const base64 = await toBase64(blob);
-        sendMessage({ type: "updated-blob", base64: base64 });
+        sendMessage({ type: "updated-blob", base64: base64, topLevel: true });
       } catch (error) {
         sendMessage({ type: "ffmpeg-error", error: JSON.stringify(error) });
       }
@@ -102,7 +108,7 @@ const Sandbox = () => {
       try {
         const blob = await base64ToBlob(ffmpegInstance.current, message.base64);
         const base64 = await toBase64(blob);
-        sendMessage({ type: "updated-blob", base64: base64 });
+        sendMessage({ type: "updated-blob", base64: base64, topLevel: true });
       } catch (error) {
         sendMessage({ type: "ffmpeg-error", error: JSON.stringify(error) });
       }
@@ -125,8 +131,8 @@ const Sandbox = () => {
           height: message.height,
         });
         const base64 = await toBase64(blob);
-        sendMessage({ type: "updated-blob", base64: base64 });
-        sendMessage({ type: "crop-update" });
+        sendMessage({ type: "updated-blob", base64: base64, topLevel: true });
+        //sendMessage({ type: "crop-update" });
       } catch (error) {
         sendMessage({ type: "ffmpeg-error", error: JSON.stringify(error) });
       }
@@ -147,33 +153,6 @@ const Sandbox = () => {
           base64: base64,
           addToHistory: true,
         });
-      } catch (error) {
-        sendMessage({ type: "ffmpeg-error", error: JSON.stringify(error) });
-      }
-    } else if (message.type === "fetch-file") {
-      try {
-        const blob = await fetchFile(message.url);
-        const base64 = await toBase64(blob);
-        sendMessage({ type: "updated-blob", base64: base64 });
-      } catch (error) {
-        sendMessage({ type: "ffmpeg-error", error: JSON.stringify(error) });
-      }
-    } else if (message.type === "generate-thumbstrips") {
-      try {
-        const blob = await generateThumbstrips(
-          ffmpegInstance.current,
-          message.blob
-        );
-        const base64 = await toBase64(blob);
-        sendMessage({ type: "updated-blob", base64: base64 });
-      } catch (error) {
-        sendMessage({ type: "ffmpeg-error", error: JSON.stringify(error) });
-      }
-    } else if (message.type === "get-audio") {
-      try {
-        const blob = await getAudio(ffmpegInstance.current, message.video);
-        const base64 = await toBase64(blob);
-        sendMessage({ type: "updated-blob", base64: base64 });
       } catch (error) {
         sendMessage({ type: "ffmpeg-error", error: JSON.stringify(error) });
       }
@@ -221,7 +200,7 @@ const Sandbox = () => {
           message.duration
         );
         const base64 = await toBase64(blob);
-        sendMessage({ type: "updated-blob", base64: base64 });
+        sendMessage({ type: "updated-blob", base64: base64, topLevel: true });
       } catch (error) {
         sendMessage({ type: "ffmpeg-error", error: JSON.stringify(error) });
       }

@@ -77,7 +77,7 @@ export const setupHandlers = ({ setLoading }) => {
     console.log("Preparing Picture in Picture request");
 
     waitForVideoRef((videoEl) => {
-      surfaceHandler(message, { current: videoEl }); // ✅ FIXED
+      surfaceHandler(message, { current: videoEl });
     });
   });
   registerMessage("camera-toggled-toolbar", cameraToggledToolbar);

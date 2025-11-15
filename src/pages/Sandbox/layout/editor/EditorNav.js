@@ -11,10 +11,11 @@ const EditorNav = () => {
     setContentState((prevContentState) => ({
       ...prevContentState,
       mode: "player",
-      blob: contentState.originalBlob,
       start: 0,
       end: 1,
     }));
+
+    contentState.restoreBackup();
   };
 
   const handleRevert = () => {
@@ -27,13 +28,17 @@ const EditorNav = () => {
   };
 
   const saveChanges = async () => {
-    await contentState.handleReencode();
-    setContentState((prevContentState) => ({
-      ...prevContentState,
+    if (contentState.isFfmpegRunning) return;
+
+    setContentState((prev) => ({
+      ...prev,
       mode: "player",
+      hasTempChanges: false,
       start: 0,
       end: 1,
     }));
+
+    contentState.clearBackup();
   };
 
   return (

@@ -81,13 +81,14 @@ const Recorder = () => {
   async function saveChunk(e, i) {
     const ts = e.timecode ?? 0;
 
-    if (
-      savedCount.current > 0 &&
-      ts === lastTimecode.current &&
-      e.data.size === lastSize.current
-    ) {
-      return false;
-    }
+    // FLAG: disabled duplicate chunk check due to issues with some devices
+    // if (
+    //   savedCount.current > 0 &&
+    //   ts === lastTimecode.current &&
+    //   e.data.size === lastSize.current
+    // ) {
+    //   return false;
+    // }
 
     if (!(await canFitChunk(e.data.size))) {
       lowStorageAbort.current = true;
@@ -194,7 +195,7 @@ const Recorder = () => {
       return;
     }
 
-    chunksStore.clear();
+    await chunksStore.clear();
 
     lastTimecode.current = 0;
     lastSize.current = 0;
@@ -244,6 +245,9 @@ const Recorder = () => {
     };
 
     recorder.current.onstop = async () => {
+      try {
+        recorder.current?.requestData();
+      } catch {}
       if (isRestarting.current) return;
       await waitForDrain();
       if (!sentLast.current) {
@@ -252,6 +256,16 @@ const Recorder = () => {
         chrome.runtime.sendMessage({ type: "video-ready" });
       }
     };
+
+    if (helperAudioStream.current) {
+      const track = helperAudioStream.current.getAudioTracks()[0];
+      if (track) {
+        track.onended = () => {
+          chrome.storage.local.set({ recording: false });
+          sendStopRecording();
+        };
+      }
+    }
 
     const checkMaxMemory = () => {
       try {
@@ -275,7 +289,7 @@ const Recorder = () => {
       }
     };
 
-    recorder.current.ondataavailable = (e) => {
+    recorder.current.ondataavailable = async (e) => {
       if (!e || !e.data || !e.data.size) {
         if (recorder.current && recorder.current.state === "inactive") {
           chrome.storage.local.set({
@@ -288,9 +302,7 @@ const Recorder = () => {
         return;
       }
 
-      if (lowStorageAbort.current) {
-        return;
-      }
+      if (lowStorageAbort.current) return;
 
       if (!hasChunks.current) {
         hasChunks.current = true;
@@ -298,7 +310,25 @@ const Recorder = () => {
         lastSize.current = e.data.size;
       }
 
+      // push chunk
       pending.current.push(e);
+      pendingBytes.current += e.data.size;
+
+      if (pendingBytes.current > MAX_PENDING_BYTES) {
+        try {
+          if (recorder.current.state !== "paused") {
+            recorder.current.pause();
+          }
+          await drainQueue();
+          if (recorder.current.state === "paused") {
+            recorder.current.resume();
+          }
+        } catch {
+          // fallback: force drain without pausing
+          await drainQueue();
+        }
+      }
+
       void drainQueue();
     };
 
@@ -332,14 +362,19 @@ const Recorder = () => {
 
   async function stopRecording() {
     isFinishing.current = true;
-    if (recorder.current) {
-      try {
-        recorder.current.requestData();
-      } catch {}
-      recorder.current.stop();
-      await waitForDrain();
-      recorder.current = null;
-    }
+
+    try {
+      recorder.current?.requestData();
+    } catch {}
+
+    try {
+      if (recorder.current && recorder.current.state !== "inactive") {
+        recorder.current.stop();
+      }
+    } catch {}
+
+    await waitForDrain();
+    recorder.current = null;
 
     if (liveStream.current) {
       liveStream.current.getTracks().forEach((t) => t.stop());
@@ -645,6 +680,23 @@ const Recorder = () => {
     });
     tabID.current = streamId;
   };
+
+  // FLAG: add protection on page close
+  useEffect(() => {
+    const handleClose = () => {
+      try {
+        stopRecording();
+      } catch {}
+    };
+
+    window.addEventListener("pagehide", handleClose);
+    window.addEventListener("beforeunload", handleClose);
+
+    return () => {
+      window.removeEventListener("pagehide", handleClose);
+      window.removeEventListener("beforeunload", handleClose);
+    };
+  }, []);
 
   const onMessage = useCallback(
     (request, sender, sendResponse) => {

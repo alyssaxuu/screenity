@@ -46,7 +46,6 @@ const RecorderOffscreen = () => {
   const fps = useRef(30);
   const backupRef = useRef(false);
 
-  // FLAG: New stuff
   const pending = useRef([]);
   const draining = useRef(false);
   const lowStorageAbort = useRef(false);

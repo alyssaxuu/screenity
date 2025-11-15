@@ -20,7 +20,6 @@ const RightPanel = () => {
   const contentStateRef = useRef(contentState);
   const consoleErrorRef = useRef([]);
 
-  // Override console.error to catch errors from ffmpeg.wasm
   useEffect(() => {
     console.error = (error) => {
       consoleErrorRef.current.push(error);
@@ -103,6 +102,9 @@ const RightPanel = () => {
     )
       return;
     if (!contentState.mp4ready) return;
+
+    contentState.createBackup();
+
     setContentState((prevContentState) => ({
       ...prevContentState,
       mode: "edit",
@@ -123,7 +125,15 @@ const RightPanel = () => {
       !contentState.override
     )
       return;
+
     if (!contentState.mp4ready) return;
+
+    contentState.createBackup();
+
+    if (!contentState.frame && !contentState.isFfmpegRunning) {
+      contentState.getFrame();
+    }
+
     setContentState((prevContentState) => ({
       ...prevContentState,
       mode: "crop",
@@ -144,6 +154,9 @@ const RightPanel = () => {
     )
       return;
     if (!contentState.mp4ready) return;
+
+    contentState.createBackup();
+
     setContentState((prevContentState) => ({
       ...prevContentState,
       mode: "audio",
@@ -252,7 +265,7 @@ const RightPanel = () => {
               </div>
             </div>
           )}
-          {contentState.fallback && (
+          {contentState.fallback && contentState.noffmpeg && (
             <div className={styles.alert}>
               <div className={styles.buttonLeft}>
                 <ReactSVG src={URL + "editor/icons/alert.svg"} />

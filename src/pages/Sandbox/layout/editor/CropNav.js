@@ -11,7 +11,6 @@ const CropNav = () => {
     setContentState((prevContentState) => ({
       ...prevContentState,
       mode: "player",
-      blob: contentState.originalBlob,
       start: 0,
       end: 1,
       width: contentState.prevWidth,
@@ -20,6 +19,8 @@ const CropNav = () => {
       top: 0,
       fromCropper: false,
     }));
+
+    contentState.clearBackup();
   };
 
   const handleRevert = () => {
@@ -37,12 +38,21 @@ const CropNav = () => {
   };
 
   const saveChanges = async () => {
-    contentState.handleCrop(
+    await contentState.handleCrop(
       contentState.left,
       contentState.top,
       contentState.width,
       contentState.height
     );
+
+    setContentState((prev) => ({
+      ...prev,
+      // mode: "player",
+      fromCropper: true,
+      hasTempChanges: false,
+    }));
+
+    contentState.clearBackup();
   };
 
   return (
@@ -75,16 +85,28 @@ const CropNav = () => {
             onClick={handleRevert}
             disabled={contentState.isFfmpegRunning}
           >
-            {chrome.i18n.getMessage("sandboxEditorResetButton")}
+            {chrome.i18n.getMessage("sandboxEditorRevertButton")}
           </button>
           <button
             className="button primaryButton"
             onClick={saveChanges}
             disabled={contentState.isFfmpegRunning}
           >
-            {contentState.cropping
-              ? chrome.i18n.getMessage("sandboxEditorSaveProgressButton")
-              : chrome.i18n.getMessage("sandboxEditorSaveButton")}
+            {contentState.isFfmpegRunning ? (
+              contentState.processingProgress > 0 ? (
+                <>
+                  {chrome.i18n.getMessage("sandboxEditorSaveProgressButton") ||
+                    "Saving"}{" "}
+                  {Math.round(contentState.processingProgress)}%
+                </>
+              ) : (
+                chrome.i18n.getMessage("sandboxEditorSaveProgressButton") ||
+                "Saving..."
+              )
+            ) : (
+              chrome.i18n.getMessage("sandboxEditorSaveButton") ||
+              "Save changes"
+            )}
           </button>
         </div>
       </div>
