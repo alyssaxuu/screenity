@@ -1,6 +1,11 @@
 # Screenity
-[![jiewjjc232](https://github.com/alyssaxuu/screenity/assets/7581348/ed55e52e-4adf-442b-b774-6856abacdffb)](https://screenity.io)
 
+> _✨ Screenity's open source work is sponsored by_
+> ### Recall.ai - API for desktop recording [<img src="https://github.com/user-attachments/assets/eee643f1-1b64-4d14-bb04-498c321fd937" align="right">](https://www.recall.ai/product/desktop-recording-sdk?utm_source=github&utm_medium=sponsorship&utm_campaign=alyssaxuu-screenity)
+>
+> If you’re looking for a hosted desktop recording API, consider checking out [Recall.ai](https://www.recall.ai/product/desktop-recording-sdk?utm_source=github&utm_medium=sponsorship&utm_campaign=alyssaxuu-screenity), an API that records Zoom, Google Meet, Microsoft Teams, in-person meetings, and more.
+
+[![jiewjjc232](https://github.com/alyssaxuu/screenity/assets/7581348/ed55e52e-4adf-442b-b774-6856abacdffb)](https://screenity.io)
 
 The free and privacy-friendly screen recorder with no limits 🎥
 
