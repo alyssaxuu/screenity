@@ -340,8 +340,15 @@ const Recorder = () => {
           videoBitrate: videoBitsPerSecond,
           audioBitrate: audioBitsPerSecond,
           onFinalized: async () => {
-            console.log("[RECORDER] WebCodecs finalize event → assembling MP4");
-            await assembleAndDownload(); // ⭐ only downloaded here
+            // Finish writing any remaining chunks (usually none)
+            await waitForDrain();
+
+            // Let the editor know the MP4 blobs are ready
+            if (!sentLast.current) {
+              sentLast.current = true;
+              isFinishing.current = false;
+              chrome.runtime.sendMessage({ type: "video-ready" });
+            }
           },
           onChunk: (chunkData, timestampUs) => {
             // chunkData = Uint8Array from muxer
@@ -360,11 +367,6 @@ const Recorder = () => {
           },
           onStop: async () => {
             await waitForDrain();
-            if (!sentLast.current) {
-              sentLast.current = true;
-              isFinishing.current = false;
-              chrome.runtime.sendMessage({ type: "video-ready" });
-            }
           },
         });
 
@@ -459,33 +461,6 @@ const Recorder = () => {
       });
       sendStopRecording();
     };
-  }
-
-  async function assembleAndDownload() {
-    const keys = await chunksStore.keys();
-    const items = await Promise.all(keys.map((k) => chunksStore.getItem(k)));
-    const ordered = items.sort((a, b) => a.index - b.index);
-
-    const blob = new Blob(
-      ordered.map((o) => o.chunk),
-      {
-        type: "video/mp4",
-      }
-    );
-
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "recording.mp4";
-    a.click();
-
-    setTimeout(() => URL.revokeObjectURL(url), 2000);
-
-    console.log(
-      "[RECORDER] Auto-downloaded recording.mp4",
-      ordered.length,
-      "chunks"
-    );
   }
 
   async function stopRecording() {

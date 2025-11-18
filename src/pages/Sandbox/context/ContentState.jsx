@@ -105,7 +105,10 @@ const ContentState = (props) => {
       c.chunk instanceof Blob ? c.chunk : new Blob([c.chunk])
     );
 
-    const blob = new Blob(parts, { type: "video/webm" });
+    const first = parts[0];
+    const inferredType = first?.type || "video/webm";
+
+    const blob = new Blob(parts, { type: inferredType });
 
     reconstructVideo(blob);
   };
@@ -258,11 +261,40 @@ const ContentState = (props) => {
   }, [contentState.blob]);
 
   const reconstructVideo = async (withBlob) => {
-    const blob = withBlob
+    let blob = withBlob
       ? withBlob
-      : new Blob(videoChunks.current, {
-          type: "video/webm; codecs=vp8, opus",
-        });
+      : new Blob(videoChunks.current, { type: "video/webm; codecs=vp8,opus" });
+
+    if (blob.type === "video/mp4" || /\.mp4$/i.test(blob.name || "")) {
+      setContentState((prev) => ({
+        ...prev,
+        blob: blob,
+        webm: null,
+        mp4ready: true,
+        ready: true,
+        rawBlob: blob,
+        isFfmpegRunning: false,
+        noffmpeg: false,
+      }));
+
+      // Extract duration, width, height
+      const video = document.createElement("video");
+      video.preload = "metadata";
+      video.onloadedmetadata = () => {
+        setContentState((prev) => ({
+          ...prev,
+          duration: video.duration,
+          width: video.videoWidth,
+          height: video.videoHeight,
+        }));
+
+        URL.revokeObjectURL(video.src);
+      };
+      video.src = URL.createObjectURL(blob);
+
+      chrome.runtime.sendMessage({ type: "recording-complete" });
+      return;
+    }
 
     const { recordingDuration } = await chrome.storage.local.get(
       "recordingDuration"

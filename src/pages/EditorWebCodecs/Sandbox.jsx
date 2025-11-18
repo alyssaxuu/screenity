@@ -36,6 +36,13 @@ const Sandbox = () => {
     }
   };
 
+  function isMp4Blob(blob) {
+    return blob
+      .slice(4, 12)
+      .text()
+      .then((t) => t === "ftyp");
+  }
+
   const toBase64 = (blob) =>
     new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -87,6 +94,27 @@ const Sandbox = () => {
         }
 
         case "base64-to-blob": {
+          // Decode the base64 blob (type might be wrong or missing)
+          const rawBlob = await fetch(message.base64).then((r) => r.blob());
+
+          // Real MP4 signature check
+          const header = await rawBlob.slice(4, 12).text();
+          const looksMp4 = header === "ftyp";
+
+          if (looksMp4) {
+            console.log("Already MP4, skipping conversion.");
+            // ⬆️ Already MP4 → skip all conversion
+            sendMessage({
+              type: "updated-blob",
+              base64: message.base64,
+              topLevel: true,
+            });
+            break;
+          }
+
+          console.log("Converting WebM to MP4...");
+
+          // Otherwise treat it as WebM → MP4
           const webmBlob = base64ToWebmBlob(message.base64);
           const mp4Blob = await convertWebmToMp4(webmBlob, (progress) =>
             sendMessage({
@@ -94,6 +122,7 @@ const Sandbox = () => {
               progress: Math.round(progress * 100),
             })
           );
+
           const base64 = await toBase64(mp4Blob);
           sendMessage({ type: "updated-blob", base64, topLevel: true });
           break;
