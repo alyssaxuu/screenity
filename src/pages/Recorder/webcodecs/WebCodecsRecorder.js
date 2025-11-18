@@ -39,6 +39,17 @@ export class WebCodecsRecorder {
     // Resize canvas for downscaling frames
     this.resizeCanvas = null;
     this.resizeCtx = null;
+
+    this.justResumed = false;
+    this.paused = false;
+    this.pauseStartUs = null;
+    this.totalPausedDurationUs = 0;
+
+    this._startPromise = null;
+    this._startResolve = null;
+
+    this._prebufferedAudio = [];
+    this._audioReady = false;
   }
 
   async _probeRealResolution() {
@@ -59,146 +70,181 @@ export class WebCodecsRecorder {
   }
 
   async start() {
-    console.log("[WCR] start() called");
-    if (this.running) {
-      console.log("[WCR] already running, ignoring start()");
-      return;
-    }
+    // Reset offsets
+    this.videoTimestampOffsetUs = null;
+    this.firstVideoFrame = undefined;
+    if (this.running) return this._startPromise;
+
+    this._startPromise = new Promise((resolve) => {
+      this._startResolve = resolve;
+    });
 
     this.running = true;
-
-    this.videoTrack = this.stream.getVideoTracks()[0] || null;
-    this.audioTrack = this.stream.getAudioTracks()[0] || null;
-
-    console.log(
-      "[WCR] videoTrack",
-      this.videoTrack,
-      "state=",
-      this.videoTrack?.readyState
-    );
-    console.log(
-      "[WCR] audioTrack",
-      this.audioTrack,
-      "state=",
-      this.audioTrack?.readyState
-    );
-
-    if (!this.videoTrack) {
-      const err = new Error("WebCodecsRecorder: No video track");
-      console.error("[WCR] error:", err);
-      this.options.onError?.(err);
-      this.running = false;
-      return;
-    }
-
     try {
-      console.log("[WCR] probing real resolution...");
-      const { width, height } = await this._probeRealResolution();
-      this.actualWidth = width;
-      this.actualHeight = height;
-
-      // --- Compute safe target resolution for H.264 ---
-      // 1) clamp width to 1920
-      let targetWidth = Math.min(width, 1920);
-      let targetHeight = Math.round((height / width) * targetWidth);
-
-      // 2) if height > 1080, clamp height and recompute width
-      if (targetHeight > 1080) {
-        targetHeight = 1080;
-        targetWidth = Math.round((width / height) * targetHeight);
-      }
-
-      this.targetWidth = targetWidth;
-      this.targetHeight = targetHeight;
+      this.videoTrack = this.stream.getVideoTracks()[0] || null;
+      this.audioTrack = this.stream.getAudioTracks()[0] || null;
 
       console.log(
-        "[WCR] Capture resolution:",
-        width,
-        "x",
-        height,
-        "→ Target:",
-        this.targetWidth,
-        "x",
-        this.targetHeight
+        "[WCR] videoTrack",
+        this.videoTrack,
+        "state=",
+        this.videoTrack?.readyState
+      );
+      console.log(
+        "[WCR] audioTrack",
+        this.audioTrack,
+        "state=",
+        this.audioTrack?.readyState
       );
 
-      const fps = this.options.fps || 30;
-      const safeBitrate = this.options.videoBitrate || 10_000_000;
+      if (!this.videoTrack) {
+        const err = new Error("WebCodecsRecorder: No video track");
+        this.options.onError?.(err);
+        this.running = false;
 
-      // Choose encoder config (REAL check, not just isConfigSupported)
-      const videoConfig = await this.chooseVideoEncoderConfig({
-        width: this.targetWidth,
-        height: this.targetHeight,
-        fps,
-        bitrate: safeBitrate,
-      });
-      this.selectedVideoCodec = videoConfig.codec;
+        if (this._startResolve) {
+          this._startResolve(false);
+          this._startResolve = null;
+        }
 
-      const audioConfig = await this.prepareAudioEncoderConfig();
+        this._startPromise = null;
+        return false;
+      }
 
-      console.log("[WCR] Video config chosen:", videoConfig);
-      console.log("[WCR] Audio config:", audioConfig);
+      try {
+        console.log("[WCR] probing real resolution...");
+        const { width, height } = await this._probeRealResolution();
+        this.actualWidth = width;
+        this.actualHeight = height;
 
-      console.log("[WCR] creating MediaStreamTrackProcessors...");
-      this.videoProcessor = new MediaStreamTrackProcessor({
-        track: this.videoTrack,
-      });
-      this.videoReader = this.videoProcessor.readable.getReader();
+        // --- Compute safe target resolution for H.264 ---
+        // 1) clamp width to 1920
+        let targetWidth = Math.min(width, 1920);
+        let targetHeight = Math.round((height / width) * targetWidth);
 
-      if (audioConfig && this.audioTrack) {
-        this.audioProcessor = new MediaStreamTrackProcessor({
-          track: this.audioTrack,
+        // 2) if height > 1080, clamp height and recompute width
+        if (targetHeight > 1080) {
+          targetHeight = 1080;
+          targetWidth = Math.round((width / height) * targetHeight);
+        }
+
+        this.targetWidth = targetWidth;
+        this.targetHeight = targetHeight;
+
+        console.log(
+          "[WCR] Capture resolution:",
+          width,
+          "x",
+          height,
+          "→ Target:",
+          this.targetWidth,
+          "x",
+          this.targetHeight
+        );
+
+        const fps = this.options.fps || 30;
+        const safeBitrate = this.options.videoBitrate || 10_000_000;
+
+        // Choose encoder config (REAL check, not just isConfigSupported)
+        const videoConfig = await this.chooseVideoEncoderConfig({
+          width: this.targetWidth,
+          height: this.targetHeight,
+          fps,
+          bitrate: safeBitrate,
         });
-        this.audioReader = this.audioProcessor.readable.getReader();
-      } else {
-        this.audioProcessor = null;
-        this.audioReader = null;
+        this.selectedVideoCodec = videoConfig.codec;
+
+        const audioConfig = await this.prepareAudioEncoderConfig();
+        this._pendingAudioConfig = audioConfig;
+
+        console.log("[WCR] Video config chosen:", videoConfig);
+        console.log("[WCR] Audio config:", audioConfig);
+
+        console.log("[WCR] creating MediaStreamTrackProcessors...");
+        this.videoProcessor = new MediaStreamTrackProcessor({
+          track: this.videoTrack,
+        });
+        this.videoReader = this.videoProcessor.readable.getReader();
+
+        // --- CREATE AUDIO PROCESSOR ---
+        if (audioConfig && this.audioTrack) {
+          this.audioProcessor = new MediaStreamTrackProcessor({
+            track: this.audioTrack,
+          });
+          this.audioReader = this.audioProcessor.readable.getReader();
+        } else {
+          this.audioProcessor = null;
+          this.audioReader = null;
+        }
+
+        // --- START AUDIO LOOP IMMEDIATELY (BEFORE VIDEO) ---
+        if (this.audioReader) {
+          console.log("[WCR] starting early audio buffering loop");
+          this.readAudioLoop(); // <-- THIS IS NOW CORRECTLY PLACED
+        }
+
+        console.log("[WCR] creating muxer...");
+        this.muxer = new Mp4MuxerWrapper({
+          width: this.targetWidth,
+          height: this.targetHeight,
+          fps,
+          videoBitrate: this.options.videoBitrate,
+          audioBitrate: this.options.audioBitrate,
+          videoCodec: videoConfig.containerCodec,
+          audioCodec: audioConfig ? "aac" : undefined,
+          onChunk: this.options.onChunk,
+        });
+        console.log("[WCR] muxer created");
+
+        if (audioConfig) {
+          this.muxer.enableAudio();
+        }
+
+        await this.muxer.start();
+        console.log("[WCR] muxer started");
+
+        console.log("[WCR] initVideoEncoder()...");
+        await this.initVideoEncoder(videoConfig.config, videoConfig.codec);
+        console.log("[WCR] initVideoEncoder() done");
+
+        console.log("[WCR] starting read loops after sync...");
+
+        await Promise.resolve(); // microtasks flushed
+
+        setTimeout(() => {
+          this.readVideoLoop();
+
+          if (this._startResolve) {
+            this._startResolve(true);
+            this._startResolve = null;
+          }
+        }, 30);
+
+        console.log("[WCR] start() completed");
+      } catch (err) {
+        console.error("[WCR] start() failed:", err);
+        this.options.onError?.(err);
+        this.running = false;
+        this.cleanup();
+
+        if (this._startResolve) {
+          this._startResolve(false);
+          this._startResolve = null;
+        }
       }
-
-      console.log("[WCR] creating muxer...");
-      this.muxer = new Mp4MuxerWrapper({
-        width: this.targetWidth,
-        height: this.targetHeight,
-        fps,
-        videoBitrate: this.options.videoBitrate,
-        audioBitrate: this.options.audioBitrate,
-        videoCodec: videoConfig.containerCodec,
-        audioCodec: audioConfig ? "aac" : undefined,
-        onChunk: this.options.onChunk,
-      });
-      console.log("[WCR] muxer created");
-
-      if (audioConfig) {
-        this.muxer.enableAudio();
-      }
-
-      await this.muxer.start();
-      console.log("[WCR] muxer started");
-
-      console.log("[WCR] initVideoEncoder()...");
-      await this.initVideoEncoder(videoConfig.config, videoConfig.codec);
-      console.log("[WCR] initVideoEncoder() done");
-
-      if (audioConfig) {
-        console.log("[WCR] initAudioEncoder()...");
-        await this.initAudioEncoder(audioConfig);
-        console.log("[WCR] initAudioEncoder() done");
-      } else {
-        console.log("[WCR] audio encoder skipped (unsupported or no track)");
-      }
-
-      console.log("[WCR] starting read loops...");
-      this.readVideoLoop();
-      if (this.audioReader && this.audioEncoder) {
-        this.readAudioLoop();
-      }
-      console.log("[WCR] start() completed");
     } catch (err) {
-      console.error("[WCR] start() failed:", err);
+      console.error("[WCR] start() outer error:", err);
       this.options.onError?.(err);
       this.running = false;
       this.cleanup();
+
+      if (this._startResolve) {
+        this._startResolve(false);
+        this._startResolve = null;
+      }
     }
+
+    return this._startPromise;
   }
 
   async stop() {
@@ -247,6 +293,25 @@ export class WebCodecsRecorder {
     }
   }
 
+  pause() {
+    if (!this.running || this.paused) return;
+    this.paused = true;
+    this.pauseStartUs = performance.now() * 1000; // µs
+  }
+
+  resume() {
+    if (!this.running || !this.paused) return;
+
+    const nowUs = performance.now() * 1000;
+    this.totalPausedDurationUs += nowUs - this.pauseStartUs;
+
+    this.paused = false;
+    this.justResumed = true;
+
+    // 🟢 CRUCIAL LINE
+    this.muxer?.setPausedOffset(this.totalPausedDurationUs);
+  }
+
   cleanup() {
     console.log("[WCR] cleanup()");
     try {
@@ -283,6 +348,9 @@ export class WebCodecsRecorder {
 
     this.resizeCanvas = null;
     this.resizeCtx = null;
+
+    this._startPromise = null;
+    this._startResolve = null;
   }
 
   async initVideoEncoder(config, codecLabel) {
@@ -327,6 +395,7 @@ export class WebCodecsRecorder {
     this.audioEncoder = new AudioEncoder({
       output: (chunk, meta) => {
         console.log("[WCR] AUDIO CHUNK", chunk, meta);
+
         this.muxer.addAudioChunk(chunk, meta);
       },
       error: (err) => {
@@ -336,6 +405,11 @@ export class WebCodecsRecorder {
     });
 
     this.audioEncoder.configure(config);
+
+    // 🔥 align audio base timestamp to video base timestamp
+    if (this.muxer && this.videoTimestampOffsetUs != null) {
+      this.muxer.setAudioOffset(this.videoTimestampOffsetUs);
+    }
 
     console.log("[WCR] audio encoder OK");
   }
@@ -424,17 +498,28 @@ export class WebCodecsRecorder {
       if (this.videoTimestampOffsetUs === null) {
         this.videoTimestampOffsetUs = frame.timestamp;
       }
-      return Math.max(
+
+      const baseUs = Math.max(
         0,
         Math.round(frame.timestamp - this.videoTimestampOffsetUs)
       );
+
+      // 🟢 FIX: subtract paused duration
+      return Math.max(0, baseUs - this.totalPausedDurationUs);
     }
 
+    // Fallback for browsers without timestamps
     const now = performance.now();
     if (this.videoFallbackStartMs === null) {
       this.videoFallbackStartMs = now;
     }
-    return Math.max(0, Math.round((now - this.videoFallbackStartMs) * 1000));
+
+    const baseUs = Math.max(
+      0,
+      Math.round((now - this.videoFallbackStartMs) * 1000)
+    );
+
+    return Math.max(0, baseUs - this.totalPausedDurationUs);
   }
 
   async readVideoLoop() {
@@ -444,7 +529,7 @@ export class WebCodecsRecorder {
       return;
     }
 
-    // Lazily init resize canvas on first frame
+    // lazily init canvas
     const ensureResizeCanvas = () => {
       if (!this.resizeCanvas) {
         this.resizeCanvas = document.createElement("canvas");
@@ -462,32 +547,18 @@ export class WebCodecsRecorder {
 
     try {
       while (this.running) {
-        let readResult;
-        try {
-          readResult = await this.videoReader.read();
-        } catch (err) {
-          console.error("[WCR] videoReader.read() error:", err);
-          break;
+        if (this.paused) {
+          await new Promise((r) => setTimeout(r, 10));
+          continue;
         }
 
-        const { value: frame, done } = readResult;
-
-        if (done || !frame) {
-          console.log("[WCR] video loop done or no frame", done, !!frame);
-          break;
-        }
-
-        console.log("[WCR] got VIDEO FRAME", {
-          frameNumber: this.frameCount,
-          ts: frame.timestamp,
-          codedWidth: frame.codedWidth,
-          codedHeight: frame.codedHeight,
-          format: frame.format,
-        });
+        const { value: frame, done } = await this.videoReader
+          .read()
+          .catch(() => ({ done: true }));
+        if (done || !frame) break;
 
         ensureResizeCanvas();
 
-        // Draw original frame to canvas → downscale to target
         this.resizeCtx.drawImage(
           frame,
           0,
@@ -496,41 +567,52 @@ export class WebCodecsRecorder {
           this.targetHeight
         );
 
-        // Create new VideoFrame from the resized canvas
         const resized = new VideoFrame(this.resizeCanvas, {
           timestamp: frame.timestamp,
         });
 
         const timestampUs = this.getVideoTimestampUs(frame);
 
-        try {
-          const isFirstFrame = this.firstVideoFrame === undefined;
-          if (isFirstFrame) this.firstVideoFrame = true;
+        // 🔥 FIRST VIDEO FRAME → establish baseline and init audio
+        if (this.firstVideoFrame === undefined) {
+          this.firstVideoFrame = true;
 
-          // Force keyframe every 2 seconds or on first frame
-          const framesSinceKey = this.frameCount % (this.options.fps * 2 || 60);
-          const needsKey = isFirstFrame || framesSinceKey === 0;
+          // define baseline
+          this.videoTimestampOffsetUs = frame.timestamp;
+          console.log(
+            "[WCR] Video baseline set to",
+            this.videoTimestampOffsetUs
+          );
 
-          console.log("[WCR] Encoding frame", this.frameCount, {
-            timestampUs,
-            keyFrame: needsKey,
-            encoderQueueSize: this.videoEncoder.encodeQueueSize,
-            encoderState: this.videoEncoder.state,
-          });
+          // apply offset BEFORE any audio arrives
+          if (this.muxer)
+            this.muxer.setAudioOffset(this.videoTimestampOffsetUs);
 
-          // encode resized frame; timestamp comes from frame.timestamp
-          this.videoEncoder.encode(resized, {
-            keyFrame: needsKey,
-          });
-
-          this.frameCount++;
-        } catch (err) {
-          console.error("[WCR] video encode error", err);
-          this.options.onError?.(err);
-          resized.close();
-          frame.close();
-          break;
+          // initialize audio encoder now that baseline exists
+          if (!this.audioEncoder && this._pendingAudioConfig) {
+            console.log("[WCR] initAudioEncoder AFTER first video frame");
+            await this.initAudioEncoder(this._pendingAudioConfig);
+            await Promise.resolve(); // flush any encoder microtasks
+            // flush prebuffered audio
+            for (const buf of this._prebufferedAudio) {
+              this.audioEncoder.encode(buf);
+              buf.close?.();
+            }
+            this._prebufferedAudio.length = 0;
+            this._audioReady = true;
+          }
         }
+
+        // Force first-frame keyframe
+        const needsKey =
+          this.frameCount === 0 ||
+          this.justResumed ||
+          this.firstVideoFrame === true;
+        this.justResumed = false;
+
+        this.videoEncoder.encode(resized, { keyFrame: needsKey });
+
+        this.frameCount++;
 
         resized.close();
         frame.close();
@@ -543,7 +625,11 @@ export class WebCodecsRecorder {
   }
 
   async readAudioLoop() {
-    if (!this.audioReader || !this.audioEncoder) return;
+    while (this.paused && this.running) {
+      await new Promise((r) => setTimeout(r, 10));
+    }
+
+    if (!this.audioReader) return; // ❗ remove audioEncoder requirement
 
     console.log("[WCR] audio loop starting");
 
@@ -551,12 +637,17 @@ export class WebCodecsRecorder {
       const { value: audioData, done } = await this.audioReader
         .read()
         .catch(() => ({ done: true }));
+
       if (done || !audioData) {
         console.log("[WCR] audio loop done or no audio", done, audioData);
         break;
       }
 
-      console.log("[WCR] got AUDIO FRAME", audioData);
+      if (!this._audioReady) {
+        // buffer raw audio frames until video baseline is known
+        this._prebufferedAudio.push(audioData);
+        continue;
+      }
 
       try {
         this.audioEncoder.encode(audioData);

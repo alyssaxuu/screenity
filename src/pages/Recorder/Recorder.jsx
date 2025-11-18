@@ -370,7 +370,18 @@ const Recorder = () => {
           },
         });
 
-        await recorder.current.start();
+        const ok = await recorder.current.start();
+
+        if (!ok) {
+          console.error(
+            "[RECORDER] WebCodecs start failed — falling back to MediaRecorder."
+          );
+          useWebCodecs.current = false;
+          recorder.current = null;
+
+          // fall back into MediaRecorder path
+          return await startRecording();
+        }
       } else {
         // 🔁 Fallback to MediaRecorder (current behavior)
         useWebCodecs.current = false;
@@ -461,6 +472,51 @@ const Recorder = () => {
       });
       sendStopRecording();
     };
+  }
+
+  async function warmUpStream(liveStream) {
+    const videoTrack = liveStream.getVideoTracks()[0];
+    const audioTrack = liveStream.getAudioTracks()[0];
+
+    // 1) Probe video track for a real frame
+    await new Promise(async (resolve) => {
+      const proc = new MediaStreamTrackProcessor({ track: videoTrack });
+      const reader = proc.readable.getReader();
+
+      while (true) {
+        const { value: frame } = await reader.read();
+        if (frame) {
+          if (frame.codedWidth > 0 && frame.codedHeight > 0) {
+            frame.close();
+            reader.releaseLock();
+            resolve();
+            break;
+          }
+          frame.close();
+        }
+      }
+    });
+
+    // 2) Probe audio track for real samples
+    if (audioTrack) {
+      await new Promise(async (resolve) => {
+        const proc = new MediaStreamTrackProcessor({ track: audioTrack });
+        const reader = proc.readable.getReader();
+
+        while (true) {
+          const { value: audio } = await reader.read();
+          if (audio && audio.numberOfFrames > 0) {
+            audio.close?.();
+            reader.releaseLock();
+            resolve();
+            break;
+          }
+          audio?.close?.();
+        }
+      });
+    }
+
+    console.log("[warmUp] audio + video tracks are now stable");
   }
 
   async function stopRecording() {
@@ -736,6 +792,9 @@ const Recorder = () => {
     // Send message to go back to the previously active tab
     setStarted(true);
 
+    // after helperVideoStream & helperAudioStream are resolved:
+    await warmUpStream(liveStream.current);
+
     chrome.runtime.sendMessage({ type: "reset-active-tab" });
   }
 
@@ -843,17 +902,21 @@ const Recorder = () => {
       } else if (request.type === "pause-recording-tab") {
         if (!recorder.current) return;
         if (
-          !useWebCodecs.current &&
-          recorder.current instanceof MediaRecorder
+          useWebCodecs.current &&
+          recorder.current instanceof WebCodecsRecorder
         ) {
+          recorder.current.pause();
+        } else if (recorder.current instanceof MediaRecorder) {
           recorder.current.pause();
         }
       } else if (request.type === "resume-recording-tab") {
         if (!recorder.current) return;
         if (
-          !useWebCodecs.current &&
-          recorder.current instanceof MediaRecorder
+          useWebCodecs.current &&
+          recorder.current instanceof WebCodecsRecorder
         ) {
+          recorder.current.resume();
+        } else if (recorder.current instanceof MediaRecorder) {
           recorder.current.resume();
         }
       } else if (request.type === "dismiss-recording") {

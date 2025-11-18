@@ -46,6 +46,7 @@ export class Mp4MuxerWrapper {
   private audioTimestampOffsetUs: number | null = null;
   private lastVideoTimestampUs = 0;
   private lastAudioTimestampUs = 0;
+	private pausedOffsetUs: number;
 
   private started = false;
 
@@ -55,6 +56,7 @@ export class Mp4MuxerWrapper {
     this.target = new BufferTarget();
     this.videoCodec = options.videoCodec || "avc";
     this.audioCodec = options.audioCodec || "aac";
+this.pausedOffsetUs = 0;
 
     const minFragmentDuration = Math.max(
       0.2,
@@ -141,6 +143,14 @@ export class Mp4MuxerWrapper {
     }
   }
 
+	setPausedOffset(offsetUs: number) {
+  	this.pausedOffsetUs = offsetUs;
+	}
+
+	setAudioOffset(offsetUs: number) {
+  	this.audioTimestampOffsetUs = offsetUs;
+	}
+
   private emitHeaderIfReady() {
     if (this.headerEmitted || !this.ftypChunk || !this.moovChunk) {
       return;
@@ -199,31 +209,42 @@ export class Mp4MuxerWrapper {
       durationSeconds
     );
   }
+private normalizeSampleTimestamp(
+  kind: "video" | "audio",
+  timestampUs?: number,
+  durationUs: number = 0
+) {
+  const offsetKey =
+    kind === "video" ? "videoTimestampOffsetUs" : "audioTimestampOffsetUs";
+  const lastKey =
+    kind === "video" ? "lastVideoTimestampUs" : "lastAudioTimestampUs";
 
-  private normalizeSampleTimestamp(
-    kind: "video" | "audio",
-    timestampUs?: number,
-    durationUs: number = 0
-  ) {
-    const offsetKey =
-      kind === "video" ? "videoTimestampOffsetUs" : "audioTimestampOffsetUs";
-    const lastKey =
-      kind === "video" ? "lastVideoTimestampUs" : "lastAudioTimestampUs";
-
-    if (typeof timestampUs !== "number") {
-      const next = (this[lastKey] || 0) + durationUs;
-      this[lastKey] = next;
-      return next;
-    }
-
-    if (this[offsetKey] === null) {
-      this[offsetKey] = timestampUs;
-    }
-
-    const relative = Math.max(0, timestampUs - (this[offsetKey] || 0));
-    this[lastKey] = relative;
-    return relative;
+  // Fallback when encoder doesn’t give timestamps
+  if (typeof timestampUs !== "number") {
+    const next = (this as any)[lastKey] + durationUs || durationUs;
+    (this as any)[lastKey] = next;
+    return next;
   }
+
+  let baseOffset = (this as any)[offsetKey] as number | null;
+
+  // If we explicitly set an audio offset, prefer that
+  if (kind === "audio" && this.audioTimestampOffsetUs != null) {
+    baseOffset = this.audioTimestampOffsetUs;
+  } else if (baseOffset == null) {
+    // First sample for this track: establish base offset
+    baseOffset = timestampUs;
+    (this as any)[offsetKey] = baseOffset;
+  }
+
+  const relative = Math.max(
+    0,
+    timestampUs - baseOffset - this.pausedOffsetUs
+  );
+
+  (this as any)[lastKey] = relative;
+  return relative;
+}
 
   private normalizeFragmentTimestamp(timestampSeconds: number | null | undefined) {
     if (timestampSeconds == null) {
