@@ -5,6 +5,8 @@ import { createMediaRecorder } from "./mediaRecorderUtils";
 import { sendRecordingError, sendStopRecording } from "./messaging";
 import { getBitrates, getResolutionForQuality } from "./recorderConfig";
 
+import { WebCodecsRecorder } from "./webcodecs/WebCodecsRecorder";
+
 localforage.config({
   driver: localforage.INDEXEDDB,
   name: "screenity",
@@ -15,6 +17,8 @@ localforage.config({
 const chunksStore = localforage.createInstance({
   name: "chunks",
 });
+
+document.body.style.willChange = "contents";
 
 const Recorder = () => {
   const isRestarting = useRef(false);
@@ -44,6 +48,7 @@ const Recorder = () => {
   const audioOutputGain = useRef(null);
 
   const recorder = useRef(null);
+  const useWebCodecs = useRef(false);
 
   const isTab = useRef(false);
   const tabID = useRef(null);
@@ -189,8 +194,10 @@ const Recorder = () => {
     if (recorder.current !== null) return;
 
     navigator.storage.persist();
-    // Check if the stream actually has data in it
-    if (helperVideoStream.current.getVideoTracks().length === 0) {
+    if (
+      !helperVideoStream.current ||
+      helperVideoStream.current.getVideoTracks().length === 0
+    ) {
       sendRecordingError("No video tracks available");
       return;
     }
@@ -205,21 +212,29 @@ const Recorder = () => {
     draining.current = false;
     lowStorageAbort.current = false;
     pendingBytes.current = 0;
+    sentLast.current = false;
+    isFinishing.current = false;
 
-    try {
-      const { qualityValue } = await chrome.storage.local.get(["qualityValue"]);
+    const { qualityValue } = await chrome.storage.local.get(["qualityValue"]);
+    const { audioBitsPerSecond, videoBitsPerSecond } =
+      getBitrates(qualityValue);
 
-      const { audioBitsPerSecond, videoBitsPerSecond } =
-        getBitrates(qualityValue);
+    // Decide if we can use WebCodecs
+    const canUseWebCodecs =
+      typeof VideoEncoder !== "undefined" &&
+      typeof AudioEncoder !== "undefined" &&
+      typeof MediaStreamTrackProcessor !== "undefined";
 
-      recorder.current = createMediaRecorder(liveStream.current, {
-        audioBitsPerSecond,
-        videoBitsPerSecond,
-      });
-    } catch (err) {
-      sendRecordingError(JSON.stringify(err));
-      return;
-    }
+    // Get basic video info
+    const videoTrack = liveStream.current?.getVideoTracks()[0] ?? null;
+    const settings = videoTrack?.getSettings() || {};
+    const width = settings.width ?? 1920;
+    const height = settings.height ?? 1080;
+
+    // fps from storage
+    const { fpsValue } = await chrome.storage.local.get(["fpsValue"]);
+    let fps = parseInt(fpsValue);
+    if (Number.isNaN(fps)) fps = 30;
 
     chrome.storage.local.set({
       recording: true,
@@ -229,34 +244,194 @@ const Recorder = () => {
     isRestarting.current = false;
     index.current = 0;
 
+    // Common "onChunk" handler that uses your existing queue + drain logic
+    // Common "onChunk" handler
+    const handleChunk = async (data, timestampMs) => {
+      // 🔹 WebCodecs path: save directly, no queue, no canFitChunk
+      if (useWebCodecs.current) {
+        const blob =
+          data instanceof Blob ? data : new Blob([data], { type: "video/mp4" });
+
+        const ts = timestampMs ?? 0;
+        const i = index.current;
+
+        console.log(
+          "[RECORDER] WebCodecs handleChunk → index",
+          i,
+          "size",
+          blob.size,
+          "ts",
+          ts
+        );
+
+        try {
+          await chunksStore.setItem(`chunk_${i}`, {
+            index: i,
+            chunk: blob,
+            timestamp: ts,
+          });
+          console.log("[RECORDER] WebCodecs saved chunk_", i);
+          index.current = i + 1;
+          hasChunks.current = true;
+          savedCount.current += 1;
+
+          if (backupRef.current) {
+            chrome.runtime.sendMessage({ type: "write-file", index: i });
+          }
+        } catch (err) {
+          console.error("[RECORDER] WebCodecs saveChunk error", err);
+        }
+
+        return;
+      }
+
+      // 🔹 MediaRecorder path (unchanged)
+      if (lowStorageAbort.current) return;
+
+      const blob =
+        data instanceof Blob ? data : new Blob([data], { type: "video/mp4" });
+
+      const e = {
+        data: blob,
+        timecode: timestampMs ?? 0,
+      };
+
+      if (!hasChunks.current) {
+        hasChunks.current = true;
+        lastTimecode.current = e.timecode;
+        lastSize.current = e.data.size;
+      }
+
+      pending.current.push(e);
+      pendingBytes.current += e.data.size;
+
+      if (pendingBytes.current > MAX_PENDING_BYTES) {
+        try {
+          if (
+            recorder.current instanceof MediaRecorder &&
+            recorder.current.state !== "paused"
+          ) {
+            recorder.current.pause();
+          }
+          await drainQueue();
+          if (
+            recorder.current instanceof MediaRecorder &&
+            recorder.current.state === "paused"
+          ) {
+            recorder.current.resume();
+          }
+        } catch {
+          await drainQueue();
+        }
+      }
+
+      void drainQueue();
+    };
+
     try {
-      recorder.current.start(1000);
+      if (canUseWebCodecs) {
+        // ✅ Use WebCodecs backend
+        useWebCodecs.current = true;
+
+        recorder.current = new WebCodecsRecorder(liveStream.current, {
+          width,
+          height,
+          fps,
+          videoBitrate: videoBitsPerSecond,
+          audioBitrate: audioBitsPerSecond,
+          onFinalized: async () => {
+            console.log("[RECORDER] WebCodecs finalize event → assembling MP4");
+            await assembleAndDownload(); // ⭐ only downloaded here
+          },
+          onChunk: (chunkData, timestampUs) => {
+            // chunkData = Uint8Array from muxer
+            const blob = new Blob([chunkData], { type: "video/mp4" });
+
+            // Convert microseconds → ms (what the rest of your code expects)
+            const timestampMs = timestampUs
+              ? Math.floor(timestampUs / 1000)
+              : 0;
+
+            handleChunk(blob, timestampMs);
+          },
+          onError: (err) => {
+            console.error("[WebCodecsRecorder] error", err);
+            sendRecordingError(String(err));
+          },
+          onStop: async () => {
+            await waitForDrain();
+            if (!sentLast.current) {
+              sentLast.current = true;
+              isFinishing.current = false;
+              chrome.runtime.sendMessage({ type: "video-ready" });
+            }
+          },
+        });
+
+        await recorder.current.start();
+      } else {
+        // 🔁 Fallback to MediaRecorder (current behavior)
+        useWebCodecs.current = false;
+        recorder.current = createMediaRecorder(liveStream.current, {
+          audioBitsPerSecond,
+          videoBitsPerSecond,
+        });
+
+        try {
+          recorder.current.start(1000);
+        } catch (err) {
+          sendRecordingError(
+            "Failed to start recording: " + JSON.stringify(err)
+          );
+          return;
+        }
+
+        recorder.current.onerror = (ev) => {
+          chrome.runtime.sendMessage({
+            type: "recording-error",
+            error: "mediarecorder",
+            why: String(ev?.error || "unknown"),
+          });
+        };
+
+        recorder.current.onstop = async () => {
+          try {
+            recorder.current.requestData();
+          } catch {}
+          if (isRestarting.current) return;
+          await waitForDrain();
+          if (!sentLast.current) {
+            sentLast.current = true;
+            isFinishing.current = false;
+            chrome.runtime.sendMessage({ type: "video-ready" });
+          }
+        };
+
+        recorder.current.ondataavailable = async (e) => {
+          if (!e || !e.data || !e.data.size) {
+            if (
+              recorder.current instanceof MediaRecorder &&
+              recorder.current.state === "inactive"
+            ) {
+              chrome.storage.local.set({
+                recording: false,
+                restarting: false,
+                tabRecordedID: null,
+              });
+              sendStopRecording();
+            }
+            return;
+          }
+
+          await handleChunk(e.data, e.timecode ?? 0);
+        };
+      }
     } catch (err) {
-      sendRecordingError("Failed to start recording: " + JSON.stringify(err));
+      sendRecordingError(JSON.stringify(err));
       return;
     }
 
-    recorder.current.onerror = (ev) => {
-      chrome.runtime.sendMessage({
-        type: "recording-error",
-        error: "mediarecorder",
-        why: String(ev?.error || "unknown"),
-      });
-    };
-
-    recorder.current.onstop = async () => {
-      try {
-        recorder.current?.requestData();
-      } catch {}
-      if (isRestarting.current) return;
-      await waitForDrain();
-      if (!sentLast.current) {
-        sentLast.current = true;
-        isFinishing.current = false;
-        chrome.runtime.sendMessage({ type: "video-ready" });
-      }
-    };
-
+    // Same audio/video track onended logic
     if (helperAudioStream.current) {
       const track = helperAudioStream.current.getAudioTracks()[0];
       if (track) {
@@ -266,80 +441,6 @@ const Recorder = () => {
         };
       }
     }
-
-    const checkMaxMemory = () => {
-      try {
-        navigator.storage.estimate().then(({ usage = 0, quota = 0 }) => {
-          const remaining = quota - usage;
-          const minHeadroom = 25 * 1024 * 1024;
-          if (remaining < minHeadroom) {
-            chrome.storage.local.set({
-              recording: false,
-              restarting: false,
-              tabRecordedID: null,
-              memoryError: true,
-            });
-            sendStopRecording();
-          }
-        });
-      } catch (err) {
-        sendRecordingError(
-          "Failed to check available memory: " + JSON.stringify(err)
-        );
-      }
-    };
-
-    recorder.current.ondataavailable = async (e) => {
-      if (!e || !e.data || !e.data.size) {
-        if (recorder.current && recorder.current.state === "inactive") {
-          chrome.storage.local.set({
-            recording: false,
-            restarting: false,
-            tabRecordedID: null,
-          });
-          sendStopRecording();
-        }
-        return;
-      }
-
-      if (lowStorageAbort.current) return;
-
-      if (!hasChunks.current) {
-        hasChunks.current = true;
-        lastTimecode.current = e.timecode ?? 0;
-        lastSize.current = e.data.size;
-      }
-
-      // push chunk
-      pending.current.push(e);
-      pendingBytes.current += e.data.size;
-
-      if (pendingBytes.current > MAX_PENDING_BYTES) {
-        try {
-          if (recorder.current.state !== "paused") {
-            recorder.current.pause();
-          }
-          await drainQueue();
-          if (recorder.current.state === "paused") {
-            recorder.current.resume();
-          }
-        } catch {
-          // fallback: force drain without pausing
-          await drainQueue();
-        }
-      }
-
-      void drainQueue();
-    };
-
-    recorder.current.onpause = () => {
-      lastTimecode.current = 0;
-      lastSize.current = 0;
-    };
-    recorder.current.onresume = () => {
-      lastTimecode.current = 0;
-      lastSize.current = 0;
-    };
 
     liveStream.current.getVideoTracks()[0].onended = () => {
       chrome.storage.local.set({
@@ -360,16 +461,53 @@ const Recorder = () => {
     };
   }
 
+  async function assembleAndDownload() {
+    const keys = await chunksStore.keys();
+    const items = await Promise.all(keys.map((k) => chunksStore.getItem(k)));
+    const ordered = items.sort((a, b) => a.index - b.index);
+
+    const blob = new Blob(
+      ordered.map((o) => o.chunk),
+      {
+        type: "video/mp4",
+      }
+    );
+
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "recording.mp4";
+    a.click();
+
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+
+    console.log(
+      "[RECORDER] Auto-downloaded recording.mp4",
+      ordered.length,
+      "chunks"
+    );
+  }
+
   async function stopRecording() {
+    if (isFinishing.current) {
+      console.log("[RECORDER] stopRecording ignored (already running)");
+      return;
+    }
     isFinishing.current = true;
 
     try {
-      recorder.current?.requestData();
-    } catch {}
-
-    try {
-      if (recorder.current && recorder.current.state !== "inactive") {
-        recorder.current.stop();
+      if (
+        useWebCodecs.current &&
+        recorder.current instanceof WebCodecsRecorder
+      ) {
+        await recorder.current.stop();
+      } else if (recorder.current instanceof MediaRecorder) {
+        try {
+          recorder.current.requestData();
+        } catch {}
+        if (recorder.current.state !== "inactive") {
+          recorder.current.stop();
+        }
       }
     } catch {}
 
@@ -529,8 +667,11 @@ const Recorder = () => {
           mandatory: {
             chromeMediaSource: isTab.current ? "tab" : "desktop",
             chromeMediaSourceId: id,
-            maxWidth: width,
-            maxHeight: height,
+            // FLAG: try ideal + max to enforce exact resolution
+            // maxWidth: width,
+            // maxHeight: height,
+            // width: { ideal: width, max: width },
+            // height: { ideal: height, max: height },
             maxFrameRate: fps,
           },
         },
@@ -726,10 +867,20 @@ const Recorder = () => {
         setAudioOutputVolume(request.volume);
       } else if (request.type === "pause-recording-tab") {
         if (!recorder.current) return;
-        recorder.current.pause();
+        if (
+          !useWebCodecs.current &&
+          recorder.current instanceof MediaRecorder
+        ) {
+          recorder.current.pause();
+        }
       } else if (request.type === "resume-recording-tab") {
         if (!recorder.current) return;
-        recorder.current.resume();
+        if (
+          !useWebCodecs.current &&
+          recorder.current instanceof MediaRecorder
+        ) {
+          recorder.current.resume();
+        }
       } else if (request.type === "dismiss-recording") {
         dismissRecording();
       }
