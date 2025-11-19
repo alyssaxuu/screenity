@@ -1,8 +1,30 @@
 import { base64ToUint8Array } from "../utils/base64ToUint8Array";
 import { sendMessageTab } from "../tabManagement";
 import signIn from "../modules/signIn";
+import { chunksStore } from "../recording/chunkHandler";
 
-const findOrCreateScreenityFolder = async (token: any): Promise<any> => {
+interface DriveUploadResponse {
+  status: "ok" | "ew";
+  url: string | null;
+  error?: string;
+}
+
+interface SaveToDriveRequest {
+  base64?: string;
+  title: string;
+}
+
+interface TokenPayload {
+  exp: number;
+  [key: string]: any;
+}
+
+interface ChunkData {
+  timestamp: number;
+  chunk: Blob;
+}
+
+const findOrCreateScreenityFolder = async (token: string): Promise<string> => {
   const headers = new Headers({
     Authorization: `Bearer ${token}`,
     "Content-Type": "application/json",
@@ -49,9 +71,9 @@ const getAuthTokenFromStorage = async (): Promise<string> => {
         return;
       }
 
-      let payload: { exp: number; [key: string]: any };
+      let payload: TokenPayload;
       try {
-        payload = JSON.parse(atob(token.split(".")[1])) as { exp: number; [key: string]: any };
+        payload = JSON.parse(atob(token.split(".")[1])) as TokenPayload;
       } catch {
         // Token is invalid, sign in again
         const newToken = await signIn();
@@ -73,7 +95,10 @@ const getAuthTokenFromStorage = async (): Promise<string> => {
   });
 };
 
-const saveToDrive = async (videoBlob: Blob, fileName: string): Promise<DriveUploadResponse> => {
+const saveToDrive = async (
+  videoBlob: Blob,
+  fileName: string
+): Promise<DriveUploadResponse> => {
   try {
     const token = await getAuthTokenFromStorage();
     if (!token) throw new Error("Sign-in failed");
@@ -134,14 +159,18 @@ const saveToDrive = async (videoBlob: Blob, fileName: string): Promise<DriveUplo
 
     return { status: "ok", url: fileId };
   } catch (error) {
-    console.error("Error uploading to Google Drive:", error.message);
-    return { status: "ew", url: null };
+    const err = error instanceof Error ? error : new Error(String(error));
+    console.error("Error uploading to Google Drive:", err.message);
+    return { status: "ew", url: null, error: err.message };
   }
 };
 
-const savedToDrive = async (): Promise<any> => {
-  const { sandboxTab } = await chrome.storage.local.get(["sandboxTab"]);
-  sendMessageTab(sandboxTab, { type: "saved-to-drive" });
+const savedToDrive = async (): Promise<void> => {
+  const result = await chrome.storage.local.get(["sandboxTab"]);
+  const sandboxTab = result.sandboxTab as number | undefined;
+  if (sandboxTab) {
+    sendMessageTab(sandboxTab, { type: "saved-to-drive" });
+  }
 };
 
 export const handleSaveToDrive = async (
@@ -152,14 +181,16 @@ export const handleSaveToDrive = async (
     let response;
 
     if (!fallback) {
-      const blob = base64ToUint8Array(request.base64);
+      const blob = base64ToUint8Array(request.base64 as string);
       const fileName = request.title + ".mp4";
       response = await saveToDrive(blob, fileName);
     } else {
-      const chunks = [];
-      await chunksStore.iterate((value) => chunks.push(value));
+      const chunks: ChunkData[] = [];
+      await chunksStore.iterate((value: ChunkData) => {
+        chunks.push(value);
+      });
 
-      let array = [];
+      const array: Blob[] = [];
       let lastTimestamp = 0;
       for (const chunk of chunks) {
         if (chunk.timestamp < lastTimestamp) continue;
@@ -172,10 +203,32 @@ export const handleSaveToDrive = async (
       response = await saveToDrive(blob, fileName);
     }
 
-    await savedToDrive();
+    if (response.status === "ok") {
+      await savedToDrive();
+    } else {
+      // Notify UI of error
+      const result = await chrome.storage.local.get(["sandboxTab"]);
+      const sandboxTab = result.sandboxTab as number | undefined;
+      if (sandboxTab) {
+        sendMessageTab(sandboxTab, {
+          type: "save-drive-error",
+          error: response.error || "Upload failed",
+        });
+      }
+    }
+
     return response;
   } catch (err) {
-    console.error("handleSaveToDrive failed:", err);
+    const error = err instanceof Error ? err : new Error(String(err));
+    console.error("handleSaveToDrive failed:", error);
+    const result = await chrome.storage.local.get(["sandboxTab"]);
+    const sandboxTab = result.sandboxTab as number | undefined;
+    if (sandboxTab) {
+      sendMessageTab(sandboxTab, {
+        type: "save-drive-error",
+        error: error.message || "Unknown error",
+      });
+    }
     return { status: "ew", url: null };
   }
 };

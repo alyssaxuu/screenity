@@ -7,14 +7,7 @@ import { sendMessageTab, focusTab } from "../tabManagement";
 export const onTabRemovedListener = () => {
   chrome.tabs.onRemoved.addListener(async (tabId) => {
     try {
-      const {
-        region,
-        customRegion,
-        recording,
-        restarting,
-        recordingTab,
-        tabRecordedID,
-      } = await chrome.storage.local.get([
+      const result = await chrome.storage.local.get([
         "region",
         "customRegion",
         "recording",
@@ -22,6 +15,12 @@ export const onTabRemovedListener = () => {
         "recordingTab",
         "tabRecordedID",
       ]);
+      const region = result.region as boolean | undefined;
+      const customRegion = result.customRegion as boolean | undefined;
+      const recording = result.recording as boolean | undefined;
+      const restarting = result.restarting as boolean | undefined;
+      const recordingTab = result.recordingTab as number | undefined;
+      const tabRecordedID = result.tabRecordedID as number | undefined;
 
       const isRegionMode = region || customRegion;
       const recordedTabId = tabRecordedID || recordingTab;
@@ -33,7 +32,8 @@ export const onTabRemovedListener = () => {
         // Clear reference to the removed tab
         chrome.storage.local.set({ recordingTab: null, tabRecordedID: null });
 
-        const { activeTab } = await chrome.storage.local.get(["activeTab"]);
+        const activeResult = await chrome.storage.local.get(["activeTab"]);
+        const activeTab = activeResult.activeTab as number | undefined;
 
         try {
           if (activeTab) {
@@ -46,7 +46,8 @@ export const onTabRemovedListener = () => {
         chrome.action.setIcon({ path: "assets/icon-34.png" });
       }
     } catch (error) {
-      console.error("Error handling tab removal:", error.message);
+      const err = error instanceof Error ? error : new Error(String(error));
+      console.error("Error handling tab removal:", err.message);
     }
   });
 };

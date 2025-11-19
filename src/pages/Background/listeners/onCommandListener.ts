@@ -2,8 +2,12 @@ import { sendMessageTab, getCurrentTab } from "../tabManagement";
 
 // Main command listener
 export const onCommandListener = () => {
-  chrome.commands.onCommand.addListener(async (command) => {
+  chrome.commands.onCommand.addListener(async (command: string) => {
     const activeTab = await getCurrentTab();
+
+    if (!activeTab || !activeTab.url || !activeTab.id) {
+      return;
+    }
 
     if (command === "start-recording") {
       // Validate if it's possible to inject into content
@@ -29,17 +33,22 @@ export const onCommandListener = () => {
             active: true,
           })
           .then((tab) => {
-            chrome.storage.local.set({ activeTab: tab.id });
+            if (tab.id) {
+              chrome.storage.local.set({ activeTab: tab.id });
 
-            // Wait for the tab to load
-            chrome.tabs.onUpdated.addListener(function _(tabId, changeInfo) {
-              if (tabId === tab.id && changeInfo.status === "complete") {
-                setTimeout(() => {
-                  sendMessageTab(tab.id, { type: "start-stream" });
-                }, 500);
-                chrome.tabs.onUpdated.removeListener(_);
-              }
-            });
+              // Wait for the tab to load
+              chrome.tabs.onUpdated.addListener(function _(
+                tabId: number,
+                changeInfo: chrome.tabs.TabChangeInfo | undefined
+              ) {
+                if (tabId === tab.id && changeInfo.status === "complete" && tab.id) {
+                  setTimeout(() => {
+                    sendMessageTab(tab.id!, { type: "start-stream" });
+                  }, 500);
+                  chrome.tabs.onUpdated.removeListener(_);
+                }
+              });
+            }
           });
       }
     } else if (command === "cancel-recording") {

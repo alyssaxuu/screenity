@@ -69,7 +69,8 @@ export const onInstalledListener = () => {
 
     chrome.storage.local.set({ systemAudio: true });
 
-    const { backupTab } = await chrome.storage.local.get(["backupTab"]);
+    const backupResult = await chrome.storage.local.get(["backupTab"]);
+    const backupTab = backupResult.backupTab as number | undefined;
     if (backupTab) {
       removeTab(backupTab);
     }

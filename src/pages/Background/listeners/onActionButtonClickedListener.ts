@@ -7,15 +7,21 @@ const CLOUD_FEATURES_ENABLED =
   process.env.SCREENITY_ENABLE_CLOUD_FEATURES === "true";
 
 // Utility to handle tab messaging logic
-const handleTabMessaging = async (tab: any): Promise<any> => {
-  const { activeTab } = await chrome.storage.local.get(["activeTab"]);
+const handleTabMessaging = async (tab: chrome.tabs.Tab): Promise<void> => {
+  const result = await chrome.storage.local.get(["activeTab"]);
+  const activeTab = result.activeTab as number | undefined;
 
   try {
-    const targetTab = await chrome.tabs.get(activeTab);
+    if (activeTab) {
+      const targetTab = await chrome.tabs.get(activeTab);
 
-    if (targetTab) {
-      sendMessageTab(activeTab, { type: "stop-recording-tab" });
-    } else {
+      if (targetTab) {
+        sendMessageTab(activeTab, { type: "stop-recording-tab" });
+      } else if (tab.id) {
+        sendMessageTab(tab.id, { type: "stop-recording-tab" });
+        chrome.storage.local.set({ activeTab: tab.id });
+      }
+    } else if (tab.id) {
       sendMessageTab(tab.id, { type: "stop-recording-tab" });
       chrome.storage.local.set({ activeTab: tab.id });
     }
@@ -92,11 +98,11 @@ const openPlaygroundOrPopup = async (tab: any): Promise<any> => {
     });
     chrome.storage.local.set({ activeTab: newTab.id });
 
-    const onUpdated = (tabId, changeInfo, updatedTab: any) => {
-      if (updatedTab.id === newTab.id && changeInfo.status === "complete") {
+    const onUpdated = (tabId: number, changeInfo: chrome.tabs.TabChangeInfo | undefined, updatedTab: chrome.tabs.Tab) => {
+      if (updatedTab.id === newTab.id && changeInfo.status === "complete" && newTab.id) {
         chrome.tabs.onUpdated.removeListener(onUpdated);
         setTimeout(() => {
-          sendMessageTab(newTab.id, { type: "toggle-popup" });
+          sendMessageTab(newTab.id!, { type: "toggle-popup" });
         }, 500);
       }
     };
@@ -108,7 +114,8 @@ const openPlaygroundOrPopup = async (tab: any): Promise<any> => {
 export const onActionButtonClickedListener = () => {
   chrome.action.onClicked.addListener(async (tab) => {
     try {
-      const { recording } = await chrome.storage.local.get(["recording"]);
+      const recordingResult = await chrome.storage.local.get(["recording"]);
+      const recording = recordingResult.recording as boolean | undefined;
 
       if (recording) {
         stopRecording();
@@ -124,11 +131,14 @@ export const onActionButtonClickedListener = () => {
         await openPlaygroundOrPopup(tab);
       }
 
-      const { firstTime } = await chrome.storage.local.get(["firstTime"]);
-      if (firstTime && tab.url.includes(chrome.runtime.getURL("setup.html"))) {
+      const firstTimeResult = await chrome.storage.local.get(["firstTime"]);
+      const firstTime = firstTimeResult.firstTime as boolean | undefined;
+      if (firstTime && tab.url && tab.url.includes(chrome.runtime.getURL("setup.html"))) {
         chrome.storage.local.set({ firstTime: false });
         const activeTab = await getCurrentTab();
-        sendMessageTab(activeTab.id, { type: "setup-complete" });
+        if (activeTab && activeTab.id) {
+          sendMessageTab(activeTab.id, { type: "setup-complete" });
+        }
       }
     } catch (error) {
       console.error("Error handling action click:", error);

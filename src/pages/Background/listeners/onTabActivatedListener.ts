@@ -1,7 +1,12 @@
 import { sendMessageTab } from "../tabManagement";
 
+interface TabActiveInfo {
+  tabId: number;
+  windowId: number;
+}
+
 export const handleTabActivation = async (
-  activeInfo: chrome.tabs.TabActiveInfo
+  activeInfo: TabActiveInfo
 ): Promise<void> => {
   try {
     const result = await chrome.storage.local.get(["recordingStartTime"]);
@@ -27,6 +32,7 @@ export const handleTabActivation = async (
       if (tabRecordedID && tabRecordedID !== activeInfo.tabId) {
         sendMessageTab(activeInfo.tabId, { type: "hide-popup-recording" });
       } else if (
+        tab.url &&
         !(
           tab.url.includes("backup.html") &&
           tab.url.includes("chrome-extension://")
@@ -37,11 +43,12 @@ export const handleTabActivation = async (
       }
 
       // Check if it's region or customRegion recording
-      const { region } = await chrome.storage.local.get(["region"]);
-      const { customRegion } = await chrome.storage.local.get(["customRegion"]);
-      const { recordingType } = await chrome.storage.local.get([
-        "recordingType",
-      ]);
+      const regionResult = await chrome.storage.local.get(["region"]);
+      const customRegionResult = await chrome.storage.local.get(["customRegion"]);
+      const typeResult = await chrome.storage.local.get(["recordingType"]);
+      const region = regionResult.region as boolean | undefined;
+      const customRegion = customRegionResult.customRegion as boolean | undefined;
+      const recordingType = typeResult.recordingType as string | undefined;
       if (!region && !customRegion && recordingType !== "region") {
         sendMessageTab(activeInfo.tabId, {
           type: "recording-check",
@@ -54,10 +61,12 @@ export const handleTabActivation = async (
 
     // If there's a recording start time, update the UI with time
     if (recordingStartTime) {
-      const { alarm } = await chrome.storage.local.get(["alarm"]);
+      const alarmResult = await chrome.storage.local.get(["alarm"]);
+      const alarm = alarmResult.alarm as boolean | undefined;
       if (alarm) {
-        const { alarmTime } = await chrome.storage.local.get(["alarmTime"]);
-        const seconds = parseFloat(alarmTime);
+        const timeResult = await chrome.storage.local.get(["alarmTime"]);
+        const alarmTime = timeResult.alarmTime as string | number | undefined;
+        const seconds = parseFloat(String(alarmTime || 0));
         const time = Math.floor((Date.now() - recordingStartTime) / 1000);
         const remaining = seconds - time;
         sendMessageTab(activeInfo.tabId, {
@@ -70,7 +79,8 @@ export const handleTabActivation = async (
       }
     }
   } catch (error) {
-    console.error("Error in handleTabActivation:", error.message);
+    const err = error instanceof Error ? error : new Error(String(error));
+    console.error("Error in handleTabActivation:", err.message);
   }
 };
 

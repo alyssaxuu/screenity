@@ -15,7 +15,7 @@ export const initializeListeners = () => {
   onTabRemovedListener();
   onTabActivatedListener();
   onTabUpdatedListener();
-  onWindowFocusChangedListener();
+  // onWindowFocusChangedListener requires windowId parameter, called from onWindowFocusChanged event
   onActionButtonClickedListener();
   onStartupListener();
   onMessageExternalListener();

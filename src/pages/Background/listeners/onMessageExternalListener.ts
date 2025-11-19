@@ -31,9 +31,8 @@ export const onMessageExternalListener = () => {
           lastAuthCheck: Date.now(),
         });
 
-        const { originalTabId } = await chrome.storage.local.get(
-          "originalTabId"
-        );
+        const tabResult = await chrome.storage.local.get("originalTabId");
+        const originalTabId = tabResult.originalTabId as number | undefined;
 
         if (originalTabId) {
           chrome.tabs.update(originalTabId, { active: true });
@@ -46,10 +45,12 @@ export const onMessageExternalListener = () => {
           await chrome.storage.local.remove("originalTabId");
 
           // Message tab to update from storage
-          sendMessageTab(originalTabId, {
-            type: "check-auth",
-            senderId: sender.tab.id,
-          });
+          if (sender.tab?.id) {
+            sendMessageTab(originalTabId, {
+              type: "check-auth",
+              senderId: sender.tab.id,
+            });
+          }
         }
 
         return true;

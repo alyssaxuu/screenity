@@ -2,7 +2,7 @@ import { sendMessageTab } from "../tabManagement";
 
 export const handleTabUpdate = async (
   tabId: number,
-  changeInfo: chrome.tabs.TabChangeInfo,
+  changeInfo: chrome.tabs.TabChangeInfo | undefined,
   tab: chrome.tabs.Tab
 ): Promise<void> => {
   try {
@@ -34,10 +34,12 @@ export const handleTabUpdate = async (
 
       if (recordingStartTime) {
         // Check if alarm
-        const { alarm } = await chrome.storage.local.get(["alarm"]);
+        const alarmResult = await chrome.storage.local.get(["alarm"]);
+        const alarm = alarmResult.alarm as boolean | undefined;
         if (alarm) {
-          const { alarmTime } = await chrome.storage.local.get(["alarmTime"]);
-          const seconds = parseFloat(alarmTime);
+          const timeResult = await chrome.storage.local.get(["alarmTime"]);
+          const alarmTime = timeResult.alarmTime as string | number | undefined;
+          const seconds = parseFloat(String(alarmTime || 0));
           const time = Math.floor((Date.now() - recordingStartTime) / 1000);
           const remaining = seconds - time;
           sendMessageTab(tabId, {
@@ -59,14 +61,17 @@ export const handleTabUpdate = async (
 
       // Check if tab is playground.html
       if (
+        tab.url &&
         tab.url.includes(chrome.runtime.getURL("playground.html")) &&
-        changeInfo.status === "complete"
+        changeInfo?.status === "complete" &&
+        tab.id
       ) {
         sendMessageTab(tab.id, { type: "toggle-popup" });
       }
     }
   } catch (error) {
-    console.error("Error in handleTabUpdate:", error.message);
+    const err = error instanceof Error ? error : new Error(String(error));
+    console.error("Error in handleTabUpdate:", err.message);
   }
 };
 
