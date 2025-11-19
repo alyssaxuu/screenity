@@ -9,15 +9,20 @@ import { stopRecording } from "./stopRecording";
 import { addAlarmListener } from "../alarms/addAlarmListener";
 import { getStreamingData } from "./getStreamingData";
 import { discardOffscreenDocuments } from "../offscreen/discardOffscreenDocuments";
-interface CheckCapturePermissionsParams {
-  isLoggedIn: boolean;
-  isSubscribed: boolean;
-}
+import type {
+  CheckCapturePermissionsParams,
+  CheckCapturePermissionsResponse,
+} from "../../../types/recording";
+import type {
+  OnGetPermissionsMessage,
+  RecordingErrorMessage,
+  WriteFileMessage,
+} from "../../../types/messaging";
 
 export const checkCapturePermissions = async ({ 
   isLoggedIn, 
   isSubscribed 
-}: CheckCapturePermissionsParams): Promise<{ status: string }> => {
+}: CheckCapturePermissionsParams): Promise<CheckCapturePermissionsResponse> => {
   const permissions = ["desktopCapture", "alarms", "offscreen"];
 
   // Add clipboardWrite and notifications only for subscribed users
@@ -59,9 +64,9 @@ export const handlePip = async (started: boolean = false): Promise<void> => {
   }
 };
 
-import type { ExtensionMessage } from "../../../types/messaging";
+import type { OnGetPermissionsMessage } from "../../../types/messaging";
 
-export const handleOnGetPermissions = async (request: ExtensionMessage): Promise<void> => {
+export const handleOnGetPermissions = async (request: OnGetPermissionsMessage): Promise<void> => {
   // Send a message to (actual) active tab
   const activeTab = await getCurrentTab();
   if (activeTab && activeTab.id) {
@@ -92,7 +97,7 @@ export const handleRecordingComplete = async (): Promise<void> => {
   }
 };
 
-export const handleRecordingError = async (request: ExtensionMessage): Promise<void> => {
+export const handleRecordingError = async (request: RecordingErrorMessage): Promise<void> => {
   const activeResult = await chrome.storage.local.get(["activeTab"]);
   const activeTab = activeResult.activeTab as number | undefined;
 
@@ -101,7 +106,7 @@ export const handleRecordingError = async (request: ExtensionMessage): Promise<v
   sendMessageRecord({ type: "recording-error" }).then(() => {
     sendMessageTab(activeTab, { type: "stop-pending" });
     focusTab(activeTab);
-    const error = (request as any).error;
+    const error = request.error;
     if (error === "stream-error") {
       sendMessageTab(activeTab, { type: "stream-error" });
     } else if (error === "backup-error") {
@@ -135,7 +140,7 @@ export const videoReady = async (): Promise<void> => {
   stopRecording();
 };
 
-export const writeFile = async (request: ExtensionMessage): Promise<void> => {
+export const writeFile = async (request: WriteFileMessage): Promise<void> => {
   const result = await chrome.storage.local.get(["backupTab"]);
   const backupTab = result.backupTab as number | undefined;
 
@@ -144,7 +149,6 @@ export const writeFile = async (request: ExtensionMessage): Promise<void> => {
       backupTab,
       {
         type: "write-file",
-        index: request.index,
       },
       null,
       () => {

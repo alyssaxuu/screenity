@@ -1,14 +1,8 @@
 import { sendMessageTab } from "../tabManagement";
 import { loginWithWebsite } from "../auth/loginWithWebsite";
-import type { ExtensionMessage } from "../../../types/messaging";
+import type { SetSurfaceMessage } from "../../../types/messaging";
 
-interface SetSurfaceRequest {
-  type: string;
-  surface: string;
-  [key: string]: any;
-}
-
-export const setSurface = async (request: SetSurfaceRequest): Promise<void> => {
+export const setSurface = async (request: SetSurfaceMessage): Promise<void> => {
   await chrome.storage.local.set({ surface: request.surface });
 
   const result = await loginWithWebsite();

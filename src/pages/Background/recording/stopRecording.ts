@@ -4,6 +4,7 @@ import { sendMessageRecord } from "./sendMessageRecord";
 import { sendChunks } from "./sendChunks";
 import { waitForContentScript } from "../utils/waitForContentScript";
 import { supportsWebCodecs } from "../utils/featureDetection";
+import type { TabChangeInfo } from "../../../types/tabs";
 
 export const stopRecording = async (): Promise<void> => {
   chrome.action.setIcon({ path: "assets/icon-34.png" });
@@ -42,7 +43,7 @@ export const stopRecording = async (): Promise<void> => {
       if (!tab.id) return;
       chrome.tabs.onUpdated.addListener(function _(
         tabId: number,
-        changeInfo: { status?: string } | undefined,
+        changeInfo: TabChangeInfo | undefined,
         updatedTab: chrome.tabs.Tab
       ) {
         if (tabId === tab.id && changeInfo?.status === "complete" && tab.id) {
@@ -72,7 +73,7 @@ export const stopRecording = async (): Promise<void> => {
       if (!tab.id) return;
       chrome.tabs.onUpdated.addListener(function _(
         tabId: number,
-        changeInfo: { status?: string } | undefined,
+        changeInfo: TabChangeInfo | undefined,
         updatedTab: chrome.tabs.Tab
       ) {
         if (tabId === tab.id && changeInfo?.status === "complete" && tab.id) {
@@ -100,7 +101,7 @@ export const stopRecording = async (): Promise<void> => {
       if (!tab.id) return;
       chrome.tabs.onUpdated.addListener(function _(
         tabId: number,
-        changeInfo: { status?: string } | undefined,
+        changeInfo: TabChangeInfo | undefined,
         updatedTab: chrome.tabs.Tab
       ) {
         if (tabId === tab.id && changeInfo?.status === "complete" && tab.id) {

@@ -1,9 +1,5 @@
 import { handleTabActivation } from "./onTabActivatedListener";
-
-interface TabActiveInfo {
-  tabId: number;
-  windowId?: number;
-}
+import type { TabActiveInfo } from "../../../types/tabs";
 
 export const onWindowFocusChangedListener = async (windowId: number): Promise<void> => {
   if (windowId === chrome.windows.WINDOW_ID_NONE) return;

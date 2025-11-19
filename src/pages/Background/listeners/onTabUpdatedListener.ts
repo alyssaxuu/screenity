@@ -1,8 +1,9 @@
 import { sendMessageTab } from "../tabManagement";
+import type { TabChangeInfo } from "../../../types/tabs";
 
 export const handleTabUpdate = async (
   tabId: number,
-  changeInfo: { status?: string } | undefined,
+  changeInfo: TabChangeInfo | undefined,
   tab: chrome.tabs.Tab
 ): Promise<void> => {
   try {

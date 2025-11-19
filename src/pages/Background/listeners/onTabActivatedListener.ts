@@ -1,9 +1,5 @@
 import { sendMessageTab } from "../tabManagement";
-
-interface TabActiveInfo {
-  tabId: number;
-  windowId: number;
-}
+import type { TabActiveInfo } from "../../../types/tabs";
 
 export const handleTabActivation = async (
   activeInfo: TabActiveInfo

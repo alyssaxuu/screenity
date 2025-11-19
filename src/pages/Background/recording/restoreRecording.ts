@@ -50,9 +50,11 @@ export const restoreRecording = async (): Promise<void> => {
       // Wait for the tab to load before sending messages
       if (tab.id) {
         await new Promise<void>((resolve) => {
+import type { TabChangeInfo } from "../../../types/tabs";
+
           chrome.tabs.onUpdated.addListener(function listener(
             tabId: number,
-            info: { status?: string } | undefined
+            info: TabChangeInfo | undefined
           ) {
             if (info?.status === "complete" && tabId === tab.id && tab.id) {
               chrome.tabs.onUpdated.removeListener(listener);

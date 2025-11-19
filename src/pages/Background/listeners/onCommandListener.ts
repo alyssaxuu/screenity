@@ -1,4 +1,5 @@
 import { sendMessageTab, getCurrentTab } from "../tabManagement";
+import type { TabChangeInfo } from "../../../types/tabs";
 
 // Main command listener
 export const onCommandListener = () => {
@@ -39,7 +40,7 @@ export const onCommandListener = () => {
               // Wait for the tab to load
               chrome.tabs.onUpdated.addListener(function _(
                 tabId: number,
-                changeInfo: { status?: string } | undefined
+                changeInfo: TabChangeInfo | undefined
               ) {
                 if (tabId === tab.id && changeInfo?.status === "complete" && tab.id) {
                   setTimeout(() => {

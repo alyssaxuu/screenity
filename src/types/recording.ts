@@ -57,4 +57,3 @@ export interface CheckCapturePermissionsParams {
 export interface CheckCapturePermissionsResponse {
   status: "ok" | "error";
 }
-

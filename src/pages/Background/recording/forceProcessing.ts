@@ -1,5 +1,6 @@
 import { removeTab } from "../tabManagement";
 import { sendChunks } from "./sendChunks";
+import type { TabChangeInfo } from "../../../types/tabs";
 
 export const forceProcessing = async (): Promise<void> => {
   const editorURL = "editor.html";
@@ -15,7 +16,7 @@ export const forceProcessing = async (): Promise<void> => {
     (tab) => {
       chrome.tabs.onUpdated.addListener(function onTabUpdate(
         tabId: number,
-        changeInfo: { status?: string } | undefined
+        changeInfo: TabChangeInfo | undefined
       ) {
         if (tabId === tab.id && changeInfo?.status === "complete" && tab.id) {
           chrome.tabs.onUpdated.removeListener(onTabUpdate);

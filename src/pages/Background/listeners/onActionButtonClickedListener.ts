@@ -2,6 +2,7 @@ import { sendMessageTab, getCurrentTab } from "../tabManagement";
 import { sendMessageRecord } from '../recording/sendMessageRecord';
 import { stopRecording } from '../recording/stopRecording';
 import { loginWithWebsite } from '../auth/loginWithWebsite';
+import type { TabChangeInfo } from "../../../types/tabs";
 
 const CLOUD_FEATURES_ENABLED =
   process.env.SCREENITY_ENABLE_CLOUD_FEATURES === "true";
@@ -98,7 +99,9 @@ const openPlaygroundOrPopup = async (tab: any): Promise<any> => {
     });
     chrome.storage.local.set({ activeTab: newTab.id });
 
-    const onUpdated = (tabId: number, changeInfo: { status?: string } | undefined, updatedTab: chrome.tabs.Tab) => {
+import type { TabChangeInfo } from "../../../types/tabs";
+
+    const onUpdated = (tabId: number, changeInfo: TabChangeInfo | undefined, updatedTab: chrome.tabs.Tab) => {
       if (updatedTab.id === newTab.id && changeInfo?.status === "complete" && newTab.id) {
         chrome.tabs.onUpdated.removeListener(onUpdated);
         setTimeout(() => {

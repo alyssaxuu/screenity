@@ -2,27 +2,12 @@ import { base64ToUint8Array } from "../utils/base64ToUint8Array";
 import { sendMessageTab } from "../tabManagement";
 import signIn from "../modules/signIn";
 import { chunksStore } from "../recording/chunkHandler";
-
-interface DriveUploadResponse {
-  status: "ok" | "ew";
-  url: string | null;
-  error?: string;
-}
-
-interface SaveToDriveRequest {
-  base64?: string;
-  title: string;
-}
-
-interface TokenPayload {
-  exp: number;
-  [key: string]: any;
-}
-
-interface ChunkData {
-  timestamp: number;
-  chunk: Blob;
-}
+import type {
+  DriveUploadResponse,
+  SaveToDriveRequest,
+  TokenPayload,
+} from "../../../types/drive";
+import type { ChunkData } from "../../../types/recording";
 
 const findOrCreateScreenityFolder = async (token: string): Promise<string> => {
   const headers = new Headers({

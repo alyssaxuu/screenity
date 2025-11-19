@@ -3,6 +3,7 @@ import { sendMessageRecord } from "../recording/sendMessageRecord";
 import { closeOffscreenDocument } from "./closeOffscreenDocument";
 import { loginWithWebsite } from "../auth/loginWithWebsite";
 import type { ExtensionMessage } from "../../../types/messaging";
+import type { TabChangeInfo } from "../../../types/tabs";
 
 const openRecorderTab = async (
   activeTab: chrome.tabs.Tab | undefined,
@@ -50,7 +51,7 @@ const openRecorderTab = async (
 
       chrome.tabs.onUpdated.addListener(function _(
         tabId: number,
-        changeInfo: { status?: string } | undefined
+        changeInfo: TabChangeInfo | undefined
       ) {
         if (tabId === tab.id && changeInfo?.status === "complete") {
           chrome.tabs.onUpdated.removeListener(_);
