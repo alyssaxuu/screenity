@@ -13,7 +13,10 @@ const handlers: Record<string, MessageHandler> = {};
  * @param type - Message type to handle
  * @param handler - Handler function
  */
-export const registerMessage = (type: string, handler: MessageHandler): void => {
+export const registerMessage = (
+  type: string,
+  handler: MessageHandler
+): void => {
   if (handlers[type]) {
     console.warn(
       `⚠️ Handler for ${type} already exists in this context. Skipping.`
@@ -77,10 +80,9 @@ export const messageRouter = (): void => {
         return true;
       }
       // If result is a Promise, return true to keep channel open
-      if (result && typeof result === 'object' && 'then' in result) {
+      if (result && typeof result === "object" && "then" in result) {
         return true;
       }
     }
   );
 };
-
