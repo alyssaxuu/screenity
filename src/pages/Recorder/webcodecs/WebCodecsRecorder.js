@@ -1,4 +1,15 @@
-// extension/webcodecs/WebCodecsRecorder.js
+/*!
+ * Screenity WebCodecs Recorder
+ * Copyright (c) 2025 Serial Labs Ltd.
+ *
+ * This file is part of Screenity and is licensed under the GNU GPLv3.
+ * See the LICENSE file in the project root for details.
+ *
+ * This module implements complex WebCodecs-based recording logic
+ * for video/audio sync, muxing, and safe timestamp management.
+ * If you reuse or modify this file in another project, GPLv3
+ * obligations (including copyleft and attribution) apply.
+ */
 import { Mp4MuxerWrapper } from "./Mp4MuxerWrapper";
 
 export class WebCodecsRecorder {
@@ -157,8 +168,16 @@ export class WebCodecsRecorder {
         const audioConfig = await this.prepareAudioEncoderConfig();
         this._pendingAudioConfig = audioConfig;
 
-        console.log("[WCR] Video config chosen:", videoConfig);
         console.log("[WCR] Audio config:", audioConfig);
+
+        if (!audioConfig) {
+          console.warn(
+            "[WCR] No audio track available — disabling audio in muxer"
+          );
+          this.options.audioBitrate = undefined;
+          this.options.enableAudio = false;
+          this._audioReady = false;
+        }
 
         console.log("[WCR] creating MediaStreamTrackProcessors...");
         this.videoProcessor = new MediaStreamTrackProcessor({
@@ -177,10 +196,9 @@ export class WebCodecsRecorder {
           this.audioReader = null;
         }
 
-        // --- START AUDIO LOOP IMMEDIATELY (BEFORE VIDEO) ---
-        if (this.audioReader) {
+        if (this.audioReader && this.options.enableAudio) {
           console.log("[WCR] starting early audio buffering loop");
-          this.readAudioLoop(); // <-- THIS IS NOW CORRECTLY PLACED
+          this.readAudioLoop();
         }
 
         console.log("[WCR] creating muxer...");
@@ -191,12 +209,12 @@ export class WebCodecsRecorder {
           videoBitrate: this.options.videoBitrate,
           audioBitrate: this.options.audioBitrate,
           videoCodec: videoConfig.containerCodec,
-          audioCodec: audioConfig ? "aac" : undefined,
+          audioCodec: this.options.enableAudio ? "aac" : undefined,
           onChunk: this.options.onChunk,
         });
         console.log("[WCR] muxer created");
 
-        if (audioConfig) {
+        if (this.options.enableAudio) {
           this.muxer.enableAudio();
         }
 
@@ -328,12 +346,10 @@ export class WebCodecsRecorder {
       this.audioEncoder?.close();
     } catch {}
 
-    try {
-      this.videoTrack?.stop();
-    } catch {}
-    try {
-      this.audioTrack?.stop();
-    } catch {}
+    // ❌ DO NOT stop the shared capture tracks here.
+    // The owner (Recorder) decides when to stop/release them.
+    // try { this.videoTrack?.stop(); } catch {}
+    // try { this.audioTrack?.stop(); } catch {}
 
     this.videoProcessor = null;
     this.audioProcessor = null;
@@ -341,6 +357,10 @@ export class WebCodecsRecorder {
     this.audioReader = null;
     this.videoEncoder = null;
     this.audioEncoder = null;
+
+    this.videoTrack = null;
+    this.audioTrack = null;
+
     this.videoTimestampOffsetUs = null;
     this.videoFallbackStartMs = null;
     this.firstVideoFrame = undefined;
@@ -510,6 +530,16 @@ export class WebCodecsRecorder {
 
     // Fallback for browsers without timestamps
     const now = performance.now();
+    if (!this._lastFrameTime) this._lastFrameTime = now;
+    const delta = now - this._lastFrameTime;
+    this._lastFrameTime = now;
+
+    // If encoder falls behind (e.g. >150ms per frame, ~7 FPS)
+    if (delta > 160 && !this._warnedBackpressure) {
+      this._warnedBackpressure = true;
+      console.warn("[WCR] encoding overload detected:", delta, "ms/frame");
+      this.options.onError?.({ type: "encoder-overload", delta });
+    }
     if (this.videoFallbackStartMs === null) {
       this.videoFallbackStartMs = now;
     }
@@ -555,7 +585,18 @@ export class WebCodecsRecorder {
         const { value: frame, done } = await this.videoReader
           .read()
           .catch(() => ({ done: true }));
-        if (done || !frame) break;
+
+        if (done) {
+          console.warn("[WCR] video track ended — stopping");
+          this.options.onError?.({ type: "video-ended" });
+          break;
+        }
+        if (!frame) break;
+
+        if (frame.codedWidth === 0 || frame.codedHeight === 0) {
+          console.warn("[WCR] zero-size video frame — possible track loss");
+          this.options.onError?.({ type: "video-lost" });
+        }
 
         ensureResizeCanvas();
 
@@ -640,6 +681,12 @@ export class WebCodecsRecorder {
 
       if (done || !audioData) {
         console.log("[WCR] audio loop done or no audio", done, audioData);
+        break;
+      }
+
+      if (!this.audioTrack || this.audioTrack.readyState === "ended") {
+        console.warn("[WCR] audio track ended — mic lost");
+        this.options.onError?.({ type: "audio-lost" });
         break;
       }
 

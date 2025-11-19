@@ -1,4 +1,15 @@
-// webcodecs/Mp4MuxerWrapper.ts
+/*!
+ * Screenity WebCodecs Recorder
+ * Copyright (c) 2025 Serial Labs Ltd.
+ *
+ * This file is part of Screenity and is licensed under the GNU GPLv3.
+ * See the LICENSE file in the project root for details.
+ *
+ * This module implements complex WebCodecs-based recording logic
+ * for video/audio sync, muxing, and safe timestamp management.
+ * If you reuse or modify this file in another project, GPLv3
+ * obligations (including copyleft and attribution) apply.
+ */
 // @ts-nocheck
 
 import {
@@ -221,17 +232,21 @@ private normalizeSampleTimestamp(
 
   // Fallback when encoder doesn’t give timestamps
   if (typeof timestampUs !== "number") {
-    const next = (this as any)[lastKey] + durationUs || durationUs;
-    (this as any)[lastKey] = next;
-    return next;
+    const prev = (this as any)[lastKey] ?? 0;
+		const next = prev + durationUs;
+		(this as any)[lastKey] = next;
+		return next;
   }
 
   let baseOffset = (this as any)[offsetKey] as number | null;
 
   // If we explicitly set an audio offset, prefer that
-  if (kind === "audio" && this.audioTimestampOffsetUs != null) {
-    baseOffset = this.audioTimestampOffsetUs;
-  } else if (baseOffset == null) {
+  if (kind === "audio") {
+		if (this.audioTimestampOffsetUs == null) {
+			this.audioTimestampOffsetUs = timestampUs;
+		}
+		baseOffset = this.audioTimestampOffsetUs;
+	} else if (baseOffset == null) {
     // First sample for this track: establish base offset
     baseOffset = timestampUs;
     (this as any)[offsetKey] = baseOffset;

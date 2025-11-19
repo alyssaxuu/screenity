@@ -1,13 +1,15 @@
 import { sendMessageRecord } from "./sendMessageRecord";
-import { removeTab } from "../tabManagement";
 import { resetActiveTabRestart } from "../tabManagement/resetActiveTab";
 
 export const handleRestart = async () => {
   chrome.storage.local.set({ restarting: true });
 
+  sendMessageRecord({ type: "restart-recording-tab" });
+
   resetActiveTabRestart();
 };
 
 export const handleRestartRecordingTab = async (request) => {
-  sendMessageRecord({ type: "restart-recording-tab" });
+  handleRestart();
+  //sendMessageRecord({ type: "restart-recording-tab" });
 };

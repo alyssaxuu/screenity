@@ -67,6 +67,10 @@ const Recorder = () => {
   const MAX_PENDING_BYTES = 8 * 1024 * 1024;
   const pendingBytes = useRef(0);
 
+  const uiClosing = useRef(false);
+
+  const isRecording = useRef(false);
+
   async function canFitChunk(byteLength) {
     const now = performance.now();
     if (now - lastEstimateAt.current < ESTIMATE_INTERVAL_MS) {
@@ -241,6 +245,7 @@ const Recorder = () => {
       restarting: false,
     });
 
+    isRecording.current = true;
     isRestarting.current = false;
     index.current = 0;
 
@@ -525,6 +530,7 @@ const Recorder = () => {
       return;
     }
     isFinishing.current = true;
+    isRecording.current = false;
 
     try {
       if (
@@ -545,38 +551,78 @@ const Recorder = () => {
     await waitForDrain();
     recorder.current = null;
 
-    if (liveStream.current) {
-      liveStream.current.getTracks().forEach((t) => t.stop());
+    // ❗ Only fully release tracks if the user is NOT restarting
+    if (!isRestarting.current) {
+      console.log("[RECORDER] stopRecording(): fully stopping all tracks");
+      liveStream.current?.getTracks().forEach((t) => t.stop());
+      helperVideoStream.current?.getTracks().forEach((t) => t.stop());
+      helperAudioStream.current?.getTracks().forEach((t) => t.stop());
+
       liveStream.current = null;
-    }
-
-    if (helperVideoStream.current) {
-      helperVideoStream.current.getTracks().forEach((t) => t.stop());
       helperVideoStream.current = null;
-    }
-
-    if (helperAudioStream.current) {
-      helperAudioStream.current.getTracks().forEach((t) => t.stop());
       helperAudioStream.current = null;
+    } else {
+      console.log("[RECORDER] stopRecording(): preserving streams for restart");
     }
   }
 
-  const dismissRecording = async () => {
-    isRestarting.current = true;
-    if (recorder.current !== null) {
-      recorder.current.stop();
-      recorder.current = null;
-    }
+  const dismissRecording = () => {
+    uiClosing.current = true;
+    isRecording.current = false;
     window.close();
   };
 
   const restartRecording = async () => {
-    isRestarting.current = true;
-    if (recorder.current !== null) {
-      recorder.current.stop();
+    if (isRestarting.current) {
+      console.warn("[RECORDER] duplicate restart ignored");
+      return;
     }
+    console.log("[RECORDER] restartRecording()");
+
+    isRestarting.current = true;
+    isRecording.current = false;
+    sentLast.current = false;
+    isFinishing.current = false;
+
+    // Stop encoders, but keep tracks alive
+    try {
+      if (
+        useWebCodecs.current &&
+        recorder.current instanceof WebCodecsRecorder
+      ) {
+        recorder.current.running = false;
+        recorder.current.paused = false;
+        await recorder.current.cleanup();
+      } else if (recorder.current instanceof MediaRecorder) {
+        recorder.current.ondataavailable = null;
+        recorder.current.onstop = null;
+        recorder.current.onerror = null;
+        if (recorder.current.state !== "inactive") recorder.current.stop();
+      }
+    } catch (err) {
+      console.warn("[RECORDER] restart stop error", err);
+    }
+
     recorder.current = null;
-    chrome.runtime.sendMessage({ type: "reset-active-tab-restart" });
+
+    // Reset chunks + timestamps
+    pending.current = [];
+    pendingBytes.current = 0;
+    draining.current = false;
+    hasChunks.current = false;
+    savedCount.current = 0;
+    lastSize.current = 0;
+    lastTimecode.current = 0;
+    await chunksStore.clear();
+
+    // ❌ DO NOT start recording here
+    // UI will decide when to start
+    console.log("[RECORDER] ready for restart — waiting for startRecording()");
+
+    // Ensure next start uses WebCodecs cleanly
+    useWebCodecs.current = false;
+
+    isRestarting.current = false;
   };
 
   async function startAudioStream(id) {
@@ -779,6 +825,17 @@ const Recorder = () => {
 
     // Add the tracks to the stream
     liveStream.current.addTrack(helperVideoStream.current.getVideoTracks()[0]);
+
+    const mainVideoTrack = liveStream.current?.getVideoTracks()[0];
+    if (mainVideoTrack) {
+      mainVideoTrack.onmute = () => {
+        console.warn("[RECORDER] video track muted — possible display sleep");
+      };
+      mainVideoTrack.oninactive = () => {
+        console.warn("[RECORDER] video track inactive — auto-stop");
+        stopRecording();
+      };
+    }
     if (
       (helperAudioStream.current != null &&
         helperAudioStream.current.getAudioTracks().length > 0) ||
@@ -858,17 +915,22 @@ const Recorder = () => {
 
   // FLAG: add protection on page close
   useEffect(() => {
-    const handleClose = () => {
-      try {
-        stopRecording();
-      } catch {}
+    const handleClose = (e) => {
+      // OK to close if:
+      if (uiClosing.current || !isRecording.current) return;
+
+      console.warn("[RECORDER] Prevented accidental tab close!");
+
+      // Stop everything immediately but prevent loss
+      stopRecording();
+
+      // Show native "are you sure?" dialog to prevent closing
+      e.preventDefault();
+      e.returnValue = "";
     };
 
-    window.addEventListener("pagehide", handleClose);
     window.addEventListener("beforeunload", handleClose);
-
     return () => {
-      window.removeEventListener("pagehide", handleClose);
       window.removeEventListener("beforeunload", handleClose);
     };
   }, []);
@@ -892,7 +954,11 @@ const Recorder = () => {
       } else if (request.type === "start-recording-tab") {
         startRecording();
       } else if (request.type === "restart-recording-tab") {
-        restartRecording();
+        if (!isRestarting.current) {
+          restartRecording();
+        } else {
+          console.warn("[RECORDER] ignoring duplicate restart request");
+        }
       } else if (request.type === "stop-recording-tab") {
         stopRecording();
       } else if (request.type === "set-mic-active-tab") {
