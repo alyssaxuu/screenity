@@ -9,17 +9,21 @@ export const isPinned = async (): Promise<boolean> => {
   }
 };
 
-export const getPlatformInfo = async (): Promise<chrome.runtime.PlatformInfo | null> => {
-  try {
-    return await chrome.runtime.getPlatformInfo();
-  } catch (error) {
-    const err = error instanceof Error ? error : new Error(String(error));
-    console.error("Failed to retrieve platform info:", err.message);
-    return null;
-  }
-};
+export const getPlatformInfo =
+  async (): Promise<chrome.runtime.PlatformInfo | null> => {
+    try {
+      return await chrome.runtime.getPlatformInfo();
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      console.error("Failed to retrieve platform info:", err.message);
+      return null;
+    }
+  };
 
-export const resizeWindow = async (width: number, height: number): Promise<void> => {
+export const resizeWindow = async (
+  width: number,
+  height: number
+): Promise<void> => {
   if (width === 0 || height === 0) {
     return;
   }

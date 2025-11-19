@@ -1,4 +1,4 @@
-export const closeOffscreenDocument = async (): Promise<any> => {
+export const closeOffscreenDocument = async (): Promise<void> => {
   try {
     const existingContexts = await chrome.runtime.getContexts({});
     const offscreenDocument = existingContexts.find(

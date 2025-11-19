@@ -1,7 +1,7 @@
 /**
  * Closes any active offscreen document if it exists.
  */
-export const discardOffscreenDocuments = async (): Promise<any> => {
+export const discardOffscreenDocuments = async (): Promise<void> => {
   try {
     const existingContexts = await chrome.runtime.getContexts({});
     const offscreenDocument = existingContexts.find(
@@ -12,6 +12,7 @@ export const discardOffscreenDocuments = async (): Promise<any> => {
       await chrome.offscreen.closeDocument();
     }
   } catch (error) {
-    console.error("Failed to discard offscreen documents:", error.message);
+    const err = error instanceof Error ? error : new Error(String(error));
+    console.error("Failed to discard offscreen documents:", err.message);
   }
 };
