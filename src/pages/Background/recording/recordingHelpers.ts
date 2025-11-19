@@ -36,7 +36,7 @@ export const checkCapturePermissions = async ({
   }
 
   const granted = await new Promise<boolean>((resolve) => {
-    chrome.permissions.request({ permissions: permissions as chrome.permissions.Permission[] }, resolve);
+    chrome.permissions.request({ permissions: permissions as chrome.permissions.Permissions }, resolve);
   });
 
   if (granted) {
@@ -64,7 +64,7 @@ import type { ExtensionMessage } from "../../../types/messaging";
 export const handleOnGetPermissions = async (request: ExtensionMessage): Promise<void> => {
   // Send a message to (actual) active tab
   const activeTab = await getCurrentTab();
-  if (activeTab) {
+  if (activeTab && activeTab.id) {
     sendMessageTab(activeTab.id, {
       type: "on-get-permissions",
       data: request,

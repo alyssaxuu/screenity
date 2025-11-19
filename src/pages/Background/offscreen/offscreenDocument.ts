@@ -1,8 +1,7 @@
 import { getCurrentTab } from "../tabManagement";
-import { sendMessageRecord } from "../recording/sendMessageRecord.js";
-import { closeOffscreenDocument } from "./closeOffscreenDocument.js";
-import { loginWithWebsite } from "../auth/loginWithWebsite.js";
-
+import { sendMessageRecord } from "../recording/sendMessageRecord";
+import { closeOffscreenDocument } from "./closeOffscreenDocument";
+import { loginWithWebsite } from "../auth/loginWithWebsite";
 import type { ExtensionMessage } from "../../../types/messaging";
 
 const openRecorderTab = async (
@@ -46,35 +45,37 @@ const openRecorderTab = async (
         region: false,
         wasRegion: true,
         clickEvents: [],
-        ...(isRegion ? { tabRecordedID: activeTab.id } : {}),
+        ...(isRegion && activeTab?.id ? { tabRecordedID: activeTab.id } : {}),
       });
 
-      chrome.tabs.onUpdated.addListener(function _(tabId, changeInfo) {
-        if (tabId === tab.id && changeInfo.status === "complete") {
+      chrome.tabs.onUpdated.addListener(function _(
+        tabId: number,
+        changeInfo: { status?: string } | undefined
+      ) {
+        if (tabId === tab.id && changeInfo?.status === "complete") {
           chrome.tabs.onUpdated.removeListener(_);
           sendMessageRecord({
             type: "loaded",
             request: request,
             backup: backup,
-            ...(isRegion
-              ? {
-                  isTab: true,
-                  tabID: activeTab.id,
-                }
-              : {}),
+        ...(isRegion && activeTab?.id
+          ? {
+              isTab: true,
+              tabID: activeTab.id,
+            }
+          : {}),
           });
         }
       });
     });
 };
 
-import type { ExtensionMessage } from "../../../types/messaging";
-
 export const offscreenDocument = async (
   request: ExtensionMessage,
   tabId: number | null = null
-): Promise<any> => {
-  const { backup } = await chrome.storage.local.get(["backup"]);
+): Promise<void> => {
+  const backupResult = await chrome.storage.local.get(["backup"]);
+  const backup = backupResult.backup as boolean | undefined;
   let activeTab = await getCurrentTab();
 
   if (tabId !== null) {

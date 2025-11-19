@@ -95,7 +95,7 @@ export const setupHandlers = () => {
   registerMessage("restarted", () => restartActiveTab());
 
   registerMessage("new-chunk", (message, sender, sendResponse) => {
-    newChunk(message, sendResponse);
+    newChunk(message, sender, sendResponse);
     return true;
   });
 
@@ -104,9 +104,11 @@ export const setupHandlers = () => {
     async () => await handleGetStreamingData()
   );
   registerMessage("cancel-recording", () => cancelRecording());
-  registerMessage("stop-recording-tab", (message, sendResponse) => {
+  registerMessage("stop-recording-tab", (message, sender, sendResponse) => {
     handleStopRecordingTab(message);
-    sendResponse({ ok: true });
+    if (sendResponse) {
+      sendResponse({ ok: true });
+    }
     return true;
   });
   registerMessage("restart-recording-tab", (message) =>
@@ -121,7 +123,7 @@ export const setupHandlers = () => {
   registerMessage("resume-recording-tab", () =>
     sendMessageRecord({ type: "resume-recording-tab" })
   );
-  registerMessage("set-mic-active-tab", (message) => setMicActiveTab(message));
+  registerMessage("set-mic-active-tab", (message) => setMicActiveTab(message as any));
   registerMessage("recording-error", (message) =>
     handleRecordingError(message)
   );
@@ -204,18 +206,18 @@ export const setupHandlers = () => {
     )
   );
   registerMessage("clear-recordings", () => clearAllRecordings());
-  registerMessage("force-processing", (message) => forceProcessing(message));
-  registerMessage("focus-this-tab", (message, sender) =>
-    focusTab(sender.tab.id)
-  );
+  registerMessage("force-processing", () => forceProcessing());
+  registerMessage("focus-this-tab", (message, sender) => {
+    if (sender.tab?.id) {
+      focusTab(sender.tab.id);
+    }
+  });
   registerMessage("stop-recording-tab-backup", (message) =>
     handleStopRecordingTabBackup(message)
   );
-  registerMessage("indexed-db-download", (message) =>
-    downloadIndexedDB(message)
-  );
+  registerMessage("indexed-db-download", () => downloadIndexedDB());
   registerMessage("get-platform-info", async () => await getPlatformInfo());
-  registerMessage("restore-recording", (message) => restoreRecording(message));
+  registerMessage("restore-recording", () => restoreRecording());
   registerMessage("check-restore", async (message, sender, sendResponse) => {
     const response = await checkRestore();
     sendResponse(response);
@@ -706,7 +708,7 @@ export const setupHandlers = () => {
       if (editorTab) {
         focusTab(editorTab);
       }
-    } else if (message.multiMode) {
+    } else if ((message as any).multiMode) {
       messageTab = (await getCurrentTab())?.id || null;
     } else {
       const result = await chrome.storage.local.get(["editorTab"]);
@@ -721,8 +723,8 @@ export const setupHandlers = () => {
     }
 
     // Only copy once if there's a publicUrl
-    if (message.publicUrl) {
-      copyToClipboard(message.publicUrl);
+    if ((message as any).publicUrl) {
+      copyToClipboard((message as any).publicUrl);
     }
 
     if (messageTab) {
@@ -891,9 +893,12 @@ export const setupHandlers = () => {
     const url = `https://tally.so/r/310MNg?${query.toString()}`;
     createTab(url, true, true);
   });
-  registerMessage("check-banner-support", async (message, sendResponse) => {
-    const { bannerSupport } = await chrome.storage.local.get(["bannerSupport"]);
-    sendResponse({ bannerSupport: Boolean(bannerSupport) });
+  registerMessage("check-banner-support", async (message, sender, sendResponse) => {
+    const result = await chrome.storage.local.get(["bannerSupport"]);
+    const bannerSupport = result.bannerSupport as boolean | undefined;
+    if (sendResponse) {
+      sendResponse({ bannerSupport: Boolean(bannerSupport) });
+    }
     return true;
   });
   registerMessage("hide-banner", async () => {
@@ -903,10 +908,17 @@ export const setupHandlers = () => {
   registerMessage("clear-recording-alarm", async () => {
     await chrome.alarms.clear("recording-alarm");
   });
-  registerMessage("refresh-auth", async () => {
-    if (!CLOUD_FEATURES_ENABLED)
-      return { success: false, message: "Cloud features disabled" };
-    return await loginWithWebsite();
+  registerMessage("refresh-auth", async (message, sender, sendResponse) => {
+    if (!CLOUD_FEATURES_ENABLED) {
+      if (sendResponse) {
+        sendResponse({ success: false, message: "Cloud features disabled" });
+      }
+      return;
+    }
+    const result = await loginWithWebsite();
+    if (sendResponse) {
+      sendResponse(result);
+    }
   });
   registerMessage("sync-recording-state", async (message, sendResponse) => {
     const { recording, paused, recordingStartTime, pendingRecording } =
@@ -916,12 +928,14 @@ export const setupHandlers = () => {
         "recordingStartTime",
         "pendingRecording",
       ]);
-    sendResponse({
-      recording: Boolean(recording),
-      paused: Boolean(paused),
-      recordingStartTime: recordingStartTime || null,
-      pendingRecording: Boolean(pendingRecording),
-    });
+    if (sendResponse) {
+      sendResponse({
+        recording: Boolean(recording),
+        paused: Boolean(paused),
+        recordingStartTime: recordingStartTime || null,
+        pendingRecording: Boolean(pendingRecording),
+      });
+    }
     return true;
   });
 };
