@@ -1,10 +1,12 @@
 import { sendMessageTab } from "../tabManagement";
 import { chunksStore } from "./chunkHandler";
 import { supportsWebCodecs } from "../utils/featureDetection";
+import type { TabChangeInfo } from "../../../types/tabs";
+import type { ChunkData } from "../../../types/recording";
 
-export const checkRestore = async (): Promise<{ restore: boolean; chunks?: any[] }> => {
-  const chunks: any[] = [];
-  await chunksStore.iterate((value: any) => {
+export const checkRestore = async (): Promise<{ restore: boolean; chunks?: ChunkData[] }> => {
+  const chunks: ChunkData[] = [];
+  await chunksStore.iterate((value: ChunkData) => {
     chunks.push(value);
   });
 

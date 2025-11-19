@@ -166,11 +166,26 @@ export interface CreateVideoProjectMessage extends BaseMessage {
 
 export interface FinishMultiRecordingMessage extends BaseMessage {
   type: "finish-multi-recording";
-  projectId: string;
+  projectId?: string;
   sceneId?: string;
   multiMode?: boolean;
   publicUrl?: string;
   newProject?: boolean;
+}
+
+export interface ClickEventMessage extends BaseMessage {
+  type: "click-event";
+  payload: {
+    x: number;
+    y: number;
+    surface: string;
+    region?: boolean;
+    isTab?: boolean;
+  };
+}
+
+export interface GetMonitorForWindowMessage extends BaseMessage {
+  type: "get-monitor-for-window";
 }
 
 export interface FetchVideosMessage extends BaseMessage {
@@ -186,6 +201,16 @@ export interface UpdateProjectLoadingMessage extends BaseMessage {
   multiMode?: boolean;
 }
 
+export interface PrepareOpenEditorMessage extends BaseMessage {
+  type: "prepare-open-editor";
+  url: string;
+}
+
+export interface PrepareEditorExistingMessage extends BaseMessage {
+  type: "prepare-editor-existing";
+  multiMode?: boolean;
+}
+
 export interface UpdateProjectReadyMessage extends BaseMessage {
   type: "update-project-ready";
   share?: boolean;
@@ -198,6 +223,8 @@ export interface EditorReadyMessage extends BaseMessage {
   projectId?: string;
   sceneId?: string;
   multiMode?: boolean;
+  newProject?: boolean;
+  publicUrl?: string;
 }
 
 export interface PreparingRecordingMessage extends BaseMessage {
@@ -397,5 +424,9 @@ export type ExtensionMessage =
   | AvailableMemoryMessage
   | ForceProcessingMessage
   | ClearRecordingsMessage
+  | PrepareOpenEditorMessage
+  | PrepareEditorExistingMessage
+  | ClickEventMessage
+  | GetMonitorForWindowMessage
   | BaseMessage;
 
