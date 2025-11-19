@@ -1,6 +1,9 @@
 import { sendMessageTab } from "../tabManagement";
 
-export const requestDownload = async (base64: string, title: string): Promise<void> => {
+export const requestDownload = async (
+  base64: string,
+  title: string
+): Promise<void> => {
   try {
     // Open a new tab with the download page
     const tab = await chrome.tabs.create({
@@ -9,7 +12,10 @@ export const requestDownload = async (base64: string, title: string): Promise<vo
     });
 
     // Add a listener for when the tab finishes loading
-    const listener = (tabId: number, changeInfo: { status?: string } | undefined) => {
+    const listener = (
+      tabId: number,
+      changeInfo: { status?: string } | undefined
+    ) => {
       if (tabId === tab.id && changeInfo?.status === "complete" && tab.id) {
         chrome.tabs.onUpdated.removeListener(listener);
 
@@ -38,7 +44,10 @@ export const downloadIndexedDB = async (): Promise<void> => {
     });
 
     // Add a listener for when the tab finishes loading
-    const listener = (tabId: number, changeInfo: { status?: string } | undefined) => {
+    const listener = (
+      tabId: number,
+      changeInfo: { status?: string } | undefined
+    ) => {
       if (tabId === tab.id && changeInfo?.status === "complete" && tab.id) {
         chrome.tabs.onUpdated.removeListener(listener);
 
