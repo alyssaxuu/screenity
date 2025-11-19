@@ -67,6 +67,8 @@
     "@babel/plugin-transform-runtime": "^7.27.1",
     "@babel/preset-env": "^7.20.2",
     "@babel/preset-react": "^7.27.1",
+    "@types/chrome": "^0.1.31",
+    "@types/node": "^24.10.1",
     "@types/react": "^18.3.21",
     "@types/react-dom": "^18.3.7",
     "babel-loader": "^9.1.3",
