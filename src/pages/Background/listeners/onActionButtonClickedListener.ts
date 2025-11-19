@@ -98,7 +98,7 @@ const openPlaygroundOrPopup = async (tab: any): Promise<any> => {
     });
     chrome.storage.local.set({ activeTab: newTab.id });
 
-    const onUpdated = (tabId: number, changeInfo: chrome.tabs.TabChangeInfo | undefined, updatedTab: chrome.tabs.Tab) => {
+    const onUpdated = (tabId: number, changeInfo: { status?: string } | undefined, updatedTab: chrome.tabs.Tab) => {
       if (updatedTab.id === newTab.id && changeInfo.status === "complete" && newTab.id) {
         chrome.tabs.onUpdated.removeListener(onUpdated);
         setTimeout(() => {

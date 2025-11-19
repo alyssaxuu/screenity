@@ -60,7 +60,7 @@ const CLOUD_FEATURES_ENABLED =
 export const copyToClipboard = (text: string): void => {
   if (!text) return;
   chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-    if (!tabs.length) return;
+    if (!tabs.length || !tabs[0].id) return;
     const tabId = tabs[0].id;
     chrome.scripting.executeScript({
       target: { tabId },

@@ -44,10 +44,14 @@ export const handleTabActivation = async (
 
       // Check if it's region or customRegion recording
       const regionResult = await chrome.storage.local.get(["region"]);
-      const customRegionResult = await chrome.storage.local.get(["customRegion"]);
+      const customRegionResult = await chrome.storage.local.get([
+        "customRegion",
+      ]);
       const typeResult = await chrome.storage.local.get(["recordingType"]);
       const region = regionResult.region as boolean | undefined;
-      const customRegion = customRegionResult.customRegion as boolean | undefined;
+      const customRegion = customRegionResult.customRegion as
+        | boolean
+        | undefined;
       const recordingType = typeResult.recordingType as string | undefined;
       if (!region && !customRegion && recordingType !== "region") {
         sendMessageTab(activeInfo.tabId, {

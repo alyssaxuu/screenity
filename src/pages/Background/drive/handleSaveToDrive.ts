@@ -224,9 +224,10 @@ export const handleSaveToDrive = async (
     const result = await chrome.storage.local.get(["sandboxTab"]);
     const sandboxTab = result.sandboxTab as number | undefined;
     if (sandboxTab) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
       sendMessageTab(sandboxTab, {
         type: "save-drive-error",
-        error: error.message || "Unknown error",
+        error: errorMessage || "Unknown error",
       });
     }
     return { status: "ew", url: null };
