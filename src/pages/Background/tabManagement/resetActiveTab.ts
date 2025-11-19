@@ -6,13 +6,14 @@ import {
 } from "../recording/startRecording";
 import { getCurrentTab } from "./getCurrentTab";
 
-export const restartActiveTab = async (): Promise<any> => {
+export const restartActiveTab = async (): Promise<void> => {
   try {
     const activeTab = await getCurrentTab();
     if (activeTab && activeTab.id) {
       sendMessageTab(activeTab.id, { type: "ready-to-record" });
 
-      const { countdown } = await chrome.storage.local.get(["countdown"]);
+      const result = await chrome.storage.local.get(["countdown"]);
+      const countdown = result.countdown as boolean | undefined;
       const delay = countdown ? 3500 : 500;
 
       setTimeout(() => {
@@ -30,9 +31,11 @@ export const restartActiveTab = async (): Promise<any> => {
   }
 };
 
-export const resetActiveTab = async (forceRestart : boolean = false): Promise<any> => {
-  const { activeTab } = await chrome.storage.local.get(["activeTab"]);
-  const { surface } = await chrome.storage.local.get(["surface"]);
+export const resetActiveTab = async (forceRestart: boolean = false): Promise<void> => {
+  const activeResult = await chrome.storage.local.get(["activeTab"]);
+  const surfaceResult = await chrome.storage.local.get(["surface"]);
+  const activeTab = activeResult.activeTab as number | undefined;
+  const surface = surfaceResult.surface as string | undefined;
 
   if (forceRestart) {
     return restartActiveTab();
@@ -72,7 +75,8 @@ export const resetActiveTab = async (forceRestart : boolean = false): Promise<an
       if (targetTabId) {
         sendMessageTab(targetTabId, { type: "ready-to-record" });
 
-        const { countdown } = await chrome.storage.local.get(["countdown"]);
+        const countdownResult = await chrome.storage.local.get(["countdown"]);
+        const countdown = countdownResult.countdown as boolean | undefined;
         const delay = countdown ? 3500 : 500;
 
         setTimeout(() => {
@@ -92,9 +96,10 @@ export const resetActiveTab = async (forceRestart : boolean = false): Promise<an
     console.error("No active tab ID stored.");
   }
 
-  async function isRestrictedDomain(tabId) {
+  async function isRestrictedDomain(tabId: number): Promise<boolean> {
     try {
       const tab = await chrome.tabs.get(tabId);
+      if (!tab.url) return false;
       const url = new URL(tab.url);
       return (
         url.hostname.includes("google.com") ||
@@ -108,6 +113,6 @@ export const resetActiveTab = async (forceRestart : boolean = false): Promise<an
   }
 };
 
-export const resetActiveTabRestart = async (): Promise<any> => {
+export const resetActiveTabRestart = async (): Promise<void> => {
   await resetActiveTab(true);
 };

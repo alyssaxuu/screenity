@@ -82,9 +82,8 @@ export const getBrowserCapabilities = (): BrowserCapabilities => {
  * @returns Promise that resolves to true if WebCodecs is supported
  */
 export const supportsWebCodecs = async (): Promise<boolean> => {
-  const { realWebCodecsSupport } = await chrome.storage.local.get(
-    "realWebCodecsSupport"
-  );
+  const result = await chrome.storage.local.get("realWebCodecsSupport");
+  const realWebCodecsSupport = result.realWebCodecsSupport as boolean | undefined;
 
   if (realWebCodecsSupport === true) return true;
 
