@@ -2,9 +2,9 @@ import { sendMessageTab } from "../tabManagement";
 import { chunksStore } from "./chunkHandler";
 import { supportsWebCodecs } from "../utils/featureDetection";
 
-export const checkRestore = async (): Promise<any> => {
-  const chunks = [];
-  await chunksStore.iterate((value, key) => {
+export const checkRestore = async (): Promise<{ restore: boolean; chunks?: any[] }> => {
+  const chunks: any[] = [];
+  await chunksStore.iterate((value: any) => {
     chunks.push(value);
   });
 
@@ -14,7 +14,7 @@ export const checkRestore = async (): Promise<any> => {
   return { restore: true };
 };
 
-export const restoreRecording = async (): Promise<any> => {
+export const restoreRecording = async (): Promise<void> => {
   const hasWebCodecs = supportsWebCodecs();
 
   let editorUrl, messageType;
@@ -47,20 +47,25 @@ export const restoreRecording = async (): Promise<any> => {
       chrome.storage.local.set({ sandboxTab: tab.id });
 
       // Wait for the tab to load before sending messages
-      await new Promise((resolve) => {
-        chrome.tabs.onUpdated.addListener(function listener(tabId, info) {
-          if (info.status === "complete" && tabId === tab.id) {
-            chrome.tabs.onUpdated.removeListener(listener);
+      if (tab.id) {
+        await new Promise<void>((resolve) => {
+          chrome.tabs.onUpdated.addListener(function listener(
+            tabId: number,
+            info: chrome.tabs.TabChangeInfo
+          ) {
+            if (info.status === "complete" && tabId === tab.id && tab.id) {
+              chrome.tabs.onUpdated.removeListener(listener);
 
-            setTimeout(() => {
-              sendMessageTab(tab.id, {
-                type: messageType,
-              });
-              resolve();
-            }, 2000);
-          }
+              setTimeout(() => {
+                sendMessageTab(tab.id!, {
+                  type: messageType,
+                });
+                resolve();
+              }, 2000);
+            }
+          });
         });
-      });
+      }
     }
   );
 };

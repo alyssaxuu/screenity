@@ -3,9 +3,13 @@ import { initBackup } from "../backup/initBackup";
 import { offscreenDocument } from "../offscreen/offscreenDocument";
 import { localDirectoryStore } from "./chunkHandler";
 
-export const desktopCapture = async (request: any): Promise<any> => {
-  const { backup } = await chrome.storage.local.get(["backup"]);
-  const { backupSetup } = await chrome.storage.local.get(["backupSetup"]);
+import type { ExtensionMessage } from "../../../types/messaging";
+
+export const desktopCapture = async (request: ExtensionMessage): Promise<void> => {
+  const backupResult = await chrome.storage.local.get(["backup"]);
+  const setupResult = await chrome.storage.local.get(["backupSetup"]);
+  const backup = backupResult.backup as boolean | undefined;
+  const backupSetup = setupResult.backupSetup as boolean | undefined;
 
   // Ensure that chunk sending is marked as not in progress
   chrome.storage.local.set({ sendingChunks: false });
@@ -18,7 +22,9 @@ export const desktopCapture = async (request: any): Promise<any> => {
 
     // Get the current active tab and initialize backup
     const activeTab = await getCurrentTab();
-    initBackup(request, activeTab.id);
+    if (activeTab && activeTab.id) {
+      initBackup(request, activeTab.id);
+    }
   } else {
     // Proceed with offscreen document creation
     offscreenDocument(request);

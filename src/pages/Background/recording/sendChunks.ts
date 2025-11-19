@@ -1,10 +1,10 @@
 import { chunksStore } from "./chunkHandler";
 import { handleChunks } from "./chunkHandler";
 
-export const sendChunks = async (override : boolean = false): Promise<any> => {
+export const sendChunks = async (override: boolean = false): Promise<void> => {
   try {
-    const chunks = [];
-    await chunksStore.iterate((value) => {
+    const chunks: any[] = [];
+    await chunksStore.iterate((value: any) => {
       chunks.push(value);
     });
     handleChunks(chunks, override);

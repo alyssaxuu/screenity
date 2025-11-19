@@ -64,7 +64,8 @@ export const handleChunks = async (
       sendMessageTab(sandboxTab, { type: "banner-support" });
     }
 
-    const delay = (ms: number): Promise<void> => new Promise((res) => setTimeout(res, ms));
+    const delay = (ms: number): Promise<void> =>
+      new Promise((res) => setTimeout(res, ms));
 
     const sendBatch = async (batch: any[]): Promise<boolean> => {
       for (let attempt = 1; attempt <= maxRetries; attempt++) {

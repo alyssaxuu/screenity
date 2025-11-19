@@ -1,7 +1,7 @@
 import { sendMessageRecord } from "./sendMessageRecord";
 import { discardOffscreenDocuments } from "../offscreen/discardOffscreenDocuments";
 
-export const discardRecording = async (): Promise<any> => {
+export const discardRecording = async (): Promise<void> => {
   sendMessageRecord({ type: "dismiss-recording" });
   chrome.action.setIcon({ path: "assets/icon-34.png" });
 
@@ -18,7 +18,7 @@ export const discardRecording = async (): Promise<any> => {
   chrome.runtime.sendMessage({ type: "turn-off-pip" });
 };
 
-export const handleDismissRecordingTab = async (): Promise<any> => {
+export const handleDismissRecordingTab = async (): Promise<void> => {
   chrome.runtime.sendMessage({ type: "discard-backup" });
   discardRecording();
 };
