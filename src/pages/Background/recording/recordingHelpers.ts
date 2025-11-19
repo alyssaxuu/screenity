@@ -30,13 +30,13 @@ export const checkCapturePermissions = async ({
     chrome.desktopCapture &&
     chrome.alarms &&
     chrome.offscreen &&
-    (!permissions.includes("clipboardWrite") || chrome.clipboard)
+    (!permissions.includes("clipboardWrite") || (chrome as any).clipboard)
   ) {
     return { status: "ok" };
   }
 
-  const granted = await new Promise((resolve) => {
-    chrome.permissions.request({ permissions }, resolve);
+  const granted = await new Promise<boolean>((resolve) => {
+    chrome.permissions.request({ permissions: permissions as chrome.permissions.Permission[] }, resolve);
   });
 
   if (granted) {
@@ -78,7 +78,7 @@ export const handleRecordingComplete = async (): Promise<void> => {
 
   if (recordingTab) {
     chrome.tabs.get(recordingTab, (tab) => {
-      if (tab) {
+      if (tab && tab.url) {
         // Check if tab url contains chrome-extension and recorder.html
         if (
           tab.url.includes("chrome-extension") &&

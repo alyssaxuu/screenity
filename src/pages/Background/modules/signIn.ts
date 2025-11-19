@@ -42,7 +42,7 @@ const signInEdge = async (): Promise<any> => {
         }
 
         // Save token to storage
-        await new Promise((res) =>
+        await new Promise<void>((res) =>
           chrome.storage.local.set({ token }, () => res())
         );
 
@@ -60,7 +60,7 @@ const signInChrome = async (): Promise<any> => {
   }
 
   // Save token to storage
-  await new Promise((resolve) =>
+  await new Promise<void>((resolve) =>
     chrome.storage.local.set({ token: token.token }, () => resolve())
   );
 
@@ -77,7 +77,8 @@ const signIn = async (): Promise<any> => {
       return await signInChrome();
     }
   } catch (error) {
-    console.error("Error signing in:", error.message);
+    const err = error instanceof Error ? error : new Error(String(error));
+    console.error("Error signing in:", err.message);
     return null;
   }
 };

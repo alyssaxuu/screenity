@@ -10,7 +10,7 @@ export const sendMessageTab = async (
     return Promise.reject("Tab ID or message is null");
 
   try {
-    const tab = await new Promise((resolve, reject) => {
+    const tab = await new Promise<chrome.tabs.Tab | undefined>((resolve, reject) => {
       chrome.tabs.get(tabId, (tab) => {
         if (chrome.runtime.lastError) {
           reject(chrome.runtime.lastError.message);
@@ -27,13 +27,14 @@ export const sendMessageTab = async (
       tab.url.startsWith("chromewebstore.google.com") ||
       tab.url.startsWith("chrome.google.com/webstore") ||
       tab.url === "" ||
-      tab.url === "about:blank"
+      tab.url === "about:blank" ||
+      !tab.id
     ) {
       return Promise.reject("Invalid tab URL");
     }
 
     return new Promise((resolve, reject) => {
-      chrome.tabs.sendMessage(tab.id, message, (response) => {
+      chrome.tabs.sendMessage(tab.id, message, (response: any) => {
         if (chrome.runtime.lastError) {
           reject(chrome.runtime.lastError.message);
         } else {

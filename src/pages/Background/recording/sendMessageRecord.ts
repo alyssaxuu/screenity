@@ -21,9 +21,14 @@ export const sendMessageRecord = (
           }
         });
       } else {
-        sendMessageTab(result.recordingTab, message, responseCallback)
-          .then(resolve)
-          .catch(reject);
+        const recordingTab = result.recordingTab as number | undefined;
+        if (recordingTab) {
+          sendMessageTab(recordingTab, message, responseCallback)
+            .then(resolve)
+            .catch(reject);
+        } else {
+          reject(new Error("No recording tab found"));
+        }
       }
     });
   });

@@ -9,8 +9,8 @@ export const requestDownload = async (base64: string, title: string): Promise<vo
     });
 
     // Add a listener for when the tab finishes loading
-    const listener = (tabId: number, changeInfo: chrome.tabs.TabChangeInfo) => {
-      if (tabId === tab.id && changeInfo.status === "complete" && tab.id) {
+    const listener = (tabId: number, changeInfo: { status?: string } | undefined) => {
+      if (tabId === tab.id && changeInfo?.status === "complete" && tab.id) {
         chrome.tabs.onUpdated.removeListener(listener);
 
         // Send the message with the download data
@@ -38,8 +38,8 @@ export const downloadIndexedDB = async (): Promise<void> => {
     });
 
     // Add a listener for when the tab finishes loading
-    const listener = (tabId: number, changeInfo: chrome.tabs.TabChangeInfo) => {
-      if (tabId === tab.id && changeInfo.status === "complete" && tab.id) {
+    const listener = (tabId: number, changeInfo: { status?: string } | undefined) => {
+      if (tabId === tab.id && changeInfo?.status === "complete" && tab.id) {
         chrome.tabs.onUpdated.removeListener(listener);
 
         // Send the message to trigger the IndexedDB download

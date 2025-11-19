@@ -17,8 +17,7 @@ export const executeScripts = async (): Promise<void> => {
           {
             target: { tabId: tab.id },
             files: cs.js,
-          },
-          () => chrome.runtime.lastError
+          }
         );
         executeScriptPromises.push(executeScriptPromise);
       }

@@ -1,9 +1,11 @@
 import { sendMessageRecord } from "../recording/sendMessageRecord";
 import type { ExtensionMessage } from "../../../types/messaging";
 
-interface SetMicActiveRequest extends ExtensionMessage {
+interface SetMicActiveRequest {
+  type: string;
   active: boolean;
   defaultAudioInput?: string;
+  [key: string]: any;
 }
 
 export const setMicActiveTab = async (request: SetMicActiveRequest): Promise<void> => {

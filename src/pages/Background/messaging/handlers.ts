@@ -84,15 +84,15 @@ export const setupHandlers = () => {
     offscreenDocument(message.request, message.tabId)
   );
   registerMessage("write-file", (message) => writeFile(message));
-  registerMessage("handle-restart", (message) => handleRestart(message));
-  registerMessage("handle-dismiss", (message) => handleDismiss(message));
+  registerMessage("handle-restart", () => handleRestart());
+  registerMessage("handle-dismiss", () => handleDismiss());
   registerMessage("reset-active-tab", () => resetActiveTab(false));
-  registerMessage("reset-active-tab-restart", (message) =>
-    resetActiveTabRestart(message)
+  registerMessage("reset-active-tab-restart", () =>
+    resetActiveTabRestart()
   );
-  registerMessage("video-ready", (message) => videoReady(message));
-  registerMessage("start-recording", (message) => startRecording(message));
-  registerMessage("restarted", (message) => restartActiveTab(message));
+  registerMessage("video-ready", () => videoReady());
+  registerMessage("start-recording", () => startRecording());
+  registerMessage("restarted", () => restartActiveTab());
 
   registerMessage("new-chunk", (message, sender, sendResponse) => {
     newChunk(message, sendResponse);
@@ -101,9 +101,9 @@ export const setupHandlers = () => {
 
   registerMessage(
     "get-streaming-data",
-    async (message, sender) => await handleGetStreamingData(message, sender)
+    async () => await handleGetStreamingData()
   );
-  registerMessage("cancel-recording", (message) => cancelRecording(message));
+  registerMessage("cancel-recording", () => cancelRecording());
   registerMessage("stop-recording-tab", (message, sendResponse) => {
     handleStopRecordingTab(message);
     sendResponse({ ok: true });
@@ -112,8 +112,8 @@ export const setupHandlers = () => {
   registerMessage("restart-recording-tab", (message) =>
     handleRestartRecordingTab(message)
   );
-  registerMessage("dismiss-recording-tab", (message) =>
-    handleDismissRecordingTab(message)
+  registerMessage("dismiss-recording-tab", () =>
+    handleDismissRecordingTab()
   );
   registerMessage("pause-recording-tab", () =>
     sendMessageRecord({ type: "pause-recording-tab" })
@@ -130,9 +130,9 @@ export const setupHandlers = () => {
   );
   registerMessage(
     "recording-complete",
-    async (message, sender) => await handleRecordingComplete(message, sender)
+    async () => await handleRecordingComplete()
   );
-  registerMessage("check-recording", (message) => checkRecording(message));
+  registerMessage("check-recording", () => checkRecording());
 
   registerMessage("review-screenity", () =>
     createTab(
@@ -178,10 +178,10 @@ export const setupHandlers = () => {
       true
     )
   );
-  registerMessage("set-surface", (message) => setSurface(message));
+  registerMessage("set-surface", (message) => setSurface(message as any));
   registerMessage("pip-ended", () => handlePip(false));
   registerMessage("pip-started", () => handlePip(true));
-  registerMessage("sign-out-drive", (message) => handleSignOutDrive(message));
+  registerMessage("sign-out-drive", () => handleSignOutDrive());
   registerMessage("open-help", () =>
     createTab("https://help.screenity.io/", true, true)
   );
@@ -238,14 +238,14 @@ export const setupHandlers = () => {
   registerMessage("is-pinned", async () => await isPinned());
   registerMessage(
     "save-to-drive",
-    async (message) => await handleSaveToDrive(message, false)
+    async (message) => await handleSaveToDrive(message as any, false)
   );
   registerMessage(
     "save-to-drive-fallback",
-    async (message) => await handleSaveToDrive(message, true)
+    async (message) => await handleSaveToDrive(message as any, true)
   );
-  registerMessage("request-download", (message) =>
-    requestDownload(message.base64, message.title)
+  registerMessage("request-download", (message: any) =>
+    requestDownload((message as any).base64, (message as any).title)
   );
   registerMessage("resize-window", (message) =>
     resizeWindow(message.width, message.height)
@@ -260,7 +260,7 @@ export const setupHandlers = () => {
       true
     )
   );
-  registerMessage("add-alarm-listener", (payload) => addAlarmListener(payload));
+  registerMessage("add-alarm-listener", () => addAlarmListener());
   registerMessage(
     "check-auth-status",
     async (message, sender, sendResponse) => {
@@ -324,8 +324,9 @@ export const setupHandlers = () => {
           sendResponse({ success: true, videoId: result.videoId });
         }
       } catch (err) {
-        console.error("❌ Failed to create video project:", err.message);
-        sendResponse({ success: false, error: err.message });
+        const error = err instanceof Error ? err : new Error(String(err));
+        console.error("❌ Failed to create video project:", error.message);
+        sendResponse({ success: false, error: error.message });
       }
 
       return true;
@@ -391,6 +392,8 @@ export const setupHandlers = () => {
           chrome.system.display.getInfo((displays) => {
             const monitor = displays.find(
               (d) =>
+                win.left !== undefined &&
+                win.top !== undefined &&
                 win.left >= d.bounds.left &&
                 win.left < d.bounds.left + d.bounds.width &&
                 win.top >= d.bounds.top &&
@@ -432,13 +435,14 @@ export const setupHandlers = () => {
     });
   });
 
-  function storeClick(click) {
-    chrome.storage.local.get({ clickEvents: [] }, (data) => {
-      chrome.storage.local.set({ clickEvents: [...data.clickEvents, click] });
+  function storeClick(click: any): void {
+    chrome.storage.local.get({ clickEvents: [] }, (data: any) => {
+      const clickEvents = (data.clickEvents as any[]) || [];
+      chrome.storage.local.set({ clickEvents: [...clickEvents, click] });
     });
   }
 
-  function getMonitorForWindow(message, sender, sendResponse) {
+  function getMonitorForWindow(message: any, sender: any, sendResponse: (response: any) => void): void {
     chrome.system.display.getInfo((displays) => {
       chrome.windows.getCurrent((win) => {
         if (!win || chrome.runtime.lastError) {
@@ -452,6 +456,8 @@ export const setupHandlers = () => {
 
         const monitor = displays.find(
           (d) =>
+            win.left !== undefined &&
+            win.top !== undefined &&
             win.left >= d.bounds.left &&
             win.left < d.bounds.left + d.bounds.width &&
             win.top >= d.bounds.top &&
@@ -535,8 +541,9 @@ export const setupHandlers = () => {
         sendResponse({ success: true, videos: result.videos });
       }
     } catch (err) {
-      console.error("❌ Failed to fetch videos:", err.message);
-      sendResponse({ success: false, error: err.message });
+      const error = err instanceof Error ? err : new Error(String(err));
+      console.error("❌ Failed to fetch videos:", error.message);
+      sendResponse({ success: false, error: error.message });
     }
 
     return true;
@@ -603,8 +610,9 @@ export const setupHandlers = () => {
           sendResponse({ success: true, ...result });
         }
       } catch (err) {
-        console.error("❌ Error checking storage quota:", err);
-        sendResponse({ success: false, error: err.message });
+        const error = err instanceof Error ? err : new Error(String(err));
+        console.error("❌ Error checking storage quota:", error);
+        sendResponse({ success: false, error: error.message });
       }
 
       return true;
@@ -644,9 +652,12 @@ export const setupHandlers = () => {
     if (message.multiMode) {
       messageTab = (await getCurrentTab())?.id || null;
     } else {
-      const { editorTab } = await chrome.storage.local.get(["editorTab"]);
-      messageTab = editorTab;
-      focusTab(editorTab);
+      const result = await chrome.storage.local.get(["editorTab"]);
+      const editorTab = result.editorTab as number | undefined;
+      messageTab = editorTab || null;
+      if (editorTab) {
+        focusTab(editorTab);
+      }
     }
 
     sendMessageTab(messageTab, {
@@ -698,8 +709,9 @@ export const setupHandlers = () => {
     } else if (message.multiMode) {
       messageTab = (await getCurrentTab())?.id || null;
     } else {
-      const { editorTab } = await chrome.storage.local.get(["editorTab"]);
-      messageTab = editorTab;
+      const result = await chrome.storage.local.get(["editorTab"]);
+      const editorTab = result.editorTab as number | undefined;
+      messageTab = editorTab || null;
 
       chrome.runtime.sendMessage({ type: "turn-off-pip" });
 
@@ -772,7 +784,8 @@ export const setupHandlers = () => {
         });
       } else {
         // Multi recording on existing project
-        const { editorTab } = await chrome.storage.local.get(["editorTab"]);
+        const result = await chrome.storage.local.get(["editorTab"]);
+        const editorTab = result.editorTab as number | undefined;
         // check if editor tab is valid, if so focus to it, otherwise use active tab
         if (editorTab) {
           focusTab(editorTab);

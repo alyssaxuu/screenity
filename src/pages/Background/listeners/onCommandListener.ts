@@ -41,7 +41,7 @@ export const onCommandListener = () => {
                 tabId: number,
                 changeInfo: { status?: string } | undefined
               ) {
-                if (tabId === tab.id && changeInfo.status === "complete" && tab.id) {
+                if (tabId === tab.id && changeInfo?.status === "complete" && tab.id) {
                   setTimeout(() => {
                     sendMessageTab(tab.id!, { type: "start-stream" });
                   }, 500);

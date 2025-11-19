@@ -6,7 +6,7 @@ export const handleTabUpdate = async (
   tab: chrome.tabs.Tab
 ): Promise<void> => {
   try {
-    if (changeInfo.status === "complete") {
+    if (changeInfo?.status === "complete") {
       const recordingResult = await chrome.storage.local.get(["recording"]);
       const restartingResult = await chrome.storage.local.get(["restarting"]);
       const tabResult = await chrome.storage.local.get(["tabRecordedID"]);

@@ -2,8 +2,10 @@ import { sendMessageTab } from "../tabManagement";
 import { loginWithWebsite } from "../auth/loginWithWebsite";
 import type { ExtensionMessage } from "../../../types/messaging";
 
-interface SetSurfaceRequest extends ExtensionMessage {
+interface SetSurfaceRequest {
+  type: string;
   surface: string;
+  [key: string]: any;
 }
 
 export const setSurface = async (request: SetSurfaceRequest): Promise<void> => {

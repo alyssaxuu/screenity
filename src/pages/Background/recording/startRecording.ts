@@ -46,7 +46,7 @@ export const startRecording = async (): Promise<void> => {
   const alarm = alarmResult.alarm as boolean | undefined;
   const alarmTime = timeResult.alarmTime as string | number | undefined;
   if (alarm) {
-    const seconds = parseFloat(alarmTime);
+    const seconds = parseFloat(String(alarmTime || 0));
     chrome.alarms.create("recording-alarm", { delayInMinutes: seconds / 60 });
   }
 };

@@ -31,7 +31,11 @@ export const stopRecording = async (): Promise<void> => {
   chrome.storage.local.set({ recordingStartTime: 0 });
 
   // Check if browser supports WebCodecs for Mediabunny
-  const hasWebCodecs = supportsWebCodecs();
+  const hasWebCodecs = await supportsWebCodecs();
+
+  if (isSubscribed) {
+    chrome.alarms.clear("recording-alarm");
+    discardOffscreenDocuments();
 
   if (isSubscribed) {
     chrome.alarms.clear("recording-alarm");
@@ -39,23 +43,25 @@ export const stopRecording = async (): Promise<void> => {
   } else if (hasWebCodecs) {
     // Use Mediabunny (editorwebcodecs.html) when WebCodecs is supported
     chrome.tabs.create({ url: "editorwebcodecs.html", active: true }, (tab) => {
+      if (!tab.id) return;
       chrome.tabs.onUpdated.addListener(function _(
-        tabId,
-        changeInfo,
-        updatedTab
+        tabId: number,
+        changeInfo: { status?: string } | undefined,
+        updatedTab: chrome.tabs.Tab
       ) {
-        if (tabId === tab.id && changeInfo.status === "complete") {
+        if (tabId === tab.id && changeInfo?.status === "complete" && tab.id) {
           chrome.tabs.onUpdated.removeListener(_);
           chrome.storage.local.set({ sandboxTab: tab.id });
           waitForContentScript(tab.id)
             .then(() => {
               // Use fallback-recording for WebCodecs flow
-              sendMessageTab(tab.id, { type: "fallback-recording" });
+              sendMessageTab(tab.id!, { type: "fallback-recording" });
             })
             .catch((err) => {
+              const error = err instanceof Error ? err : new Error(String(err));
               console.error(
                 "❌ Failed to wait for content script:",
-                err.message
+                error.message
               );
             });
         }
@@ -67,22 +73,24 @@ export const stopRecording = async (): Promise<void> => {
     // Fallback for large recordings without WebCodecs - use viewer mode
 
     chrome.tabs.create({ url: "editorviewer.html", active: true }, (tab) => {
+      if (!tab.id) return;
       chrome.tabs.onUpdated.addListener(function _(
-        tabId,
-        changeInfo,
-        updatedTab
+        tabId: number,
+        changeInfo: { status?: string } | undefined,
+        updatedTab: chrome.tabs.Tab
       ) {
-        if (tabId === tab.id && changeInfo.status === "complete") {
+        if (tabId === tab.id && changeInfo?.status === "complete" && tab.id) {
           chrome.tabs.onUpdated.removeListener(_);
           chrome.storage.local.set({ sandboxTab: tab.id });
           waitForContentScript(tab.id)
             .then(() => {
-              sendMessageTab(tab.id, { type: "viewer-recording" });
+              sendMessageTab(tab.id!, { type: "viewer-recording" });
             })
             .catch((err) => {
+              const error = err instanceof Error ? err : new Error(String(err));
               console.error(
                 "❌ Failed to wait for content script:",
-                err.message
+                error.message
               );
             });
         }
@@ -93,12 +101,13 @@ export const stopRecording = async (): Promise<void> => {
   } else {
     // Use FFmpeg (editor.html) for browsers without WebCodecs
     chrome.tabs.create({ url: "editor.html", active: true }, (tab) => {
+      if (!tab.id) return;
       chrome.tabs.onUpdated.addListener(function _(
-        tabId,
-        changeInfo,
-        updatedTab
+        tabId: number,
+        changeInfo: { status?: string } | undefined,
+        updatedTab: chrome.tabs.Tab
       ) {
-        if (tabId === tab.id && changeInfo.status === "complete") {
+        if (tabId === tab.id && changeInfo?.status === "complete" && tab.id) {
           chrome.tabs.onUpdated.removeListener(_);
           chrome.storage.local.set({ sandboxTab: tab.id });
           waitForContentScript(tab.id)
@@ -106,9 +115,10 @@ export const stopRecording = async (): Promise<void> => {
               sendChunks();
             })
             .catch((err) => {
+              const error = err instanceof Error ? err : new Error(String(err));
               console.error(
                 "❌ Failed to wait for content script:",
-                err.message
+                error.message
               );
             });
         }
@@ -128,7 +138,9 @@ export const stopRecording = async (): Promise<void> => {
   discardOffscreenDocuments();
 };
 
-export const handleStopRecordingTab = async (request: any): Promise<any> => {
+import type { ExtensionMessage } from "../../../types/messaging";
+
+export const handleStopRecordingTab = async (request: ExtensionMessage): Promise<void> => {
   chrome.action.setIcon({ path: "assets/icon-34.png" });
   if (request.memoryError) {
     chrome.storage.local.set({
@@ -142,7 +154,7 @@ export const handleStopRecordingTab = async (request: any): Promise<any> => {
   sendMessageRecord({ type: "stop-recording-tab" });
 };
 
-export const handleStopRecordingTabBackup = async (request: any): Promise<any> => {
+export const handleStopRecordingTabBackup = async (request: ExtensionMessage): Promise<void> => {
   chrome.storage.local.set({
     recording: false,
     restarting: false,
@@ -154,6 +166,8 @@ export const handleStopRecordingTabBackup = async (request: any): Promise<any> =
   const activeResult = await chrome.storage.local.get(["activeTab"]);
   const activeTab = activeResult.activeTab as number | undefined;
 
-  sendMessageTab(activeTab, { type: "stop-pending" });
-  focusTab(activeTab);
+  if (activeTab) {
+    sendMessageTab(activeTab, { type: "stop-pending" });
+    focusTab(activeTab);
+  }
 };

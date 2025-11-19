@@ -3,13 +3,15 @@ import { sendMessageRecord } from "../recording/sendMessageRecord.js";
 import { closeOffscreenDocument } from "./closeOffscreenDocument.js";
 import { loginWithWebsite } from "../auth/loginWithWebsite.js";
 
+import type { ExtensionMessage } from "../../../types/messaging";
+
 const openRecorderTab = async (
-  activeTab,
-  backup,
-  isRegion,
-  camera = false,
-  request
-: any): Promise<any> => {
+  activeTab: chrome.tabs.Tab | undefined,
+  backup: boolean | undefined,
+  isRegion: boolean | undefined,
+  camera: boolean = false,
+  request: ExtensionMessage
+): Promise<void> => {
   let switchTab = true;
 
   // Check subscription status
@@ -24,9 +26,9 @@ const openRecorderTab = async (
       switchTab = false;
     }
   } else {
-    switchTab = activeTab.url.includes(
+    switchTab = activeTab?.url?.includes(
       chrome.runtime.getURL("playground.html")
-    );
+    ) || false;
   }
 
   chrome.tabs
@@ -79,13 +81,17 @@ export const offscreenDocument = async (
     activeTab = await chrome.tabs.get(tabId);
   }
 
+  if (!activeTab || !activeTab.id) {
+    return;
+  }
+
   chrome.storage.local.set({
     activeTab: activeTab.id,
     tabRecordedID: null,
     memoryError: false,
   });
 
-  if (activeTab.url.includes(chrome.runtime.getURL("playground.html"))) {
+  if (activeTab.url && activeTab.url.includes(chrome.runtime.getURL("playground.html"))) {
     chrome.storage.local.set({ tabPreferred: true });
   } else {
     chrome.storage.local.set({ tabPreferred: false });

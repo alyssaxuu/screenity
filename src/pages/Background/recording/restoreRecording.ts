@@ -15,9 +15,10 @@ export const checkRestore = async (): Promise<{ restore: boolean; chunks?: any[]
 };
 
 export const restoreRecording = async (): Promise<void> => {
-  const hasWebCodecs = supportsWebCodecs();
+  const hasWebCodecs = await supportsWebCodecs();
 
-  let editorUrl, messageType;
+  let editorUrl: string;
+  let messageType: string;
 
   if (hasWebCodecs) {
     editorUrl = "editorwebcodecs.html";
@@ -51,9 +52,9 @@ export const restoreRecording = async (): Promise<void> => {
         await new Promise<void>((resolve) => {
           chrome.tabs.onUpdated.addListener(function listener(
             tabId: number,
-            info: chrome.tabs.TabChangeInfo
+            info: { status?: string } | undefined
           ) {
-            if (info.status === "complete" && tabId === tab.id && tab.id) {
+            if (info?.status === "complete" && tabId === tab.id && tab.id) {
               chrome.tabs.onUpdated.removeListener(listener);
 
               setTimeout(() => {
