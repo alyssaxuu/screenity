@@ -924,22 +924,31 @@ export const setupHandlers = () => {
       sendResponse(result);
     }
   });
-  registerMessage("sync-recording-state", async (message, sendResponse) => {
-    const { recording, paused, recordingStartTime, pendingRecording } =
-      await chrome.storage.local.get([
+  registerMessage(
+    "sync-recording-state",
+    async (message, sender, sendResponse) => {
+      const result = await chrome.storage.local.get([
         "recording",
         "paused",
         "recordingStartTime",
         "pendingRecording",
       ]);
-    if (sendResponse) {
-      sendResponse({
-        recording: Boolean(recording),
-        paused: Boolean(paused),
-        recordingStartTime: recordingStartTime || null,
-        pendingRecording: Boolean(pendingRecording),
-      });
+      const recording = result.recording as boolean | undefined;
+      const paused = result.paused as boolean | undefined;
+      const recordingStartTime = result.recordingStartTime as
+        | number
+        | undefined;
+      const pendingRecording = result.pendingRecording as boolean | undefined;
+
+      if (sendResponse && typeof sendResponse === "function") {
+        sendResponse({
+          recording: Boolean(recording),
+          paused: Boolean(paused),
+          recordingStartTime: recordingStartTime || null,
+          pendingRecording: Boolean(pendingRecording),
+        });
+      }
+      return true;
     }
-    return true;
-  });
+  );
 };
