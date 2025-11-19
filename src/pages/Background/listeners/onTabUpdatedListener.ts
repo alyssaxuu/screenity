@@ -1,19 +1,22 @@
 import { sendMessageTab } from "../tabManagement";
 
-export const handleTabUpdate = async (tabId, changeInfo, tab: any): Promise<any> => {
+export const handleTabUpdate = async (
+  tabId: number,
+  changeInfo: chrome.tabs.TabChangeInfo,
+  tab: chrome.tabs.Tab
+): Promise<void> => {
   try {
     if (changeInfo.status === "complete") {
-      const { recording } = await chrome.storage.local.get(["recording"]);
-      const { restarting } = await chrome.storage.local.get(["restarting"]);
-      const { tabRecordedID } = await chrome.storage.local.get([
-        "tabRecordedID",
-      ]);
-      const { pendingRecording } = await chrome.storage.local.get([
-        "pendingRecording",
-      ]);
-      const { recordingStartTime } = await chrome.storage.local.get([
-        "recordingStartTime",
-      ]);
+      const recordingResult = await chrome.storage.local.get(["recording"]);
+      const restartingResult = await chrome.storage.local.get(["restarting"]);
+      const tabResult = await chrome.storage.local.get(["tabRecordedID"]);
+      const pendingResult = await chrome.storage.local.get(["pendingRecording"]);
+      const timeResult = await chrome.storage.local.get(["recordingStartTime"]);
+      const recording = recordingResult.recording as boolean | undefined;
+      const restarting = restartingResult.restarting as boolean | undefined;
+      const tabRecordedID = tabResult.tabRecordedID as number | undefined;
+      const pendingRecording = pendingResult.pendingRecording as boolean | undefined;
+      const recordingStartTime = timeResult.recordingStartTime as number | undefined;
 
       if (!recording && !restarting && !pendingRecording) {
         sendMessageTab(tabId, { type: "recording-ended" });

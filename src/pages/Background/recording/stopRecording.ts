@@ -5,15 +5,17 @@ import { sendChunks } from "./sendChunks";
 import { waitForContentScript } from "../utils/waitForContentScript";
 import { supportsWebCodecs } from "../utils/featureDetection";
 
-export const stopRecording = async (): Promise<any> => {
+export const stopRecording = async (): Promise<void> => {
   chrome.action.setIcon({ path: "assets/icon-34.png" });
   chrome.storage.local.set({ restarting: false });
-  const { recordingStartTime, isSubscribed } = await chrome.storage.local.get([
+  const result = await chrome.storage.local.get([
     "recordingStartTime",
     "isSubscribed",
   ]);
+  const recordingStartTime = result.recordingStartTime as number | undefined;
+  const isSubscribed = result.isSubscribed as boolean | undefined;
 
-  let duration = Date.now() - recordingStartTime;
+  let duration = Date.now() - (recordingStartTime || 0);
   const maxDuration = 7 * 60 * 1000;
 
   if (recordingStartTime === 0) {
@@ -116,7 +118,8 @@ export const stopRecording = async (): Promise<any> => {
     chrome.runtime.sendMessage({ type: "turn-off-pip" });
   }
 
-  const { wasRegion } = await chrome.storage.local.get(["wasRegion"]);
+  const wasResult = await chrome.storage.local.get(["wasRegion"]);
+  const wasRegion = wasResult.wasRegion as boolean | undefined;
   if (wasRegion) {
     chrome.storage.local.set({ wasRegion: false, region: true });
   }
@@ -148,7 +151,8 @@ export const handleStopRecordingTabBackup = async (request: any): Promise<any> =
   });
   sendMessageRecord({ type: "stop-recording-tab" });
 
-  const { activeTab } = await chrome.storage.local.get(["activeTab"]);
+  const activeResult = await chrome.storage.local.get(["activeTab"]);
+  const activeTab = activeResult.activeTab as number | undefined;
 
   sendMessageTab(activeTab, { type: "stop-pending" });
   focusTab(activeTab);

@@ -60,10 +60,15 @@ const VIDEO_INIT = {
   scenes: {},
 };
 
+interface CreateVideoProjectOptions {
+  title?: string;
+  instantMode?: boolean;
+}
+
 export const createVideoProject = async ({
   title = "Untitled Recording",
   instantMode = false,
-} = {}: any): Promise<any> => {
+}: CreateVideoProjectOptions = {}): Promise<any> => {
   return new Promise((resolve, reject) => {
     if (typeof chrome === "undefined" || !chrome.runtime?.sendMessage) {
       return reject(new Error("Chrome extension runtime is not available"));

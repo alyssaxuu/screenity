@@ -1,26 +1,25 @@
 import { sendMessageTab } from "../tabManagement";
 
-export const handleTabActivation = async (activeInfo: any): Promise<any> => {
+export const handleTabActivation = async (activeInfo: chrome.tabs.TabActiveInfo): Promise<void> => {
   try {
-    const { recordingStartTime } = await chrome.storage.local.get([
-      "recordingStartTime",
-    ]);
+    const result = await chrome.storage.local.get(["recordingStartTime"]);
+    const recordingStartTime = result.recordingStartTime as number | undefined;
 
     // Get the activated tab
     const tab = await chrome.tabs.get(activeInfo.tabId);
 
     // Check if currently recording or restarting
-    const { recording } = await chrome.storage.local.get(["recording"]);
-    const { restarting } = await chrome.storage.local.get(["restarting"]);
-    const { pendingRecording } = await chrome.storage.local.get([
-      "pendingRecording",
-    ]);
+    const recordingResult = await chrome.storage.local.get(["recording"]);
+    const restartingResult = await chrome.storage.local.get(["restarting"]);
+    const pendingResult = await chrome.storage.local.get(["pendingRecording"]);
+    const recording = recordingResult.recording as boolean | undefined;
+    const restarting = restartingResult.restarting as boolean | undefined;
+    const pendingRecording = pendingResult.pendingRecording as boolean | undefined;
 
     if (recording) {
       // Check if region recording and if the current tab is the recording tab
-      const { tabRecordedID } = await chrome.storage.local.get([
-        "tabRecordedID",
-      ]);
+      const tabResult = await chrome.storage.local.get(["tabRecordedID"]);
+      const tabRecordedID = tabResult.tabRecordedID as number | undefined;
       if (tabRecordedID && tabRecordedID !== activeInfo.tabId) {
         sendMessageTab(activeInfo.tabId, { type: "hide-popup-recording" });
       } else if (

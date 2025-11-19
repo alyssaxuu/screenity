@@ -1,15 +1,17 @@
 import { discardRecording } from "./discardRecording";
 import { discardOffscreenDocuments } from "../offscreen/discardOffscreenDocuments";
 
-export const checkRecording = async (): Promise<any> => {
-  const { recordingTab, offscreen } = await chrome.storage.local.get([
+export const checkRecording = async (): Promise<void> => {
+  const result = await chrome.storage.local.get([
     "recordingTab",
     "offscreen",
   ]);
+  const recordingTab = result.recordingTab as number | undefined;
+  const offscreen = result.offscreen as boolean | undefined;
 
   if (recordingTab && !offscreen) {
     try {
-      chrome.tabs.get(recordingTab, (tab) => {
+      chrome.tabs.get(recordingTab as number, (tab) => {
         if (!tab) {
           discardRecording();
         }

@@ -10,7 +10,7 @@ export const getCameraStream = async (
   videoRef,
   offScreenCanvasRef,
   offScreenCanvasContextRef,
-  { onStart = (: any): Promise<any> => {}, onFinish = () => {} } = {}
+  { onStart = (): Promise<any> => Promise.resolve(), onFinish = (): void => {} } = {}
 ) => {
   const { setWidth, setHeight, recordingTypeRef } = getContextRefs();
 

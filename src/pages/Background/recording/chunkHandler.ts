@@ -13,7 +13,7 @@ export const localDirectoryStore = localforage.createInstance({
   name: "localDirectory",
 });
 
-export const clearAllRecordings = async (): Promise<any> => {
+export const clearAllRecordings = async (): Promise<void> => {
   try {
     await chunksStore.clear();
   } catch (err) {
@@ -25,14 +25,16 @@ export const handleChunks = async (
   chunks: any[],
   override: boolean = false
 ): Promise<void> => {
-  const { sendingChunks, sandboxTab, bannerSupport } =
-    await chrome.storage.local.get([
-      "sendingChunks",
-      "sandboxTab",
-      "bannerSupport",
-    ]);
+  const result = await chrome.storage.local.get([
+    "sendingChunks",
+    "sandboxTab",
+    "bannerSupport",
+  ]);
+  const sendingChunks = result.sendingChunks as boolean | undefined;
+  const sandboxTab = result.sandboxTab as number | undefined;
+  const bannerSupport = result.bannerSupport as boolean | undefined;
 
-  if (sendingChunks) return;
+  if (sendingChunks || !sandboxTab) return;
 
   await chrome.storage.local.set({ sendingChunks: true });
 
@@ -62,9 +64,9 @@ export const handleChunks = async (
       sendMessageTab(sandboxTab, { type: "banner-support" });
     }
 
-    const delay = (ms: any) => new Promise((res) => setTimeout(res, ms));
+    const delay = (ms: number): Promise<void> => new Promise((res) => setTimeout(res, ms));
 
-    const sendBatch = async (batch: any): Promise<any> => {
+    const sendBatch = async (batch: any[]): Promise<boolean> => {
       for (let attempt = 1; attempt <= maxRetries; attempt++) {
         try {
           const response = await sendMessageTab(sandboxTab, {
@@ -110,23 +112,32 @@ export const handleChunks = async (
   }
 };
 
+import type { ExtensionMessage } from "../../../types/messaging";
+
 export const newChunk = async (
-  request,
-  sender,
-  sendResponse: any
-): Promise<any> => {
+  request: ExtensionMessage,
+  sender: chrome.runtime.MessageSender,
+  sendResponse: (response: { status: string; error?: string }) => void
+): Promise<boolean> => {
   try {
-    const { sandboxTab } = await chrome.storage.local.get(["sandboxTab"]);
+    const result = await chrome.storage.local.get(["sandboxTab"]);
+    const sandboxTab = result.sandboxTab as number | undefined;
+
+    if (!sandboxTab) {
+      sendResponse({ status: "error", error: "No sandbox tab" });
+      return true;
+    }
 
     await sendMessageTab(sandboxTab, {
       type: "new-chunk-tab",
-      chunk: request.chunk,
-      index: request.index,
+      chunk: (request as any).chunk,
+      index: (request as any).index,
     });
 
     sendResponse({ status: "ok" });
   } catch (err) {
-    sendResponse({ status: "error", error: err.message });
+    const error = err instanceof Error ? err : new Error(String(err));
+    sendResponse({ status: "error", error: error.message });
   }
 
   return true;

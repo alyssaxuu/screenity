@@ -1,10 +1,11 @@
 import { removeTab } from "../tabManagement";
 import { sendChunks } from "./sendChunks";
 
-export const forceProcessing = async (): Promise<any> => {
+export const forceProcessing = async (): Promise<void> => {
   const editorURL = "editor.html";
 
-  const { sandboxTab } = await chrome.storage.local.get(["sandboxTab"]);
+  const result = await chrome.storage.local.get(["sandboxTab"]);
+  const sandboxTab = result.sandboxTab as number | undefined;
 
   chrome.tabs.create(
     {
@@ -13,8 +14,8 @@ export const forceProcessing = async (): Promise<any> => {
     },
     (tab) => {
       chrome.tabs.onUpdated.addListener(function onTabUpdate(
-        tabId,
-        changeInfo
+        tabId: number,
+        changeInfo: chrome.tabs.TabChangeInfo
       ) {
         if (tabId === tab.id && changeInfo.status === "complete") {
           chrome.tabs.onUpdated.removeListener(onTabUpdate);

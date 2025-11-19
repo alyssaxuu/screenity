@@ -1,6 +1,6 @@
 import { sendMessageTab } from "../tabManagement";
 
-export const requestDownload = async (base64, title: any): Promise<any> => {
+export const requestDownload = async (base64: string, title: string): Promise<void> => {
   try {
     // Open a new tab with the download page
     const tab = await chrome.tabs.create({
@@ -9,8 +9,8 @@ export const requestDownload = async (base64, title: any): Promise<any> => {
     });
 
     // Add a listener for when the tab finishes loading
-    const listener = (tabId, changeInfo: any) => {
-      if (tabId === tab.id && changeInfo.status === "complete") {
+    const listener = (tabId: number, changeInfo: chrome.tabs.TabChangeInfo) => {
+      if (tabId === tab.id && changeInfo.status === "complete" && tab.id) {
         chrome.tabs.onUpdated.removeListener(listener);
 
         // Send the message with the download data
@@ -24,11 +24,12 @@ export const requestDownload = async (base64, title: any): Promise<any> => {
 
     chrome.tabs.onUpdated.addListener(listener);
   } catch (error) {
-    console.error("Failed to request download:", error.message);
+    const err = error instanceof Error ? error : new Error(String(error));
+    console.error("Failed to request download:", err.message);
   }
 };
 
-export const downloadIndexedDB = async (): Promise<any> => {
+export const downloadIndexedDB = async (): Promise<void> => {
   try {
     // Open a new tab with the download page
     const tab = await chrome.tabs.create({
@@ -37,8 +38,8 @@ export const downloadIndexedDB = async (): Promise<any> => {
     });
 
     // Add a listener for when the tab finishes loading
-    const listener = (tabId, changeInfo: any) => {
-      if (tabId === tab.id && changeInfo.status === "complete") {
+    const listener = (tabId: number, changeInfo: chrome.tabs.TabChangeInfo) => {
+      if (tabId === tab.id && changeInfo.status === "complete" && tab.id) {
         chrome.tabs.onUpdated.removeListener(listener);
 
         // Send the message to trigger the IndexedDB download
@@ -50,6 +51,7 @@ export const downloadIndexedDB = async (): Promise<any> => {
 
     chrome.tabs.onUpdated.addListener(listener);
   } catch (error) {
-    console.error("Failed to initiate IndexedDB download:", error.message);
+    const err = error instanceof Error ? error : new Error(String(error));
+    console.error("Failed to initiate IndexedDB download:", err.message);
   }
 };

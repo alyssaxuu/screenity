@@ -66,7 +66,12 @@ const openRecorderTab = async (
     });
 };
 
-export const offscreenDocument = async (request, tabId = null: any): Promise<any> => {
+import type { ExtensionMessage } from "../../../types/messaging";
+
+export const offscreenDocument = async (
+  request: ExtensionMessage,
+  tabId: number | null = null
+): Promise<any> => {
   const { backup } = await chrome.storage.local.get(["backup"]);
   let activeTab = await getCurrentTab();
 

@@ -1,6 +1,6 @@
 import { sendMessageRecord } from "./sendMessageRecord";
 
-export const startRecording = async (): Promise<any> => {
+export const startRecording = async (): Promise<void> => {
   chrome.storage.local.set({
     recordingStartTime: Date.now(),
     restarting: false,
@@ -8,9 +8,11 @@ export const startRecording = async (): Promise<any> => {
   });
 
   // Check if customRegion is set
-  const { customRegion } = await chrome.storage.local.get(["customRegion"]);
+  const customResult = await chrome.storage.local.get(["customRegion"]);
+  const customRegion = customResult.customRegion as any;
 
-  const { recordingType } = await chrome.storage.local.get(["recordingType"]);
+  const typeResult = await chrome.storage.local.get(["recordingType"]);
+  const recordingType = typeResult.recordingType as string | undefined;
 
   if (recordingType === "region") {
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
@@ -39,15 +41,17 @@ export const startRecording = async (): Promise<any> => {
   }
   chrome.action.setIcon({ path: "assets/recording-logo.png" });
   // Set up alarm if set in storage
-  const { alarm } = await chrome.storage.local.get(["alarm"]);
-  const { alarmTime } = await chrome.storage.local.get(["alarmTime"]);
+  const alarmResult = await chrome.storage.local.get(["alarm"]);
+  const timeResult = await chrome.storage.local.get(["alarmTime"]);
+  const alarm = alarmResult.alarm as boolean | undefined;
+  const alarmTime = timeResult.alarmTime as string | number | undefined;
   if (alarm) {
     const seconds = parseFloat(alarmTime);
     chrome.alarms.create("recording-alarm", { delayInMinutes: seconds / 60 });
   }
 };
 
-export const startAfterCountdown = async (): Promise<any> => {
+export const startAfterCountdown = async (): Promise<void> => {
   try {
     // Retrieve the tab and offscreen status from local storage
     const { recordingTab, offscreen } = await chrome.storage.local.get([
