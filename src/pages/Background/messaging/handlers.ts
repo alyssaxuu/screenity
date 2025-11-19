@@ -727,11 +727,11 @@ export const setupHandlers = () => {
       copyToClipboard((message as any).publicUrl);
     }
 
-    if (messageTab) {
+    if (messageTab && typeof messageTab === "number") {
       sendMessageTab(messageTab, {
         type: "update-project-ready",
-        share: Boolean(message.publicUrl),
-        newProject: Boolean(message.newProject),
+        share: Boolean((message as any).publicUrl),
+        newProject: Boolean((message as any).newProject),
         sceneId: sceneId,
       });
     } else {
