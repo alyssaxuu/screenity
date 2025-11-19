@@ -685,27 +685,28 @@ export const setupHandlers = () => {
     let messageTab = null;
     const sceneId = message.sceneId || null;
 
-    if (message.newProject) {
-      const { editorTab } = await chrome.storage.local.get(["editorTab"]);
-      messageTab = editorTab;
+    if ((message as any).newProject) {
+      const result = await chrome.storage.local.get(["editorTab"]);
+      const editorTab = result.editorTab as number | undefined;
+      messageTab = editorTab || null;
 
       chrome.runtime.sendMessage({ type: "turn-off-pip" });
 
       // FLAG: this should go here right?
       const res = await fetch(
-        `${API_BASE}/videos/${message.projectId}/auto-publish`,
+        `${API_BASE}/videos/${(message as any).projectId}/auto-publish`,
         {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
             Authorization: `Bearer ${await chrome.storage.local
               .get("screenityToken")
-              .then((r) => r.screenityToken)}`,
+              .then((r: any) => r.screenityToken)}`,
           },
         }
       );
 
-      if (editorTab) {
+      if (editorTab && typeof editorTab === "number") {
         focusTab(editorTab);
       }
     } else if ((message as any).multiMode) {
