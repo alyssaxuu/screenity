@@ -70,10 +70,14 @@ export const messageRouter = (): void => {
       message: ExtensionMessage,
       sender: chrome.runtime.MessageSender,
       sendResponse: (response?: any) => void
-    ) => {
+    ): boolean | void => {
       const result = messageDispatcher(message, sender, sendResponse);
 
-      if (result === true || result instanceof Promise) {
+      if (result === true) {
+        return true;
+      }
+      // If result is a Promise, return true to keep channel open
+      if (result && typeof result === 'object' && 'then' in result) {
         return true;
       }
     }
