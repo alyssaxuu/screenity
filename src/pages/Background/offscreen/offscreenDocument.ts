@@ -25,9 +25,9 @@ const openRecorderTab = async (
       switchTab = false;
     }
   } else {
-    switchTab = activeTab?.url?.includes(
-      chrome.runtime.getURL("playground.html")
-    ) || false;
+    switchTab =
+      activeTab?.url?.includes(chrome.runtime.getURL("playground.html")) ||
+      false;
   }
 
   chrome.tabs
@@ -58,12 +58,12 @@ const openRecorderTab = async (
             type: "loaded",
             request: request,
             backup: backup,
-        ...(isRegion && activeTab?.id
-          ? {
-              isTab: true,
-              tabID: activeTab.id,
-            }
-          : {}),
+            ...(isRegion && activeTab?.id
+              ? {
+                  isTab: true,
+                  tabID: activeTab.id,
+                }
+              : {}),
           });
         }
       });
@@ -92,7 +92,10 @@ export const offscreenDocument = async (
     memoryError: false,
   });
 
-  if (activeTab.url && activeTab.url.includes(chrome.runtime.getURL("playground.html"))) {
+  if (
+    activeTab.url &&
+    activeTab.url.includes(chrome.runtime.getURL("playground.html"))
+  ) {
     chrome.storage.local.set({ tabPreferred: true });
   } else {
     chrome.storage.local.set({ tabPreferred: false });

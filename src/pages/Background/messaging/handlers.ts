@@ -87,9 +87,7 @@ export const setupHandlers = () => {
   registerMessage("handle-restart", () => handleRestart());
   registerMessage("handle-dismiss", () => handleDismiss());
   registerMessage("reset-active-tab", () => resetActiveTab(false));
-  registerMessage("reset-active-tab-restart", () =>
-    resetActiveTabRestart()
-  );
+  registerMessage("reset-active-tab-restart", () => resetActiveTabRestart());
   registerMessage("video-ready", () => videoReady());
   registerMessage("start-recording", () => startRecording());
   registerMessage("restarted", () => restartActiveTab());
@@ -114,16 +112,16 @@ export const setupHandlers = () => {
   registerMessage("restart-recording-tab", (message) =>
     handleRestartRecordingTab(message)
   );
-  registerMessage("dismiss-recording-tab", () =>
-    handleDismissRecordingTab()
-  );
+  registerMessage("dismiss-recording-tab", () => handleDismissRecordingTab());
   registerMessage("pause-recording-tab", () =>
     sendMessageRecord({ type: "pause-recording-tab" })
   );
   registerMessage("resume-recording-tab", () =>
     sendMessageRecord({ type: "resume-recording-tab" })
   );
-  registerMessage("set-mic-active-tab", (message) => setMicActiveTab(message as any));
+  registerMessage("set-mic-active-tab", (message) =>
+    setMicActiveTab(message as any)
+  );
   registerMessage("recording-error", (message) =>
     handleRecordingError(message)
   );
@@ -444,7 +442,11 @@ export const setupHandlers = () => {
     });
   }
 
-  function getMonitorForWindow(message: any, sender: any, sendResponse: (response: any) => void): void {
+  function getMonitorForWindow(
+    message: any,
+    sender: any,
+    sendResponse: (response: any) => void
+  ): void {
     chrome.system.display.getInfo((displays) => {
       chrome.windows.getCurrent((win) => {
         if (!win || chrome.runtime.lastError) {
@@ -488,8 +490,6 @@ export const setupHandlers = () => {
         }
       });
     });
-
-    return true;
   }
 
   registerMessage("get-monitor-for-window", getMonitorForWindow);
@@ -893,14 +893,17 @@ export const setupHandlers = () => {
     const url = `https://tally.so/r/310MNg?${query.toString()}`;
     createTab(url, true, true);
   });
-  registerMessage("check-banner-support", async (message, sender, sendResponse) => {
-    const result = await chrome.storage.local.get(["bannerSupport"]);
-    const bannerSupport = result.bannerSupport as boolean | undefined;
-    if (sendResponse) {
-      sendResponse({ bannerSupport: Boolean(bannerSupport) });
+  registerMessage(
+    "check-banner-support",
+    async (message, sender, sendResponse) => {
+      const result = await chrome.storage.local.get(["bannerSupport"]);
+      const bannerSupport = result.bannerSupport as boolean | undefined;
+      if (sendResponse) {
+        sendResponse({ bannerSupport: Boolean(bannerSupport) });
+      }
+      return true;
     }
-    return true;
-  });
+  );
   registerMessage("hide-banner", async () => {
     await chrome.storage.local.set({ bannerSupport: false });
     chrome.runtime.sendMessage({ type: "hide-banner" });

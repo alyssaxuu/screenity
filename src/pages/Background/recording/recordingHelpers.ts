@@ -36,7 +36,7 @@ export const checkCapturePermissions = async ({
   }
 
   const granted = await new Promise<boolean>((resolve) => {
-    chrome.permissions.request({ permissions: permissions as chrome.permissions.Permissions }, resolve);
+    chrome.permissions.request({ permissions: permissions as any }, resolve);
   });
 
   if (granted) {
