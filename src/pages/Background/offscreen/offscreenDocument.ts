@@ -51,10 +51,10 @@ const openRecorderTab = async (
 
       chrome.tabs.onUpdated.addListener(function _(
         tabId: number,
-        changeInfo: chrome.tabs.TabChangeInfo | undefined,
+        changeInfo: TabChangeInfo,
         updatedTab: chrome.tabs.Tab
       ) {
-        if (tab.id && tabId === tab.id && changeInfo?.status === "complete") {
+        if (tab.id && tabId === tab.id && changeInfo.status === "complete") {
           chrome.tabs.onUpdated.removeListener(_);
           sendMessageRecord({
             type: "loaded",
@@ -105,8 +105,13 @@ export const offscreenDocument = async (
 
   await closeOffscreenDocument();
 
-  const requestWithRegion = request as ExtensionMessage & { region?: boolean; customRegion?: boolean; offscreenRecording?: boolean; camera?: boolean };
-  
+  const requestWithRegion = request as ExtensionMessage & {
+    region?: boolean;
+    customRegion?: boolean;
+    offscreenRecording?: boolean;
+    camera?: boolean;
+  };
+
   if (requestWithRegion.region) {
     if (tabId !== null) chrome.tabs.update(tabId, { active: true });
 
@@ -129,7 +134,13 @@ export const offscreenDocument = async (
   } else {
     if (!requestWithRegion.offscreenRecording || requestWithRegion.camera) {
       // Skip offscreen recording if conditions aren't met
-      await openRecorderTab(activeTab, backup, false, request.camera, request);
+      await openRecorderTab(
+        activeTab,
+        backup,
+        false,
+        requestWithRegion.camera,
+        request
+      );
       return;
     }
 
@@ -163,10 +174,16 @@ export const offscreenDocument = async (
         quality: qualityValue,
         fps: fpsValue,
         backup: backup,
-      });
+      } as ExtensionMessage);
     } catch (error) {
       console.error("Error creating offscreen document:", error);
-      await openRecorderTab(activeTab, backup, false, request.camera, request);
+      await openRecorderTab(
+        activeTab,
+        backup,
+        false,
+        requestWithRegion.camera,
+        request
+      );
     }
   }
 };

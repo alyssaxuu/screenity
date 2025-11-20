@@ -76,7 +76,10 @@ export const handleTabActivation = async (
         } as ExtensionMessage);
       } else {
         const time = Math.floor((Date.now() - recordingStartTime) / 1000);
-        sendMessageTab(activeInfo.tabId, { type: "time", time: time } as ExtensionMessage);
+        sendMessageTab(activeInfo.tabId, {
+          type: "time",
+          time: time,
+        } as ExtensionMessage);
       }
     }
   } catch (error) {

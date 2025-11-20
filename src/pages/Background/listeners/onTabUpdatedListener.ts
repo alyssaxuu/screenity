@@ -1,13 +1,14 @@
 import { sendMessageTab } from "../tabManagement";
 import type { ExtensionMessage } from "../../../types/messaging";
+import type { TabChangeInfo } from "../../../types/tabs";
 
 export const handleTabUpdate = async (
   tabId: number,
-  changeInfo: chrome.tabs.TabChangeInfo | undefined,
+  changeInfo: TabChangeInfo,
   tab: chrome.tabs.Tab
 ): Promise<void> => {
   try {
-    if (changeInfo?.status === "complete") {
+    if (changeInfo.status === "complete") {
       const recordingResult = await chrome.storage.local.get(["recording"]);
       const restartingResult = await chrome.storage.local.get(["restarting"]);
       const tabResult = await chrome.storage.local.get(["tabRecordedID"]);
@@ -64,7 +65,7 @@ export const handleTabUpdate = async (
       if (
         tab.url &&
         tab.url.includes(chrome.runtime.getURL("playground.html")) &&
-        changeInfo?.status === "complete" &&
+        changeInfo.status === "complete" &&
         tab.id
       ) {
         sendMessageTab(tab.id, { type: "toggle-popup" });

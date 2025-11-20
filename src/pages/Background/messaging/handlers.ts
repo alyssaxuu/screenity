@@ -107,7 +107,9 @@ export const setupHandlers = () => {
     const backupMessage = message as BackupCreatedMessage;
     offscreenDocument(backupMessage.request, backupMessage.tabId);
   });
-  registerMessage("write-file", (message) => writeFile(message as WriteFileMessage));
+  registerMessage("write-file", (message) =>
+    writeFile(message as WriteFileMessage)
+  );
   registerMessage("handle-restart", () => handleRestart());
   registerMessage("handle-dismiss", () => handleDismiss());
   registerMessage("reset-active-tab", () => resetActiveTab(false));
@@ -348,7 +350,7 @@ export const setupHandlers = () => {
         const projectMessage = message as CreateVideoProjectMessage;
         const tokenResult = await chrome.storage.local.get("screenityToken");
         const screenityToken = tokenResult.screenityToken as string | undefined;
-        
+
         if (!screenityToken) {
           if (sendResponse) {
             sendResponse({ success: false, error: "No authentication token" });
@@ -364,7 +366,9 @@ export const setupHandlers = () => {
           },
           body: JSON.stringify({
             title: projectMessage.title || "Untitled Recording",
-            data: (projectMessage as ExtensionMessage & { data?: unknown }).data || {},
+            data:
+              (projectMessage as ExtensionMessage & { data?: unknown }).data ||
+              {},
             instantMode: projectMessage.instantMode || false,
             recording: true,
             isPublic: projectMessage.instantMode ? true : false,
@@ -437,73 +441,76 @@ export const setupHandlers = () => {
     const senderWindowId = sender.tab?.windowId;
 
     // Ask Recorder for current video time
-    sendMessageRecord({ type: "get-video-time" }, (response: { videoTime?: number } | undefined) => {
-      const videoTime = response?.videoTime ?? null;
+    sendMessageRecord(
+      { type: "get-video-time" },
+      (response: { videoTime?: number } | undefined) => {
+        const videoTime = response?.videoTime ?? null;
 
-      const baseClick: ClickEvent = { 
-        x, 
-        y, 
-        surface, 
-        region: region || false, 
-        timestamp: videoTime || 0 
-      };
+        const baseClick: ClickEvent = {
+          x,
+          y,
+          surface,
+          region: region || false,
+          timestamp: videoTime || 0,
+        };
 
-      if (region || isTab) {
-        storeClick(baseClick);
-        return;
-      }
+        if (region || isTab) {
+          storeClick(baseClick);
+          return;
+        }
 
-      if (surface === "monitor" && typeof senderWindowId === "number") {
-        chrome.windows.get(senderWindowId, (win) => {
-          if (!win || chrome.runtime.lastError) {
-            console.warn("Failed to get window for click");
-            return;
-          }
+        if (surface === "monitor" && typeof senderWindowId === "number") {
+          chrome.windows.get(senderWindowId, (win) => {
+            if (!win || chrome.runtime.lastError) {
+              console.warn("Failed to get window for click");
+              return;
+            }
 
-          chrome.system.display.getInfo((displays) => {
-            const monitor = displays.find(
-              (d) =>
-                win.left !== undefined &&
-                win.top !== undefined &&
-                win.left >= d.bounds.left &&
-                win.left < d.bounds.left + d.bounds.width &&
-                win.top >= d.bounds.top &&
-                win.top < d.bounds.top + d.bounds.height
-            );
+            chrome.system.display.getInfo((displays) => {
+              const monitor = displays.find(
+                (d) =>
+                  win.left !== undefined &&
+                  win.top !== undefined &&
+                  win.left >= d.bounds.left &&
+                  win.left < d.bounds.left + d.bounds.width &&
+                  win.top >= d.bounds.top &&
+                  win.top < d.bounds.top + d.bounds.height
+              );
 
-            if (!monitor) {
-              console.warn("[click-event] No matching monitor found");
+              if (!monitor) {
+                console.warn("[click-event] No matching monitor found");
+                return;
+              }
+
+              const screenX = (win.left ?? 0) + x;
+              const screenY = (win.top ?? 0) + y;
+              const adjX = screenX - monitor.bounds.left;
+              const adjY = screenY - monitor.bounds.top;
+
+              storeClick({ ...baseClick, x: adjX, y: adjY });
+            });
+          });
+          return;
+        }
+
+        if (surface === "window" && typeof senderWindowId === "number") {
+          chrome.windows.get(senderWindowId, (win) => {
+            if (!win || chrome.runtime.lastError) {
+              console.warn("Failed to get window for window click");
               return;
             }
 
             const screenX = (win.left ?? 0) + x;
             const screenY = (win.top ?? 0) + y;
-            const adjX = screenX - monitor.bounds.left;
-            const adjY = screenY - monitor.bounds.top;
 
-            storeClick({ ...baseClick, x: adjX, y: adjY });
+            storeClick({ ...baseClick, x: screenX, y: screenY } as ClickEvent);
           });
-        });
-        return;
+          return;
+        }
+
+        storeClick(baseClick);
       }
-
-      if (surface === "window" && typeof senderWindowId === "number") {
-        chrome.windows.get(senderWindowId, (win) => {
-          if (!win || chrome.runtime.lastError) {
-            console.warn("Failed to get window for window click");
-            return;
-          }
-
-            const screenX = (win.left ?? 0) + x;
-            const screenY = (win.top ?? 0) + y;
-
-          storeClick({ ...baseClick, x: screenX, y: screenY } as ClickEvent);
-        });
-        return;
-      }
-
-      storeClick(baseClick);
-    });
+    );
   });
 
   function storeClick(click: ClickEvent): void {
