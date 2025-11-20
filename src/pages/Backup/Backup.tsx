@@ -41,12 +41,6 @@ interface WindowWithDirectoryPicker extends Window {
   }): Promise<FileSystemDirectoryHandle>;
 }
 
-interface NavigatorWithUserActivation extends Navigator {
-  userActivation?: {
-    isActive: boolean;
-  };
-}
-
 localforage.config({
   driver: localforage.INDEXEDDB,
   name: "screenity",
@@ -90,7 +84,9 @@ const Backup = () => {
     } else if (permission === "prompt") {
       chrome.runtime.sendMessage({ type: "focus-this-tab" });
       return false;
-    } else if ((await fileHandle.requestPermission({ mode: "readwrite" })) === "granted") {
+    } else if (
+      (await fileHandle.requestPermission({ mode: "readwrite" })) === "granted"
+    ) {
       chrome.runtime.sendMessage({ type: "focus-this-tab" });
       return true;
     } else {
@@ -213,7 +209,7 @@ const Backup = () => {
     waitWrite.current = false;
     closeRequest.current = false;
 
-    const nav = navigator as NavigatorWithUserActivation;
+    const nav = navigator;
     if (!nav.userActivation?.isActive) {
       chrome.runtime.sendMessage({ type: "focus-this-tab" });
       return;
