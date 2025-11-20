@@ -4,7 +4,6 @@ import RecorderUI from "./RecorderUI";
 import { createMediaRecorder } from "./mediaRecorderUtils";
 import { sendRecordingError, sendStopRecording } from "./messaging";
 import { getBitrates, getResolutionForQuality } from "./recorderConfig";
-
 import { WebCodecsRecorder } from "./webcodecs/WebCodecsRecorder";
 
 localforage.config({
@@ -13,12 +12,42 @@ localforage.config({
   version: 1,
 });
 
-// Get chunks store
 const chunksStore = localforage.createInstance({
   name: "chunks",
 });
 
 document.body.style.willChange = "contents";
+
+// ============================================================
+// DEBUG FLAG + LOGGER
+// ============================================================
+// Flip this to true locally when you want super detailed logs.
+// You can also override from the devtools console via:
+//   window.SCREENITY_DEBUG_RECORDER = true;
+//const DEBUG_RECORDER =
+//typeof window !== "undefined" ? !!window.SCREENITY_DEBUG_RECORDER : false;
+
+const DEBUG_RECORDER = true;
+
+const logPrefix = "[Screenity Recorder]";
+
+function debug(...args) {
+  if (!DEBUG_RECORDER) return;
+  // eslint-disable-next-line no-console
+  console.log(logPrefix, ...args);
+}
+
+function debugWarn(...args) {
+  if (!DEBUG_RECORDER) return;
+  // eslint-disable-next-line no-console
+  console.warn(logPrefix, ...args);
+}
+
+function debugError(...args) {
+  if (!DEBUG_RECORDER) return;
+  // eslint-disable-next-line no-console
+  console.error(logPrefix, ...args);
+}
 
 const Recorder = () => {
   const isRestarting = useRef(false);
@@ -32,14 +61,11 @@ const Recorder = () => {
 
   const [started, setStarted] = useState(false);
 
-  // Main stream (recording)
   const liveStream = useRef(null);
 
-  // Helper streams
   const helperVideoStream = useRef(null);
   const helperAudioStream = useRef(null);
 
-  // Audio controls, with refs to persist across renders
   const aCtx = useRef(null);
   const destination = useRef(null);
   const audioInputSource = useRef(null);
@@ -71,6 +97,8 @@ const Recorder = () => {
 
   const isRecording = useRef(false);
 
+  debug("Recorder component mounted");
+
   async function canFitChunk(byteLength) {
     const now = performance.now();
     if (now - lastEstimateAt.current < ESTIMATE_INTERVAL_MS) {
@@ -81,8 +109,19 @@ const Recorder = () => {
     try {
       const { usage = 0, quota = 0 } = await navigator.storage.estimate();
       const remaining = quota - usage;
-      return remaining > MIN_HEADROOM + (byteLength || 0);
-    } catch {
+      const ok = remaining > MIN_HEADROOM + (byteLength || 0);
+      if (DEBUG_RECORDER) {
+        debug("Storage estimate", {
+          usage,
+          quota,
+          remaining,
+          byteLength,
+          ok,
+        });
+      }
+      return ok;
+    } catch (err) {
+      debugWarn("navigator.storage.estimate() failed, assuming OK", err);
       return !lowStorageAbort.current;
     }
   }
@@ -90,16 +129,8 @@ const Recorder = () => {
   async function saveChunk(e, i) {
     const ts = e.timecode ?? 0;
 
-    // FLAG: disabled duplicate chunk check due to issues with some devices
-    // if (
-    //   savedCount.current > 0 &&
-    //   ts === lastTimecode.current &&
-    //   e.data.size === lastSize.current
-    // ) {
-    //   return false;
-    // }
-
     if (!(await canFitChunk(e.data.size))) {
+      debugWarn("Low storage, aborting recording");
       lowStorageAbort.current = true;
       chrome.storage.local.set({
         recording: false,
@@ -117,7 +148,15 @@ const Recorder = () => {
         chunk: e.data,
         timestamp: ts,
       });
+      if (DEBUG_RECORDER) {
+        debug("Saved chunk to IndexedDB", {
+          key: `chunk_${i}`,
+          size: e.data.size,
+          ts,
+        });
+      }
     } catch (err) {
+      debugError("Failed to save chunk, aborting recording", err);
       lowStorageAbort.current = true;
       chrome.storage.local.set({
         recording: false,
@@ -144,8 +183,15 @@ const Recorder = () => {
     draining.current = true;
 
     try {
+      if (DEBUG_RECORDER) {
+        debug("Draining queue start", {
+          pending: pending.current.length,
+          pendingBytes: pendingBytes.current,
+        });
+      }
       while (pending.current.length) {
         if (lowStorageAbort.current) {
+          debugWarn("Low storage while draining, clearing queue");
           pending.current.length = 0;
           pendingBytes.current = 0;
           break;
@@ -155,6 +201,7 @@ const Recorder = () => {
         pendingBytes.current -= e.data.size;
 
         if (!(await canFitChunk(e.data.size))) {
+          debugWarn("Low storage during drain, stopping recording");
           lowStorageAbort.current = true;
           chrome.storage.local.set({
             recording: false,
@@ -173,40 +220,55 @@ const Recorder = () => {
         if (saved) index.current = i + 1;
       }
     } finally {
+      if (DEBUG_RECORDER) {
+        debug("Draining queue finished", {
+          pending: pending.current.length,
+          pendingBytes: pendingBytes.current,
+        });
+      }
       draining.current = false;
     }
   }
 
   async function waitForDrain() {
+    if (DEBUG_RECORDER) {
+      debug("waitForDrain() called");
+    }
     while (draining.current || pending.current.length) {
       await new Promise((r) => setTimeout(r, 10));
+    }
+    if (DEBUG_RECORDER) {
+      debug("waitForDrain() resolved");
     }
   }
 
   useEffect(() => {
     chrome.storage.local.get(["backup"], (result) => {
-      if (result.backup) {
-        backupRef.current = true;
-      } else {
-        backupRef.current = false;
-      }
+      backupRef.current = !!result.backup;
+      debug("Loaded backup flag from storage", backupRef.current);
     });
   }, []);
 
   async function startRecording() {
-    // Check that a recording is not already in progress
-    if (recorder.current !== null) return;
+    if (recorder.current !== null) {
+      debugWarn("startRecording() called but recorder already exists");
+      return;
+    }
+
+    debug("startRecording()");
 
     navigator.storage.persist();
     if (
       !helperVideoStream.current ||
       helperVideoStream.current.getVideoTracks().length === 0
     ) {
+      debugError("No video tracks available in helperVideoStream");
       sendRecordingError("No video tracks available");
       return;
     }
 
     await chunksStore.clear();
+    debug("Cleared chunksStore");
 
     lastTimecode.current = 0;
     lastSize.current = 0;
@@ -223,22 +285,37 @@ const Recorder = () => {
     const { audioBitsPerSecond, videoBitsPerSecond } =
       getBitrates(qualityValue);
 
-    // Decide if we can use WebCodecs
+    debug("Bitrates resolved", {
+      qualityValue,
+      audioBitsPerSecond,
+      videoBitsPerSecond,
+    });
+
+    // FLAG: FORCE OLD MediaRecorder for testing
+    const FORCE_MEDIARECORDER = false;
+
     const canUseWebCodecs =
+      !FORCE_MEDIARECORDER &&
       typeof VideoEncoder !== "undefined" &&
       typeof AudioEncoder !== "undefined" &&
       typeof MediaStreamTrackProcessor !== "undefined";
 
-    // Get basic video info
     const videoTrack = liveStream.current?.getVideoTracks()[0] ?? null;
     const settings = videoTrack?.getSettings() || {};
     const width = settings.width ?? 1920;
     const height = settings.height ?? 1080;
 
-    // fps from storage
     const { fpsValue } = await chrome.storage.local.get(["fpsValue"]);
     let fps = parseInt(fpsValue);
     if (Number.isNaN(fps)) fps = 30;
+
+    debug("Recorder capabilities", {
+      canUseWebCodecs,
+      FORCE_MEDIARECORDER,
+      width,
+      height,
+      fps,
+    });
 
     chrome.storage.local.set({
       recording: true,
@@ -249,10 +326,7 @@ const Recorder = () => {
     isRestarting.current = false;
     index.current = 0;
 
-    // Common "onChunk" handler that uses your existing queue + drain logic
-    // Common "onChunk" handler
     const handleChunk = async (data, timestampMs) => {
-      // 🔹 WebCodecs path: save directly, no queue, no canFitChunk
       if (useWebCodecs.current) {
         const blob =
           data instanceof Blob ? data : new Blob([data], { type: "video/mp4" });
@@ -260,37 +334,35 @@ const Recorder = () => {
         const ts = timestampMs ?? 0;
         const i = index.current;
 
-        console.log(
-          "[RECORDER] WebCodecs handleChunk → index",
-          i,
-          "size",
-          blob.size,
-          "ts",
-          ts
-        );
-
         try {
           await chunksStore.setItem(`chunk_${i}`, {
             index: i,
             chunk: blob,
             timestamp: ts,
           });
-          console.log("[RECORDER] WebCodecs saved chunk_", i);
           index.current = i + 1;
           hasChunks.current = true;
           savedCount.current += 1;
+
+          if (DEBUG_RECORDER) {
+            debug("WebCodecs chunk saved", {
+              i,
+              ts,
+              size: blob.size,
+              savedCount: savedCount.current,
+            });
+          }
 
           if (backupRef.current) {
             chrome.runtime.sendMessage({ type: "write-file", index: i });
           }
         } catch (err) {
-          console.error("[RECORDER] WebCodecs saveChunk error", err);
+          debugError("Failed to save WebCodecs chunk", err);
         }
 
         return;
       }
 
-      // 🔹 MediaRecorder path (unchanged)
       if (lowStorageAbort.current) return;
 
       const blob =
@@ -310,7 +382,19 @@ const Recorder = () => {
       pending.current.push(e);
       pendingBytes.current += e.data.size;
 
+      if (DEBUG_RECORDER) {
+        debug("Queued MediaRecorder chunk", {
+          size: blob.size,
+          timecode: e.timecode,
+          pending: pending.current.length,
+          pendingBytes: pendingBytes.current,
+        });
+      }
+
       if (pendingBytes.current > MAX_PENDING_BYTES) {
+        debugWarn(
+          "Pending bytes exceeded threshold, pausing MediaRecorder and draining queue"
+        );
         try {
           if (
             recorder.current instanceof MediaRecorder &&
@@ -325,7 +409,11 @@ const Recorder = () => {
           ) {
             recorder.current.resume();
           }
-        } catch {
+        } catch (err) {
+          debugError(
+            "Error while draining queue with MediaRecorder paused",
+            err
+          );
           await drainQueue();
         }
       }
@@ -335,20 +423,30 @@ const Recorder = () => {
 
     try {
       if (canUseWebCodecs) {
-        // ✅ Use WebCodecs backend
         useWebCodecs.current = true;
+
+        const hasAudioTrack =
+          !!liveStream.current &&
+          typeof liveStream.current.getAudioTracks === "function" &&
+          liveStream.current.getAudioTracks().length > 0;
+
+        debug("Initializing WebCodecsRecorder", {
+          hasAudioTrack,
+          videoBitsPerSecond,
+          audioBitsPerSecond,
+        });
 
         recorder.current = new WebCodecsRecorder(liveStream.current, {
           width,
           height,
           fps,
           videoBitrate: videoBitsPerSecond,
-          audioBitrate: audioBitsPerSecond,
+          audioBitrate: hasAudioTrack ? audioBitsPerSecond : undefined,
+          enableAudio: hasAudioTrack,
+          debug: DEBUG_RECORDER,
           onFinalized: async () => {
-            // Finish writing any remaining chunks (usually none)
+            debug("WebCodecsRecorder onFinalized()");
             await waitForDrain();
-
-            // Let the editor know the MP4 blobs are ready
             if (!sentLast.current) {
               sentLast.current = true;
               isFinishing.current = false;
@@ -356,39 +454,43 @@ const Recorder = () => {
             }
           },
           onChunk: (chunkData, timestampUs) => {
-            // chunkData = Uint8Array from muxer
             const blob = new Blob([chunkData], { type: "video/mp4" });
-
-            // Convert microseconds → ms (what the rest of your code expects)
             const timestampMs = timestampUs
               ? Math.floor(timestampUs / 1000)
               : 0;
-
+            if (DEBUG_RECORDER) {
+              debug("WebCodecsRecorder onChunk", {
+                size: blob.size,
+                timestampUs,
+                timestampMs,
+              });
+            }
             handleChunk(blob, timestampMs);
           },
           onError: (err) => {
-            console.error("[WebCodecsRecorder] error", err);
+            debugError("WebCodecsRecorder error", err);
             sendRecordingError(String(err));
           },
           onStop: async () => {
+            debug("WebCodecsRecorder onStop()");
             await waitForDrain();
           },
         });
 
         const ok = await recorder.current.start();
 
+        debug("WebCodecsRecorder.start() result", ok);
+
         if (!ok) {
-          console.error(
-            "[RECORDER] WebCodecs start failed — falling back to MediaRecorder."
+          debugWarn(
+            "Falling back to MediaRecorder because WebCodecsRecorder failed"
           );
           useWebCodecs.current = false;
           recorder.current = null;
-
-          // fall back into MediaRecorder path
           return await startRecording();
         }
       } else {
-        // 🔁 Fallback to MediaRecorder (current behavior)
+        debug("Using MediaRecorder fallback");
         useWebCodecs.current = false;
         recorder.current = createMediaRecorder(liveStream.current, {
           audioBitsPerSecond,
@@ -397,7 +499,9 @@ const Recorder = () => {
 
         try {
           recorder.current.start(1000);
+          debug("MediaRecorder.start(1000) called");
         } catch (err) {
+          debugError("Failed to start MediaRecorder", err);
           sendRecordingError(
             "Failed to start recording: " + JSON.stringify(err)
           );
@@ -405,6 +509,7 @@ const Recorder = () => {
         }
 
         recorder.current.onerror = (ev) => {
+          debugError("MediaRecorder.onerror", ev);
           chrome.runtime.sendMessage({
             type: "recording-error",
             error: "mediarecorder",
@@ -413,6 +518,7 @@ const Recorder = () => {
         };
 
         recorder.current.onstop = async () => {
+          debug("MediaRecorder.onstop");
           try {
             recorder.current.requestData();
           } catch {}
@@ -427,6 +533,7 @@ const Recorder = () => {
 
         recorder.current.ondataavailable = async (e) => {
           if (!e || !e.data || !e.data.size) {
+            debugWarn("MediaRecorder.ondataavailable with empty data", e);
             if (
               recorder.current instanceof MediaRecorder &&
               recorder.current.state === "inactive"
@@ -441,19 +548,27 @@ const Recorder = () => {
             return;
           }
 
+          if (DEBUG_RECORDER) {
+            debug("MediaRecorder.ondataavailable", {
+              size: e.data.size,
+              timecode: e.timecode ?? 0,
+            });
+          }
+
           await handleChunk(e.data, e.timecode ?? 0);
         };
       }
     } catch (err) {
+      debugError("startRecording() top-level error", err);
       sendRecordingError(JSON.stringify(err));
       return;
     }
 
-    // Same audio/video track onended logic
     if (helperAudioStream.current) {
       const track = helperAudioStream.current.getAudioTracks()[0];
       if (track) {
         track.onended = () => {
+          debugWarn("helperAudioStream audio track ended");
           chrome.storage.local.set({ recording: false });
           sendStopRecording();
         };
@@ -461,6 +576,7 @@ const Recorder = () => {
     }
 
     liveStream.current.getVideoTracks()[0].onended = () => {
+      debugWarn("liveStream video track ended");
       chrome.storage.local.set({
         recording: false,
         restarting: false,
@@ -470,6 +586,7 @@ const Recorder = () => {
     };
 
     helperVideoStream.current.getVideoTracks()[0].onended = () => {
+      debugWarn("helperVideoStream video track ended");
       chrome.storage.local.set({
         recording: false,
         restarting: false,
@@ -480,10 +597,14 @@ const Recorder = () => {
   }
 
   async function warmUpStream(liveStream) {
+    debug("warmUpStream() start", {
+      hasVideo: liveStream.getVideoTracks().length,
+      hasAudio: liveStream.getAudioTracks().length,
+    });
+
     const videoTrack = liveStream.getVideoTracks()[0];
     const audioTrack = liveStream.getAudioTracks()[0];
 
-    // 1) Probe video track for a real frame
     await new Promise(async (resolve) => {
       const proc = new MediaStreamTrackProcessor({ track: videoTrack });
       const reader = proc.readable.getReader();
@@ -492,6 +613,10 @@ const Recorder = () => {
         const { value: frame } = await reader.read();
         if (frame) {
           if (frame.codedWidth > 0 && frame.codedHeight > 0) {
+            debug("warmUpStream() video frame OK", {
+              codedWidth: frame.codedWidth,
+              codedHeight: frame.codedHeight,
+            });
             frame.close();
             reader.releaseLock();
             resolve();
@@ -502,7 +627,6 @@ const Recorder = () => {
       }
     });
 
-    // 2) Probe audio track for real samples
     if (audioTrack) {
       await new Promise(async (resolve) => {
         const proc = new MediaStreamTrackProcessor({ track: audioTrack });
@@ -511,6 +635,9 @@ const Recorder = () => {
         while (true) {
           const { value: audio } = await reader.read();
           if (audio && audio.numberOfFrames > 0) {
+            debug("warmUpStream() audio OK", {
+              numberOfFrames: audio.numberOfFrames,
+            });
             audio.close?.();
             reader.releaseLock();
             resolve();
@@ -521,14 +648,15 @@ const Recorder = () => {
       });
     }
 
-    console.log("[warmUp] audio + video tracks are now stable");
+    debug("warmUpStream() done");
   }
 
   async function stopRecording() {
     if (isFinishing.current) {
-      console.log("[RECORDER] stopRecording ignored (already running)");
+      debugWarn("stopRecording() called while already finishing");
       return;
     }
+    debug("stopRecording()");
     isFinishing.current = true;
     isRecording.current = false;
 
@@ -537,8 +665,10 @@ const Recorder = () => {
         useWebCodecs.current &&
         recorder.current instanceof WebCodecsRecorder
       ) {
+        debug("Stopping WebCodecsRecorder");
         await recorder.current.stop();
       } else if (recorder.current instanceof MediaRecorder) {
+        debug("Stopping MediaRecorder");
         try {
           recorder.current.requestData();
         } catch {}
@@ -546,14 +676,15 @@ const Recorder = () => {
           recorder.current.stop();
         }
       }
-    } catch {}
+    } catch (err) {
+      debugError("stopRecording() error while stopping recorder", err);
+    }
 
     await waitForDrain();
     recorder.current = null;
 
-    // ❗ Only fully release tracks if the user is NOT restarting
     if (!isRestarting.current) {
-      console.log("[RECORDER] stopRecording(): fully stopping all tracks");
+      debug("Stopping tracks and clearing streams");
       liveStream.current?.getTracks().forEach((t) => t.stop());
       helperVideoStream.current?.getTracks().forEach((t) => t.stop());
       helperAudioStream.current?.getTracks().forEach((t) => t.stop());
@@ -561,12 +692,11 @@ const Recorder = () => {
       liveStream.current = null;
       helperVideoStream.current = null;
       helperAudioStream.current = null;
-    } else {
-      console.log("[RECORDER] stopRecording(): preserving streams for restart");
     }
   }
 
   const dismissRecording = () => {
+    debug("dismissRecording()");
     uiClosing.current = true;
     isRecording.current = false;
     window.close();
@@ -574,38 +704,39 @@ const Recorder = () => {
 
   const restartRecording = async () => {
     if (isRestarting.current) {
-      console.warn("[RECORDER] duplicate restart ignored");
+      debugWarn("restartRecording() called while already restarting");
       return;
     }
-    console.log("[RECORDER] restartRecording()");
+
+    debug("restartRecording()");
 
     isRestarting.current = true;
     isRecording.current = false;
     sentLast.current = false;
     isFinishing.current = false;
 
-    // Stop encoders, but keep tracks alive
     try {
       if (
         useWebCodecs.current &&
         recorder.current instanceof WebCodecsRecorder
       ) {
+        debug("Cleaning up WebCodecsRecorder for restart");
         recorder.current.running = false;
         recorder.current.paused = false;
         await recorder.current.cleanup();
       } else if (recorder.current instanceof MediaRecorder) {
+        debug("Stopping MediaRecorder for restart");
         recorder.current.ondataavailable = null;
         recorder.current.onstop = null;
         recorder.current.onerror = null;
         if (recorder.current.state !== "inactive") recorder.current.stop();
       }
     } catch (err) {
-      console.warn("[RECORDER] restart stop error", err);
+      debugError("Error while restarting recorder", err);
     }
 
     recorder.current = null;
 
-    // Reset chunks + timestamps
     pending.current = [];
     pendingBytes.current = 0;
     draining.current = false;
@@ -615,17 +746,14 @@ const Recorder = () => {
     lastTimecode.current = 0;
     await chunksStore.clear();
 
-    // ❌ DO NOT start recording here
-    // UI will decide when to start
-    console.log("[RECORDER] ready for restart — waiting for startRecording()");
-
-    // Ensure next start uses WebCodecs cleanly
     useWebCodecs.current = false;
 
     isRestarting.current = false;
+    debug("restartRecording() done, ready to start again");
   };
 
   async function startAudioStream(id) {
+    debug("startAudioStream()", { id });
     const audioStreamOptions = {
       mimeType: "video/webm;codecs=vp8,opus",
       audio: {
@@ -638,10 +766,16 @@ const Recorder = () => {
     const result = await navigator.mediaDevices
       .getUserMedia(audioStreamOptions)
       .then((stream) => {
+        debug("startAudioStream() got stream with exact device", {
+          hasAudio: stream.getAudioTracks().length,
+        });
         return stream;
       })
       .catch((err) => {
-        // Try again without the device ID
+        debugWarn(
+          "startAudioStream() exact device failed, retrying generic",
+          err
+        );
         const audioStreamOptions = {
           mimeType: "video/webm;codecs=vp8,opus",
           audio: true,
@@ -650,52 +784,69 @@ const Recorder = () => {
         return navigator.mediaDevices
           .getUserMedia(audioStreamOptions)
           .then((stream) => {
+            debug("startAudioStream() got generic stream", {
+              hasAudio: stream.getAudioTracks().length,
+            });
             return stream;
           })
-          .catch((err) => {
+          .catch((err2) => {
+            debugError("startAudioStream() failed completely", err2);
             return null;
           });
       });
 
     return result;
   }
-  // Set audio input volume
+
   function setAudioInputVolume(volume) {
+    if (!audioInputGain.current) {
+      debugWarn("setAudioInputVolume() called but audioInputGain is null");
+      return;
+    }
+    debug("setAudioInputVolume()", volume);
     audioInputGain.current.gain.value = volume;
   }
 
-  // Set audio output volume
   function setAudioOutputVolume(volume) {
+    if (!audioOutputGain.current) {
+      debugWarn("setAudioOutputVolume() called but audioOutputGain is null");
+      return;
+    }
+    debug("setAudioOutputVolume()", volume);
     audioOutputGain.current.gain.value = volume;
   }
 
   const setMic = async (result) => {
+    debug("setMic()", result);
     if (helperAudioStream.current != null) {
       if (result.active) {
         setAudioInputVolume(1);
       } else {
         setAudioInputVolume(0);
       }
-    } else {
-      // No microphone available
     }
   };
 
   async function startStream(data, id, options, permissions, permissions2) {
-    // Get quality value
-    const { qualityValue } = await chrome.storage.local.get(["qualityValue"]);
+    debug("startStream()", {
+      recordingType: data.recordingType,
+      id,
+      isTab: isTab.current,
+      options,
+      permissions: permissions?.state,
+      micPermissions: permissions2?.state,
+    });
 
+    const { qualityValue } = await chrome.storage.local.get(["qualityValue"]);
     const { width, height } = getResolutionForQuality(qualityValue);
 
     const { fpsValue } = await chrome.storage.local.get(["fpsValue"]);
     let fps = parseInt(fpsValue);
 
-    // Check if fps is a number
     if (isNaN(fps)) {
       fps = 30;
     }
 
-    // Check if the user selected a tab in desktopcapture
     let userConstraints = {
       audio: {
         deviceId: data.defaultAudioInput,
@@ -720,16 +871,26 @@ const Recorder = () => {
       userConstraints.audio = false;
     }
 
+    debug("User media constraints", {
+      userConstraints,
+      qualityValue,
+      fps,
+    });
+
     let userStream;
     if (
       permissions.state != "denied" &&
       permissions2.state != "denied" &&
       data.recordingType === "camera"
     ) {
+      debug("Requesting camera userStream");
       userStream = await navigator.mediaDevices.getUserMedia(userConstraints);
+      debug("Camera userStream acquired", {
+        videoTracks: userStream.getVideoTracks().length,
+        audioTracks: userStream.getAudioTracks().length,
+      });
     }
 
-    // Save the helper streams
     if (data.recordingType === "camera") {
       helperVideoStream.current = userStream;
     } else {
@@ -744,45 +905,52 @@ const Recorder = () => {
           mandatory: {
             chromeMediaSource: isTab.current ? "tab" : "desktop",
             chromeMediaSourceId: id,
-            // FLAG: try ideal + max to enforce exact resolution
-            // maxWidth: width,
-            // maxHeight: height,
-            // width: { ideal: width, max: width },
-            // height: { ideal: height, max: height },
+            maxWidth: width,
+            maxHeight: height,
+            width: { ideal: width, max: width },
+            height: { ideal: height, max: height },
             maxFrameRate: fps,
           },
         },
       };
+
+      debug("desktopCapture getUserMedia constraints", constraints);
 
       let stream;
 
       try {
         stream = await navigator.mediaDevices.getUserMedia(constraints);
 
-        // Check if the stream actually has data in it
         if (stream.getVideoTracks().length === 0) {
+          debugError("No video tracks returned from getUserMedia");
           sendRecordingError("No video tracks available");
           return;
         }
       } catch (err) {
+        debugError("Failed to get user media for desktop/tab capture", err);
         sendRecordingError("Failed to get user media: " + JSON.stringify(err));
         return;
       }
 
+      debug("desktop/tab stream acquired", {
+        videoTracks: stream.getVideoTracks().length,
+        audioTracks: stream.getAudioTracks().length,
+      });
+
       if (isTab.current) {
-        // Continue to play the captured audio to the user.
         const output = new AudioContext();
         const source = output.createMediaStreamSource(stream);
         source.connect(output.destination);
+        debug("Created playback AudioContext for tab preview");
       }
 
       helperVideoStream.current = stream;
 
       const surface = stream.getVideoTracks()[0].getSettings().displaySurface;
+      debug("Display surface", surface);
       chrome.runtime.sendMessage({ type: "set-surface", surface: surface });
     }
 
-    // Create an audio context, destination, and stream
     aCtx.current = new AudioContext();
     destination.current = aCtx.current.createMediaStreamDestination();
     liveStream.current = new MediaStream();
@@ -790,49 +958,45 @@ const Recorder = () => {
     const micstream = await startAudioStream(data.defaultAudioInput);
     helperAudioStream.current = micstream;
 
-    // Check if micstream has an audio track
-    if (
-      helperAudioStream.current != null &&
-      helperAudioStream.current.getAudioTracks().length > 0
-    ) {
-      audioInputGain.current = aCtx.current.createGain();
-      audioInputSource.current = aCtx.current.createMediaStreamSource(
-        helperAudioStream.current
-      );
-      audioInputSource.current
-        .connect(audioInputGain.current)
-        .connect(destination.current);
-    } else {
-      // No microphone available
-    }
-
     if (helperAudioStream.current != null && !data.micActive) {
       setAudioInputVolume(0);
     }
 
-    // Check if stream has an audio track
-    if (helperVideoStream.current.getAudioTracks().length > 0) {
-      audioOutputGain.current = aCtx.current.createGain();
-      audioOutputSource.current = aCtx.current.createMediaStreamSource(
-        helperVideoStream.current
+    // System/Tab audio
+    const sysTracks = helperVideoStream.current.getAudioTracks();
+    debug("System/tab audio tracks", sysTracks.length);
+    if (sysTracks.length > 0) {
+      const sysSource = aCtx.current.createMediaStreamSource(
+        new MediaStream([sysTracks[0]])
       );
-      audioOutputSource.current
-        .connect(audioOutputGain.current)
-        .connect(destination.current);
-    } else {
-      // No system audio available
+      audioOutputGain.current = aCtx.current.createGain();
+      sysSource.connect(audioOutputGain.current).connect(destination.current);
     }
 
-    // Add the tracks to the stream
+    // Mic audio
+    const micTracks = helperAudioStream.current?.getAudioTracks() ?? [];
+    debug("Mic audio tracks", micTracks.length);
+    if (micTracks.length > 0) {
+      const micSource = aCtx.current.createMediaStreamSource(
+        new MediaStream([micTracks[0]])
+      );
+      audioInputGain.current = aCtx.current.createGain();
+      micSource.connect(audioInputGain.current).connect(destination.current);
+
+      if (!data.micActive) {
+        audioInputGain.current.gain.value = 0;
+      }
+    }
+
     liveStream.current.addTrack(helperVideoStream.current.getVideoTracks()[0]);
 
     const mainVideoTrack = liveStream.current?.getVideoTracks()[0];
     if (mainVideoTrack) {
       mainVideoTrack.onmute = () => {
-        console.warn("[RECORDER] video track muted — possible display sleep");
+        debugWarn("mainVideoTrack muted");
       };
       mainVideoTrack.oninactive = () => {
-        console.warn("[RECORDER] video track inactive — auto-stop");
+        debugWarn("mainVideoTrack inactive → stopping recording");
         stopRecording();
       };
     }
@@ -846,17 +1010,20 @@ const Recorder = () => {
       );
     }
 
-    // Send message to go back to the previously active tab
+    debug("liveStream ready", {
+      videoTracks: liveStream.current.getVideoTracks().length,
+      audioTracks: liveStream.current.getAudioTracks().length,
+    });
+
     setStarted(true);
 
-    // after helperVideoStream & helperAudioStream are resolved:
     await warmUpStream(liveStream.current);
 
     chrome.runtime.sendMessage({ type: "reset-active-tab" });
   }
 
   async function startStreaming(data) {
-    // Check user permissions for camera and microphone individually
+    debug("startStreaming()", { data });
     const permissions = await navigator.permissions.query({
       name: "camera",
     });
@@ -864,23 +1031,35 @@ const Recorder = () => {
       name: "microphone",
     });
 
+    debug("Permissions", {
+      camera: permissions.state,
+      microphone: permissions2.state,
+    });
+
     try {
       if (data.recordingType === "camera") {
+        debug("Streaming camera recording");
         startStream(data, null, null, permissions, permissions2);
       } else if (!isTab.current) {
         let captureTypes = ["screen", "window", "tab", "audio"];
         if (tabPreferred.current) {
           captureTypes = ["tab", "screen", "window", "audio"];
         }
+        debug("desktopCapture.chooseDesktopMedia", {
+          captureTypes,
+          tabPreferred: tabPreferred.current,
+        });
         chrome.desktopCapture.chooseDesktopMedia(
           captureTypes,
           null,
           (streamId, options) => {
+            debug("chooseDesktopMedia callback", { streamId, options });
             if (
               streamId === undefined ||
               streamId === null ||
               streamId === ""
             ) {
+              debugWarn("User cancelled the desktop capture modal");
               sendRecordingError("User cancelled the modal", true);
               return;
             } else {
@@ -889,9 +1068,11 @@ const Recorder = () => {
           }
         );
       } else {
+        debug("Streaming with pre-resolved tabID", tabID.current);
         startStream(data, tabID.current, null, permissions, permissions2);
       }
     } catch (err) {
+      debugError("startStreaming() error", err);
       sendRecordingError(
         "Failed to start streaming: " + JSON.stringify(err),
         true
@@ -899,47 +1080,51 @@ const Recorder = () => {
     }
   }
 
-  // Check if trying to record from Playground
   useEffect(() => {
     chrome.storage.local.get(["tabPreferred"], (result) => {
       tabPreferred.current = result.tabPreferred;
+      debug("Loaded tabPreferred", tabPreferred.current);
     });
   }, []);
 
   const getStreamID = async (id) => {
+    debug("getStreamID()", id);
     const streamId = await chrome.tabCapture.getMediaStreamId({
       targetTabId: id,
     });
+    debug("Resolved tabCapture streamId", streamId);
     tabID.current = streamId;
   };
 
-  // FLAG: add protection on page close
   useEffect(() => {
     const handleClose = (e) => {
-      // OK to close if:
+      debug("beforeunload event", {
+        uiClosing: uiClosing.current,
+        isRecording: isRecording.current,
+      });
       if (uiClosing.current || !isRecording.current) return;
 
-      console.warn("[RECORDER] Prevented accidental tab close!");
-
-      // Stop everything immediately but prevent loss
       stopRecording();
 
-      // Show native "are you sure?" dialog to prevent closing
       e.preventDefault();
       e.returnValue = "";
     };
 
     window.addEventListener("beforeunload", handleClose);
     return () => {
+      debug("Removing beforeunload handler");
       window.removeEventListener("beforeunload", handleClose);
     };
   }, []);
 
   const onMessage = useCallback(
     (request, sender, sendResponse) => {
+      if (DEBUG_RECORDER) {
+        debug("onMessage()", request.type, { request, sender });
+      }
+
       if (request.type === "loaded") {
         backupRef.current = request.backup;
-        // FLAG: I don't know why this was a false check before...
         if (!tabPreferred.current) {
           isTab.current = request.isTab;
           if (request.isTab) {
@@ -956,8 +1141,6 @@ const Recorder = () => {
       } else if (request.type === "restart-recording-tab") {
         if (!isRestarting.current) {
           restartRecording();
-        } else {
-          console.warn("[RECORDER] ignoring duplicate restart request");
         }
       } else if (request.type === "stop-recording-tab") {
         stopRecording();
@@ -971,8 +1154,10 @@ const Recorder = () => {
           useWebCodecs.current &&
           recorder.current instanceof WebCodecsRecorder
         ) {
+          debug("Pausing WebCodecsRecorder");
           recorder.current.pause();
         } else if (recorder.current instanceof MediaRecorder) {
+          debug("Pausing MediaRecorder");
           recorder.current.pause();
         }
       } else if (request.type === "resume-recording-tab") {
@@ -981,8 +1166,10 @@ const Recorder = () => {
           useWebCodecs.current &&
           recorder.current instanceof WebCodecsRecorder
         ) {
+          debug("Resuming WebCodecsRecorder");
           recorder.current.resume();
         } else if (recorder.current instanceof MediaRecorder) {
+          debug("Resuming MediaRecorder");
           recorder.current.resume();
         }
       } else if (request.type === "dismiss-recording") {
@@ -993,13 +1180,14 @@ const Recorder = () => {
   );
 
   useEffect(() => {
-    // Event listener (extension messaging)
+    debug("Adding chrome.runtime.onMessage listener");
     chrome.runtime.onMessage.addListener(onMessage);
 
     return () => {
+      debug("Removing chrome.runtime.onMessage listener");
       chrome.runtime.onMessage.removeListener(onMessage);
     };
-  }, []);
+  }, [onMessage]);
 
   return <RecorderUI started={started} isTab={isTab.current} />;
 };

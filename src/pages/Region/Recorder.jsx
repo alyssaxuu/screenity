@@ -1,10 +1,4 @@
-import React, {
-  useEffect,
-  useState,
-  useRef,
-  useCallback,
-  useContext,
-} from "react";
+import React, { useEffect, useRef, useCallback } from "react";
 
 import localforage from "localforage";
 
