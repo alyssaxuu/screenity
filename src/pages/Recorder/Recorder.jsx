@@ -25,8 +25,7 @@ document.body.style.willChange = "contents";
 // You can also override from the devtools console via:
 //   window.SCREENITY_DEBUG_RECORDER = true;
 //const DEBUG_RECORDER =
-//typeof window !== "undefined" ? !!window.SCREENITY_DEBUG_RECORDER : false;
-
+//  typeof window !== "undefined" ? !!window.SCREENITY_DEBUG_RECORDER : false;
 const DEBUG_RECORDER = true;
 
 const logPrefix = "[Screenity Recorder]";

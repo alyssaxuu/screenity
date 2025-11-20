@@ -2,13 +2,12 @@
  * Screenity WebCodecs Recorder
  * Copyright (c) 2025 Serial Labs Ltd.
  *
- * This file is part of Screenity and is licensed under the GNU GPLv3.
- * See the LICENSE file in the project root for details.
+ * Licensed under the GNU GPLv3.
+ * See the LICENSE file for full details.
  *
- * This module implements complex WebCodecs-based recording logic
- * for video/audio sync, muxing, and safe timestamp management.
- * If you reuse or modify this file in another project, GPLv3
- * obligations (including copyleft and attribution) apply.
+ * MP4 recording using WebCodecs + MediaBunny.
+ * Handles H.264 video, AAC audio, timestamp safety,
+ * canvas resizing, pause/resume, and chunked output.
  */
 import { Mp4MuxerWrapper } from "./Mp4MuxerWrapper";
 
@@ -49,6 +48,8 @@ export class WebCodecsRecorder {
     this.selectedVideoCodec = null;
     this.firstVideoFrame = undefined;
     this.frameCount = 0;
+    // Monotonic video frame index for safe timestamps
+    this._videoFrameIndex = 0;
 
     this.resizeCanvas = null;
     this.resizeCtx = null;
@@ -90,6 +91,7 @@ export class WebCodecsRecorder {
     this.videoTimestampOffsetUs = null;
     this.firstVideoFrame = undefined;
     this._stopping = false;
+    this._videoFrameIndex = 0;
 
     if (this.running) return this._startPromise;
 
@@ -168,11 +170,6 @@ export class WebCodecsRecorder {
           this._audioReady = false;
         }
 
-        this.videoProcessor = new MediaStreamTrackProcessor({
-          track: this.videoTrack,
-        });
-        this.videoReader = this.videoProcessor.readable.getReader();
-
         if (audioConfig && this.audioTrack) {
           this.audioProcessor = new MediaStreamTrackProcessor({
             track: this.audioTrack,
@@ -184,6 +181,17 @@ export class WebCodecsRecorder {
           this.log("[WCR] start buffering audio");
           this._audioLoopPromise = this.readAudioLoop();
         }
+
+        // Make sure audio encoder is ready before first video chunk
+        if (this._pendingAudioConfig) {
+          await this.initAudioEncoder(this._pendingAudioConfig);
+          this._audioReady = true;
+        }
+
+        this.videoProcessor = new MediaStreamTrackProcessor({
+          track: this.videoTrack,
+        });
+        this.videoReader = this.videoProcessor.readable.getReader();
 
         this.log("[WCR] creating muxer...");
         this.muxer = new Mp4MuxerWrapper({
@@ -359,6 +367,7 @@ export class WebCodecsRecorder {
     this.videoFallbackStartMs = null;
     this.firstVideoFrame = undefined;
     this.selectedVideoCodec = null;
+    this._videoFrameIndex = 0;
 
     this.resizeCanvas = null;
     this.resizeCtx = null;
@@ -373,22 +382,8 @@ export class WebCodecsRecorder {
     this.log("[WCR] initVideoEncoder()", codecLabel);
 
     this.videoEncoder = new VideoEncoder({
-      output: (chunk, meta = {}) => {
-        if (this.debug) {
-          this.log("[WCR] VIDEO", chunk.type, chunk.timestamp, chunk.duration);
-        }
-        const normalizedMeta = { ...meta };
-        const decoderConfig = normalizedMeta.decoderConfig
-          ? { ...normalizedMeta.decoderConfig }
-          : {};
-
-        decoderConfig.codec = decoderConfig.codec || codecLabel;
-        decoderConfig.codedWidth = decoderConfig.codedWidth || this.targetWidth;
-        decoderConfig.codedHeight =
-          decoderConfig.codedHeight || this.targetHeight;
-        normalizedMeta.decoderConfig = decoderConfig;
-
-        this.muxer.addVideoChunk(chunk, normalizedMeta);
+      output: (chunk, meta) => {
+        this.muxer.addVideoChunk(chunk, meta);
       },
       error: (err) => {
         this.err("[WCR] VideoEncoder error:", err);
@@ -415,10 +410,6 @@ export class WebCodecsRecorder {
     });
 
     this.audioEncoder.configure(config);
-
-    if (this.muxer && this.videoTimestampOffsetUs != null) {
-      this.muxer.setAudioOffset(this.videoTimestampOffsetUs);
-    }
   }
 
   async prepareAudioEncoderConfig() {
@@ -487,42 +478,6 @@ export class WebCodecsRecorder {
     throw new Error("WebCodecsRecorder: No supported H.264 encoder");
   }
 
-  getVideoTimestampUs(frame) {
-    if (typeof frame.timestamp === "number") {
-      if (this.videoTimestampOffsetUs === null) {
-        this.videoTimestampOffsetUs = frame.timestamp;
-      }
-
-      const baseUs = Math.max(
-        0,
-        Math.round(frame.timestamp - this.videoTimestampOffsetUs)
-      );
-
-      return Math.max(0, baseUs - this.totalPausedDurationUs);
-    }
-
-    const now = performance.now();
-    if (!this._lastFrameTime) this._lastFrameTime = now;
-    const delta = now - this._lastFrameTime;
-    this._lastFrameTime = now;
-
-    if (delta > 160 && !this._warnedBackpressure) {
-      this._warnedBackpressure = true;
-      this.warn("[WCR] overload", delta);
-      this.options.onError?.({ type: "encoder-overload", delta });
-    }
-    if (this.videoFallbackStartMs === null) {
-      this.videoFallbackStartMs = now;
-    }
-
-    const baseUs = Math.max(
-      0,
-      Math.round((now - this.videoFallbackStartMs) * 1000)
-    );
-
-    return Math.max(0, baseUs - this.totalPausedDurationUs);
-  }
-
   async readVideoLoop() {
     this.log("[WCR] video loop start");
     if (!this.videoReader || !this.videoEncoder) return;
@@ -565,23 +520,28 @@ export class WebCodecsRecorder {
           this.targetHeight
         );
 
-        const resized = new VideoFrame(this.resizeCanvas, {
-          timestamp: frame.timestamp,
-        });
+        const fps = this.options.fps || 30;
+        const durUs = Math.round(1e6 / fps);
 
-        const timestampUs = this.getVideoTimestampUs(frame);
+        // Monotonic, frame-index-based timestamp to avoid drift/WebCodecs bugs
+        const tsUs = this._videoFrameIndex * durUs;
+        this._videoFrameIndex++;
+
+        const resized = new VideoFrame(this.resizeCanvas, {
+          timestamp: tsUs,
+          duration: durUs, // <-- ADD THIS
+        });
 
         if (this.firstVideoFrame === undefined) {
           this.firstVideoFrame = true;
-          this.videoTimestampOffsetUs = frame.timestamp;
-          this.log("[WCR] baseline:", this.videoTimestampOffsetUs);
+          this.frameCount = 0;
 
-          if (this.muxer)
-            this.muxer.setAudioOffset(this.videoTimestampOffsetUs);
+          if (this.muxer) {
+            this.muxer.setAudioOffset(0);
+          }
 
           if (!this.audioEncoder && this._pendingAudioConfig) {
             await this.initAudioEncoder(this._pendingAudioConfig);
-            await Promise.resolve();
             for (const buf of this._prebufferedAudio) {
               this.audioEncoder.encode(buf);
               buf.close?.();
@@ -591,13 +551,16 @@ export class WebCodecsRecorder {
           }
         }
 
-        const needsKey =
-          this.frameCount === 0 ||
-          this.justResumed ||
-          this.firstVideoFrame === true;
+        // Keyframe only first frame and after resume
+        const keyFrame = this.frameCount === 0 || this.justResumed;
         this.justResumed = false;
 
-        this.videoEncoder.encode(resized, { keyFrame: needsKey });
+        this.videoEncoder.encode(resized, {
+          timestamp: tsUs,
+          duration: durUs,
+          keyFrame,
+        });
+
         this.frameCount++;
 
         resized.close();
@@ -635,8 +598,14 @@ export class WebCodecsRecorder {
           continue;
         }
 
+        if (this.firstAudioTs === null) {
+          this.firstAudioTs = audioData.timestamp;
+        }
+
         try {
-          this.audioEncoder.encode(audioData);
+          this.audioEncoder.encode(audioData, {
+            timestamp: audioData.timestamp - this.firstAudioTs,
+          });
         } catch (err) {
           audioData.close?.();
           this.options.onError?.(err);

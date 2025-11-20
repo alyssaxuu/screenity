@@ -1,14 +1,6 @@
 /*!
- * Screenity WebCodecs Recorder
- * Copyright (c) 2025 Serial Labs Ltd.
- *
- * This file is part of Screenity and is licensed under the GNU GPLv3.
- * See the LICENSE file in the project root for details.
- *
- * This module implements complex WebCodecs-based recording logic
- * for video/audio sync, muxing, and safe timestamp management.
- * If you reuse or modify this file in another project, GPLv3
- * obligations (including copyleft and attribution) apply.
+ * Screenity WebCodecs Recorder - MP4 Muxer Wrapper
+ * Licensed under the GNU GPLv3.
  */
 // @ts-nocheck
 
@@ -21,71 +13,56 @@ import {
   EncodedPacket,
 } from "mediabunny";
 
-export class Mp4MuxerWrapper {
-  constructor(options) {
-    this.options = options;
+interface Mp4MuxerWrapperOptions {
+  width: number;
+  height: number;
+  fps: number;
+  videoBitrate: number;
+  audioBitrate: number;
+  videoCodec?: string;
+  audioCodec?: string;
+  onChunk: (chunk: Uint8Array, timestampUs: number | null) => void | Promise<void>;
+  debug?: boolean;
+}
 
-    // 🔹 Unified debug toggle + wrappers
+export class Mp4MuxerWrapper {
+  private output: Output;
+  private target: BufferTarget;
+
+  private videoSource: EncodedVideoPacketSource;
+  private audioSource: EncodedAudioPacketSource | null = null;
+
+  private videoCodec: string;
+  private audioCodec: string;
+  private pausedOffsetUs = 0;
+  private started = false;
+
+  private videoTimestampOffsetUs: number | null = null;
+  private audioTimestampOffsetUs: number | null = null;
+  private lastVideoTimestampUs = 0;
+  private lastAudioTimestampUs = 0;
+
+  private _lastDecoderConfig: any = null;
+
+  private debug: boolean;
+  private log: (...args: any[]) => void;
+  private warn: (...args: any[]) => void;
+  private err: (...args: any[]) => void;
+
+  constructor(private options: Mp4MuxerWrapperOptions) {
     this.debug = options.debug ?? false;
+
     this.log = (...args) => this.debug && console.log(...args);
     this.warn = (...args) => this.debug && console.warn(...args);
     this.err = (...args) => this.debug && console.error(...args);
 
-    this.target = new BufferTarget();
     this.videoCodec = options.videoCodec || "avc";
     this.audioCodec = options.audioCodec || "aac";
-    this.pausedOffsetUs = 0;
 
-    this.ftypChunk = null;
-    this.moovChunk = null;
-    this.headerEmitted = false;
-
-    this.pendingMoof = null;
-    this.pendingMoofTimestampSeconds = null;
-    this.fragmentTimestampOffsetSeconds = null;
-    this.videoTimestampOffsetUs = null;
-    this.audioTimestampOffsetUs = null;
-    this.lastVideoTimestampUs = 0;
-    this.lastAudioTimestampUs = 0;
-
-    this.started = false;
-
-    const minFragmentDuration = Math.max(
-      0.2,
-      (this.options.fps ? 1 / this.options.fps : 1 / 30) * 6
-    );
-
+    this.target = new BufferTarget();
     this.output = new Output({
       format: new Mp4OutputFormat({
-        fastStart: "in-memory",
-        minimumFragmentDuration: minFragmentDuration,
-        onFtyp: (data) => {
-          this.ftypChunk = this.cloneChunk(data);
-          this.emitHeaderIfReady();
-        },
-        onMoov: (data) => {
-          this.moovChunk = this.cloneChunk(data);
-          this.emitHeaderIfReady();
-        },
-        onMoof: (data, _pos, timestampSeconds = 0) => {
-          this.pendingMoof = this.cloneChunk(data);
-          this.pendingMoofTimestampSeconds =
-            this.normalizeFragmentTimestamp(timestampSeconds);
-        },
-        onMdat: (data) => {
-          if (!this.pendingMoof) return;
-          const fragment = this.concatChunks([
-            this.pendingMoof,
-            this.cloneChunk(data),
-          ]);
-          const tsUs =
-            this.pendingMoofTimestampSeconds != null
-              ? Math.round(this.pendingMoofTimestampSeconds * 1e6)
-              : null;
-          this.emitChunk(fragment, tsUs);
-          this.pendingMoof = null;
-          this.pendingMoofTimestampSeconds = null;
-        },
+        fastStart: false, // metadata at end, more compatible
       }),
       target: this.target,
     });
@@ -98,146 +75,115 @@ export class Mp4MuxerWrapper {
 
   enableAudio() {
     if (!this.audioSource) {
+      this.log("[MUXER] enableAudio");
       this.audioSource = new EncodedAudioPacketSource(this.audioCodec);
       this.output.addAudioTrack(this.audioSource);
     }
   }
 
-  addVideoChunk(chunk, meta) {
-    const packet = this.buildPacketFromChunk(chunk, meta, "video");
+  addVideoChunk(chunk: EncodedVideoChunk, meta: any) {
+    if (meta?.decoderConfig) {
+      this._lastDecoderConfig = meta.decoderConfig;
+    } else if (!meta.decoderConfig && this._lastDecoderConfig) {
+      meta.decoderConfig = this._lastDecoderConfig;
+    }
+
+    const packet = this.buildPacket(chunk, meta, "video");
     return this.videoSource.add(packet, meta);
   }
 
-  addAudioChunk(chunk, meta) {
-    if (!this.audioSource) {
-      this.warn("[MUXER] audioSource missing — ignoring packet");
-      return;
-    }
-    const packet = this.buildPacketFromChunk(chunk, meta, "audio");
+  addAudioChunk(chunk: EncodedAudioChunk, meta: any) {
+    if (!this.audioSource) return;
+
+    const packet = this.buildPacket(chunk, meta, "audio");
     return this.audioSource.add(packet, meta);
   }
 
   async start() {
     if (this.started) return;
+    this.log("[MUXER] start");
     await this.output.start();
     this.started = true;
   }
 
   async finalize() {
-		this.log?.("[MUXER] finalize() called");
+    this.log("[MUXER] finalize");
+    await this.output.finalize();
 
-		try {
-			await this.output.finalize();
-		} catch (err) {
-			this.err?.("[MUXER] finalize internal error:", err);
-		}
+    const data = this.target.buffer;
+    if (data?.byteLength) {
+      this.log("[MUXER] emitting final file", data.byteLength, "bytes");
+      this.emitChunk(new Uint8Array(data), null);
+    }
+  }
 
-		// IMPORTANT: Do NOT read this.target.buffer here
-		// It may be gigabytes for long recordings and crash memory.
-		this.log?.("[MUXER] finalize completed (streaming mode, no buffer concat)");
-	}
-
-  setPausedOffset(offsetUs) {
+  setPausedOffset(offsetUs: number) {
     this.pausedOffsetUs = offsetUs;
   }
 
-  setAudioOffset(offsetUs) {
+  setAudioOffset(offsetUs: number) {
     this.audioTimestampOffsetUs = offsetUs;
   }
 
-  emitHeaderIfReady() {
-    if (this.headerEmitted || !this.ftypChunk || !this.moovChunk) return;
-    const header = this.concatChunks([this.ftypChunk, this.moovChunk]);
-    this.headerEmitted = true;
-    this.emitChunk(header, 0);
-  }
-
-  emitChunk(chunk, timestampUs) {
+  private emitChunk(chunk: Uint8Array, timestampUs: number | null) {
     try {
-      const r = this.options.onChunk?.(chunk, timestampUs ?? null);
-      if (r && typeof r.then === "function") {
-        r.catch((err) => this.err("[MUXER] onChunk rejected:", err));
+      const res = this.options.onChunk?.(chunk, timestampUs ?? null);
+      if (res instanceof Promise) {
+        res.catch((err) => this.err("[MUXER] onChunk rejected", err));
       }
     } catch (err) {
-      this.err("[MUXER] onChunk error:", err);
+      this.err("[MUXER] onChunk error", err);
     }
   }
 
-  cloneChunk(data) {
-    return new Uint8Array(data);
-  }
-
-  concatChunks(chunks) {
-    const total = chunks.reduce((sum, c) => sum + c.byteLength, 0);
-    const combined = new Uint8Array(total);
-    let off = 0;
-    for (const c of chunks) {
-      combined.set(c, off);
-      off += c.byteLength;
-    }
-    return combined;
-  }
-
-  buildPacketFromChunk(chunk, meta, kind) {
+  private buildPacket(
+    chunk: EncodedVideoChunk | EncodedAudioChunk,
+    meta: any,
+    type: "video" | "audio"
+  ) {
     const data = new Uint8Array(chunk.byteLength);
     chunk.copyTo(data);
 
-    const relativeTimestampUs = this.normalizeSampleTimestamp(
-      kind,
-      chunk.timestamp,
-      chunk.duration || 0
-    );
+    const tsUs = this.normalizeTimestamp(type, chunk.timestamp, chunk.duration || 0);
+    const durSec = (chunk.duration || 0) / 1e6;
 
-    return new EncodedPacket(
-      data,
-      chunk.type,
-      relativeTimestampUs / 1e6,
-      (chunk.duration || 0) / 1e6
-    );
+    return new EncodedPacket(data, chunk.type, tsUs / 1e6, durSec);
   }
 
-  normalizeSampleTimestamp(kind, timestampUs, durationUs = 0) {
-    const offsetKey =
-      kind === "video" ? "videoTimestampOffsetUs" : "audioTimestampOffsetUs";
-    const lastKey =
-      kind === "video" ? "lastVideoTimestampUs" : "lastAudioTimestampUs";
+  private normalizeTimestamp(
+    type: "video" | "audio",
+    timestampUs?: number,
+    durationUs = 0
+  ) {
+    const key = type === "video" ? "lastVideoTimestampUs" : "lastAudioTimestampUs";
+    const last = (this as any)[key] ?? 0;
 
-    if (typeof timestampUs !== "number") {
-      const prev = this[lastKey] ?? 0;
-      const next = prev + durationUs;
-      this[lastKey] = next;
+    if (type === "audio") {
+      const next = last + durationUs;
+      (this as any)[key] = next;
+      this.log(`[MUX] audio ts +${durationUs} => ${next}`);
       return next;
     }
 
-    let base = this[offsetKey];
+    if (typeof timestampUs !== "number") {
+      const fallback = last + durationUs;
+      (this as any)[key] = fallback;
+      this.warn("[MUX] video missing ts, fallback:", fallback);
+      return fallback;
+    }
 
-    if (kind === "audio") {
-      if (this.audioTimestampOffsetUs == null) {
-        this.audioTimestampOffsetUs = timestampUs;
-      }
-      base = this.audioTimestampOffsetUs;
-    } else if (base == null) {
-      base = timestampUs;
-      this[offsetKey] = base;
+    if (this.videoTimestampOffsetUs == null) {
+      this.videoTimestampOffsetUs = timestampUs;
     }
 
     const relative = Math.max(
       0,
-      timestampUs - base - this.pausedOffsetUs
+      timestampUs - this.videoTimestampOffsetUs - this.pausedOffsetUs
     );
 
-    this[lastKey] = relative;
+    (this as any)[key] = relative;
+    this.log(`[MUX] video ts => ${relative}`);
+
     return relative;
-  }
-
-  normalizeFragmentTimestamp(tsSeconds) {
-    if (tsSeconds == null) return null;
-    if (this.fragmentTimestampOffsetSeconds == null) {
-      this.fragmentTimestampOffsetSeconds = tsSeconds;
-    }
-    return Math.max(
-      0,
-      tsSeconds - this.fragmentTimestampOffsetSeconds
-    );
   }
 }
