@@ -4,8 +4,12 @@ import type { ExtensionMessage } from "../../types/messaging";
 
 // File System Access API types
 interface FileSystemHandle {
-  queryPermission(opts: { mode: "readwrite" }): Promise<"granted" | "denied" | "prompt">;
-  requestPermission(opts: { mode: "readwrite" }): Promise<"granted" | "denied" | "prompt">;
+  queryPermission(opts: {
+    mode: "readwrite";
+  }): Promise<"granted" | "denied" | "prompt">;
+  requestPermission(opts: {
+    mode: "readwrite";
+  }): Promise<"granted" | "denied" | "prompt">;
 }
 
 interface FileSystemFileHandle extends FileSystemHandle {
@@ -13,8 +17,14 @@ interface FileSystemFileHandle extends FileSystemHandle {
 }
 
 interface FileSystemDirectoryHandle extends FileSystemHandle {
-  getFileHandle(name: string, opts: { create: boolean }): Promise<FileSystemFileHandle>;
-  getDirectoryHandle(name: string, opts: { create: boolean }): Promise<FileSystemDirectoryHandle>;
+  getFileHandle(
+    name: string,
+    opts: { create: boolean }
+  ): Promise<FileSystemFileHandle>;
+  getDirectoryHandle(
+    name: string,
+    opts: { create: boolean }
+  ): Promise<FileSystemDirectoryHandle>;
   removeEntry(name: string): Promise<void>;
   name: string;
 }
@@ -25,7 +35,10 @@ interface FileSystemWritableFileStream extends WritableStream {
 }
 
 interface WindowWithDirectoryPicker extends Window {
-  showDirectoryPicker?(options?: { startIn?: string; mode?: "readwrite" }): Promise<FileSystemDirectoryHandle>;
+  showDirectoryPicker?(options?: {
+    startIn?: string;
+    mode?: "readwrite";
+  }): Promise<FileSystemDirectoryHandle>;
 }
 
 interface NavigatorWithUserActivation extends Navigator {
@@ -65,17 +78,19 @@ const Backup = () => {
     backupRef.current = backupAgain;
   }, [backupAgain]);
 
-  const verifyFilePermissions = async (fileHandle: FileSystemHandle): Promise<boolean> => {
+  const verifyFilePermissions = async (
+    fileHandle: FileSystemHandle
+  ): Promise<boolean> => {
     const opts = {
       mode: "readwrite",
     };
-    const permission = await fileHandle.queryPermission(opts);
+    const permission = await fileHandle.queryPermission({ mode: "readwrite" });
     if (permission === "granted") {
       return true;
     } else if (permission === "prompt") {
       chrome.runtime.sendMessage({ type: "focus-this-tab" });
       return false;
-    } else if ((await fileHandle.requestPermission(opts)) === "granted") {
+    } else if ((await fileHandle.requestPermission({ mode: "readwrite" })) === "granted") {
       chrome.runtime.sendMessage({ type: "focus-this-tab" });
       return true;
     } else {
@@ -83,7 +98,10 @@ const Backup = () => {
     }
   };
 
-  const initLocalDirectory = async (directoryHandle: FileSystemDirectoryHandle, prompt = true): Promise<void> => {
+  const initLocalDirectory = async (
+    directoryHandle: FileSystemDirectoryHandle,
+    prompt = true
+  ): Promise<void> => {
     const permissions = await verifyFilePermissions(directoryHandle);
     if (permissions) {
       let videoTitle = `Screenity video - ${new Date().toLocaleString("en-US", {
@@ -207,25 +225,31 @@ const Backup = () => {
 
     const win = window as WindowWithDirectoryPicker;
     if ("showDirectoryPicker" in win && win.showDirectoryPicker) {
-      localDirectoryStore.getItem("directoryHandle").then(async (directory: { directoryHandle: FileSystemDirectoryHandle } | null) => {
-        if (directory) {
-          try {
-            const permissions = await verifyFilePermissions(
-              directory.directoryHandle
-            );
-            if (!permissions) {
-              directoryPicker(prompt);
+      localDirectoryStore
+        .getItem("directoryHandle")
+        .then(
+          async (
+            directory: { directoryHandle: FileSystemDirectoryHandle } | null
+          ) => {
+            if (directory) {
+              try {
+                const permissions = await verifyFilePermissions(
+                  directory.directoryHandle
+                );
+                if (!permissions) {
+                  directoryPicker(prompt);
+                } else {
+                  initLocalDirectory(directory.directoryHandle, prompt);
+                }
+              } catch (e) {
+                localDirectoryStore.clear();
+                directoryPicker(prompt);
+              }
             } else {
-              initLocalDirectory(directory.directoryHandle, prompt);
+              directoryPicker(prompt);
             }
-          } catch (e) {
-            localDirectoryStore.clear();
-            directoryPicker(prompt);
           }
-        } else {
-          directoryPicker(prompt);
-        }
-      });
+        );
     } else {
       alert(
         "Your browser doesn't support local backups. Reach out to us at support@screenity.io for more help. You can still record your screen."
@@ -297,7 +321,9 @@ const Backup = () => {
       await writable.current.close();
       writingFile.current = false;
 
-      const directory = await localDirectoryStore.getItem("directoryHandle") as { directoryHandle: FileSystemDirectoryHandle } | null;
+      const directory = (await localDirectoryStore.getItem(
+        "directoryHandle"
+      )) as { directoryHandle: FileSystemDirectoryHandle } | null;
       if (directory && directory !== null && titleRef.current) {
         const permissions = await verifyFilePermissions(
           directory.directoryHandle
@@ -353,7 +379,10 @@ const Backup = () => {
     sendResponse: (response?: unknown) => void
   ): boolean | void => {
     if (message.type === "init-backup") {
-      const initMessage = message as ExtensionMessage & { request: ExtensionMessage; tabId: number };
+      const initMessage = message as ExtensionMessage & {
+        request: ExtensionMessage;
+        tabId: number;
+      };
       request.current = initMessage.request;
       tabId.current = initMessage.tabId;
       localSaving(true);
