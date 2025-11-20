@@ -80,7 +80,7 @@ export const createVideoProject = async ({
       data = {
         ...data,
         instantMode: true,
-      };
+      } as typeof VIDEO_INIT & { instantMode: boolean };
     }
 
     chrome.runtime.sendMessage(

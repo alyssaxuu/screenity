@@ -16,7 +16,7 @@ const Warning = () => {
   const [description, setDescription] = useState("");
   const [duration, setDuration] = useState(10000);
 
-  const openWarning = useCallback((title, description, duration) => {
+  const openWarning = useCallback((title: string, description: string, duration: number) => {
     setTitle(title);
     setDescription(description);
     setDuration(duration);

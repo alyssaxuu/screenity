@@ -5,37 +5,15 @@ import { getBitrates, getResolutionForQuality } from "./recorderConfig";
 import BunnyTusUploader from "./bunnyTusUploader";
 import localforage from "localforage";
 import { createVideoProject } from "./createVideoProject";
-
-interface TimerState {
-  start: number | null;
-  total: number;
-  paused: boolean;
-}
-
-interface UploadMeta {
-  screen?: {
-    videoId: string;
-    mediaId: string;
-  };
-  camera?: {
-    videoId: string;
-    mediaId: string;
-  };
-  audio?: {
-    videoId: string;
-    mediaId: string;
-    path?: string;
-  };
-  sceneId?: string;
-}
-
-interface TimerState {
-  start: number | null;
-  total: number;
-  paused: boolean;
-  notificationInterval?: NodeJS.Timeout | null;
-  warned?: boolean;
-}
+import type {
+  TimerState,
+  UploadMeta,
+  UploadMetaScreen,
+  UploadMetaCamera,
+  UploadMetaAudio,
+  ChromeStorageResult,
+} from "../../types/cloudRecorder";
+import type { ExtensionMessage } from "../../types/messaging";
 
 localforage.config({
   driver: localforage.INDEXEDDB,
@@ -55,8 +33,16 @@ const IS_IFRAME_CONTEXT =
     !document.referrer.startsWith("chrome-extension://"));
 
 const CloudRecorder = () => {
-  const screenTimer = useRef<TimerState>({ start: null, total: 0, paused: false });
-  const cameraTimer = useRef<TimerState>({ start: null, total: 0, paused: false });
+  const screenTimer = useRef<TimerState>({
+    start: null,
+    total: 0,
+    paused: false,
+  });
+  const cameraTimer = useRef<TimerState>({
+    start: null,
+    total: 0,
+    paused: false,
+  });
   const [started, setStarted] = useState(false);
   const [initProject, setInitProject] = useState(false);
 
@@ -131,7 +117,10 @@ const CloudRecorder = () => {
     }, 1000 * 60 * 5); // every 5 minutes
   };
 
-  const attachMicToStream = (videoStream: MediaStream | null, micStream: MediaStream | null): MediaStream | null => {
+  const attachMicToStream = (
+    videoStream: MediaStream | null,
+    micStream: MediaStream | null
+  ): MediaStream | null => {
     if (!videoStream || !micStream) return videoStream;
     return new MediaStream([
       ...videoStream.getVideoTracks(),
@@ -156,9 +145,11 @@ const CloudRecorder = () => {
 
       // Mute transcription-only mic stream too
       if (rawMicStream.current) {
-        rawMicStream.current.getAudioTracks().forEach((track: MediaStreamTrack) => {
-          track.enabled = result.active;
-        });
+        rawMicStream.current
+          .getAudioTracks()
+          .forEach((track: MediaStreamTrack) => {
+            track.enabled = result.active;
+          });
       }
     }
   };
@@ -186,7 +177,11 @@ const CloudRecorder = () => {
     }
   };
 
-  const deleteProject = async (projectId: string, uploadMeta: UploadMeta | null, deleteVideo = true): Promise<void> => {
+  const deleteProject = async (
+    projectId: string,
+    uploadMeta: UploadMeta | null,
+    deleteVideo = true
+  ): Promise<void> => {
     const screenMeta = uploadMeta?.screen;
     const cameraMeta = uploadMeta?.camera;
 
@@ -259,7 +254,8 @@ const CloudRecorder = () => {
             await deleteProject(projectId, uploadMeta, false);
           }
         } catch (err) {
-          console.warn("❌ Failed to delete media:", err);
+          const error = err instanceof Error ? err : new Error(String(err));
+          console.warn("❌ Failed to delete media:", error);
         }
       }
       uploadMetaRef.current = null;
@@ -294,9 +290,10 @@ const CloudRecorder = () => {
           // Only delete if new project
           if (projectId) {
             try {
-              await deleteProject(projectId, uploadMeta);
+              await deleteProject(projectId as string, uploadMeta);
             } catch (err) {
-              console.warn("❌ Failed to delete project:", err);
+              const error = err instanceof Error ? err : new Error(String(err));
+              console.warn("❌ Failed to delete project:", error);
             }
           }
         }
@@ -317,16 +314,18 @@ const CloudRecorder = () => {
     if (projectId && !recordingToScene) {
       // Only delete if new project
       try {
-        await deleteProject(projectId, uploadMeta);
+        await deleteProject(projectId as string, uploadMeta);
       } catch (err) {
-        console.warn("❌ Failed to delete project:", err);
+        const error = err instanceof Error ? err : new Error(String(err));
+        console.warn("❌ Failed to delete project:", error);
       }
     } else if (projectId) {
       // Only delete media, not project
       try {
-        await deleteProject(projectId, uploadMeta, false);
+        await deleteProject(projectId as string, uploadMeta, false);
       } catch (err) {
-        console.warn("❌ Failed to delete media:", err);
+        const error = err instanceof Error ? err : new Error(String(err));
+        console.warn("❌ Failed to delete media:", error);
       }
     }
 
@@ -375,7 +374,8 @@ const CloudRecorder = () => {
       }
 
       if (screenStream.current) {
-        screenUploader.current = new BunnyTusUploader() as BunnyTusUploader | null;
+        screenUploader.current =
+          new BunnyTusUploader() as BunnyTusUploader | null;
         const track = screenStream.current.getVideoTracks()[0];
         let width, height;
         if (regionRef.current && target.current) {
@@ -386,7 +386,10 @@ const CloudRecorder = () => {
           width = settings.width;
           height = settings.height;
         }
-        await screenUploader.current.initialize(projectId, {
+        if (!screenUploader.current) {
+          throw new Error("Screen uploader not initialized");
+        }
+        await screenUploader.current.initialize(projectId as string, {
           title: "Screen Recording",
           type: "screen",
           width,
@@ -396,13 +399,17 @@ const CloudRecorder = () => {
       }
 
       if (cameraStream.current) {
-        cameraUploader.current = new BunnyTusUploader() as BunnyTusUploader | null;
+        cameraUploader.current =
+          new BunnyTusUploader() as BunnyTusUploader | null;
         const track = cameraStream.current.getVideoTracks()[0];
         if (track?.readyState === "ended") {
           throw new Error("Camera track has ended");
         }
         const { width, height } = track.getSettings();
-        await cameraUploader.current.initialize(projectId, {
+        if (!cameraUploader.current) {
+          throw new Error("Camera uploader not initialized");
+        }
+        await cameraUploader.current.initialize(projectId as string, {
           title: "Camera Recording",
           type: "camera",
           linkedMediaId: screenUploader.current?.getMeta()?.mediaId || null,
@@ -438,7 +445,9 @@ const CloudRecorder = () => {
       recorder.onerror = (event: Event) => {
         const errorEvent = event as Event & { error?: DOMException };
         console.error("MediaRecorder error:", errorEvent.error);
-        sendRecordingError("Recording error: " + (errorEvent.error?.message || "Unknown error"));
+        sendRecordingError(
+          "Recording error: " + (errorEvent.error?.message || "Unknown error")
+        );
       };
 
       return recorder;
@@ -502,6 +511,9 @@ const CloudRecorder = () => {
           audioBitsPerSecond: 128000, // 128 Kbps
         };
 
+        if (!stream) {
+          throw new Error("Screen stream is null");
+        }
         screenRecorder.current = createMediaRecorder(
           stream,
           screenOptions,
@@ -611,11 +623,16 @@ const CloudRecorder = () => {
         let streamToRecord = cameraStream.current;
 
         if (recordingType.current === "camera") {
-          if (micStream.current) {
-            streamToRecord = attachMicToStream(
-              cameraStream.current,
-              micStream.current
-            );
+          if (micStream.current && cameraStream.current) {
+            if (cameraStream.current && micStream.current) {
+              const attached = attachMicToStream(
+                cameraStream.current,
+                micStream.current
+              );
+              if (attached) {
+                streamToRecord = attached;
+              }
+            }
           } else {
             console.warn("⚠️ Camera-only recording: microphone not available");
           }
@@ -630,6 +647,9 @@ const CloudRecorder = () => {
           audioBitsPerSecond: 128000, // 128 Kbps
         };
 
+        if (!streamToRecord) {
+          throw new Error("Stream to record is null");
+        }
         cameraRecorder.current = createMediaRecorder(
           streamToRecord,
           cameraOptions,
@@ -669,9 +689,9 @@ const CloudRecorder = () => {
 
       let warned = false;
       const MAX_DURATION =
-        parseFloat(process.env.MAX_RECORDING_DURATION) || 60 * 60;
+        parseFloat(process.env.MAX_RECORDING_DURATION || "3600") || 60 * 60;
       const WARNING_THRESHOLD =
-        parseFloat(process.env.RECORDING_WARNING_THRESHOLD) || 60;
+        parseFloat(process.env.RECORDING_WARNING_THRESHOLD || "60") || 60;
 
       if (screenTimer.current.notificationInterval)
         clearInterval(screenTimer.current.notificationInterval);
@@ -711,7 +731,8 @@ const CloudRecorder = () => {
       chrome.storage.local.set({ recording: true });
       setStarted(true);
     } catch (err) {
-      sendRecordingError("Recording failed: " + err.message);
+      const error = err instanceof Error ? err : new Error(String(err));
+      sendRecordingError("Recording failed: " + error.message);
     }
 
     const now = Date.now();
@@ -738,7 +759,10 @@ const CloudRecorder = () => {
     cameraTimer.current.paused = false;
   }
 
-  async function uploadAudioToBunny(audioFile, projectId) {
+  async function uploadAudioToBunny(
+    audioFile: Blob,
+    projectId: string
+  ): Promise<unknown> {
     const formData = new FormData();
     formData.append("file", audioFile);
     formData.append("projectId", projectId);
@@ -756,14 +780,20 @@ const CloudRecorder = () => {
     return result;
   }
 
-  const stopAllRecorders = async () => {
-    const stopRecorder = async (recorderRef) => {
+  const stopAllRecorders = async (): Promise<void> => {
+    const stopRecorder = async (
+      recorderRef: React.MutableRefObject<MediaRecorder | null>
+    ): Promise<void> => {
       if (recorderRef.current && recorderRef.current.state !== "inactive") {
         try {
           await Promise.race([
             new Promise((resolve) => {
-              recorderRef.current.onstop = resolve;
-              recorderRef.current.stop();
+              if (recorderRef.current) {
+                recorderRef.current.onstop = resolve;
+                recorderRef.current.stop();
+              } else {
+                resolve(undefined);
+              }
             }),
             new Promise((_, reject) =>
               setTimeout(() => reject(new Error("Stop timeout")), 5000)
@@ -787,7 +817,10 @@ const CloudRecorder = () => {
     });
   };
 
-  const createBlobFromChunks = (chunks, mimeType) => {
+  const createBlobFromChunks = (
+    chunks: Blob[],
+    mimeType: string
+  ): Blob | null => {
     if (!chunks || chunks.length === 0) return null;
     return new Blob(chunks, { type: mimeType });
   };
@@ -797,7 +830,7 @@ const CloudRecorder = () => {
   const calculateDurations = () => {
     const now = Date.now();
 
-    const getDuration = (timer) => {
+    const getDuration = (timer: TimerState): number => {
       const elapsed = !timer.paused && timer.start ? now - timer.start : 0;
       const total = (timer.total || 0) + elapsed;
       const duration = total / 1000;
@@ -816,7 +849,11 @@ const CloudRecorder = () => {
     };
   };
 
-  const handleAudioUpload = async (audioBlob, projectId, uploadMeta) => {
+  const handleAudioUpload = async (
+    audioBlob: Blob,
+    projectId: string,
+    uploadMeta: UploadMeta | null
+  ): Promise<unknown> => {
     if (!audioBlob) return;
 
     try {
@@ -827,23 +864,27 @@ const CloudRecorder = () => {
 
       return result;
     } catch (err) {
-      console.warn("❌ Audio upload/transcription failed:", err);
+      const error = err instanceof Error ? err : new Error(String(err));
+      console.warn("❌ Audio upload/transcription failed:", error);
     }
   };
 
-  const handleTranscription = async (uploadMeta, projectId) => {
+  const handleTranscription = async (
+    uploadMeta: UploadMeta,
+    projectId: string
+  ): Promise<void> => {
     if (!uploadMeta.audio || !uploadMeta.audio.mediaId) return;
     try {
       const transcriptionTarget =
         uploadMeta.screen?.mediaId || uploadMeta.camera?.mediaId;
 
-      if (transcriptionTarget && uploadMeta.audio?.url) {
+      if (transcriptionTarget && (uploadMeta.audio as UploadMetaAudio)?.url) {
         await fetch(`${API_BASE}/transcription/queue`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           credentials: "include",
           body: JSON.stringify({
-            input: uploadMeta.audio.url,
+            input: (uploadMeta.audio as UploadMetaAudio)?.url || "",
             output: `transcriptions/${uploadMeta.audio.mediaId}.json`,
             videoId: projectId,
             sceneId: uploadMeta.sceneId,
@@ -878,10 +919,10 @@ const CloudRecorder = () => {
   }, []);
 
   const createSceneOrHandleMultiMode = async (
-    uploadMeta,
-    durations,
-    isSilent
-  ) => {
+    uploadMeta: UploadMeta,
+    durations: { screen?: number; camera?: number },
+    isSilent: boolean
+  ): Promise<void> => {
     const {
       projectId,
       clickEvents = [],
@@ -939,16 +980,16 @@ const CloudRecorder = () => {
       transcriptionSourceMediaId: !isSilent
         ? uploadMeta.audio?.mediaId || null
         : null,
-      thumbnail: uploadMeta.screen?.thumbnail || null,
+      thumbnail: (uploadMeta.screen as UploadMetaScreen)?.thumbnail || null,
       dimensions: {
         screen: {
-          width: uploadMeta.screen?.width || 1920,
-          height: uploadMeta.screen?.height || 1080,
+          width: (uploadMeta.screen as UploadMetaScreen)?.width || 1920,
+          height: (uploadMeta.screen as UploadMetaScreen)?.height || 1080,
         },
         camera: uploadMeta.camera
           ? {
-              width: uploadMeta.camera?.width || 1920,
-              height: uploadMeta.camera?.height || 1080,
+              width: (uploadMeta.camera as UploadMetaCamera)?.width || 1920,
+              height: (uploadMeta.camera as UploadMetaCamera)?.height || 1080,
               flip: cameraFlipped,
             }
           : null,
@@ -974,8 +1015,12 @@ const CloudRecorder = () => {
       throw new Error(`Failed to create scene: ${errorText}`);
     } else {
       if (multiMode) {
+        const storageResult = await chrome.storage.local.get([
+          "multiSceneCount",
+        ]);
+        const currentCount = (storageResult.multiSceneCount as number) || 0;
         await chrome.storage.local.set({
-          multiSceneCount: multiSceneCount + 1,
+          multiSceneCount: currentCount + 1,
           multiLastSceneId: payload.sceneId,
         });
         chrome.runtime.sendMessage({
@@ -1011,7 +1056,10 @@ const CloudRecorder = () => {
   };
 
   // Check if audio is silent to skip transcription
-  const isAudioSilent = async (audioBlob, silenceThreshold = 0.01) => {
+  const isAudioSilent = async (
+    audioBlob: Blob,
+    silenceThreshold = 0.01
+  ): Promise<boolean> => {
     const arrayBuffer = await audioBlob.arrayBuffer();
     const audioCtx = new OfflineAudioContext(1, 44100 * 40, 44100); // up to 40s
     const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
@@ -1075,16 +1123,52 @@ const CloudRecorder = () => {
 
     const { sceneId } = await chrome.storage.local.get(["sceneId"]);
 
-    const uploadMeta = {
-      screen: screenUploader.current?.getMeta() || null,
-      camera: cameraUploader.current?.getMeta() || null,
+    const screenMeta = screenUploader.current?.getMeta();
+    const cameraMeta = cameraUploader.current?.getMeta();
+
+    const uploadMeta: UploadMeta = {
+      screen: screenMeta
+        ? {
+            videoId: screenMeta.videoId,
+            mediaId: screenMeta.mediaId,
+            offset: screenMeta.offset,
+            status: screenMeta.status,
+            error: screenMeta.error,
+            isPaused: screenMeta.isPaused,
+            isFinalizing: screenMeta.isFinalizing,
+            metadata: screenMeta.metadata,
+            sceneId: screenMeta.sceneId,
+            thumbnail: screenMeta.thumbnail
+              ? String(screenMeta.thumbnail)
+              : undefined,
+            width: screenMeta.width || undefined,
+            height: screenMeta.height || undefined,
+          }
+        : null,
+      camera: cameraMeta
+        ? {
+            videoId: cameraMeta.videoId,
+            mediaId: cameraMeta.mediaId,
+            offset: cameraMeta.offset,
+            status: cameraMeta.status,
+            error: cameraMeta.error,
+            isPaused: cameraMeta.isPaused,
+            isFinalizing: cameraMeta.isFinalizing,
+            metadata: cameraMeta.metadata,
+            sceneId: cameraMeta.sceneId,
+            thumbnail: cameraMeta.thumbnail
+              ? String(cameraMeta.thumbnail)
+              : undefined,
+            width: cameraMeta.width || undefined,
+            height: cameraMeta.height || undefined,
+          }
+        : null,
       audio: null,
-      //sceneId,
-      // use sceneId as per the metadata in screenUploader or cameraUploader, whichever exists
       sceneId:
-        screenUploader.current?.getMeta()?.sceneId ||
-        cameraUploader.current?.getMeta()?.sceneId ||
-        sceneId,
+        screenMeta?.sceneId ||
+        cameraMeta?.sceneId ||
+        (sceneId as string | undefined) ||
+        null,
     };
 
     uploadMetaRef.current = uploadMeta;
@@ -1131,8 +1215,15 @@ const CloudRecorder = () => {
     // Create final audio blob from chunks
     const audioBlob = createBlobFromChunks(audioChunks.current, "audio/webm");
 
-    const result = await handleAudioUpload(audioBlob, projectId, uploadMeta);
-    uploadMeta.audio = result;
+    if (!audioBlob) {
+      return;
+    }
+    const result = await handleAudioUpload(
+      audioBlob,
+      projectId as string,
+      uploadMeta
+    );
+    uploadMeta.audio = result as UploadMetaAudio | null;
 
     chrome.storage.local.set({ uploadMeta });
 
@@ -1145,7 +1236,7 @@ const CloudRecorder = () => {
         await createSceneOrHandleMultiMode(uploadMeta, durations, silent);
 
         if (!silent && audioBlob) {
-          await handleTranscription(uploadMeta, projectId);
+          await handleTranscription(uploadMeta, projectId as string);
         }
 
         chrome.runtime.sendMessage({ type: "video-ready", uploadMeta });
@@ -1156,21 +1247,24 @@ const CloudRecorder = () => {
           window.location.reload();
         }
       } catch (err) {
-        console.error("❌ Failed to create scene:", err);
+        const error = err instanceof Error ? err : new Error(String(err));
+        console.error("❌ Failed to create scene:", error);
 
         // Provide user-friendly error message based on the error type
         let userMessage = "Failed to save recording: ";
         if (
-          err.message.includes("No data uploaded") ||
-          err.message.includes("offset is 0")
+          error.message.includes("No data uploaded") ||
+          error.message.includes("offset is 0")
         ) {
           userMessage +=
             "No video data was uploaded. This may be due to network issues. Please check your connection and try again.";
-        } else if (err.message.includes("No media was successfully uploaded")) {
+        } else if (
+          error.message.includes("No media was successfully uploaded")
+        ) {
           userMessage +=
             "Upload did not complete successfully. Please check your internet connection and try recording again.";
         } else {
-          userMessage += err.message;
+          userMessage += error.message;
         }
 
         sendRecordingError(userMessage);
@@ -1180,7 +1274,7 @@ const CloudRecorder = () => {
             uploadMeta,
             durations,
             timestamp: Date.now(),
-            error: err.message,
+            error: error.message,
           },
         });
 
@@ -1197,7 +1291,9 @@ const CloudRecorder = () => {
     }
   };
 
-  const startAudioStream = async (id) => {
+  const startAudioStream = async (
+    id: string | undefined
+  ): Promise<MediaStream | null> => {
     const audioStreamOptions = {
       audio: {
         deviceId: id ? { exact: id } : undefined,
@@ -1210,9 +1306,10 @@ const CloudRecorder = () => {
       );
       return stream;
     } catch (err) {
+      const error = err instanceof Error ? err : new Error(String(err));
       console.warn(
         "⚠️ Failed to access audio with deviceId, trying fallback:",
-        err
+        error
       );
 
       // Fallback without deviceId
@@ -1222,26 +1319,31 @@ const CloudRecorder = () => {
         });
         return fallbackStream;
       } catch (err2) {
-        console.error("❌ Failed to access audio stream:", err2);
-        sendRecordingError("Failed to access audio stream: " + err2.message);
+        const error2 = err2 instanceof Error ? err2 : new Error(String(err2));
+        console.error("❌ Failed to access audio stream:", error2);
+        sendRecordingError("Failed to access audio stream: " + error2.message);
         return null;
       }
     }
   };
 
-  const startStream = async (data, id, permissions, permissions2) => {
+  const startStream = async (
+    data: { recordingType?: string; systemAudio?: boolean },
+    id: string | number | null,
+    permissions: unknown,
+    permissions2: unknown
+  ): Promise<void> => {
     // Defaulting quality for now
     //const { qualityValue } = await chrome.storage.local.get(["qualityValue"]);
     const { width = 1920, height = 1080 } = getResolutionForQuality() || {};
 
     // Defaulting FPS for now
     // const { fpsValue } = await chrome.storage.local.get(["fpsValue"]);
-    const fps = parseInt(30);
+    const fps = 30;
 
-    const { instantMode: instant } = await chrome.storage.local.get([
-      "instantMode",
-    ]);
-    instantMode.current = instant || false;
+    const result = await chrome.storage.local.get(["instantMode"]);
+    const instant = result.instantMode as boolean | undefined;
+    instantMode.current = instant === true;
 
     const constraints = {
       audio: false,
@@ -1282,7 +1384,9 @@ const CloudRecorder = () => {
             constraints
           );
           screenStream.current = stream;
-          regionRef.current = true;
+          (
+            regionRef as React.MutableRefObject<HTMLElement | boolean | null>
+          ).current = true;
 
           if (isTab.current) {
             const ctx = new AudioContext();
@@ -1298,7 +1402,10 @@ const CloudRecorder = () => {
             sendStopRecording();
           };
         } catch (err) {
-          sendRecordingError("Failed to access region stream: " + err.message);
+          const error = err instanceof Error ? err : new Error(String(err));
+          sendRecordingError(
+            "Failed to access region stream: " + error.message
+          );
           return;
         }
 
@@ -1307,10 +1414,13 @@ const CloudRecorder = () => {
             "defaultVideoInput",
           ]);
 
-          const cameraConstraints = {
+          const defaultVideoInputValue = defaultVideoInput as
+            | string
+            | undefined;
+          const cameraConstraints: MediaStreamConstraints = {
             video: {
-              ...(defaultVideoInput && defaultVideoInput !== "none"
-                ? { deviceId: { exact: defaultVideoInput } }
+              ...(defaultVideoInputValue && defaultVideoInputValue !== "none"
+                ? { deviceId: { exact: defaultVideoInputValue } }
                 : {}),
               width: { ideal: width },
               height: { ideal: height },
@@ -1324,17 +1434,21 @@ const CloudRecorder = () => {
               cameraConstraints
             );
           } catch (err) {
+            const error = err instanceof Error ? err : new Error(String(err));
             sendRecordingError(
-              "Failed to access camera stream: " + err.message
+              "Failed to access camera stream: " + error.message
             );
             return;
           }
         }
 
         try {
-          if (target.current) {
+          if (target.current && screenStream.current) {
             const track = screenStream.current.getVideoTracks()[0];
-            await track.cropTo(target.current);
+            // cropTo is a non-standard API, cast to any to avoid type errors
+            if ((track as any).cropTo) {
+              await (track as any).cropTo(target.current);
+            }
           } else {
             sendRecordingError(
               "No crop target set for region capture. Please select a region."
@@ -1342,7 +1456,8 @@ const CloudRecorder = () => {
             return;
           }
         } catch (err) {
-          sendRecordingError("Failed to crop region stream: " + err.message);
+          const error = err instanceof Error ? err : new Error(String(err));
+          sendRecordingError("Failed to crop region stream: " + error.message);
           return;
         }
       } else {
@@ -1353,7 +1468,7 @@ const CloudRecorder = () => {
           ? {
               // Tab recording - minimal constraints, let Chrome determine optimal capture
               chromeMediaSource: "tab",
-              chromeMediaSourceId: id,
+              chromeMediaSourceId: String(id),
               maxFrameRate: fps,
               // No width/height constraints for tabs - Chrome will capture at the tab's natural size
               maxWidth: tabWidth,
@@ -1362,36 +1477,37 @@ const CloudRecorder = () => {
           : {
               // Desktop/window recording - use quality settings as max bounds
               chromeMediaSource: "desktop",
-              chromeMediaSourceId: id,
+              chromeMediaSourceId: String(id),
               maxWidth: width,
               maxHeight: height,
               maxFrameRate: fps,
             };
 
+        // Chrome extension getUserMedia with mandatory constraints (non-standard API)
         const desktopConstraints = {
           audio: {
             mandatory: {
               chromeMediaSource: isTab.current ? "tab" : "desktop",
-              chromeMediaSourceId: id,
+              chromeMediaSourceId: String(id),
             },
           },
           video: {
             mandatory: { ...videoConstraints },
           },
-        };
+        } as any; // Cast to any because mandatory constraints are non-standard
 
         try {
           screenStream.current = await navigator.mediaDevices.getUserMedia(
             desktopConstraints
           );
           const track = screenStream.current.getVideoTracks()[0];
-          const {
-            width,
-            height,
-            displaySurface: surface,
-          } = track.getSettings(); // Always use displaySurface from track
+          const trackSettings = track.getSettings();
+          const width = trackSettings.width;
+          const height = trackSettings.height;
+          // displaySurface is a non-standard property, access via any
+          const surface = (trackSettings as any).displaySurface;
 
-          const settings = screenStream.current
+          const streamSettings = screenStream.current
             .getVideoTracks()[0]
             .getSettings();
 
@@ -1443,7 +1559,10 @@ const CloudRecorder = () => {
             sendStopRecording();
           };
         } catch (err) {
-          sendRecordingError("Failed to access screen stream: " + err.message);
+          const error = err instanceof Error ? err : new Error(String(err));
+          sendRecordingError(
+            "Failed to access screen stream: " + error.message
+          );
           return;
         }
 
@@ -1452,10 +1571,13 @@ const CloudRecorder = () => {
             "defaultVideoInput",
           ]);
 
-          const cameraConstraints = {
+          const defaultVideoInputValue = defaultVideoInput as
+            | string
+            | undefined;
+          const cameraConstraints: MediaStreamConstraints = {
             video: {
-              ...(defaultVideoInput && defaultVideoInput !== "none"
-                ? { deviceId: { exact: defaultVideoInput } }
+              ...(defaultVideoInputValue && defaultVideoInputValue !== "none"
+                ? { deviceId: { exact: defaultVideoInputValue } }
                 : {}),
               width: { ideal: width },
               height: { ideal: height },
@@ -1469,8 +1591,9 @@ const CloudRecorder = () => {
               cameraConstraints
             );
           } catch (err) {
+            const error = err instanceof Error ? err : new Error(String(err));
             sendRecordingError(
-              "Failed to access camera stream: " + err.message
+              "Failed to access camera stream: " + error.message
             );
             return;
           }
@@ -1480,7 +1603,10 @@ const CloudRecorder = () => {
       setInitProject(true);
 
       // Try to get microphone access
-      micStream.current = await startAudioStream(data.defaultAudioInput);
+      const defaultAudioInput = (data as any).defaultAudioInput as
+        | string
+        | undefined;
+      micStream.current = await startAudioStream(defaultAudioInput);
       rawMicStream.current = micStream.current;
 
       // Setup audio context and routing
@@ -1514,8 +1640,9 @@ const CloudRecorder = () => {
         const { systemAudioVolume } = await chrome.storage.local.get([
           "systemAudioVolume",
         ]);
-        if (systemAudioVolume !== undefined) {
-          audioOutputGain.current.gain.value = systemAudioVolume;
+        if (systemAudioVolume !== undefined && audioOutputGain.current) {
+          const volume = systemAudioVolume as number;
+          audioOutputGain.current.gain.value = volume;
         }
       }
 
@@ -1540,7 +1667,7 @@ const CloudRecorder = () => {
         } else {
           const now = new Date();
           const options = { day: "2-digit", month: "short", year: "numeric" };
-          const title = `Untitled video - ${now.toLocaleString(
+          const title = `Untitled video - ${now.toLocaleDateString(
             "en-GB",
             options
           )}`;
@@ -1570,19 +1697,23 @@ const CloudRecorder = () => {
         setInitProject(false);
         chrome.runtime.sendMessage({ type: "reset-active-tab" });
       } catch (err) {
-        sendRecordingError("Failed to initialize uploaders: " + err.message);
+        const error = err instanceof Error ? err : new Error(String(err));
+        sendRecordingError("Failed to initialize uploaders: " + error.message);
       }
     } catch (err) {
+      const error = err instanceof Error ? err : new Error(String(err));
       setInitProject(false);
-      sendRecordingError("Failed to start stream: " + err.message, true);
+      sendRecordingError("Failed to start stream: " + error.message, true);
     }
   };
 
-  const startStreaming = async (data) => {
+  const startStreaming = async (data: { recordingType?: string }) => {
     try {
-      const permissions = await navigator.permissions.query({ name: "camera" });
-      const permissions2 = await navigator.permissions.query({
-        name: "microphone",
+      // navigator.permissions.query with "camera" and "microphone" are non-standard
+      // Cast to any to avoid type errors
+      const permissions = await (navigator.permissions as any).query({ name: "camera" as any });
+      const permissions2 = await (navigator.permissions as any).query({
+        name: "microphone" as any,
       });
 
       if (data.recordingType === "camera") {
@@ -1590,7 +1721,7 @@ const CloudRecorder = () => {
       } else if (!isTab.current && data.recordingType != "region") {
         chrome.desktopCapture.chooseDesktopMedia(
           ["screen", "window", "tab", "audio"],
-          null,
+          undefined,
           (streamId) => {
             if (!streamId) {
               sendRecordingError("User cancelled stream selection", true);
@@ -1603,18 +1734,20 @@ const CloudRecorder = () => {
         startStream(data, tabID.current, permissions, permissions2);
       }
     } catch (err) {
-      sendRecordingError("Failed to setup streaming: " + err.message);
+      const error = err instanceof Error ? err : new Error(String(err));
+      sendRecordingError("Failed to setup streaming: " + error.message);
     }
   };
 
-  const getStreamID = async (id) => {
+  const getStreamID = async (id: number) => {
     try {
       const streamId = await chrome.tabCapture.getMediaStreamId({
         targetTabId: id,
       });
       tabID.current = streamId;
     } catch (err) {
-      sendRecordingError("Failed to get stream ID: " + err.message);
+      const error = err instanceof Error ? err : new Error(String(err));
+      sendRecordingError("Failed to get stream ID: " + error.message);
     }
   };
 
@@ -1635,10 +1768,12 @@ const CloudRecorder = () => {
   useEffect(() => {
     if (!IS_IFRAME_CONTEXT) return;
 
-    const onMessage = (event) => {
+    const onMessage = (event: MessageEvent) => {
       if (event.data.type === "crop-target") {
         target.current = event.data.target;
-        regionRef.current = true;
+        (
+          regionRef as React.MutableRefObject<HTMLElement | boolean | null>
+        ).current = true;
         regionWidth.current = event.data.width;
         regionHeight.current = event.data.height;
       } else if (event.data.type === "restart-recording") {
@@ -1666,129 +1801,151 @@ const CloudRecorder = () => {
 
     return timer.current.paused
       ? timer.current.total
-      : timer.current.total + (now - timer.current.start);
+      : timer.current.total + (now - (timer.current.start || now));
   }
 
-  const onMessage = useCallback((request, sender, sendResponse) => {
-    if (request.type === "loaded") {
+  const onMessage = useCallback(
+    (
+      request: ExtensionMessage,
+      sender: chrome.runtime.MessageSender,
+      sendResponse: (response?: any) => void
+    ) => {
+    const req = request as ExtensionMessage & {
+      backup?: boolean;
+      region?: boolean;
+      isTab?: boolean;
+      tabID?: number;
+      data?: string;
+      volume?: number;
+    };
+    
+    if (req.type === "loaded") {
       setInitProject(false);
-      backupRef.current = request.backup;
+      backupRef.current = req.backup || false;
       if (IS_IFRAME_CONTEXT) {
         // Only trigger if it's actually a region recording
-        if (request.region) {
+        if (req.region) {
           isInit.current = true;
           chrome.runtime.sendMessage({ type: "get-streaming-data" });
         }
-      } else if (!request.region) {
+      } else if (!req.region) {
         if (!tabPreferred.current) {
-          isTab.current = request.isTab;
-          if (request.isTab) getStreamID(request.tabID);
+          isTab.current = req.isTab || false;
+          if (req.isTab && req.tabID !== undefined) getStreamID(req.tabID);
         } else {
           isTab.current = false;
         }
         isInit.current = true;
         chrome.runtime.sendMessage({ type: "get-streaming-data" });
       }
-    } else if (request.type === "streaming-data") {
+    } else if (req.type === "streaming-data") {
       if (!isInit.current) return;
       if (IS_IFRAME_CONTEXT) {
         if (regionRef.current) {
-          startStreaming(JSON.parse(request.data));
+          startStreaming(JSON.parse(req.data || "{}"));
         }
       } else if (!regionRef.current) {
-        startStreaming(JSON.parse(request.data));
+        startStreaming(JSON.parse(req.data || "{}"));
       }
-    } else if (request.type === "start-recording-tab") {
+    } else if (req.type === "start-recording-tab") {
       if (!isInit.current) return;
 
       if (IS_IFRAME_CONTEXT) {
-        if (request.region) setTimeout(() => startRecording(), 100);
+        if (req.region) setTimeout(() => startRecording(), 100);
       } else if (!regionRef.current) {
         setTimeout(() => startRecording(), 100);
       }
-    } else if (request.type === "restart-recording-tab") {
+    } else if (req.type === "restart-recording-tab") {
       if (!isInit.current) return;
       if (!IS_IFRAME_CONTEXT) {
         restartRecording();
       }
-    } else if (request.type === "stop-recording-tab") {
+    } else if (req.type === "stop-recording-tab") {
       if (!isInit.current) return;
       stopRecording();
-    } else if (request.type === "set-mic-active-tab") {
+    } else if (req.type === "set-mic-active-tab") {
       if (!isInit.current) return;
-      setMic(request);
-    } else if (request.type === "set-audio-output-volume") {
+      setMic({ active: (req as any).active || false });
+    } else if (req.type === "set-audio-output-volume") {
       if (!isInit.current) return;
-      setAudioOutputVolume(request.volume);
-    } else if (request.type === "get-video-time") {
-      if (!isInit.current) return;
-      const videoTime = getActiveVideoTime() / 1000; // in seconds
-      sendResponse({ videoTime });
-      return true;
-    } else if (request.type === "pause-recording-tab") {
-      if (!isInit.current) return;
+      setAudioOutputVolume(req.volume || 0);
+      } else if (request.type === "get-video-time") {
+        if (!isInit.current) return;
+        const videoTime = getActiveVideoTime() / 1000; // in seconds
+        sendResponse({ videoTime });
+        return true;
+      } else if (request.type === "pause-recording-tab") {
+        if (!isInit.current) return;
 
-      // Pause all active recorders
-      if (
-        screenRecorder.current &&
-        screenRecorder.current.state === "recording"
-      ) {
-        screenRecorder.current.pause();
-      }
-      if (
-        cameraRecorder.current &&
-        cameraRecorder.current.state === "recording"
-      ) {
-        cameraRecorder.current.pause();
-      }
-      if (
-        audioRecorder.current &&
-        audioRecorder.current.state === "recording"
-      ) {
-        audioRecorder.current.pause();
-      }
+        // Pause all active recorders
+        if (
+          screenRecorder.current &&
+          screenRecorder.current.state === "recording"
+        ) {
+          screenRecorder.current.pause();
+        }
+        if (
+          cameraRecorder.current &&
+          cameraRecorder.current.state === "recording"
+        ) {
+          cameraRecorder.current.pause();
+        }
+        if (
+          audioRecorder.current &&
+          audioRecorder.current.state === "recording"
+        ) {
+          audioRecorder.current.pause();
+        }
 
-      const now = Date.now();
-      if (!screenTimer.current.paused && screenTimer.current.start) {
-        screenTimer.current.total += now - screenTimer.current.start;
-        screenTimer.current.paused = true;
-      }
-      if (!cameraTimer.current.paused && cameraTimer.current.start) {
-        cameraTimer.current.total += now - cameraTimer.current.start;
-        cameraTimer.current.paused = true;
-      }
-    } else if (request.type === "resume-recording-tab") {
-      if (!isInit.current) return;
+        const now = Date.now();
+        if (!screenTimer.current.paused && screenTimer.current.start) {
+          screenTimer.current.total += now - screenTimer.current.start;
+          screenTimer.current.paused = true;
+        }
+        if (!cameraTimer.current.paused && cameraTimer.current.start) {
+          cameraTimer.current.total += now - cameraTimer.current.start;
+          cameraTimer.current.paused = true;
+        }
+      } else if (request.type === "resume-recording-tab") {
+        if (!isInit.current) return;
 
-      // Resume all paused recorders
-      if (screenRecorder.current && screenRecorder.current.state === "paused") {
-        screenRecorder.current.resume();
-      }
-      if (cameraRecorder.current && cameraRecorder.current.state === "paused") {
-        cameraRecorder.current.resume();
-      }
-      if (audioRecorder.current && audioRecorder.current.state === "paused") {
-        audioRecorder.current.resume();
-      }
+        // Resume all paused recorders
+        if (
+          screenRecorder.current &&
+          screenRecorder.current.state === "paused"
+        ) {
+          screenRecorder.current.resume();
+        }
+        if (
+          cameraRecorder.current &&
+          cameraRecorder.current.state === "paused"
+        ) {
+          cameraRecorder.current.resume();
+        }
+        if (audioRecorder.current && audioRecorder.current.state === "paused") {
+          audioRecorder.current.resume();
+        }
 
-      const now = Date.now();
-      if (screenTimer.current.paused) {
-        screenTimer.current.start = now;
-        screenTimer.current.paused = false;
+        const now = Date.now();
+        if (screenTimer.current.paused) {
+          screenTimer.current.start = now;
+          screenTimer.current.paused = false;
+        }
+        if (cameraTimer.current.paused) {
+          cameraTimer.current.start = now;
+          cameraTimer.current.paused = false;
+        }
+      } else if (request.type === "dismiss-recording") {
+        if (!isInit.current) return;
+        dismissRecording();
       }
-      if (cameraTimer.current.paused) {
-        cameraTimer.current.start = now;
-        cameraTimer.current.paused = false;
-      }
-    } else if (request.type === "dismiss-recording") {
-      if (!isInit.current) return;
-      dismissRecording();
-    }
-  }, []);
+    },
+    []
+  );
 
   useEffect(() => {
     chrome.storage.local.get(["tabPreferred"], (result) => {
-      tabPreferred.current = result.tabPreferred;
+      tabPreferred.current = (result.tabPreferred as boolean) || false;
     });
 
     chrome.runtime.onMessage.addListener(onMessage);

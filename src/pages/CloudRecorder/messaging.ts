@@ -5,7 +5,7 @@ const IS_IFRAME_CONTEXT =
   (window.top !== window.self &&
     !document.referrer.startsWith("chrome-extension://"));
 
-export function sendRecordingError(why, cancel = false) {
+export function sendRecordingError(why: unknown, cancel = false): void {
   chrome.runtime.sendMessage({
     type: "recording-error",
     error: !cancel ? "stream-error" : "cancel-modal",

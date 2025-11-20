@@ -7,7 +7,7 @@ export const MIME_TYPES = [
   "video/webm;codecs=avc1",
 ];
 
-export function getBitrates(quality) {
+export function getBitrates(quality: string): { audio: number; video: number } {
   switch (quality) {
     case "4k":
       return { audio: 192000, video: 40000000 };
@@ -36,6 +36,6 @@ export const VIDEO_QUALITIES = {
   default: { width: 2560, height: 1440 }, // 2.5K as default
 };
 
-export function getResolutionForQuality(qualityValue = "default") {
-  return VIDEO_QUALITIES[qualityValue] || VIDEO_QUALITIES.default;
+export function getResolutionForQuality(qualityValue: string = "default"): { width: number; height: number } {
+  return VIDEO_QUALITIES[qualityValue as keyof typeof VIDEO_QUALITIES] || VIDEO_QUALITIES.default;
 }

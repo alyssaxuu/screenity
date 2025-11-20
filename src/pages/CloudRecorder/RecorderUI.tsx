@@ -1,7 +1,13 @@
 import React from "react";
 import Warning from "./warning/Warning";
 
-const RecorderUI = ({ started, initProject = false, isTab }) => {
+interface RecorderUIProps {
+  started: boolean;
+  initProject?: boolean;
+  isTab: boolean;
+}
+
+const RecorderUI = ({ started, initProject = false, isTab }: RecorderUIProps) => {
   return (
     <div className="wrap">
       <img

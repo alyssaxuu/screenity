@@ -11,6 +11,14 @@ if (container) {
 }
 
 // Hot Module Replacement
-if (module.hot) {
-  module.hot.accept();
+import type { Module } from "webpack";
+
+interface NodeModuleWithHot extends NodeModule {
+  hot?: {
+    accept: () => void;
+  };
+}
+
+if ((module as NodeModuleWithHot).hot) {
+  (module as NodeModuleWithHot).hot?.accept();
 }
