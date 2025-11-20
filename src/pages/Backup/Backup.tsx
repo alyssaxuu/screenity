@@ -1,6 +1,38 @@
 import React, { useState, useEffect, useRef } from "react";
-
 import localforage from "localforage";
+import type { ExtensionMessage } from "../../types/messaging";
+
+// File System Access API types
+interface FileSystemHandle {
+  queryPermission(opts: { mode: "readwrite" }): Promise<"granted" | "denied" | "prompt">;
+  requestPermission(opts: { mode: "readwrite" }): Promise<"granted" | "denied" | "prompt">;
+}
+
+interface FileSystemFileHandle extends FileSystemHandle {
+  createWritable(): Promise<FileSystemWritableFileStream>;
+}
+
+interface FileSystemDirectoryHandle extends FileSystemHandle {
+  getFileHandle(name: string, opts: { create: boolean }): Promise<FileSystemFileHandle>;
+  getDirectoryHandle(name: string, opts: { create: boolean }): Promise<FileSystemDirectoryHandle>;
+  removeEntry(name: string): Promise<void>;
+  name: string;
+}
+
+interface FileSystemWritableFileStream extends WritableStream {
+  write(data: Blob): Promise<void>;
+  close(): Promise<void>;
+}
+
+interface WindowWithDirectoryPicker extends Window {
+  showDirectoryPicker?(options?: { startIn?: string; mode?: "readwrite" }): Promise<FileSystemDirectoryHandle>;
+}
+
+interface NavigatorWithUserActivation extends Navigator {
+  userActivation?: {
+    isActive: boolean;
+  };
+}
 
 localforage.config({
   driver: localforage.INDEXEDDB,
@@ -17,14 +49,14 @@ const localDirectoryStore = localforage.createInstance({
 
 const Backup = () => {
   const [setupComplete, setSetupComplete] = useState(false);
-  const writable = useRef(null);
-  const request = useRef(null);
-  const tabId = useRef(null);
+  const writable = useRef<FileSystemWritableFileStream | null>(null);
+  const request = useRef<ExtensionMessage | null>(null);
+  const tabId = useRef<number | null>(null);
   const repeatRef = useRef(0);
   const [backupAgain, setBackupAgain] = useState(false);
   const backupRef = useRef(false);
   const writingFile = useRef(false);
-  const titleRef = useRef(null);
+  const titleRef = useRef<string | null>(null);
   const [override, setOverride] = useState(false);
   const waitWrite = useRef(false);
   const closeRequest = useRef(false);
@@ -33,7 +65,7 @@ const Backup = () => {
     backupRef.current = backupAgain;
   }, [backupAgain]);
 
-  const verifyFilePermissions = async (fileHandle) => {
+  const verifyFilePermissions = async (fileHandle: FileSystemHandle): Promise<boolean> => {
     const opts = {
       mode: "readwrite",
     };
@@ -51,7 +83,7 @@ const Backup = () => {
     }
   };
 
-  const initLocalDirectory = async (directoryHandle, prompt = true) => {
+  const initLocalDirectory = async (directoryHandle: FileSystemDirectoryHandle, prompt = true): Promise<void> => {
     const permissions = await verifyFilePermissions(directoryHandle);
     if (permissions) {
       let videoTitle = `Screenity video - ${new Date().toLocaleString("en-US", {
@@ -66,7 +98,7 @@ const Backup = () => {
 
       videoTitle = videoTitle.replace(/:/g, "-");
 
-      titleRef.current = videoTitle;
+      titleRef.current = videoTitle as string;
 
       const fileHandle = await directoryHandle.getFileHandle(videoTitle, {
         create: true,
@@ -106,22 +138,27 @@ const Backup = () => {
     }
   };
 
-  const directoryPicker = async (prompt = true) => {
+  const directoryPicker = async (prompt = true): Promise<void> => {
     chrome.runtime.sendMessage({ type: "focus-this-tab" });
-    let directoryPicker = null;
+    let directoryPicker: FileSystemDirectoryHandle | null = null;
     // Request access to create a file in a user-selected directory
     try {
-      directoryPicker = await window.showDirectoryPicker({
+      const win = window as WindowWithDirectoryPicker;
+      if (!win.showDirectoryPicker) {
+        throw new Error("showDirectoryPicker not available");
+      }
+      directoryPicker = await win.showDirectoryPicker({
         startIn: "videos",
         mode: "readwrite",
       });
     } catch (err) {
+      const error = err instanceof Error ? err : new Error(String(err));
       if (backupRef.current) {
         chrome.runtime.sendMessage({
           type: "recording-error",
           error: "backup-error",
-          why: JSON.stringify(err),
-        });
+          why: JSON.stringify(error),
+        } as ExtensionMessage);
       }
       return;
     }
@@ -131,8 +168,8 @@ const Backup = () => {
         chrome.runtime.sendMessage({
           type: "recording-error",
           error: "backup-error",
-          why: JSON.stringify(err),
-        });
+          why: "User cancelled directory picker",
+        } as ExtensionMessage);
       }
       return;
     }
@@ -154,11 +191,12 @@ const Backup = () => {
     initLocalDirectory(directoryHandle, prompt);
   };
 
-  const localSaving = async (prompt = true) => {
+  const localSaving = async (prompt = true): Promise<void> => {
     waitWrite.current = false;
     closeRequest.current = false;
 
-    if (!navigator.userActivation.isActive) {
+    const nav = navigator as NavigatorWithUserActivation;
+    if (!nav.userActivation?.isActive) {
       chrome.runtime.sendMessage({ type: "focus-this-tab" });
       return;
     }
@@ -167,8 +205,9 @@ const Backup = () => {
       localDirectoryStore.clear();
     }
 
-    if ("showDirectoryPicker" in window) {
-      localDirectoryStore.getItem("directoryHandle").then(async (directory) => {
+    const win = window as WindowWithDirectoryPicker;
+    if ("showDirectoryPicker" in win && win.showDirectoryPicker) {
+      localDirectoryStore.getItem("directoryHandle").then(async (directory: { directoryHandle: FileSystemDirectoryHandle } | null) => {
         if (directory) {
           try {
             const permissions = await verifyFilePermissions(
@@ -202,41 +241,45 @@ const Backup = () => {
     }
   };
 
-  const writeFile = async (index) => {
+  const writeFile = async (index: number): Promise<void> => {
     if (!writable.current) return;
     if (!writingFile.current) return;
     waitWrite.current = true;
     try {
-      const chunks = [];
+      interface ChunkData {
+        index: number;
+        chunk: Blob;
+      }
+      const chunks: ChunkData[] = [];
       chunksStore
-        .iterate((value, key, iterationNumber) => {
+        .iterate((value: ChunkData) => {
           chunks.push(value);
         })
         .then(async () => {
           if (chunks && chunks.length > 0) {
             const chunk = chunks.find((chunk) => chunk.index === index);
 
-            if (chunk) {
+            if (chunk && writable.current) {
               await writable.current.write(chunk.chunk);
               waitWrite.current = false;
-              if (closeRequest.current) {
+              if (closeRequest.current && writable.current) {
                 closeRequest.current = false;
-                writable.current.close();
+                await writable.current.close();
               }
             } else {
               waitWrite.current = false;
-              if (closeRequest.current) {
+              if (closeRequest.current && writable.current) {
                 closeRequest.current = false;
-                writable.current.close();
+                await writable.current.close();
               }
             }
           }
         });
     } catch {
       waitWrite.current = false;
-      if (closeRequest.current) {
+      if (closeRequest.current && writable.current) {
         closeRequest.current = false;
-        writable.current.close();
+        await writable.current.close();
       }
       chrome.storage.local.set({
         recording: false,
@@ -249,13 +292,13 @@ const Backup = () => {
   };
 
   // Delete the latest file saved in the local backup folder
-  const deleteFile = async (restart = null) => {
-    if (writingFile.current) {
+  const deleteFile = async (restart: boolean | null = null): Promise<void> => {
+    if (writingFile.current && writable.current) {
       await writable.current.close();
       writingFile.current = false;
 
-      const directory = await localDirectoryStore.getItem("directoryHandle");
-      if (directory && directory !== null) {
+      const directory = await localDirectoryStore.getItem("directoryHandle") as { directoryHandle: FileSystemDirectoryHandle } | null;
+      if (directory && directory !== null && titleRef.current) {
         const permissions = await verifyFilePermissions(
           directory.directoryHandle
         );
@@ -304,15 +347,21 @@ const Backup = () => {
     checkBackupSetup();
   }, []);
 
-  const onMessage = (message, sender, sendResponse) => {
+  const onMessage = (
+    message: ExtensionMessage,
+    sender: chrome.runtime.MessageSender,
+    sendResponse: (response?: unknown) => void
+  ): boolean | void => {
     if (message.type === "init-backup") {
-      request.current = message.request;
-      tabId.current = message.tabId;
+      const initMessage = message as ExtensionMessage & { request: ExtensionMessage; tabId: number };
+      request.current = initMessage.request;
+      tabId.current = initMessage.tabId;
       localSaving(true);
     } else if (message.type === "write-file") {
-      writeFile(message.index);
+      const writeMessage = message as ExtensionMessage & { index: number };
+      writeFile(writeMessage.index);
     } else if (message.type === "close-writable") {
-      if (!waitWrite.current) {
+      if (!waitWrite.current && writable.current) {
         writable.current.close();
       } else {
         closeRequest.current = true;
@@ -328,6 +377,7 @@ const Backup = () => {
       setOverride(true);
       window.close();
     }
+    return true;
   };
   const closeTab = () => {
     chrome.runtime.sendMessage({

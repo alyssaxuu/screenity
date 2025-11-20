@@ -12,6 +12,12 @@ if (container) {
 }
 
 // Hot Module Replacement
+declare const module: {
+  hot?: {
+    accept(): void;
+  };
+};
+
 if (module.hot) {
   module.hot.accept();
 }
