@@ -116,10 +116,8 @@ const Sandbox = () => {
         }
 
         case "base64-to-blob": {
-          // Decode the base64 blob (type might be wrong or missing)
           const rawBlob = await fetch(message.base64).then((r) => r.blob());
 
-          // Real MP4 signature check
           const header = await rawBlob.slice(4, 12).text();
           const looksMp4 = header === "ftyp";
 
@@ -132,9 +130,6 @@ const Sandbox = () => {
             break;
           }
 
-          console.log("Converting WebM to MP4...");
-
-          // Otherwise treat it as WebM → MP4
           const webmBlob = base64ToWebmBlob(message.base64);
           const mp4Blob = await convertWebmToMp4(webmBlob, (progress) =>
             sendMessage({
