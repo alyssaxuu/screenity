@@ -112,15 +112,21 @@ const Background = (props: BackgroundProps) => {
     renderEffectBackground();
   }, [windowSize]);
 
-  const renderEffectBackground = () => {
-    bottomCanvasRef.current.width = innerWidth;
-    bottomCanvasRef.current.height = innerHeight;
-    bottomCanvasContextRef.current.drawImage(
-      effectRef.current,
+  const renderEffectBackground = (): void => {
+    const bottomCanvas = bottomCanvasRef.current;
+    const bottomCtx = bottomCanvasContextRef.current;
+    const effect = effectRef.current;
+    
+    if (!bottomCanvas || !bottomCtx || !effect) return;
+    
+    bottomCanvas.width = innerWidth;
+    bottomCanvas.height = innerHeight;
+    bottomCtx.drawImage(
+      effect,
       0,
       0,
-      effectRef.current.width,
-      effectRef.current.height,
+      effect.width,
+      effect.height,
       0,
       0,
       innerWidth,
@@ -128,7 +134,7 @@ const Background = (props: BackgroundProps) => {
     );
   };
 
-  const loadEffect = (effect) => {
+  const loadEffect = (effect: string): void => {
     const img = new Image();
     img.src = effect;
     img.onload = () => {
@@ -141,9 +147,9 @@ const Background = (props: BackgroundProps) => {
     loadModel();
   }, []);
 
-  const loadModel = async () => {
+  const loadModel = async (): Promise<void> => {
     const model = bodySegmentation.SupportedModels.MediaPipeSelfieSegmentation;
-    const segmenterConfig = {
+    const segmenterConfig: bodySegmentation.MediaPipeSelfieSegmentationMediaPipeModelConfig = {
       runtime: "mediapipe",
       solutionPath: "./assets/selfieSegmentation",
       modelType: "general",
@@ -157,7 +163,7 @@ const Background = (props: BackgroundProps) => {
   useEffect(() => {
     if (props.frame === null) return;
 
-    latestImageDataRef.current = props.frame;
+    latestImageDataRef.current = props.frame as ImageData | null;
     requestFrameRender();
   }, [props.frame]);
 
@@ -182,7 +188,7 @@ const Background = (props: BackgroundProps) => {
     }
   };
 
-  const segmentPerson = async (img) => {
+  const segmentPerson = async (img: ImageData): Promise<void> => {
     try {
       if (!blurRef.current && !effectRef.current) return;
       if (!latestImageDataRef.current) return;
@@ -204,7 +210,7 @@ const Background = (props: BackgroundProps) => {
     }
   };
 
-  const renderBlur = async (img, people) => {
+  const renderBlur = async (img: ImageData, people: any[]): Promise<void> => {
     try {
       const backgroundBlurAmount = 16;
       const edgeBlurAmount = 10;
@@ -230,7 +236,7 @@ const Background = (props: BackgroundProps) => {
     }
   };
 
-  const renderEffect = async (img, people, width, height) => {
+  const renderEffect = async (img: ImageData, people: any[], width: number, height: number): Promise<void> => {
     try {
       const ratio = img.width / img.height;
       const foregroundColor = { r: 0, g: 0, b: 0, a: 0 };

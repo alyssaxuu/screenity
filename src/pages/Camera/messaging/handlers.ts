@@ -125,7 +125,7 @@ const safelyApplyFilter = (
   }
 };
 
-const handleSetBackgroundEffect = async (message: any): Promise<any> => {
+const handleSetBackgroundEffect = async (message: ExtensionMessage & { effect?: string }): Promise<void> => {
   const { blurRef, effectRef, offScreenCanvasContextRef } = getContextRefs();
 
   await chrome.storage.local.set({ backgroundEffect: message.effect });
@@ -138,7 +138,7 @@ const handleSetBackgroundEffect = async (message: any): Promise<any> => {
     blurRef.current = false;
 
     try {
-      const effectImage = await loadEffect(message.effect);
+      const effectImage = await loadEffect(message.effect) as HTMLImageElement | null;
       effectRef.current = effectImage;
       safelyApplyFilter(offScreenCanvasContextRef, "none");
     } catch (err) {
@@ -157,7 +157,7 @@ const handleToggleBlur = async (
   const { blurRef, offScreenCanvasContextRef } = getContextRefs();
   const enabled = message.enabled ?? !blurRef.current;
 
-  if (blurRef.current !== undefined) blurRef.current = enabled;
+  blurRef.current = enabled;
 
   await chrome.storage.local.set({ backgroundEffect: enabled ? "blur" : "" });
 
@@ -201,7 +201,7 @@ const handleCameraOnlyUpdate = (): void => {
   if (setIsCameraMode) {
     setIsCameraMode(true);
   }
-  if (recordingTypeRef && 'current' in recordingTypeRef) {
+  if (recordingTypeRef && "current" in recordingTypeRef) {
     (recordingTypeRef as { current: string }).current = "camera";
   }
 };
@@ -229,7 +229,7 @@ const handleScreenUpdate = (): void => {
     setHeight("auto");
   }
 
-  if (recordingTypeRef && 'current' in recordingTypeRef) {
+  if (recordingTypeRef && "current" in recordingTypeRef) {
     (recordingTypeRef as { current: string }).current = "screen";
   }
 };

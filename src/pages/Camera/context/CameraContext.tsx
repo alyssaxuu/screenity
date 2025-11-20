@@ -88,7 +88,7 @@ export const useCameraContext = (): CameraContextType => {
 };
 
 export const getContextRefs = () => {
-  const missingRefs = [];
+  const missingRefs: string[] = [];
 
   if (!globalRefs.videoRef) missingRefs.push("videoRef");
   if (!globalRefs.streamRef) missingRefs.push("streamRef");
@@ -114,17 +114,20 @@ export const getContextRefs = () => {
     );
   }
 
+  // Create mutable refs for fallback cases using React.MutableRefObject pattern
+  const createMutableRef = <T,>(value: T): React.MutableRefObject<T> => {
+    return { current: value } as React.MutableRefObject<T>;
+  };
+
   return {
-    videoRef: globalRefs.videoRef ?? { current: null },
-    streamRef: globalRefs.streamRef ?? { current: new MediaStream() },
-    recordingTypeRef: globalRefs.recordingTypeRef ?? { current: "screen" },
-    offScreenCanvasRef: globalRefs.offScreenCanvasRef ?? { current: null },
-    offScreenCanvasContextRef: globalRefs.offScreenCanvasContextRef ?? {
-      current: null,
-    },
-    segmenterRef: globalRefs.segmenterRef ?? { current: null },
-    blurRef: globalRefs.blurRef ?? { current: false },
-    effectRef: globalRefs.effectRef ?? { current: null },
+    videoRef: (globalRefs.videoRef ?? createMutableRef<HTMLVideoElement | null>(null)) as React.MutableRefObject<HTMLVideoElement | null>,
+    streamRef: (globalRefs.streamRef ?? createMutableRef<MediaStream>(new MediaStream())) as React.MutableRefObject<MediaStream>,
+    recordingTypeRef: (globalRefs.recordingTypeRef ?? createMutableRef<string>("screen")) as React.MutableRefObject<string>,
+    offScreenCanvasRef: (globalRefs.offScreenCanvasRef ?? createMutableRef<HTMLCanvasElement | null>(null)) as React.MutableRefObject<HTMLCanvasElement | null>,
+    offScreenCanvasContextRef: (globalRefs.offScreenCanvasContextRef ?? createMutableRef<CanvasRenderingContext2D | null>(null)) as React.MutableRefObject<CanvasRenderingContext2D | null>,
+    segmenterRef: (globalRefs.segmenterRef ?? createMutableRef<any>(null)) as React.MutableRefObject<any>,
+    blurRef: (globalRefs.blurRef ?? createMutableRef<boolean>(false)) as React.MutableRefObject<boolean>,
+    effectRef: (globalRefs.effectRef ?? createMutableRef<HTMLImageElement | null>(null)) as React.MutableRefObject<HTMLImageElement | null>,
     setWidth:
       globalRefs.setWidth ??
       ((width: string) => console.warn("⚠️ setWidth not initialized")),
@@ -132,7 +135,7 @@ export const getContextRefs = () => {
       globalRefs.setHeight ??
       ((height: string) => console.warn("⚠️ setHeight not initialized")),
     setBackgroundEffects: globalRefs.setBackgroundEffects ?? (() => {}),
-    backgroundEffectsRef: globalRefs.backgroundEffectsRef ?? { current: false },
+    backgroundEffectsRef: (globalRefs.backgroundEffectsRef ?? createMutableRef<boolean>(false)) as React.MutableRefObject<boolean>,
     setIsCameraMode: globalRefs.setIsCameraMode ?? (() => {}),
   };
 };
