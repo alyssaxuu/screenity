@@ -6,6 +6,37 @@ import BunnyTusUploader from "./bunnyTusUploader";
 import localforage from "localforage";
 import { createVideoProject } from "./createVideoProject";
 
+interface TimerState {
+  start: number | null;
+  total: number;
+  paused: boolean;
+}
+
+interface UploadMeta {
+  screen?: {
+    videoId: string;
+    mediaId: string;
+  };
+  camera?: {
+    videoId: string;
+    mediaId: string;
+  };
+  audio?: {
+    videoId: string;
+    mediaId: string;
+    path?: string;
+  };
+  sceneId?: string;
+}
+
+interface TimerState {
+  start: number | null;
+  total: number;
+  paused: boolean;
+  notificationInterval?: NodeJS.Timeout | null;
+  warned?: boolean;
+}
+
 localforage.config({
   driver: localforage.INDEXEDDB,
   name: "screenity",
@@ -24,31 +55,31 @@ const IS_IFRAME_CONTEXT =
     !document.referrer.startsWith("chrome-extension://"));
 
 const CloudRecorder = () => {
-  const screenTimer = useRef({ start: null, total: 0, paused: false });
-  const cameraTimer = useRef({ start: null, total: 0, paused: false });
+  const screenTimer = useRef<TimerState>({ start: null, total: 0, paused: false });
+  const cameraTimer = useRef<TimerState>({ start: null, total: 0, paused: false });
   const [started, setStarted] = useState(false);
   const [initProject, setInitProject] = useState(false);
 
   const isTab = useRef(false);
-  const tabID = useRef(null);
+  const tabID = useRef<number | null>(null);
   const tabPreferred = useRef(false);
 
-  const screenStream = useRef(null);
-  const cameraStream = useRef(null);
-  const micStream = useRef(null);
-  const rawMicStream = useRef(null);
+  const screenStream = useRef<MediaStream | null>(null);
+  const cameraStream = useRef<MediaStream | null>(null);
+  const micStream = useRef<MediaStream | null>(null);
+  const rawMicStream = useRef<MediaStream | null>(null);
 
-  const screenRecorder = useRef(null);
-  const cameraRecorder = useRef(null);
-  const audioRecorder = useRef(null);
+  const screenRecorder = useRef<MediaRecorder | null>(null);
+  const cameraRecorder = useRef<MediaRecorder | null>(null);
+  const audioRecorder = useRef<MediaRecorder | null>(null);
 
-  const screenUploader = useRef(null);
-  const cameraUploader = useRef(null);
-  const uploadMetaRef = useRef(null);
+  const screenUploader = useRef<BunnyTusUploader | null>(null);
+  const cameraUploader = useRef<BunnyTusUploader | null>(null);
+  const uploadMetaRef = useRef<UploadMeta | null>(null);
 
   const backupRef = useRef(false);
-  const audioInputGain = useRef(null);
-  const audioOutputGain = useRef(null);
+  const audioInputGain = useRef<GainNode | null>(null);
+  const audioOutputGain = useRef<GainNode | null>(null);
 
   const uploadersInitialized = useRef(false);
 
@@ -59,14 +90,14 @@ const CloudRecorder = () => {
   const hasChunks = useRef(false);
   const index = useRef(0);
 
-  const target = useRef(null);
-  const regionRef = useRef(null);
+  const target = useRef<HTMLElement | null>(null);
+  const regionRef = useRef<HTMLElement | null>(null);
   const regionWidth = useRef(0);
   const regionHeight = useRef(0);
 
-  const screenChunks = useRef([]);
-  const cameraChunks = useRef([]);
-  const audioChunks = useRef([]);
+  const screenChunks = useRef<Blob[]>([]);
+  const cameraChunks = useRef<Blob[]>([]);
+  const audioChunks = useRef<Blob[]>([]);
 
   const recordingType = useRef("screen");
 
@@ -78,10 +109,10 @@ const CloudRecorder = () => {
   // This checks if the recording was previously initialized
   const isInit = useRef(false);
 
-  const aCtx = useRef(null);
-  const destination = useRef(null);
+  const aCtx = useRef<AudioContext | null>(null);
+  const destination = useRef<MediaStreamAudioDestinationNode | null>(null);
 
-  const keepAliveInterval = useRef(null);
+  const keepAliveInterval = useRef<NodeJS.Timeout | null>(null);
 
   const startKeepAlive = () => {
     if (keepAliveInterval.current) clearInterval(keepAliveInterval.current);
@@ -100,7 +131,7 @@ const CloudRecorder = () => {
     }, 1000 * 60 * 5); // every 5 minutes
   };
 
-  const attachMicToStream = (videoStream, micStream) => {
+  const attachMicToStream = (videoStream: MediaStream | null, micStream: MediaStream | null): MediaStream | null => {
     if (!videoStream || !micStream) return videoStream;
     return new MediaStream([
       ...videoStream.getVideoTracks(),
@@ -111,28 +142,28 @@ const CloudRecorder = () => {
   const checkMaxMemory = () => {
     navigator.storage.estimate().then((data) => {
       const minMemory = 26214400;
-      if (data.quota < minMemory) {
+      if (data.quota && data.quota < minMemory) {
         chrome.storage.local.set({ memoryError: true });
         sendStopRecording();
       }
     });
   };
 
-  const setMic = async (result) => {
+  const setMic = async (result: { active: boolean }): Promise<void> => {
     if (micStream.current && audioInputGain.current) {
       // Mute merged audio in the main stream
       audioInputGain.current.gain.value = result.active ? 1 : 0;
 
       // Mute transcription-only mic stream too
       if (rawMicStream.current) {
-        rawMicStream.current.getAudioTracks().forEach((track) => {
+        rawMicStream.current.getAudioTracks().forEach((track: MediaStreamTrack) => {
           track.enabled = result.active;
         });
       }
     }
   };
 
-  const setAudioOutputVolume = (volume) => {
+  const setAudioOutputVolume = (volume: number): void => {
     if (audioOutputGain.current) {
       audioOutputGain.current.gain.value = volume;
     }
@@ -141,21 +172,21 @@ const CloudRecorder = () => {
   const flushPendingChunks = async () => {
     if (screenUploader.current) {
       try {
-        await screenUploader.current.waitForPendingUploads?.();
+        await screenUploader.current.waitForPendingUploads();
       } catch (e) {
         console.warn("Error waiting for screen chunks to finish:", e);
       }
     }
     if (cameraUploader.current) {
       try {
-        await cameraUploader.current.waitForPendingUploads?.();
+        await cameraUploader.current.waitForPendingUploads();
       } catch (e) {
         console.warn("Error waiting for camera chunks to finish:", e);
       }
     }
   };
 
-  const deleteProject = async (projectId, uploadMeta, deleteVideo = true) => {
+  const deleteProject = async (projectId: string, uploadMeta: UploadMeta | null, deleteVideo = true): Promise<void> => {
     const screenMeta = uploadMeta?.screen;
     const cameraMeta = uploadMeta?.camera;
 
@@ -216,22 +247,25 @@ const CloudRecorder = () => {
 
     if (restarting) {
       await Promise.allSettled([
-        screenUploader.current?.abort?.(),
-        cameraUploader.current?.abort?.(),
+        screenUploader.current?.abort(),
+        cameraUploader.current?.abort(),
       ]);
       if (!recordingToScene) {
         try {
           const uploadMeta = uploadMetaRef.current;
-          const { projectId } = await chrome.storage.local.get(["projectId"]);
-          await deleteProject(projectId, uploadMeta, false);
+          const result = await chrome.storage.local.get(["projectId"]);
+          const projectId = result.projectId as string | undefined;
+          if (projectId) {
+            await deleteProject(projectId, uploadMeta, false);
+          }
         } catch (err) {
           console.warn("❌ Failed to delete media:", err);
         }
       }
       uploadMetaRef.current = null;
       sentLast.current = false;
-      screenUploader.current = null;
-      cameraUploader.current = null;
+      screenUploader.current = null as unknown as BunnyTusUploader | null;
+      cameraUploader.current = null as unknown as BunnyTusUploader | null;
       uploadersInitialized.current = false;
       cleanupTimers();
       return;
@@ -341,7 +375,7 @@ const CloudRecorder = () => {
       }
 
       if (screenStream.current) {
-        screenUploader.current = new BunnyTusUploader();
+        screenUploader.current = new BunnyTusUploader() as BunnyTusUploader | null;
         const track = screenStream.current.getVideoTracks()[0];
         let width, height;
         if (regionRef.current && target.current) {
@@ -362,7 +396,7 @@ const CloudRecorder = () => {
       }
 
       if (cameraStream.current) {
-        cameraUploader.current = new BunnyTusUploader();
+        cameraUploader.current = new BunnyTusUploader() as BunnyTusUploader | null;
         const track = cameraStream.current.getVideoTracks()[0];
         if (track?.readyState === "ended") {
           throw new Error("Camera track has ended");
@@ -380,25 +414,31 @@ const CloudRecorder = () => {
 
       return true;
     } catch (err) {
-      console.error("❌ Failed to initialize uploaders:", err);
-      sendRecordingError("Failed to initialize uploaders: " + err.message);
+      const error = err instanceof Error ? err : new Error(String(err));
+      console.error("❌ Failed to initialize uploaders:", error);
+      sendRecordingError("Failed to initialize uploaders: " + error.message);
       return false;
     }
   };
 
-  const createMediaRecorder = (stream, options, onDataAvailable) => {
+  const createMediaRecorder = (
+    stream: MediaStream,
+    options: MediaRecorderOptions,
+    onDataAvailable: (data: Blob) => void
+  ): MediaRecorder => {
     try {
       const recorder = new MediaRecorder(stream, options);
 
-      recorder.ondataavailable = (event) => {
+      recorder.ondataavailable = (event: BlobEvent) => {
         if (event.data && event.data.size > 0) {
           onDataAvailable(event.data);
         }
       };
 
-      recorder.onerror = (event) => {
-        console.error("MediaRecorder error:", event.error);
-        sendRecordingError("Recording error: " + event.error?.message);
+      recorder.onerror = (event: Event) => {
+        const errorEvent = event as Event & { error?: DOMException };
+        console.error("MediaRecorder error:", errorEvent.error);
+        sendRecordingError("Recording error: " + (errorEvent.error?.message || "Unknown error"));
       };
 
       return recorder;
