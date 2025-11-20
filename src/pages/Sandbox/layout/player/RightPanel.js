@@ -180,10 +180,13 @@ const RightPanel = () => {
         () => {
           const blob = contentStateRef.current.rawBlob;
           const url = window.URL.createObjectURL(blob);
+
+          const ext = blob.type.includes("mp4") ? "mp4" : "webm";
+
           chrome.downloads.download(
             {
               url: url,
-              filename: "raw-recording.webm",
+              filename: `raw-recording.${ext}`,
             },
             () => {
               window.URL.revokeObjectURL(url);

@@ -10,15 +10,15 @@ export const MIME_TYPES = [
 export function getBitrates(quality) {
   switch (quality) {
     case "4k":
-      return { audio: 256000, video: 35000000 };
+      return { audio: 192000, video: 20000000 };
     case "1080p":
-      return { audio: 192000, video: 16000000 };
-    case "720p":
       return { audio: 128000, video: 8000000 };
+    case "720p":
+      return { audio: 128000, video: 5000000 };
     case "480p":
-      return { audio: 96000, video: 4000000 };
+      return { audio: 96000, video: 3000000 };
     case "360p":
-      return { audio: 96000, video: 2000000 };
+      return { audio: 96000, video: 1500000 };
     case "240p":
       return { audio: 64000, video: 1000000 };
     default:

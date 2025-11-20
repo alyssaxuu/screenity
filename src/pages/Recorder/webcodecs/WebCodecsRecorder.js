@@ -520,36 +520,14 @@ export class WebCodecsRecorder {
           this.targetHeight
         );
 
-        const fps = this.options.fps || 30;
-        const durUs = Math.round(1e6 / fps);
+        if (!this.startTimeUs) this.startTimeUs = performance.now() * 1000;
 
-        // Monotonic, frame-index-based timestamp to avoid drift/WebCodecs bugs
-        const tsUs = this._videoFrameIndex * durUs;
-        this._videoFrameIndex++;
+        const nowUs = performance.now() * 1000;
+        const tsUs = nowUs - this.startTimeUs;
 
         const resized = new VideoFrame(this.resizeCanvas, {
           timestamp: tsUs,
-          duration: durUs, // <-- ADD THIS
         });
-
-        if (this.firstVideoFrame === undefined) {
-          this.firstVideoFrame = true;
-          this.frameCount = 0;
-
-          if (this.muxer) {
-            this.muxer.setAudioOffset(0);
-          }
-
-          if (!this.audioEncoder && this._pendingAudioConfig) {
-            await this.initAudioEncoder(this._pendingAudioConfig);
-            for (const buf of this._prebufferedAudio) {
-              this.audioEncoder.encode(buf);
-              buf.close?.();
-            }
-            this._prebufferedAudio.length = 0;
-            this._audioReady = true;
-          }
-        }
 
         // Keyframe only first frame and after resume
         const keyFrame = this.frameCount === 0 || this.justResumed;
@@ -557,7 +535,6 @@ export class WebCodecsRecorder {
 
         this.videoEncoder.encode(resized, {
           timestamp: tsUs,
-          duration: durUs,
           keyFrame,
         });
 

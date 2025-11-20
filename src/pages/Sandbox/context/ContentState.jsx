@@ -265,7 +265,36 @@ const ContentState = (props) => {
       ? withBlob
       : new Blob(videoChunks.current, { type: "video/webm; codecs=vp8,opus" });
 
-    if (blob.type === "video/mp4" || /\.mp4$/i.test(blob.name || "")) {
+    if (blob.type === "video/mp4") {
+      //const TOO_BIG_BYTES = 200 * 1024 * 1024;
+      // const TOO_BIG_BYTES = 0;
+      // if (blob.size > TOO_BIG_BYTES) {
+      //   // Convert Blob → base64 first so we can pass to sandbox
+      //   const reader = new FileReader();
+      //   reader.onloadend = () => {
+      //     const base64 = reader.result;
+
+      //     setContentState((prev) => ({
+      //       ...prev,
+      //       base64,
+      //       compressing: true,
+      //       mp4ready: false,
+      //       ready: false,
+      //       rawBlob: prev.rawBlob || blob,
+      //     }));
+
+      //     // Send to sandbox for compression
+      //     sendMessage({
+      //       type: "compress-video",
+      //       base64,
+      //       topLevel: true,
+      //     });
+      //   };
+      //   reader.readAsDataURL(blob);
+
+      //   return;
+      // }
+
       setContentState((prev) => ({
         ...prev,
         blob: blob,
@@ -652,9 +681,7 @@ const ContentState = (props) => {
   const onMessage = async (event) => {
     if (event.data.type === "updated-blob") {
       const base64 = event.data.base64;
-      // const blob = new Blob([base64ToUint8Array(base64)], {
-      //   type: "video/mp4",
-      // });
+
       const blob = base64ToUint8Array(base64);
 
       const wasCropping = contentState.cropping;
@@ -720,9 +747,7 @@ const ContentState = (props) => {
       }
     } else if (event.data.type === "download-mp4") {
       const base64 = event.data.base64;
-      // const blob = new Blob([base64ToUint8Array(base64)], {
-      //   type: "video/mp4",
-      // });
+
       const blob = base64ToUint8Array(base64);
       // Download the blob
       const url = URL.createObjectURL(blob);

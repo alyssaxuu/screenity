@@ -18,15 +18,10 @@ const chunksStore = localforage.createInstance({
 
 document.body.style.willChange = "contents";
 
-// ============================================================
-// DEBUG FLAG + LOGGER
-// ============================================================
-// Flip this to true locally when you want super detailed logs.
-// You can also override from the devtools console via:
+// Debug flag for logging
 //   window.SCREENITY_DEBUG_RECORDER = true;
-//const DEBUG_RECORDER =
-//  typeof window !== "undefined" ? !!window.SCREENITY_DEBUG_RECORDER : false;
-const DEBUG_RECORDER = true;
+const DEBUG_RECORDER =
+  typeof window !== "undefined" ? !!window.SCREENITY_DEBUG_RECORDER : false;
 
 const logPrefix = "[Screenity Recorder]";
 
@@ -290,7 +285,7 @@ const Recorder = () => {
       videoBitsPerSecond,
     });
 
-    // FLAG: FORCE OLD MediaRecorder for testing
+    // FLAG: Force old MediaRecorder for testing
     const FORCE_MEDIARECORDER = false;
 
     const canUseWebCodecs =

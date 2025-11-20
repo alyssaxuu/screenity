@@ -93,6 +93,28 @@ const Sandbox = () => {
           break;
         }
 
+        case "compress-video": {
+          const rawBlob = await fetch(message.base64).then((r) => r.blob());
+
+          const compressed = await reencodeVideo(
+            ffmpegInstance.current,
+            rawBlob,
+            null,
+            (progress) =>
+              sendMessage({
+                type: "compression-progress",
+                progress: Math.round(progress * 100),
+              })
+          );
+          const base64 = await toBase64(compressed);
+          sendMessage({
+            type: "updated-blob",
+            base64,
+            topLevel: true,
+          });
+          break;
+        }
+
         case "base64-to-blob": {
           // Decode the base64 blob (type might be wrong or missing)
           const rawBlob = await fetch(message.base64).then((r) => r.blob());
@@ -102,8 +124,6 @@ const Sandbox = () => {
           const looksMp4 = header === "ftyp";
 
           if (looksMp4) {
-            console.log("Already MP4, skipping conversion.");
-            // ⬆️ Already MP4 → skip all conversion
             sendMessage({
               type: "updated-blob",
               base64: message.base64,

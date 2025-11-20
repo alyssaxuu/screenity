@@ -71,7 +71,7 @@ export const handleRecordingComplete = async () => {
           tab.url.includes("recorder.html")
         ) {
           // FLAG: For testing purposes -> comment to debug
-          //removeTab(recordingTab);
+          removeTab(recordingTab);
         }
       }
     });
@@ -95,7 +95,7 @@ export const handleRecordingError = async (request) => {
   const { region } = await chrome.storage.local.get(["region"]);
   if (recordingTab && !region) {
     // FLAG: For testing purposes -> comment to debug
-    //removeTab(recordingTab);
+    removeTab(recordingTab);
   }
   chrome.storage.local.set({ recordingTab: null });
   discardOffscreenDocuments();
