@@ -13,47 +13,47 @@ require("dotenv").config();
 
 // Entry points for the different pages
 const entryPoints = {
-  background: path.join(__dirname, "src", "pages", "Background", "index.js"),
-  contentScript: path.join(__dirname, "src", "pages", "Content", "index.jsx"),
-  recorder: path.join(__dirname, "src", "pages", "Recorder", "index.jsx"),
+  background: path.join(__dirname, "src", "pages", "Background", "index.ts"),
+  contentScript: path.join(__dirname, "src", "pages", "Content", "index.tsx"),
+  recorder: path.join(__dirname, "src", "pages", "Recorder", "index.tsx"),
   cloudrecorder: path.join(
     __dirname,
     "src",
     "pages",
     "CloudRecorder",
-    "index.jsx"
+    "index.tsx"
   ),
   recorderoffscreen: path.join(
     __dirname,
     "src",
     "pages",
     "RecorderOffscreen",
-    "index.jsx"
+    "index.tsx"
   ),
-  camera: path.join(__dirname, "src", "pages", "Camera", "index.jsx"),
-  waveform: path.join(__dirname, "src", "pages", "Waveform", "index.jsx"),
-  sandbox: path.join(__dirname, "src", "pages", "Sandbox", "index.jsx"),
-  permissions: path.join(__dirname, "src", "pages", "Permissions", "index.jsx"),
-  setup: path.join(__dirname, "src", "pages", "Setup", "index.jsx"),
-  playground: path.join(__dirname, "src", "pages", "Playground", "index.jsx"),
-  editor: path.join(__dirname, "src", "pages", "Editor", "index.jsx"),
-  region: path.join(__dirname, "src", "pages", "Region", "index.jsx"),
-  download: path.join(__dirname, "src", "pages", "Download", "index.jsx"),
+  camera: path.join(__dirname, "src", "pages", "Camera", "index.tsx"),
+  waveform: path.join(__dirname, "src", "pages", "Waveform", "index.tsx"),
+  sandbox: path.join(__dirname, "src", "pages", "Sandbox", "index.tsx"),
+  permissions: path.join(__dirname, "src", "pages", "Permissions", "index.tsx"),
+  setup: path.join(__dirname, "src", "pages", "Setup", "index.tsx"),
+  playground: path.join(__dirname, "src", "pages", "Playground", "index.tsx"),
+  editor: path.join(__dirname, "src", "pages", "Editor", "index.tsx"),
+  region: path.join(__dirname, "src", "pages", "Region", "index.tsx"),
+  download: path.join(__dirname, "src", "pages", "Download", "index.tsx"),
   editorwebcodecs: path.join(
     __dirname,
     "src",
     "pages",
     "EditorWebCodecs",
-    "index.jsx"
+    "index.tsx"
   ),
   editorviewer: path.join(
     __dirname,
     "src",
     "pages",
     "EditorViewer",
-    "index.jsx"
+    "index.tsx"
   ),
-  backup: path.join(__dirname, "src", "pages", "Backup", "index.jsx"),
+  backup: path.join(__dirname, "src", "pages", "Backup", "index.tsx"),
 };
 
 const htmlPlugins = Object.keys(entryPoints)
@@ -129,6 +129,7 @@ if (fileSystem.existsSync(secretsPath)) {
 const config = {
   mode: process.env.NODE_ENV || "production",
   performance: { hints: false },
+  bail: true, // Fail build on first error
   entry: entryPoints,
 
   output: {
@@ -164,6 +165,12 @@ const config = {
         test: /\.(ts|tsx)$/,
         loader: "ts-loader",
         exclude: /node_modules/,
+        options: {
+          transpileOnly: false,
+          compilerOptions: {
+            noEmit: false,
+          },
+        },
       },
       {
         test: /\.(js|jsx)$/,
