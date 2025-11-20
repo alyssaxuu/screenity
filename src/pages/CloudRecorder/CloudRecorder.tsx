@@ -220,7 +220,7 @@ const CloudRecorder = () => {
       body: JSON.stringify({
         mediaToDelete,
         deleteProject: deleteVideo,
-        sceneId: uploadMeta.sceneId,
+        sceneId: (uploadMeta as UploadMeta | null)?.sceneId || null,
         purgeAllPendingDeletes: false,
         deferDeleteUntilCommit: false,
         forceDelete: true,
@@ -1666,7 +1666,11 @@ const CloudRecorder = () => {
           }
         } else {
           const now = new Date();
-          const options = { day: "2-digit", month: "short", year: "numeric" };
+          const options: Intl.DateTimeFormatOptions = {
+            day: "2-digit",
+            month: "short",
+            year: "numeric",
+          };
           const title = `Untitled video - ${now.toLocaleDateString(
             "en-GB",
             options
@@ -1711,7 +1715,9 @@ const CloudRecorder = () => {
     try {
       // navigator.permissions.query with "camera" and "microphone" are non-standard
       // Cast to any to avoid type errors
-      const permissions = await (navigator.permissions as any).query({ name: "camera" as any });
+      const permissions = await (navigator.permissions as any).query({
+        name: "camera" as any,
+      });
       const permissions2 = await (navigator.permissions as any).query({
         name: "microphone" as any,
       });
@@ -1744,7 +1750,7 @@ const CloudRecorder = () => {
       const streamId = await chrome.tabCapture.getMediaStreamId({
         targetTabId: id,
       });
-      tabID.current = streamId;
+      tabID.current = streamId as unknown as number;
     } catch (err) {
       const error = err instanceof Error ? err : new Error(String(err));
       sendRecordingError("Failed to get stream ID: " + error.message);
@@ -1810,65 +1816,65 @@ const CloudRecorder = () => {
       sender: chrome.runtime.MessageSender,
       sendResponse: (response?: any) => void
     ) => {
-    const req = request as ExtensionMessage & {
-      backup?: boolean;
-      region?: boolean;
-      isTab?: boolean;
-      tabID?: number;
-      data?: string;
-      volume?: number;
-    };
-    
-    if (req.type === "loaded") {
-      setInitProject(false);
-      backupRef.current = req.backup || false;
-      if (IS_IFRAME_CONTEXT) {
-        // Only trigger if it's actually a region recording
-        if (req.region) {
+      const req = request as ExtensionMessage & {
+        backup?: boolean;
+        region?: boolean;
+        isTab?: boolean;
+        tabID?: number;
+        data?: string;
+        volume?: number;
+      };
+
+      if (req.type === "loaded") {
+        setInitProject(false);
+        backupRef.current = req.backup || false;
+        if (IS_IFRAME_CONTEXT) {
+          // Only trigger if it's actually a region recording
+          if (req.region) {
+            isInit.current = true;
+            chrome.runtime.sendMessage({ type: "get-streaming-data" });
+          }
+        } else if (!req.region) {
+          if (!tabPreferred.current) {
+            isTab.current = req.isTab || false;
+            if (req.isTab && req.tabID !== undefined) getStreamID(req.tabID);
+          } else {
+            isTab.current = false;
+          }
           isInit.current = true;
           chrome.runtime.sendMessage({ type: "get-streaming-data" });
         }
-      } else if (!req.region) {
-        if (!tabPreferred.current) {
-          isTab.current = req.isTab || false;
-          if (req.isTab && req.tabID !== undefined) getStreamID(req.tabID);
-        } else {
-          isTab.current = false;
-        }
-        isInit.current = true;
-        chrome.runtime.sendMessage({ type: "get-streaming-data" });
-      }
-    } else if (req.type === "streaming-data") {
-      if (!isInit.current) return;
-      if (IS_IFRAME_CONTEXT) {
-        if (regionRef.current) {
+      } else if (req.type === "streaming-data") {
+        if (!isInit.current) return;
+        if (IS_IFRAME_CONTEXT) {
+          if (regionRef.current) {
+            startStreaming(JSON.parse(req.data || "{}"));
+          }
+        } else if (!regionRef.current) {
           startStreaming(JSON.parse(req.data || "{}"));
         }
-      } else if (!regionRef.current) {
-        startStreaming(JSON.parse(req.data || "{}"));
-      }
-    } else if (req.type === "start-recording-tab") {
-      if (!isInit.current) return;
+      } else if (req.type === "start-recording-tab") {
+        if (!isInit.current) return;
 
-      if (IS_IFRAME_CONTEXT) {
-        if (req.region) setTimeout(() => startRecording(), 100);
-      } else if (!regionRef.current) {
-        setTimeout(() => startRecording(), 100);
-      }
-    } else if (req.type === "restart-recording-tab") {
-      if (!isInit.current) return;
-      if (!IS_IFRAME_CONTEXT) {
-        restartRecording();
-      }
-    } else if (req.type === "stop-recording-tab") {
-      if (!isInit.current) return;
-      stopRecording();
-    } else if (req.type === "set-mic-active-tab") {
-      if (!isInit.current) return;
-      setMic({ active: (req as any).active || false });
-    } else if (req.type === "set-audio-output-volume") {
-      if (!isInit.current) return;
-      setAudioOutputVolume(req.volume || 0);
+        if (IS_IFRAME_CONTEXT) {
+          if (req.region) setTimeout(() => startRecording(), 100);
+        } else if (!regionRef.current) {
+          setTimeout(() => startRecording(), 100);
+        }
+      } else if (req.type === "restart-recording-tab") {
+        if (!isInit.current) return;
+        if (!IS_IFRAME_CONTEXT) {
+          restartRecording();
+        }
+      } else if (req.type === "stop-recording-tab") {
+        if (!isInit.current) return;
+        stopRecording();
+      } else if (req.type === "set-mic-active-tab") {
+        if (!isInit.current) return;
+        setMic({ active: (req as any).active || false });
+      } else if (req.type === "set-audio-output-volume") {
+        if (!isInit.current) return;
+        setAudioOutputVolume(req.volume || 0);
       } else if (request.type === "get-video-time") {
         if (!isInit.current) return;
         const videoTime = getActiveVideoTime() / 1000; // in seconds

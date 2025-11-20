@@ -7,7 +7,11 @@ interface RecorderUIProps {
   isTab: boolean;
 }
 
-const RecorderUI = ({ started, initProject = false, isTab }: RecorderUIProps) => {
+const RecorderUI = ({
+  started,
+  initProject = false,
+  isTab,
+}: RecorderUIProps) => {
   return (
     <div className="wrap">
       <img
