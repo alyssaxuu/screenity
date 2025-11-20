@@ -77,9 +77,10 @@ const Background = (props: BackgroundProps) => {
 
   useEffect(() => {
     chrome.storage.local.get(["backgroundEffect"], (result) => {
-      if (result.backgroundEffect != "blur") {
+      const backgroundEffect = result.backgroundEffect as string | undefined;
+      if (backgroundEffect && backgroundEffect !== "blur") {
         blurRef.current = false;
-        loadEffect(result.backgroundEffect);
+        loadEffect(backgroundEffect);
       } else {
         blurRef.current = true;
       }
@@ -116,9 +117,9 @@ const Background = (props: BackgroundProps) => {
     const bottomCanvas = bottomCanvasRef.current;
     const bottomCtx = bottomCanvasContextRef.current;
     const effect = effectRef.current;
-    
+
     if (!bottomCanvas || !bottomCtx || !effect) return;
-    
+
     bottomCanvas.width = innerWidth;
     bottomCanvas.height = innerHeight;
     bottomCtx.drawImage(
@@ -149,11 +150,12 @@ const Background = (props: BackgroundProps) => {
 
   const loadModel = async (): Promise<void> => {
     const model = bodySegmentation.SupportedModels.MediaPipeSelfieSegmentation;
-    const segmenterConfig: bodySegmentation.MediaPipeSelfieSegmentationMediaPipeModelConfig = {
-      runtime: "mediapipe",
-      solutionPath: "./assets/selfieSegmentation",
-      modelType: "general",
-    };
+    const segmenterConfig: bodySegmentation.MediaPipeSelfieSegmentationMediaPipeModelConfig =
+      {
+        runtime: "mediapipe",
+        solutionPath: "./assets/selfieSegmentation",
+        modelType: "general",
+      };
     segmenterRef.current = await bodySegmentation.createSegmenter(
       model,
       segmenterConfig
@@ -236,7 +238,12 @@ const Background = (props: BackgroundProps) => {
     }
   };
 
-  const renderEffect = async (img: ImageData, people: any[], width: number, height: number): Promise<void> => {
+  const renderEffect = async (
+    img: ImageData,
+    people: any[],
+    width: number,
+    height: number
+  ): Promise<void> => {
     try {
       const ratio = img.width / img.height;
       const foregroundColor = { r: 0, g: 0, b: 0, a: 0 };

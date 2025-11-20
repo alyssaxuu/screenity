@@ -125,7 +125,9 @@ const safelyApplyFilter = (
   }
 };
 
-const handleSetBackgroundEffect = async (message: ExtensionMessage & { effect?: string }): Promise<void> => {
+const handleSetBackgroundEffect = async (
+  message: ExtensionMessage & { effect?: string }
+): Promise<void> => {
   const { blurRef, effectRef, offScreenCanvasContextRef } = getContextRefs();
 
   await chrome.storage.local.set({ backgroundEffect: message.effect });
@@ -138,7 +140,9 @@ const handleSetBackgroundEffect = async (message: ExtensionMessage & { effect?: 
     blurRef.current = false;
 
     try {
-      const effectImage = await loadEffect(message.effect) as HTMLImageElement | null;
+      const effectImage = (await loadEffect(
+        message.effect
+      )) as HTMLImageElement | null;
       effectRef.current = effectImage;
       safelyApplyFilter(offScreenCanvasContextRef, "none");
     } catch (err) {
