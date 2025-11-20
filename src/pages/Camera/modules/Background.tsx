@@ -12,7 +12,9 @@ interface BackgroundProps {
 
 const Background = (props: BackgroundProps) => {
   const offScreenCanvasRef = useRef<HTMLCanvasElement | null>(null);
-  const offScreenCanvasContextRef = useRef<CanvasRenderingContext2D | null>(null);
+  const offScreenCanvasContextRef = useRef<CanvasRenderingContext2D | null>(
+    null
+  );
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const canvasContextRef = useRef<CanvasRenderingContext2D | null>(null);
   const bottomCanvasRef = useRef<HTMLCanvasElement | null>(null);

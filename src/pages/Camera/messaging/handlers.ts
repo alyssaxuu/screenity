@@ -17,8 +17,12 @@ import {
   setPipMode,
   setBackgroundEffects,
 } from "../utils/uiState";
+import type { ExtensionMessage } from "../../../types/messaging";
 
-function waitForVideoRef(callback: (videoEl: HTMLVideoElement) => void, attempts = 10): void {
+function waitForVideoRef(
+  callback: (videoEl: HTMLVideoElement) => void,
+  attempts = 10
+): void {
   const { videoRef } = getContextRefs();
 
   if (videoRef?.current) {
@@ -42,7 +46,8 @@ export const setupHandlers = ({ setLoading }: any) => {
       if (cameraSwitchTimeout) {
         clearTimeout(cameraSwitchTimeout);
       }
-      stopCameraStream();
+      const { streamRef, videoRef } = getContextRefs();
+      stopCameraStream(streamRef, videoRef);
 
       cameraSwitchTimeout = setTimeout(() => {
         const {
@@ -105,12 +110,16 @@ const handleStopRecording = async (request: any): Promise<any> => {
   }
 };
 
-const safelyApplyFilter = (contextRef: React.RefObject<CanvasRenderingContext2D | null>, filter: string): void => {
+const safelyApplyFilter = (
+  contextRef: React.RefObject<CanvasRenderingContext2D | null>,
+  filter: string
+): void => {
   if (contextRef.current) {
     try {
       contextRef.current.filter = filter;
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
       console.warn("⚠️ Failed to apply filter:", errorMessage);
     }
   }
@@ -142,7 +151,9 @@ const handleSetBackgroundEffect = async (message: any): Promise<any> => {
   }
 };
 
-const handleToggleBlur = async (message: ExtensionMessage & { enabled?: boolean }): Promise<void> => {
+const handleToggleBlur = async (
+  message: ExtensionMessage & { enabled?: boolean }
+): Promise<void> => {
   const { blurRef, offScreenCanvasContextRef } = getContextRefs();
   const enabled = message.enabled ?? !blurRef.current;
 
@@ -153,7 +164,9 @@ const handleToggleBlur = async (message: ExtensionMessage & { enabled?: boolean 
   safelyApplyFilter(offScreenCanvasContextRef, enabled ? "blur(5px)" : "none");
 };
 
-const handleLoadCustomEffect = async (message: ExtensionMessage & { effectUrl?: string }): Promise<void> => {
+const handleLoadCustomEffect = async (
+  message: ExtensionMessage & { effectUrl?: string }
+): Promise<void> => {
   if (!message.effectUrl) {
     console.warn("⚠️ No effect URL provided");
     return;
@@ -162,7 +175,9 @@ const handleLoadCustomEffect = async (message: ExtensionMessage & { effectUrl?: 
   const { blurRef, effectRef, offScreenCanvasContextRef } = getContextRefs();
 
   try {
-    const effectUrl = await loadEffect(message.effectUrl) as HTMLImageElement | null;
+    const effectUrl = (await loadEffect(
+      message.effectUrl
+    )) as HTMLImageElement | null;
     if (blurRef.current !== undefined) blurRef.current = false;
     if (effectRef.current !== undefined) effectRef.current = effectUrl;
 
@@ -186,8 +201,8 @@ const handleCameraOnlyUpdate = (): void => {
   if (setIsCameraMode) {
     setIsCameraMode(true);
   }
-  if (recordingTypeRef.current !== undefined) {
-    recordingTypeRef.current = "camera";
+  if (recordingTypeRef && 'current' in recordingTypeRef) {
+    (recordingTypeRef as { current: string }).current = "camera";
   }
 };
 
@@ -214,7 +229,7 @@ const handleScreenUpdate = (): void => {
     setHeight("auto");
   }
 
-  if (recordingTypeRef.current !== undefined) {
-    recordingTypeRef.current = "screen";
+  if (recordingTypeRef && 'current' in recordingTypeRef) {
+    (recordingTypeRef as { current: string }).current = "screen";
   }
 };
