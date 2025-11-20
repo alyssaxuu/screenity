@@ -1,6 +1,24 @@
 const API_BASE = process.env.SCREENITY_API_BASE_URL;
 
-export async function getThumbnailFromBlob(blob, seekTo = 0.1) {
+interface BunnyTusUploaderOptions {
+  chunkSize?: number;
+  maxRetries?: number;
+  retryDelay?: number;
+  tokenRefreshThreshold?: number;
+  maxQueueSize?: number;
+}
+
+interface InitializeOptions {
+  title: string;
+  type: string;
+  width?: number | null;
+  height?: number | null;
+  linkedMediaId?: string | null;
+  reuse?: { videoId: string; mediaId: string } | null;
+  sceneId?: string | null;
+}
+
+export async function getThumbnailFromBlob(blob: Blob, seekTo: number = 0.1): Promise<Blob> {
   return new Promise((resolve, reject) => {
     const video = document.createElement("video");
     video.preload = "metadata";
@@ -39,6 +57,11 @@ export async function getThumbnailFromBlob(blob, seekTo = 0.1) {
       canvas.height = video.videoHeight;
 
       const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        cleanup();
+        reject(new Error("Failed to get canvas context"));
+        return;
+      }
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
       canvas.toBlob(
@@ -55,7 +78,44 @@ export async function getThumbnailFromBlob(blob, seekTo = 0.1) {
 }
 
 export default class BunnyTusUploader {
-  constructor(options = {}) {
+  // Constants
+  CHUNK_SIZE: number;
+  MAX_RETRIES: number;
+  RETRY_DELAY: number;
+  TOKEN_REFRESH_THRESHOLD: number;
+  MAX_QUEUE_SIZE: number;
+
+  // State
+  uploadUrl: string | null;
+  offset: number;
+  projectId: string | null;
+  videoId: string | null;
+  mediaId: string | null;
+  signature: string | null;
+  expires: number | null;
+  libraryId: string | null;
+  status: "idle" | "initializing" | "ready" | "uploading" | "completed" | "error" | "aborted";
+  error: string | null;
+  isFinalizing: boolean;
+  isPaused: boolean;
+  metadata: Record<string, unknown>;
+  pendingUploads: Promise<unknown>[];
+  userToken: string | null;
+
+  // Queue management
+  chunkQueue: Blob[];
+  isProcessingQueue: boolean;
+  queueProcessingPromise: Promise<void> | null;
+  queuedBytes: number;
+
+  // Additional properties
+  sceneId?: string | null;
+  metaWidth?: number | null;
+  metaHeight?: number | null;
+  metaThumbnail?: Blob | null;
+  _hasExtractedMeta?: boolean;
+
+  constructor(options: BunnyTusUploaderOptions = {}) {
     this.CHUNK_SIZE = options.chunkSize || 512 * 1024; // 512KB default
     this.MAX_RETRIES = options.maxRetries || 5;
     this.RETRY_DELAY = options.retryDelay || 1000;
@@ -85,8 +145,10 @@ export default class BunnyTusUploader {
   }
 
   async initialize(
-    projectId,
-    {
+    projectId: string,
+    options: InitializeOptions
+  ): Promise<{ videoId: string; mediaId: string }> {
+    const {
       title,
       type,
       width = null,
@@ -94,8 +156,7 @@ export default class BunnyTusUploader {
       linkedMediaId = null,
       reuse = null,
       sceneId = null,
-    }
-  ) {
+    } = options;
     if (this.status !== "idle" && this.status !== "error") {
       throw new Error("Uploader has already been initialized");
     }
@@ -121,17 +182,18 @@ export default class BunnyTusUploader {
         this.videoId = reuse.videoId;
         this.mediaId = reuse.mediaId;
       } else {
-        const { authenticated, user } = await new Promise((resolve) => {
+        const response = await new Promise<{ authenticated: boolean; user?: { token: string } }>((resolve) => {
           chrome.runtime.sendMessage({ type: "check-auth-status" }, resolve);
         });
+        const { authenticated, user } = response;
 
-        if (!authenticated) throw new Error("Not authenticated with Screenity");
+        if (!authenticated || !user) throw new Error("Not authenticated with Screenity");
 
-        const { screenityToken } = await chrome.storage.local.get([
+        const tokenResult = await chrome.storage.local.get([
           "screenityToken",
         ]);
 
-        this.userToken = screenityToken;
+        this.userToken = tokenResult.screenityToken as string | null;
 
         if (!this.userToken) {
           throw new Error("Missing user token for saving upload metadata");
@@ -141,7 +203,7 @@ export default class BunnyTusUploader {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${user.token}`,
+            Authorization: `Bearer ${user.token || this.userToken}`,
           },
           body: JSON.stringify({
             title,
@@ -164,12 +226,13 @@ export default class BunnyTusUploader {
       return { videoId: this.videoId, mediaId: this.mediaId };
     } catch (err) {
       this.status = "error";
-      this.error = err.message;
-      throw err;
+      const error = err instanceof Error ? err : new Error(String(err));
+      this.error = error.message;
+      throw error;
     }
   }
 
-  async refreshTusAuth() {
+  async refreshTusAuth(): Promise<void> {
     const res = await fetch(
       `${API_BASE}/bunny/videos/tus-auth?videoId=${this.videoId}`
     );
@@ -180,7 +243,7 @@ export default class BunnyTusUploader {
     this.libraryId = libraryId;
   }
 
-  async initTusUpload() {
+  async initTusUpload(): Promise<void> {
     const res = await fetch("https://video.bunnycdn.com/tusupload", {
       method: "POST",
       headers: {
@@ -198,6 +261,7 @@ export default class BunnyTusUploader {
 
     if (!res.ok) throw new Error("Failed to start TUS upload session");
     const location = res.headers.get("location");
+    if (!location) throw new Error("No location header in TUS upload response");
     this.uploadUrl = location.startsWith("/")
       ? `https://video.bunnycdn.com${location}`
       : location;
@@ -217,7 +281,7 @@ export default class BunnyTusUploader {
     });
   }
 
-  async write(chunk) {
+  async write(chunk: Blob): Promise<void> {
     if (this.isFinalizing) throw new Error("Cannot write during finalization");
     if (this.isPaused) throw new Error("Uploader paused");
     if (!this.uploadUrl) throw new Error("Uploader not initialized");
@@ -254,14 +318,16 @@ export default class BunnyTusUploader {
           const thumbPromise = getThumbnailFromBlob(blob);
 
           // Add timeout safety
-          const safeThumbnail = await Promise.race([
+          const safeThumbnail = await Promise.race<Blob | string>([
             thumbPromise,
-            new Promise((_, reject) =>
+            new Promise<string>((_, reject) =>
               setTimeout(() => reject("thumbnail-timeout"), 1500)
             ),
           ]);
 
-          this.metaThumbnail = safeThumbnail;
+          if (safeThumbnail instanceof Blob) {
+            this.metaThumbnail = safeThumbnail;
+          }
         }
 
         this._hasExtractedMeta = true;
@@ -271,7 +337,7 @@ export default class BunnyTusUploader {
     }
   }
 
-  async checkAuthExpiration() {
+  async checkAuthExpiration(): Promise<void> {
     if (!this.expires) return;
     const now = Math.floor(Date.now() / 1000);
     if (this.expires - now < this.TOKEN_REFRESH_THRESHOLD) {
@@ -283,8 +349,11 @@ export default class BunnyTusUploader {
       }
     }
   }
-  async uploadChunk(chunk) {
+  async uploadChunk(chunk: Blob): Promise<void> {
     if (this.isFinalizing) return;
+    if (!this.uploadUrl || !this.signature || !this.expires || !this.libraryId || !this.videoId) {
+      throw new Error("Uploader not properly initialized");
+    }
     const data = new Uint8Array(await chunk.arrayBuffer());
 
     for (let attempt = 0; attempt <= this.MAX_RETRIES; attempt++) {
@@ -389,28 +458,32 @@ export default class BunnyTusUploader {
     }
   }
 
-  async processQueue() {
+  async processQueue(): Promise<void> {
     if (this.isProcessingQueue) return;
     this.isProcessingQueue = true;
 
     try {
       while (this.chunkQueue.length && !this.isPaused && !this.isFinalizing) {
         const chunk = this.chunkQueue.shift();
+        if (!chunk) break;
         this.queuedBytes -= chunk.size;
 
         // Serialize uploads: wait for each chunk to complete before starting next
         try {
           await this.uploadChunk(chunk);
         } catch (err) {
-          console.error("❌ Chunk upload failed in queue:", err);
+          const error = err instanceof Error ? err : new Error(String(err));
+          console.error("❌ Chunk upload failed in queue:", error);
 
           // Put chunk back at front of queue for potential retry
-          this.chunkQueue.unshift(chunk);
-          this.queuedBytes += chunk.size;
+          if (chunk) {
+            this.chunkQueue.unshift(chunk);
+            this.queuedBytes += chunk.size;
+          }
 
           // Set error state
           this.status = "error";
-          this.error = `Upload failed: ${err.message}`;
+          this.error = `Upload failed: ${error.message}`;
 
           // Stop processing queue on error
           break;
@@ -422,7 +495,7 @@ export default class BunnyTusUploader {
     }
   }
 
-  async waitForPendingUploads() {
+  async waitForPendingUploads(): Promise<void> {
     // Temporarily unpause to ensure all chunks are processed
     const wasPaused = this.isPaused;
     if (wasPaused) {
@@ -453,7 +526,7 @@ export default class BunnyTusUploader {
     }
   }
 
-  async finalize() {
+  async finalize(): Promise<void> {
     if (this.isFinalizing) throw new Error("Already finalizing");
     this.isFinalizing = true;
     await this.waitForPendingUploads();
@@ -486,7 +559,23 @@ export default class BunnyTusUploader {
     this.status = "completed";
   }
 
-  getMeta() {
+  getMeta(): {
+    videoId: string | null;
+    mediaId: string | null;
+    offset: number;
+    status: string;
+    error: string | null;
+    isPaused: boolean;
+    isFinalizing: boolean;
+    metadata: Record<string, unknown>;
+    expiresAt: Date | null;
+    queueLength: number;
+    queuedBytes: number;
+    width: number | null;
+    height: number | null;
+    thumbnail: Blob | null;
+    sceneId: string | null;
+  } {
     return {
       videoId: this.videoId,
       mediaId: this.mediaId,
@@ -506,11 +595,11 @@ export default class BunnyTusUploader {
     };
   }
 
-  pause() {
+  pause(): void {
     this.isPaused = true;
   }
 
-  resume() {
+  resume(): void {
     if (this.isPaused) {
       this.isPaused = false;
       if (!this.isProcessingQueue && this.chunkQueue.length > 0) {
@@ -519,7 +608,7 @@ export default class BunnyTusUploader {
     }
   }
 
-  async abort() {
+  async abort(): Promise<void> {
     this.pause();
     this.status = "aborted";
     this.uploadUrl = null;
@@ -532,5 +621,5 @@ export default class BunnyTusUploader {
 if (typeof module !== "undefined" && module.exports) {
   module.exports = BunnyTusUploader;
 } else {
-  window.BunnyTusUploader = BunnyTusUploader;
+  (window as typeof window & { BunnyTusUploader: typeof BunnyTusUploader }).BunnyTusUploader = BunnyTusUploader;
 }
