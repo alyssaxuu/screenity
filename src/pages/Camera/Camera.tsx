@@ -33,7 +33,10 @@ const Camera = () => {
   } = useCameraContext();
 
   // Helper function to update loading states
-  const updateLoadingState = (key: keyof typeof loadingStates, value: boolean) => {
+  const updateLoadingState = (
+    key: keyof typeof loadingStates,
+    value: boolean
+  ) => {
     setLoadingStates((prev) => ({ ...prev, [key]: value }));
   };
 

@@ -58,6 +58,7 @@ export const globalRefs: {
   setHeight: ((newHeight: string) => void) | null;
   setBackgroundEffects: ((active: boolean) => void) | null;
   backgroundEffectsRef: React.RefObject<boolean> | null;
+  setIsCameraMode: ((active: boolean) => void) | null;
   width: string | null;
   height: string | null;
 } = {
@@ -73,6 +74,7 @@ export const globalRefs: {
   setHeight: null,
   setBackgroundEffects: null,
   backgroundEffectsRef: null,
+  setIsCameraMode: null,
   width: null,
   height: null,
 };
@@ -131,6 +133,7 @@ export const getContextRefs = () => {
       ((height: string) => console.warn("⚠️ setHeight not initialized")),
     setBackgroundEffects: globalRefs.setBackgroundEffects ?? (() => {}),
     backgroundEffectsRef: globalRefs.backgroundEffectsRef ?? { current: false },
+    setIsCameraMode: globalRefs.setIsCameraMode ?? (() => {}),
   };
 };
 
@@ -154,7 +157,9 @@ export const CameraProvider = ({ children }: CameraProviderProps) => {
   const frameRequestedRef = useRef(false);
 
   const offScreenCanvasRef = useRef<HTMLCanvasElement | null>(null);
-  const offScreenCanvasContextRef = useRef<CanvasRenderingContext2D | null>(null);
+  const offScreenCanvasContextRef = useRef<CanvasRenderingContext2D | null>(
+    null
+  );
 
   const segmenterRef = useRef<any>(null);
   const blurRef = useRef<boolean>(false);
@@ -164,7 +169,8 @@ export const CameraProvider = ({ children }: CameraProviderProps) => {
     const { offScreenCanvas, offScreenCanvasContext } = initializeCanvases();
 
     offScreenCanvasRef.current = offScreenCanvas as HTMLCanvasElement | null;
-    offScreenCanvasContextRef.current = offScreenCanvasContext as CanvasRenderingContext2D | null;
+    offScreenCanvasContextRef.current =
+      offScreenCanvasContext as CanvasRenderingContext2D | null;
 
     globalRefs.videoRef = videoRef;
     globalRefs.streamRef = streamRef;
@@ -272,25 +278,31 @@ export const CameraProvider = ({ children }: CameraProviderProps) => {
       const frame = ctx.getImageData(0, 0, canvas.width, canvas.height);
 
       if (segmenterRef.current) {
-        segmenterRef.current.segmentPeople(frame).then(async (segmentation: any) => {
-          if (blurRef.current) {
-            // Use renderBlur for blur effect
-            await renderBlur(frame, segmentation, { current: canvas });
-          } else if (effectRef.current && offScreenCanvasRef.current && offScreenCanvasContextRef.current) {
-            // Use renderEffect for custom effects
-            await renderEffect(
-              frame,
-              segmentation,
-              offScreenCanvasRef,
-              offScreenCanvasContextRef,
-              { current: canvas },
-              { current: ctx }
-            );
-          }
+        segmenterRef.current
+          .segmentPeople(frame)
+          .then(async (segmentation: any) => {
+            if (blurRef.current) {
+              // Use renderBlur for blur effect
+              await renderBlur(frame, segmentation, { current: canvas });
+            } else if (
+              effectRef.current &&
+              offScreenCanvasRef.current &&
+              offScreenCanvasContextRef.current
+            ) {
+              // Use renderEffect for custom effects
+              await renderEffect(
+                frame,
+                segmentation,
+                offScreenCanvasRef,
+                offScreenCanvasContextRef,
+                { current: canvas },
+                { current: ctx }
+              );
+            }
 
-          setCurrentFrame(frame);
-          frameRequestedRef.current = false;
-        });
+            setCurrentFrame(frame);
+            frameRequestedRef.current = false;
+          });
       }
     } else {
       frameRequestedRef.current = false;

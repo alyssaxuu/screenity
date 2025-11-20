@@ -18,7 +18,7 @@ import {
   setBackgroundEffects,
 } from "../utils/uiState";
 
-function waitForVideoRef(callback, attempts = 10) {
+function waitForVideoRef(callback: (videoEl: HTMLVideoElement) => void, attempts = 10): void {
   const { videoRef } = getContextRefs();
 
   if (videoRef?.current) {
@@ -35,10 +35,13 @@ export const setupHandlers = ({ setLoading }: any) => {
   registerMessage("stop-recording", handleStopRecording);
   registerMessage("dismiss-recording", handleStopRecording);
 
-  let cameraSwitchTimeout;
-  registerMessage("switch-camera", (message) => {
-    if (message.id !== "none") {
-      clearTimeout(cameraSwitchTimeout);
+  let cameraSwitchTimeout: NodeJS.Timeout | undefined;
+  registerMessage("switch-camera", (message: ExtensionMessage) => {
+    const switchMessage = message as ExtensionMessage & { id?: string };
+    if (switchMessage.id && switchMessage.id !== "none") {
+      if (cameraSwitchTimeout) {
+        clearTimeout(cameraSwitchTimeout);
+      }
       stopCameraStream();
 
       cameraSwitchTimeout = setTimeout(() => {
@@ -50,7 +53,7 @@ export const setupHandlers = ({ setLoading }: any) => {
         } = getContextRefs();
 
         getCameraStream(
-          { video: { deviceId: { exact: message.id } } },
+          { video: { deviceId: { exact: switchMessage.id } } },
           streamRef,
           videoRef,
           offScreenCanvasRef,
@@ -73,10 +76,10 @@ export const setupHandlers = ({ setLoading }: any) => {
   registerMessage("camera-only-update", handleCameraOnlyUpdate);
   registerMessage("screen-update", handleScreenUpdate);
   registerMessage("toggle-pip", () => togglePip(getContextRefs().videoRef));
-  registerMessage("set-surface", (message) => {
+  registerMessage("set-surface", (message: ExtensionMessage) => {
     console.log("Preparing Picture in Picture request");
 
-    waitForVideoRef((videoEl) => {
+    waitForVideoRef((videoEl: HTMLVideoElement) => {
       surfaceHandler(message, { current: videoEl });
     });
   });
@@ -102,12 +105,13 @@ const handleStopRecording = async (request: any): Promise<any> => {
   }
 };
 
-const safelyApplyFilter = (contextRef, filter: any) => {
+const safelyApplyFilter = (contextRef: React.RefObject<CanvasRenderingContext2D | null>, filter: string): void => {
   if (contextRef.current) {
     try {
       contextRef.current.filter = filter;
     } catch (error) {
-      console.warn("⚠️ Failed to apply filter:", error.message);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.warn("⚠️ Failed to apply filter:", errorMessage);
     }
   }
 };
@@ -138,18 +142,18 @@ const handleSetBackgroundEffect = async (message: any): Promise<any> => {
   }
 };
 
-const handleToggleBlur = async (message: any): Promise<any> => {
+const handleToggleBlur = async (message: ExtensionMessage & { enabled?: boolean }): Promise<void> => {
   const { blurRef, offScreenCanvasContextRef } = getContextRefs();
   const enabled = message.enabled ?? !blurRef.current;
 
-  blurRef.current = enabled;
+  if (blurRef.current !== undefined) blurRef.current = enabled;
 
   await chrome.storage.local.set({ backgroundEffect: enabled ? "blur" : "" });
 
   safelyApplyFilter(offScreenCanvasContextRef, enabled ? "blur(5px)" : "none");
 };
 
-const handleLoadCustomEffect = async (message: any): Promise<any> => {
+const handleLoadCustomEffect = async (message: ExtensionMessage & { effectUrl?: string }): Promise<void> => {
   if (!message.effectUrl) {
     console.warn("⚠️ No effect URL provided");
     return;
@@ -158,9 +162,9 @@ const handleLoadCustomEffect = async (message: any): Promise<any> => {
   const { blurRef, effectRef, offScreenCanvasContextRef } = getContextRefs();
 
   try {
-    const effectUrl = await loadEffect(message.effectUrl);
-    blurRef.current = false;
-    effectRef.current = message.effectUrl;
+    const effectUrl = await loadEffect(message.effectUrl) as HTMLImageElement | null;
+    if (blurRef.current !== undefined) blurRef.current = false;
+    if (effectRef.current !== undefined) effectRef.current = effectUrl;
 
     await chrome.storage.local.set({ backgroundEffect: message.effectUrl });
 
@@ -170,7 +174,7 @@ const handleLoadCustomEffect = async (message: any): Promise<any> => {
   }
 };
 
-const handleCameraOnlyUpdate = () => {
+const handleCameraOnlyUpdate = (): void => {
   const { recordingTypeRef, setWidth, setHeight, setIsCameraMode } =
     getContextRefs();
 
@@ -179,11 +183,15 @@ const handleCameraOnlyUpdate = () => {
     setHeight("100%");
   }
 
-  setIsCameraMode(true);
-  recordingTypeRef.current = "camera";
+  if (setIsCameraMode) {
+    setIsCameraMode(true);
+  }
+  if (recordingTypeRef.current !== undefined) {
+    recordingTypeRef.current = "camera";
+  }
 };
 
-const handleScreenUpdate = () => {
+const handleScreenUpdate = (): void => {
   const { videoRef, recordingTypeRef, setWidth, setHeight, setIsCameraMode } =
     getContextRefs();
 
@@ -192,7 +200,9 @@ const handleScreenUpdate = () => {
     return;
   }
 
-  setIsCameraMode(false);
+  if (setIsCameraMode) {
+    setIsCameraMode(false);
+  }
 
   const { videoWidth, videoHeight } = videoRef.current;
 
@@ -204,5 +214,7 @@ const handleScreenUpdate = () => {
     setHeight("auto");
   }
 
-  recordingTypeRef.current = "screen";
+  if (recordingTypeRef.current !== undefined) {
+    recordingTypeRef.current = "screen";
+  }
 };

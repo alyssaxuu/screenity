@@ -156,7 +156,7 @@ export const renderEffect = async (
   }
 };
 
-export const loadEffect = (effectUrl: any) => {
+export const loadEffect = (effectUrl: string): Promise<HTMLImageElement | null> => {
   return new Promise((resolve, reject) => {
     if (!effectUrl) {
       resolve(null);

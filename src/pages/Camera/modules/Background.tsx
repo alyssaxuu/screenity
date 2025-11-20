@@ -6,35 +6,51 @@ import "@tensorflow/tfjs-core";
 //import "@tensorflow/tfjs-backend-webgl";
 import "@mediapipe/selfie_segmentation";
 
-const Background = (props) => {
-  const offScreenCanvasRef = useRef(null);
-  const offScreenCanvasContextRef = useRef(null);
-  const canvasRef = useRef(null);
-  const canvasContextRef = useRef(null);
-  const bottomCanvasRef = useRef(null);
-  const bottomCanvasContextRef = useRef(null);
+interface BackgroundProps {
+  [key: string]: unknown;
+}
 
-  const segmenterRef = useRef(null);
+const Background = (props: BackgroundProps) => {
+  const offScreenCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const offScreenCanvasContextRef = useRef<CanvasRenderingContext2D | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const canvasContextRef = useRef<CanvasRenderingContext2D | null>(null);
+  const bottomCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const bottomCanvasContextRef = useRef<CanvasRenderingContext2D | null>(null);
 
-  const latestImageDataRef = useRef(null);
+  const segmenterRef = useRef<any>(null);
+
+  const latestImageDataRef = useRef<ImageData | null>(null);
   const frameRequestedRef = useRef(false);
-  const blurRef = useRef(false);
-  const effectRef = useRef(null);
+  const blurRef = useRef<boolean>(false);
+  const effectRef = useRef<HTMLImageElement | null>(null);
 
   useEffect(() => {
     offScreenCanvasRef.current = document.createElement("canvas");
-    offScreenCanvasContextRef.current = offScreenCanvasRef.current.getContext(
-      "2d",
-      { willReadFrequently: true }
-    );
-
-    canvasContextRef.current = canvasRef.current.getContext("2d", {
+    const offCtx = offScreenCanvasRef.current.getContext("2d", {
       willReadFrequently: true,
     });
+    if (offCtx) {
+      offScreenCanvasContextRef.current = offCtx;
+    }
 
-    bottomCanvasContextRef.current = bottomCanvasRef.current.getContext("2d", {
-      willReadFrequently: true,
-    });
+    if (canvasRef.current) {
+      const ctx = canvasRef.current.getContext("2d", {
+        willReadFrequently: true,
+      });
+      if (ctx) {
+        canvasContextRef.current = ctx;
+      }
+    }
+
+    if (bottomCanvasRef.current) {
+      const bottomCtx = bottomCanvasRef.current.getContext("2d", {
+        willReadFrequently: true,
+      });
+      if (bottomCtx) {
+        bottomCanvasContextRef.current = bottomCtx;
+      }
+    }
   }, []);
 
   const [windowSize, setWindowSize] = useState({

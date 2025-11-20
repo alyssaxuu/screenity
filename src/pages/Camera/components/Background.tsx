@@ -46,7 +46,10 @@ const Background = () => {
     if (canvasContext && canvasContext instanceof CanvasRenderingContext2D) {
       canvasContextRef.current = canvasContext;
     }
-    if (bottomCanvasContext && bottomCanvasContext instanceof CanvasRenderingContext2D) {
+    if (
+      bottomCanvasContext &&
+      bottomCanvasContext instanceof CanvasRenderingContext2D
+    ) {
       bottomCanvasContextRef.current = bottomCanvasContext;
     }
   }, []);
@@ -102,6 +105,8 @@ const Background = () => {
     const processFrame = async (): Promise<any> => {
       const canvas = canvasRef.current;
       const ctx = canvasContextRef.current;
+
+      if (!canvas || !ctx) return;
 
       // Ensure canvas dimensions match the frame
       if (

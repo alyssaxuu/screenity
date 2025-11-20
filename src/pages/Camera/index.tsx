@@ -17,6 +17,13 @@ if (container) {
 }
 
 // Hot Module Replacement
-if (import.meta.webpackHot) {
-  import.meta.webpackHot.accept();
+interface ImportMetaWithWebpackHot extends ImportMeta {
+  webpackHot?: {
+    accept: () => void;
+  };
+}
+
+const meta = import.meta as ImportMetaWithWebpackHot;
+if (meta.webpackHot) {
+  meta.webpackHot.accept();
 }
