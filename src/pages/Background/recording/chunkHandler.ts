@@ -40,7 +40,10 @@ export const handleChunks = async (
 
   try {
     if (chunks.length === 0) {
-      sendMessageTab(sandboxTab, { type: "make-video-tab", override } as ExtensionMessage);
+      sendMessageTab(sandboxTab, {
+        type: "make-video-tab",
+        override,
+      } as ExtensionMessage);
       return;
     }
 
@@ -107,7 +110,7 @@ export const handleChunks = async (
       currentIndex += batchSize;
     }
 
-    sendMessageTab(sandboxTab, { type: "make-video-tab", override });
+    sendMessageTab(sandboxTab, { type: "make-video-tab", override } as ExtensionMessage);
   } finally {
     await chrome.storage.local.set({ sendingChunks: false });
   }
