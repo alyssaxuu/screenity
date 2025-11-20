@@ -33,7 +33,7 @@ const Camera = () => {
   } = useCameraContext();
 
   // Helper function to update loading states
-  const updateLoadingState = (key, value) => {
+  const updateLoadingState = (key: keyof typeof loadingStates, value: boolean) => {
     setLoadingStates((prev) => ({ ...prev, [key]: value }));
   };
 
@@ -42,9 +42,8 @@ const Camera = () => {
 
   // Ensure the offScreenCanvas is created exactly once
   useEffect(() => {
-    if (!offScreenCanvasRef.current) {
-      offScreenCanvasRef.current = document.createElement("canvas");
-    }
+    // Canvas is already initialized in CameraContext
+    // This effect is kept for compatibility but doesn't need to do anything
   }, []);
 
   // Initialize message listener
@@ -56,20 +55,22 @@ const Camera = () => {
 
   useEffect(() => {
     chrome.storage.local.get(["recordingType"], (result) => {
-      recordingTypeRef.current =
-        result.recordingType === "camera" ? "camera" : "screen";
+      const recordingType = result.recordingType as string | undefined;
+      const type = recordingType === "camera" ? "camera" : "screen";
+      // recordingTypeRef is managed by CameraContext, we just use it
       updateLoadingState("recordingType", false);
-      setIsCameraMode(recordingTypeRef.current === "camera");
+      setIsCameraMode(type === "camera");
     });
   }, []);
 
   useEffect(() => {
     chrome.storage.local.get(["backgroundEffectsActive"], (result) => {
-      if (result.backgroundEffectsActive !== undefined) {
-        setBackgroundEffects(result.backgroundEffectsActive);
+      const active = result.backgroundEffectsActive as boolean | undefined;
+      if (active !== undefined) {
+        setBackgroundEffects(active);
       }
 
-      if (!result.backgroundEffectsActive) {
+      if (!active) {
         updateLoadingState("modelLoading", false);
       }
 
@@ -103,10 +104,18 @@ const Camera = () => {
         offScreenCanvasRef,
         offScreenCanvasContextRef,
         {
-          onStart: () => updateLoadingState("videoElement", true),
-          onFinish: () => updateLoadingState("videoElement", false),
+          onStart: async () => {
+            updateLoadingState("videoElement", true);
+          },
+          onFinish: () => {
+            updateLoadingState("videoElement", false);
+          },
         }
-      );
+      ).catch((err) => {
+        const error = err instanceof Error ? err : new Error(String(err));
+        console.error("Failed to get camera stream:", error);
+        updateLoadingState("videoElement", false);
+      });
     });
   }, [videoRef.current]); // Will run once when videoRef is set
 
@@ -140,7 +149,7 @@ const Camera = () => {
 
   return (
     <div style={{ width: "100%", height: "100%", overflow: "hidden" }}>
-      {backgroundEffects && <Background frame={imageDataState} />}
+      {backgroundEffects && <Background />}
       <video
         style={{
           // height: height,

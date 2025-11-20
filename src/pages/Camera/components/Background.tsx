@@ -9,10 +9,10 @@ import {
 } from "../utils/backgroundUtils";
 
 const Background = () => {
-  const canvasRef = useRef(null);
-  const canvasContextRef = useRef(null);
-  const bottomCanvasRef = useRef(null);
-  const bottomCanvasContextRef = useRef(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const canvasContextRef = useRef<CanvasRenderingContext2D | null>(null);
+  const bottomCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const bottomCanvasContextRef = useRef<CanvasRenderingContext2D | null>(null);
 
   const {
     currentFrame,
@@ -43,8 +43,12 @@ const Background = () => {
       preserveDrawingBuffer: true,
     });
 
-    canvasContextRef.current = canvasContext;
-    bottomCanvasContextRef.current = bottomCanvasContext;
+    if (canvasContext && canvasContext instanceof CanvasRenderingContext2D) {
+      canvasContextRef.current = canvasContext;
+    }
+    if (bottomCanvasContext && bottomCanvasContext instanceof CanvasRenderingContext2D) {
+      bottomCanvasContextRef.current = bottomCanvasContext;
+    }
   }, []);
 
   useEffect(() => {
@@ -74,15 +78,17 @@ const Background = () => {
           bottomCanvasContextRef
         );
 
-        resizeCanvases(
-          effectRef.current.width,
-          effectRef.current.height,
-          true, // isBackgroundEffect
-          effectRef.current,
-          canvasRef,
-          bottomCanvasRef,
-          bottomCanvasContextRef
-        );
+        if (effectRef.current) {
+          resizeCanvases(
+            effectRef.current.width,
+            effectRef.current.height,
+            true, // isBackgroundEffect
+            effectRef.current,
+            canvasRef,
+            bottomCanvasRef,
+            bottomCanvasContextRef
+          );
+        }
       }
     };
 
@@ -170,11 +176,16 @@ const Background = () => {
 
   // Listen for Chrome extension messages
   useEffect(() => {
-    const handleMessage = (request: any) => {
-      if (request.type === "set-background-effect") {
+    const handleMessage = (
+      request: chrome.runtime.MessageSender,
+      sender: chrome.runtime.MessageSender,
+      sendResponse: (response?: unknown) => void
+    ): boolean | void => {
+      if ((request as { type?: string }).type === "set-background-effect") {
         // The actual handling is now in message handlers, this just forces a re-render
         console.log("Background component received effect change message");
       }
+      return true;
     };
 
     // Add event listener

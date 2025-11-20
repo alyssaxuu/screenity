@@ -9,13 +9,58 @@ import React, {
 import {
   loadSegmentationModel,
   loadEffect,
-  renderEffectBackground,
+  renderBlur,
+  renderEffect,
 } from "../utils/backgroundUtils";
 import { initializeCanvases, setupCanvasContexts } from "../utils/canvasUtils";
 
-const CameraContext = createContext();
+interface CameraContextType {
+  width: string;
+  height: string;
+  backgroundEffects: boolean;
+  isModelLoaded: boolean;
+  pipMode: boolean;
+  currentFrame: ImageData | null;
+  isCameraMode: boolean;
+  videoRef: React.RefObject<HTMLVideoElement>;
+  streamRef: React.RefObject<MediaStream>;
+  recordingTypeRef: React.RefObject<string>;
+  offScreenCanvasRef: React.RefObject<HTMLCanvasElement | null>;
+  offScreenCanvasContextRef: React.RefObject<CanvasRenderingContext2D | null>;
+  segmenterRef: React.RefObject<any>;
+  blurRef: React.RefObject<boolean>;
+  effectRef: React.RefObject<HTMLImageElement | null>;
+  setWidth: (newWidth: string) => void;
+  setHeight: (newHeight: string) => void;
+  setBackgroundEffects: (active: boolean) => void;
+  setPipMode: (active: boolean) => void;
+  setIsCameraMode: (active: boolean) => void;
+  loadCustomEffect: (effectUrl: string) => Promise<boolean>;
+  enableBlur: (enabled: boolean) => boolean;
+  setCustomEffect: (effectUrl: string) => Promise<boolean>;
+  clearEffect: () => boolean;
+  captureFrame: () => void;
+  imageDataState: ImageData | null;
+}
 
-export const globalRefs = {
+const CameraContext = createContext<CameraContextType | undefined>(undefined);
+
+export const globalRefs: {
+  videoRef: React.RefObject<HTMLVideoElement> | null;
+  streamRef: React.RefObject<MediaStream> | null;
+  recordingTypeRef: React.RefObject<string> | null;
+  offScreenCanvasRef: React.RefObject<HTMLCanvasElement | null> | null;
+  offScreenCanvasContextRef: React.RefObject<CanvasRenderingContext2D | null> | null;
+  segmenterRef: React.RefObject<any> | null;
+  blurRef: React.RefObject<boolean> | null;
+  effectRef: React.RefObject<HTMLImageElement | null> | null;
+  setWidth: ((newWidth: string) => void) | null;
+  setHeight: ((newHeight: string) => void) | null;
+  setBackgroundEffects: ((active: boolean) => void) | null;
+  backgroundEffectsRef: React.RefObject<boolean> | null;
+  width: string | null;
+  height: string | null;
+} = {
   videoRef: null,
   streamRef: null,
   recordingTypeRef: null,
@@ -32,7 +77,13 @@ export const globalRefs = {
   height: null,
 };
 
-export const useCameraContext = () => useContext(CameraContext);
+export const useCameraContext = (): CameraContextType => {
+  const context = useContext(CameraContext);
+  if (!context) {
+    throw new Error("useCameraContext must be used within CameraProvider");
+  }
+  return context;
+};
 
 export const getContextRefs = () => {
   const missingRefs = [];
@@ -74,42 +125,46 @@ export const getContextRefs = () => {
     effectRef: globalRefs.effectRef ?? { current: null },
     setWidth:
       globalRefs.setWidth ??
-      ((width) => console.warn("⚠️ setWidth not initialized")),
+      ((width: string) => console.warn("⚠️ setWidth not initialized")),
     setHeight:
       globalRefs.setHeight ??
-      ((height) => console.warn("⚠️ setHeight not initialized")),
+      ((height: string) => console.warn("⚠️ setHeight not initialized")),
     setBackgroundEffects: globalRefs.setBackgroundEffects ?? (() => {}),
     backgroundEffectsRef: globalRefs.backgroundEffectsRef ?? { current: false },
   };
 };
 
-export const CameraProvider = ({ children }: any) => {
-  const [width, setWidth] = useState("auto");
-  const [height, setHeight] = useState("100%");
+interface CameraProviderProps {
+  children: React.ReactNode;
+}
+
+export const CameraProvider = ({ children }: CameraProviderProps) => {
+  const [width, setWidth] = useState<string>("auto");
+  const [height, setHeight] = useState<string>("100%");
   const [backgroundEffects, setBackgroundEffects] = useState(false);
   const [isModelLoaded, setIsModelLoaded] = useState(false);
   const [pipMode, setPipMode] = useState(false);
-  const [currentFrame, setCurrentFrame] = useState(null);
+  const [currentFrame, setCurrentFrame] = useState<ImageData | null>(null);
   const [isCameraMode, setIsCameraMode] = useState(false);
 
   const backgroundEffectsRef = useRef(false);
-  const recordingTypeRef = useRef("screen");
-  const videoRef = useRef(null);
-  const streamRef = useRef(new MediaStream());
+  const recordingTypeRef = useRef<string>("screen");
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const streamRef = useRef<MediaStream>(new MediaStream());
   const frameRequestedRef = useRef(false);
 
-  const offScreenCanvasRef = useRef(null);
-  const offScreenCanvasContextRef = useRef(null);
+  const offScreenCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const offScreenCanvasContextRef = useRef<CanvasRenderingContext2D | null>(null);
 
-  const segmenterRef = useRef(null);
-  const blurRef = useRef(false);
-  const effectRef = useRef(null);
+  const segmenterRef = useRef<any>(null);
+  const blurRef = useRef<boolean>(false);
+  const effectRef = useRef<HTMLImageElement | null>(null);
 
   useEffect(() => {
     const { offScreenCanvas, offScreenCanvasContext } = initializeCanvases();
 
-    offScreenCanvasRef.current = offScreenCanvas;
-    offScreenCanvasContextRef.current = offScreenCanvasContext;
+    offScreenCanvasRef.current = offScreenCanvas as HTMLCanvasElement | null;
+    offScreenCanvasContextRef.current = offScreenCanvasContext as CanvasRenderingContext2D | null;
 
     globalRefs.videoRef = videoRef;
     globalRefs.streamRef = streamRef;
@@ -137,11 +192,12 @@ export const CameraProvider = ({ children }: any) => {
     initializeModel();
 
     chrome.storage.local.get(["backgroundEffect"], (result) => {
-      if (result.backgroundEffect === "blur") {
+      const backgroundEffect = result.backgroundEffect as string | undefined;
+      if (backgroundEffect === "blur") {
         blurRef.current = true;
-      } else if (result.backgroundEffect) {
+      } else if (backgroundEffect) {
         blurRef.current = false;
-        loadCustomEffect(result.backgroundEffect);
+        loadCustomEffect(backgroundEffect);
       }
     });
 
@@ -156,7 +212,7 @@ export const CameraProvider = ({ children }: any) => {
   }, [backgroundEffects]);
 
   const handleSetBackgroundEffects = useCallback(
-    (active) => {
+    (active: boolean) => {
       setBackgroundEffects(active);
       backgroundEffectsRef.current = active;
       if (videoRef.current) {
@@ -168,7 +224,7 @@ export const CameraProvider = ({ children }: any) => {
   );
 
   const handleSetWidth = useCallback(
-    (newWidth) => {
+    (newWidth: string) => {
       setWidth(newWidth);
       if (videoRef.current) {
         videoRef.current.style.width = newWidth;
@@ -178,7 +234,7 @@ export const CameraProvider = ({ children }: any) => {
   );
 
   const handleSetHeight = useCallback(
-    (newHeight) => {
+    (newHeight: string) => {
       setHeight(newHeight);
       if (videoRef.current) {
         videoRef.current.style.height = newHeight;
@@ -191,6 +247,7 @@ export const CameraProvider = ({ children }: any) => {
     if (
       !videoRef.current ||
       !offScreenCanvasRef.current ||
+      !offScreenCanvasContextRef.current ||
       frameRequestedRef.current
     ) {
       return;
@@ -203,6 +260,11 @@ export const CameraProvider = ({ children }: any) => {
       const canvas = offScreenCanvasRef.current;
       const ctx = offScreenCanvasContextRef.current;
 
+      if (!ctx) {
+        frameRequestedRef.current = false;
+        return;
+      }
+
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
 
@@ -210,17 +272,19 @@ export const CameraProvider = ({ children }: any) => {
       const frame = ctx.getImageData(0, 0, canvas.width, canvas.height);
 
       if (segmenterRef.current) {
-        segmenterRef.current.segmentPeople(frame).then((segmentation) => {
+        segmenterRef.current.segmentPeople(frame).then(async (segmentation: any) => {
           if (blurRef.current) {
-            renderEffectBackground(canvas, ctx, frame, segmentation, "blur");
-          } else if (effectRef.current) {
-            renderEffectBackground(
-              canvas,
-              ctx,
+            // Use renderBlur for blur effect
+            await renderBlur(frame, segmentation, { current: canvas });
+          } else if (effectRef.current && offScreenCanvasRef.current && offScreenCanvasContextRef.current) {
+            // Use renderEffect for custom effects
+            await renderEffect(
               frame,
               segmentation,
-              "custom",
-              effectRef.current
+              offScreenCanvasRef,
+              offScreenCanvasContextRef,
+              { current: canvas },
+              { current: ctx }
             );
           }
 
@@ -247,15 +311,15 @@ export const CameraProvider = ({ children }: any) => {
     };
   }, [backgroundEffects, captureFrame]);
 
-  const loadCustomEffect = async (effectUrl: any): Promise<any> => {
+  const loadCustomEffect = async (effectUrl: string): Promise<boolean> => {
     try {
       if (!effectUrl) {
         effectRef.current = null;
-        return;
+        return false;
       }
 
       const image = await loadEffect(effectUrl);
-      effectRef.current = image;
+      effectRef.current = image as HTMLImageElement | null;
 
       return true;
     } catch (error) {
@@ -264,7 +328,7 @@ export const CameraProvider = ({ children }: any) => {
     }
   };
 
-  const enableBlur = (enabled: any) => {
+  const enableBlur = (enabled: boolean): boolean => {
     blurRef.current = enabled;
 
     chrome.storage.local.set({ backgroundEffect: enabled ? "blur" : "" });
@@ -272,7 +336,7 @@ export const CameraProvider = ({ children }: any) => {
     return enabled;
   };
 
-  const setCustomEffect = async (effectUrl: any): Promise<any> => {
+  const setCustomEffect = async (effectUrl: string): Promise<boolean> => {
     try {
       const success = await loadCustomEffect(effectUrl);
 
@@ -300,7 +364,7 @@ export const CameraProvider = ({ children }: any) => {
     return true;
   };
 
-  const contextValue = {
+  const contextValue: CameraContextType = {
     width,
     height,
     backgroundEffects,
@@ -326,6 +390,7 @@ export const CameraProvider = ({ children }: any) => {
     setCustomEffect,
     clearEffect,
     captureFrame,
+    imageDataState: currentFrame,
   };
 
   return (
