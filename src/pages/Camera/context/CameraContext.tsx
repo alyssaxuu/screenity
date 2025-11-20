@@ -51,12 +51,15 @@ export const globalRefs: {
   recordingTypeRef: React.RefObject<string> | null;
   offScreenCanvasRef: React.RefObject<HTMLCanvasElement | null> | null;
   offScreenCanvasContextRef: React.RefObject<CanvasRenderingContext2D | null> | null;
+  bottomCanvasRef: React.RefObject<HTMLCanvasElement | null> | null;
+  bottomCanvasContextRef: React.RefObject<CanvasRenderingContext2D | null> | null;
   segmenterRef: React.RefObject<any> | null;
   blurRef: React.RefObject<boolean> | null;
   effectRef: React.RefObject<HTMLImageElement | null> | null;
   setWidth: ((newWidth: string) => void) | null;
   setHeight: ((newHeight: string) => void) | null;
   setBackgroundEffects: ((active: boolean) => void) | null;
+  setPipMode: ((active: boolean) => void) | null;
   backgroundEffectsRef: React.RefObject<boolean> | null;
   setIsCameraMode: ((active: boolean) => void) | null;
   width: string | null;
@@ -67,12 +70,15 @@ export const globalRefs: {
   recordingTypeRef: null,
   offScreenCanvasRef: null,
   offScreenCanvasContextRef: null,
+  bottomCanvasRef: null,
+  bottomCanvasContextRef: null,
   segmenterRef: null,
   blurRef: null,
   effectRef: null,
   setWidth: null,
   setHeight: null,
   setBackgroundEffects: null,
+  setPipMode: null,
   backgroundEffectsRef: null,
   setIsCameraMode: null,
   width: null,
@@ -138,6 +144,14 @@ export const getContextRefs = () => {
       createMutableRef<CanvasRenderingContext2D | null>(
         null
       )) as React.MutableRefObject<CanvasRenderingContext2D | null>,
+    bottomCanvasRef: (globalRefs.bottomCanvasRef ??
+      createMutableRef<HTMLCanvasElement | null>(
+        null
+      )) as React.MutableRefObject<HTMLCanvasElement | null>,
+    bottomCanvasContextRef: (globalRefs.bottomCanvasContextRef ??
+      createMutableRef<CanvasRenderingContext2D | null>(
+        null
+      )) as React.MutableRefObject<CanvasRenderingContext2D | null>,
     segmenterRef: (globalRefs.segmenterRef ??
       createMutableRef<any>(null)) as React.MutableRefObject<any>,
     blurRef: (globalRefs.blurRef ??
@@ -153,6 +167,7 @@ export const getContextRefs = () => {
       globalRefs.setHeight ??
       ((height: string) => console.warn("⚠️ setHeight not initialized")),
     setBackgroundEffects: globalRefs.setBackgroundEffects ?? (() => {}),
+    setPipMode: globalRefs.setPipMode ?? (() => {}),
     backgroundEffectsRef: (globalRefs.backgroundEffectsRef ??
       createMutableRef<boolean>(false)) as React.MutableRefObject<boolean>,
     setIsCameraMode: globalRefs.setIsCameraMode ?? (() => {}),
@@ -205,7 +220,9 @@ export const CameraProvider = ({ children }: CameraProviderProps) => {
     globalRefs.setWidth = handleSetWidth;
     globalRefs.setHeight = handleSetHeight;
     globalRefs.setBackgroundEffects = handleSetBackgroundEffects;
+    globalRefs.setPipMode = setPipMode;
     globalRefs.backgroundEffectsRef = backgroundEffectsRef;
+    globalRefs.setIsCameraMode = setIsCameraMode;
 
     const initializeModel = async (): Promise<any> => {
       try {

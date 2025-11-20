@@ -10,6 +10,8 @@ import {
   surfaceHandler,
   cameraToggledToolbar,
 } from "../utils/cameraUtils";
+import type { CameraToggledRequest } from "../../../types/camera";
+import type { ExtensionMessage } from "../../../types/messaging";
 import { loadEffect } from "../utils/backgroundUtils";
 import {
   setWidth,
@@ -17,7 +19,6 @@ import {
   setPipMode,
   setBackgroundEffects,
 } from "../utils/uiState";
-import type { ExtensionMessage } from "../../../types/messaging";
 
 function waitForVideoRef(
   callback: (videoEl: HTMLVideoElement) => void,
@@ -85,10 +86,14 @@ export const setupHandlers = ({ setLoading }: any) => {
     console.log("Preparing Picture in Picture request");
 
     waitForVideoRef((videoEl: HTMLVideoElement) => {
-      surfaceHandler(message, { current: videoEl });
+      const request = message as ExtensionMessage & CameraToggledRequest;
+      surfaceHandler(request, { current: videoEl });
     });
   });
-  registerMessage("camera-toggled-toolbar", cameraToggledToolbar);
+  registerMessage("camera-toggled-toolbar", (message: ExtensionMessage) => {
+    const request = message as ExtensionMessage & CameraToggledRequest;
+    return cameraToggledToolbar(request);
+  });
   registerMessage("turn-off-pip", () => {
     if (document.pictureInPictureElement) {
       document.exitPictureInPicture().catch((error) => {

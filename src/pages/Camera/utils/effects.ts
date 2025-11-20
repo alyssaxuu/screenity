@@ -1,7 +1,10 @@
 import { renderEffectBackground } from "./backgroundUtils";
 import { getContextRefs } from "../context/CameraContext";
+import type { StorageResult } from "../../../types/camera";
 
-export const loadEffect = (effectUrl: any) => {
+export const loadEffect = (
+  effectUrl: string | null | undefined
+): Promise<HTMLImageElement | null> => {
   return new Promise((resolve, reject) => {
     if (!effectUrl) {
       console.warn("No effect URL provided");
@@ -77,13 +80,17 @@ export const getCurrentEffect = () => {
 export const applySavedEffectSettings = async (): Promise<any> => {
   try {
     const result = await new Promise((resolve) => {
-      chrome.storage.local.get(["backgroundEffect"], resolve);
+      chrome.storage.local.get(["backgroundEffect"], (result) => {
+        const storageResult = result as StorageResult;
+        resolve(storageResult);
+      });
     });
 
-    if (result.backgroundEffect === "blur") {
+    const storageResult = result as StorageResult;
+    if (storageResult.backgroundEffect === "blur") {
       toggleBlur(true);
-    } else if (result.backgroundEffect) {
-      await loadEffect(result.backgroundEffect);
+    } else if (storageResult.backgroundEffect) {
+      await loadEffect(storageResult.backgroundEffect);
     }
 
     return true;

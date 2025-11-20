@@ -1,6 +1,6 @@
 import { getContextRefs } from "../context/CameraContext";
 
-export const setWidth = (width: any) => {
+export const setWidth = (width: string): void => {
   const { videoRef, setWidth: contextSetWidth } = getContextRefs();
   if (contextSetWidth) {
     contextSetWidth(width);
@@ -9,7 +9,7 @@ export const setWidth = (width: any) => {
   }
 };
 
-export const setHeight = (height: any) => {
+export const setHeight = (height: string): void => {
   const { videoRef, setHeight: contextSetHeight } = getContextRefs();
   if (contextSetHeight) {
     contextSetHeight(height);
@@ -18,7 +18,7 @@ export const setHeight = (height: any) => {
   }
 };
 
-export const setPipMode = (mode: any) => {
+export const setPipMode = (mode: boolean): void => {
   const { videoRef, setPipMode: contextSetPipMode } = getContextRefs();
   if (contextSetPipMode) {
     contextSetPipMode(mode);
@@ -27,7 +27,7 @@ export const setPipMode = (mode: any) => {
   }
 };
 
-export const setBackgroundEffects = (active: any) => {
+export const setBackgroundEffects = (active: boolean): boolean => {
   const { videoRef, setBackgroundEffects: contextSetBackgroundEffects } =
     getContextRefs();
 

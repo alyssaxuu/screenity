@@ -5,48 +5,38 @@ const CLOUD_FEATURES_ENABLED =
   process.env.SCREENITY_ENABLE_CLOUD_FEATURES === "true";
 
 export const getCameraStream = async (
-  constraints,
-  streamRef,
-  videoRef,
-  offScreenCanvasRef,
-  offScreenCanvasContextRef,
-  { onStart = (): Promise<any> => Promise.resolve(), onFinish = (): void => {} } = {}
-) => {
+  constraints: MediaStreamConstraints,
+  streamRef: React.RefObject<MediaStream>,
+  videoRef: React.RefObject<HTMLVideoElement | null>,
+  offScreenCanvasRef: React.RefObject<HTMLCanvasElement | null>,
+  offScreenCanvasContextRef: React.RefObject<CanvasRenderingContext2D | null>,
+  { onStart = async (): Promise<void> => {}, onFinish = (): void => {} } = {}
+): Promise<void> => {
   const { setWidth, setHeight, recordingTypeRef } = getContextRefs();
 
   onStart();
 
-  if (!streamRef) {
-    console.warn("⚠️ streamRef is undefined. Creating a new reference.");
-    streamRef = { current: new MediaStream() };
-  }
-
-  if (!videoRef) {
-    console.warn("⚠️ videoRef is undefined. Creating a new reference.");
-    videoRef = { current: null };
-  }
-
-  if (!offScreenCanvasRef) {
-    console.warn(
-      "⚠️ offScreenCanvasRef is undefined. Creating a new reference."
-    );
-    offScreenCanvasRef = { current: null };
-  }
-
-  if (!offScreenCanvasContextRef) {
-    console.warn(
-      "⚠️ offScreenCanvasContextRef is undefined. Creating a new reference."
-    );
-    offScreenCanvasContextRef = { current: null };
+  if (
+    !streamRef ||
+    !videoRef ||
+    !offScreenCanvasRef ||
+    !offScreenCanvasContextRef
+  ) {
+    throw new Error("Required refs are missing");
   }
 
   try {
     const stream = await navigator.mediaDevices.getUserMedia(constraints);
 
-    streamRef.current = stream;
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop());
+    }
+    (streamRef as React.MutableRefObject<MediaStream>).current = stream;
 
     const videoTrack = stream.getVideoTracks()[0];
-    const { width, height, deviceId, frameRate } = videoTrack.getSettings();
+    const settings = videoTrack.getSettings();
+    const width = settings.width ?? 1280;
+    const height = settings.height ?? 720;
 
     if (setWidth && setHeight) {
       const isCamera = recordingTypeRef?.current === "camera";
@@ -79,13 +69,13 @@ export const getCameraStream = async (
     const video = videoRef.current;
     video.srcObject = stream;
 
-    await new Promise((resolve) => {
+    await new Promise<void>((resolve) => {
       video.onloadedmetadata = async () => {
         await video.play().catch((err) => {
           console.error("❌ Error during video.play():", err);
         });
 
-        await new Promise((r) => setTimeout(r, 100));
+        await new Promise<void>((r) => setTimeout(r, 100));
 
         const canvas = offScreenCanvasRef?.current;
         if (!canvas) {
@@ -102,7 +92,9 @@ export const getCameraStream = async (
           return resolve();
         }
 
-        offScreenCanvasContextRef.current = context;
+        (
+          offScreenCanvasContextRef as React.MutableRefObject<CanvasRenderingContext2D | null>
+        ).current = context;
 
         resolve();
       };
@@ -115,7 +107,10 @@ export const getCameraStream = async (
   }
 };
 
-export const stopCameraStream = (streamRef, videoRef: any) => {
+export const stopCameraStream = (
+  streamRef: React.RefObject<MediaStream>,
+  videoRef: React.RefObject<HTMLVideoElement | null>
+): void => {
   if (!streamRef?.current) {
     console.warn("⚠️ No active stream to stop.");
     return;
@@ -145,13 +140,15 @@ export const togglePip = (videoRef: any) => {
     }
   }
 };
-export const surfaceHandler = async (request, videoRef: any): Promise<any> => {
+import type { CameraToggledRequest } from "../../../types/camera";
+
+export const surfaceHandler = async (
+  request: CameraToggledRequest,
+  videoRef: React.RefObject<HTMLVideoElement | null>
+): Promise<void> => {
   console.log("Picture in Picture request ready");
 
-  if (
-    !videoRef?.requestPictureInPicture &&
-    !videoRef?.current?.requestPictureInPicture
-  ) {
+  if (!videoRef?.current?.requestPictureInPicture) {
     setPipMode(false);
     chrome.runtime.sendMessage({ type: "pip-ended" });
     return;
@@ -193,15 +190,26 @@ export const surfaceHandler = async (request, videoRef: any): Promise<any> => {
   }
 };
 
-export const cameraToggledToolbar = async (request: any): Promise<any> => {
+export const cameraToggledToolbar = async (
+  request: CameraToggledRequest
+): Promise<void> => {
+  const { streamRef, videoRef } = getContextRefs();
   if (request.active) {
     setTimeout(() => {
-      stopCameraStream();
-      getCameraStream({
-        video: {
-          deviceId: { exact: request.id },
-        },
-      });
+      stopCameraStream(streamRef, videoRef);
+      const { offScreenCanvasRef, offScreenCanvasContextRef } =
+        getContextRefs();
+      getCameraStream(
+        {
+          video: {
+            deviceId: { exact: request.id },
+          },
+        } as MediaStreamConstraints,
+        streamRef,
+        videoRef,
+        offScreenCanvasRef,
+        offScreenCanvasContextRef
+      );
     }, 2000);
     setPipMode(false);
   }

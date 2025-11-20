@@ -268,43 +268,49 @@ const Background = (props: BackgroundProps) => {
         const opacity = 0;
         const edgeBlurAmount = 10;
 
-        canvasRef.current.width = innerHeight * ratio;
-        canvasRef.current.height = innerHeight;
+        const canvas = canvasRef.current;
+        const offScreenCanvas = offScreenCanvasRef.current;
+        const offScreenCtx = offScreenCanvasContextRef.current;
+        const canvasCtx = canvasContextRef.current;
+
+        if (!canvas || !offScreenCanvas || !offScreenCtx || !canvasCtx) return;
+
+        canvas.width = innerHeight * ratio;
+        canvas.height = innerHeight;
 
         await bodySegmentation.drawMask(
-          offScreenCanvasRef.current,
+          offScreenCanvas,
           img,
           backgroundDarkeningMask,
           opacity,
           edgeBlurAmount
         );
 
-        offScreenCanvasContextRef.current.save();
-        offScreenCanvasContextRef.current.globalCompositeOperation =
-          "destination-out";
+        offScreenCtx.save();
+        offScreenCtx.globalCompositeOperation = "destination-out";
 
-        offScreenCanvasContextRef.current.drawImage(
+        offScreenCtx.drawImage(
           maskImg,
           0,
           0,
-          offScreenCanvasRef.current.width,
-          offScreenCanvasRef.current.height
+          offScreenCanvas.width,
+          offScreenCanvas.height
         );
-        offScreenCanvasContextRef.current.restore();
+        offScreenCtx.restore();
 
-        canvasRef.current.width = innerHeight * ratio;
-        canvasRef.current.height = innerHeight;
+        canvas.width = innerHeight * ratio;
+        canvas.height = innerHeight;
 
-        canvasContextRef.current.drawImage(
-          offScreenCanvasRef.current,
+        canvasCtx.drawImage(
+          offScreenCanvas,
           0,
           0,
-          offScreenCanvasRef.current.width,
-          offScreenCanvasRef.current.height,
+          offScreenCanvas.width,
+          offScreenCanvas.height,
           0,
           0,
-          canvasRef.current.width,
-          canvasRef.current.height
+          canvas.width,
+          canvas.height
         );
 
         latestImageDataRef.current = null;
@@ -314,11 +320,12 @@ const Background = (props: BackgroundProps) => {
     }
   };
 
-  const getImageURL = (imageData) => {
+  const getImageURL = (imageData: ImageData): string => {
     const canvas = document.createElement("canvas");
     canvas.width = imageData.width;
     canvas.height = imageData.height;
     const context = canvas.getContext("2d");
+    if (!context) throw new Error("Failed to get canvas context");
     context.putImageData(imageData, 0, 0);
     const dataURL = canvas.toDataURL();
     return dataURL;

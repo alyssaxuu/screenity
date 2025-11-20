@@ -5,7 +5,7 @@ import "@mediapipe/selfie_segmentation";
 export const loadSegmentationModel = async (): Promise<any> => {
   try {
     const model = bodySegmentation.SupportedModels.MediaPipeSelfieSegmentation;
-    const segmenterConfig = {
+    const segmenterConfig: bodySegmentation.MediaPipeSelfieSegmentationMediaPipeModelConfig = {
       runtime: "mediapipe",
       solutionPath: "./assets/selfieSegmentation",
       modelType: "general",
@@ -18,7 +18,7 @@ export const loadSegmentationModel = async (): Promise<any> => {
   }
 };
 
-export const segmentPerson = async (img, segmenter: any): Promise<any> => {
+export const segmentPerson = async (img: ImageData, segmenter: any): Promise<any> => {
   if (!img || !segmenter) {
     console.warn("Missing input: ", {
       hasImage: !!img,
@@ -52,7 +52,7 @@ export const segmentPerson = async (img, segmenter: any): Promise<any> => {
   }
 };
 
-export const renderBlur = async (img, people, canvasRef: any): Promise<any> => {
+export const renderBlur = async (img: ImageData, people: any[], canvasRef: React.RefObject<HTMLCanvasElement>): Promise<any> => {
   if (!img || !people || !canvasRef.current) return;
 
   try {
@@ -82,23 +82,24 @@ export const renderBlur = async (img, people, canvasRef: any): Promise<any> => {
   }
 };
 
-export const getImageURL = (imageData: any) => {
+export const getImageURL = (imageData: ImageData): string => {
   const canvas = document.createElement("canvas");
   canvas.width = imageData.width;
   canvas.height = imageData.height;
   const context = canvas.getContext("2d");
+  if (!context) throw new Error("Failed to get canvas context");
   context.putImageData(imageData, 0, 0);
   return canvas.toDataURL();
 };
 
 export const renderEffect = async (
-  img,
-  people,
-  offScreenCanvasRef,
-  offScreenCanvasContextRef,
-  canvasRef,
-  canvasContextRef
-: any): Promise<any> => {
+  img: ImageData,
+  people: any[],
+  offScreenCanvasRef: React.RefObject<HTMLCanvasElement>,
+  offScreenCanvasContextRef: React.RefObject<CanvasRenderingContext2D | null>,
+  canvasRef: React.RefObject<HTMLCanvasElement>,
+  canvasContextRef: React.RefObject<CanvasRenderingContext2D | null>
+): Promise<any> => {
   if (!img || !people || !offScreenCanvasRef.current || !canvasRef.current)
     return false;
 
@@ -118,35 +119,41 @@ export const renderEffect = async (
       foregroundThresholdProbability
     );
 
-    offScreenCanvasRef.current.width = img.width;
-    offScreenCanvasRef.current.height = img.height;
-    canvasRef.current.width = window.innerHeight * ratio;
-    canvasRef.current.height = window.innerHeight;
+    const offScreenCanvas = offScreenCanvasRef.current;
+    const canvas = canvasRef.current;
+    const offScreenCtx = offScreenCanvasContextRef.current;
+    const canvasCtx = canvasContextRef.current;
 
-    offScreenCanvasContextRef.current.putImageData(img, 0, 0);
+    if (!offScreenCanvas || !canvas || !offScreenCtx || !canvasCtx) return false;
 
-    offScreenCanvasContextRef.current.globalCompositeOperation =
-      "destination-out";
+    offScreenCanvas.width = img.width;
+    offScreenCanvas.height = img.height;
+    canvas.width = window.innerHeight * ratio;
+    canvas.height = window.innerHeight;
+
+    offScreenCtx.putImageData(img, 0, 0);
+
+    offScreenCtx.globalCompositeOperation = "destination-out";
     await bodySegmentation.drawMask(
-      offScreenCanvasRef.current,
+      offScreenCanvas,
       img,
       backgroundDarkeningMask,
       0, // opacity
       3 // edgeBlurAmount
     );
 
-    offScreenCanvasContextRef.current.globalCompositeOperation = "source-over";
+    offScreenCtx.globalCompositeOperation = "source-over";
 
-    canvasContextRef.current.drawImage(
-      offScreenCanvasRef.current,
+    canvasCtx.drawImage(
+      offScreenCanvas,
       0,
       0,
-      offScreenCanvasRef.current.width,
-      offScreenCanvasRef.current.height,
+      offScreenCanvas.width,
+      offScreenCanvas.height,
       0,
       0,
-      canvasRef.current.width,
-      canvasRef.current.height
+      canvas.width,
+      canvas.height
     );
 
     return true;
@@ -175,10 +182,10 @@ export const loadEffect = (effectUrl: string): Promise<HTMLImageElement | null> 
 
 // Render the background effect image to the bottom canvas
 export const renderEffectBackground = (
-  effectImg,
-  bottomCanvasRef,
-  bottomCanvasContextRef
-: any) => {
+  effectImg: HTMLImageElement,
+  bottomCanvasRef: React.RefObject<HTMLCanvasElement>,
+  bottomCanvasContextRef: React.RefObject<CanvasRenderingContext2D | null>
+): boolean => {
   if (!effectImg || !bottomCanvasRef.current || !bottomCanvasContextRef.current)
     return false;
 
@@ -223,12 +230,12 @@ export const renderEffectBackground = (
 
 // Process a new video frame with current effect settings
 export const processVideoFrame = async (
-  frameData,
-  segmenter,
-  isBlurEnabled,
-  effectImg,
-  canvasRefs
-: any): Promise<any> => {
+  frameData: ImageData,
+  segmenter: any,
+  isBlurEnabled: boolean,
+  effectImg: HTMLImageElement | null,
+  canvasRefs: any
+): Promise<any> => {
   if (!frameData || !segmenter) return;
 
   try {

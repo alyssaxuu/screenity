@@ -95,9 +95,10 @@ const Camera = () => {
     updateLoadingState("videoElement", true);
 
     chrome.storage.local.get(["defaultVideoInput"], (result) => {
-      const constraints =
-        result.defaultVideoInput !== "none"
-          ? { video: { deviceId: { exact: result.defaultVideoInput } } }
+      const defaultVideoInput = result.defaultVideoInput as string | undefined;
+      const constraints: MediaStreamConstraints =
+        defaultVideoInput && defaultVideoInput !== "none"
+          ? { video: { deviceId: { exact: defaultVideoInput } } }
           : { video: true };
 
       getCameraStream(

@@ -10,7 +10,10 @@ export const initializeCanvases = () => {
   };
 };
 
-export const setupCanvasContexts = (canvasRef, bottomCanvasRef: any) => {
+export const setupCanvasContexts = (
+  canvasRef: React.RefObject<HTMLCanvasElement>,
+  bottomCanvasRef: React.RefObject<HTMLCanvasElement>
+) => {
   if (!canvasRef.current || !bottomCanvasRef.current) {
     console.error("Canvas references not available");
     return {
@@ -34,14 +37,14 @@ export const setupCanvasContexts = (canvasRef, bottomCanvasRef: any) => {
 };
 
 export const resizeCanvases = (
-  videoWidth,
-  videoHeight,
-  isBackgroundEffect,
-  effectImg,
-  canvasRef,
-  bottomCanvasRef,
-  bottomCanvasContextRef
-: any) => {
+  videoWidth: number,
+  videoHeight: number,
+  isBackgroundEffect: boolean,
+  effectImg: HTMLImageElement | null,
+  canvasRef: React.RefObject<HTMLCanvasElement>,
+  bottomCanvasRef: React.RefObject<HTMLCanvasElement>,
+  bottomCanvasContextRef: React.RefObject<CanvasRenderingContext2D | null>
+) => {
   if (!canvasRef.current) return false;
 
   const windowWidth = window.innerWidth;
@@ -73,7 +76,10 @@ export const resizeCanvases = (
   return true;
 };
 
-export const calculateCanvasDimensions = (videoWidth, videoHeight: any) => {
+export const calculateCanvasDimensions = (
+  videoWidth: number,
+  videoHeight: number
+) => {
   const windowWidth = window.innerWidth;
   const windowHeight = window.innerHeight;
   const videoRatio = videoWidth / videoHeight;
@@ -92,7 +98,11 @@ export const calculateCanvasDimensions = (videoWidth, videoHeight: any) => {
   return { width, height };
 };
 
-export const captureVideoFrame = (videoRef, canvasRef, canvasContextRef: any) => {
+export const captureVideoFrame = (
+  videoRef: React.RefObject<HTMLVideoElement | null>,
+  canvasRef: React.RefObject<HTMLCanvasElement>,
+  canvasContextRef: React.RefObject<CanvasRenderingContext2D | null>
+): ImageData | null => {
   if (!videoRef.current || !canvasRef.current || !canvasContextRef.current) {
     return null;
   }

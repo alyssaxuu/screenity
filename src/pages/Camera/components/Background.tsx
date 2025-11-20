@@ -75,11 +75,13 @@ const Background = () => {
         bottomCanvasContextRef.current &&
         canvasRef.current
       ) {
-        renderEffectBackground(
-          effectRef.current,
-          bottomCanvasRef,
-          bottomCanvasContextRef
-        );
+        if (effectRef.current) {
+          renderEffectBackground(
+            effectRef.current,
+            bottomCanvasRef,
+            bottomCanvasContextRef
+          );
+        }
 
         if (effectRef.current) {
           resizeCanvases(
