@@ -40,7 +40,8 @@ export const onCommandListener = () => {
               // Wait for the tab to load
               chrome.tabs.onUpdated.addListener(function _(
                 tabId: number,
-                changeInfo: TabChangeInfo | undefined
+                changeInfo: chrome.tabs.TabChangeInfo | undefined,
+                updatedTab: chrome.tabs.Tab
               ) {
                 if (tabId === tab.id && changeInfo?.status === "complete" && tab.id) {
                   setTimeout(() => {

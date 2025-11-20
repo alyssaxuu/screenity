@@ -99,10 +99,8 @@ const openPlaygroundOrPopup = async (tab: any): Promise<any> => {
     });
     chrome.storage.local.set({ activeTab: newTab.id });
 
-import type { TabChangeInfo } from "../../../types/tabs";
-
-    const onUpdated = (tabId: number, changeInfo: TabChangeInfo | undefined, updatedTab: chrome.tabs.Tab) => {
-      if (updatedTab.id === newTab.id && changeInfo?.status === "complete" && newTab.id) {
+    const onUpdated = (tabId: number, changeInfo: chrome.tabs.TabChangeInfo, updatedTab: chrome.tabs.Tab) => {
+      if (newTab.id && updatedTab.id === newTab.id && changeInfo.status === "complete") {
         chrome.tabs.onUpdated.removeListener(onUpdated);
         setTimeout(() => {
           sendMessageTab(newTab.id!, { type: "toggle-popup" });

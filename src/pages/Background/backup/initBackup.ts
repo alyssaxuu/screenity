@@ -1,5 +1,4 @@
 import { sendMessageTab } from "../tabManagement";
-
 import type { ExtensionMessage } from "../../../types/messaging";
 
 export const initBackup = async (request: ExtensionMessage, id: number): Promise<void> => {
@@ -18,12 +17,12 @@ export const initBackup = async (request: ExtensionMessage, id: number): Promise
       (tab) => {
         chrome.storage.local.set({ backupTab: tab.id });
         chrome.tabs.onUpdated.addListener(function listener(tabId, changeInfo) {
-          if (tabId === tab.id && changeInfo.status === "complete") {
+          if (tab.id && tabId === tab.id && changeInfo.status === "complete") {
             sendMessageTab(tab.id, {
               type: "init-backup",
               request: request,
               tabId: id,
-            });
+            } as ExtensionMessage);
             chrome.tabs.onUpdated.removeListener(listener);
           }
         });
@@ -38,7 +37,7 @@ export const initBackup = async (request: ExtensionMessage, id: number): Promise
           type: "init-backup",
           request: request,
           tabId: id,
-        });
+        } as ExtensionMessage);
       } else {
         createBackupTab();
       }

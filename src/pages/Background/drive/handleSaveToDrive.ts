@@ -8,6 +8,7 @@ import type {
   TokenPayload,
 } from "../../../types/drive";
 import type { ChunkData } from "../../../types/recording";
+import type { ExtensionMessage } from "../../../types/messaging";
 
 const findOrCreateScreenityFolder = async (token: string): Promise<string> => {
   const headers = new Headers({
@@ -198,7 +199,7 @@ export const handleSaveToDrive = async (
         sendMessageTab(sandboxTab, {
           type: "save-drive-error",
           error: response.error || "Upload failed",
-        });
+        } as ExtensionMessage);
       }
     }
 
@@ -214,7 +215,7 @@ export const handleSaveToDrive = async (
       sendMessageTab(sandboxTab, {
         type: "save-drive-error",
         error: errorMessage || "Unknown error",
-      });
+      } as ExtensionMessage);
     }
     return { status: "ew", url: null };
   }

@@ -1,5 +1,6 @@
 import { getCurrentTab, sendMessageTab, removeTab } from "../tabManagement";
 import { loginWithWebsite } from "../auth/loginWithWebsite";
+import type { ExtensionMessage } from "../../../types/messaging";
 
 const CLOUD_FEATURES_ENABLED =
   process.env.SCREENITY_ENABLE_CLOUD_FEATURES === "true";
@@ -49,7 +50,7 @@ export const onMessageExternalListener = () => {
             sendMessageTab(originalTabId, {
               type: "check-auth",
               senderId: sender.tab.id,
-            });
+            } as ExtensionMessage);
           }
         }
 
@@ -105,7 +106,7 @@ export const onMessageExternalListener = () => {
             projectId: message.projectId,
             activeSceneId: message.activeSceneId,
             recordingToScene: true,
-          });
+          } as ExtensionMessage);
         } catch (err) {
           console.warn("Failed to send popup project message:", err);
         }
@@ -130,7 +131,7 @@ export const onMessageExternalListener = () => {
           projectId: message.projectId,
           activeSceneId: message.activeSceneId,
           recordingToScene: true,
-        });
+        } as ExtensionMessage);
       } else if (message.type === "PING_FROM_WEBAPP") {
         sendResponse({ success: true, message: "pong" });
 

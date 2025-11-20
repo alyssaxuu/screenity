@@ -64,8 +64,6 @@ export const handlePip = async (started: boolean = false): Promise<void> => {
   }
 };
 
-import type { OnGetPermissionsMessage } from "../../../types/messaging";
-
 export const handleOnGetPermissions = async (request: OnGetPermissionsMessage): Promise<void> => {
   // Send a message to (actual) active tab
   const activeTab = await getCurrentTab();

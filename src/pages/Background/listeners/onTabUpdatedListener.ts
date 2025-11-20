@@ -1,9 +1,9 @@
 import { sendMessageTab } from "../tabManagement";
-import type { TabChangeInfo } from "../../../types/tabs";
+import type { ExtensionMessage } from "../../../types/messaging";
 
 export const handleTabUpdate = async (
   tabId: number,
-  changeInfo: TabChangeInfo | undefined,
+  changeInfo: chrome.tabs.TabChangeInfo | undefined,
   tab: chrome.tabs.Tab
 ): Promise<void> => {
   try {
@@ -46,10 +46,10 @@ export const handleTabUpdate = async (
           sendMessageTab(tabId, {
             type: "time",
             time: remaining,
-          });
+          } as ExtensionMessage);
         } else {
           const time = Math.floor((Date.now() - recordingStartTime) / 1000);
-          sendMessageTab(tabId, { type: "time", time: time });
+          sendMessageTab(tabId, { type: "time", time: time } as ExtensionMessage);
         }
       }
 
@@ -58,7 +58,7 @@ export const handleTabUpdate = async (
       sendMessageTab(tabId, {
         type: "commands",
         commands: commands,
-      });
+      } as ExtensionMessage);
 
       // Check if tab is playground.html
       if (

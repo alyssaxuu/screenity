@@ -1,4 +1,5 @@
 import { sendMessageTab } from "../tabManagement";
+import type { ExtensionMessage } from "../../../types/messaging";
 import type { TabActiveInfo } from "../../../types/tabs";
 
 export const handleTabActivation = async (
@@ -53,7 +54,7 @@ export const handleTabActivation = async (
         sendMessageTab(activeInfo.tabId, {
           type: "recording-check",
           recordingStartTime,
-        });
+        } as ExtensionMessage & { recordingStartTime?: number });
       }
     } else if (!recording && !restarting && !pendingRecording) {
       sendMessageTab(activeInfo.tabId, { type: "recording-ended" });
@@ -72,10 +73,10 @@ export const handleTabActivation = async (
         sendMessageTab(activeInfo.tabId, {
           type: "time",
           time: remaining,
-        });
+        } as ExtensionMessage);
       } else {
         const time = Math.floor((Date.now() - recordingStartTime) / 1000);
-        sendMessageTab(activeInfo.tabId, { type: "time", time: time });
+        sendMessageTab(activeInfo.tabId, { type: "time", time: time } as ExtensionMessage);
       }
     }
   } catch (error) {

@@ -51,9 +51,10 @@ const openRecorderTab = async (
 
       chrome.tabs.onUpdated.addListener(function _(
         tabId: number,
-        changeInfo: TabChangeInfo | undefined
+        changeInfo: chrome.tabs.TabChangeInfo | undefined,
+        updatedTab: chrome.tabs.Tab
       ) {
-        if (tabId === tab.id && changeInfo?.status === "complete") {
+        if (tab.id && tabId === tab.id && changeInfo?.status === "complete") {
           chrome.tabs.onUpdated.removeListener(_);
           sendMessageRecord({
             type: "loaded",
@@ -65,7 +66,7 @@ const openRecorderTab = async (
                   tabID: activeTab.id,
                 }
               : {}),
-          });
+          } as ExtensionMessage);
         }
       });
     });
@@ -104,7 +105,9 @@ export const offscreenDocument = async (
 
   await closeOffscreenDocument();
 
-  if (request.region) {
+  const requestWithRegion = request as ExtensionMessage & { region?: boolean; customRegion?: boolean; offscreenRecording?: boolean; camera?: boolean };
+  
+  if (requestWithRegion.region) {
     if (tabId !== null) chrome.tabs.update(tabId, { active: true });
 
     chrome.storage.local.set({
@@ -113,18 +116,18 @@ export const offscreenDocument = async (
       region: true,
     });
 
-    if (request.customRegion) {
+    if (requestWithRegion.customRegion) {
       sendMessageRecord({
         type: "loaded",
         request: request,
         backup: backup,
         region: true,
-      });
+      } as ExtensionMessage);
     } else {
       await openRecorderTab(activeTab, backup, true, false, request);
     }
   } else {
-    if (!request.offscreenRecording || request.camera) {
+    if (!requestWithRegion.offscreenRecording || requestWithRegion.camera) {
       // Skip offscreen recording if conditions aren't met
       await openRecorderTab(activeTab, backup, false, request.camera, request);
       return;
