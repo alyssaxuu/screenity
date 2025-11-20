@@ -16,9 +16,10 @@ export const forceProcessing = async (): Promise<void> => {
     (tab) => {
       chrome.tabs.onUpdated.addListener(function onTabUpdate(
         tabId: number,
-        changeInfo: TabChangeInfo | undefined
+        changeInfo: TabChangeInfo,
+        updatedTab: chrome.tabs.Tab
       ) {
-        if (tabId === tab.id && changeInfo?.status === "complete" && tab.id) {
+        if (tab.id && tabId === tab.id && changeInfo.status === "complete") {
           chrome.tabs.onUpdated.removeListener(onTabUpdate);
 
           if (sandboxTab) {

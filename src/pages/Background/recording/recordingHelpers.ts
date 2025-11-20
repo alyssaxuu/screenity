@@ -17,6 +17,7 @@ import type {
   OnGetPermissionsMessage,
   RecordingErrorMessage,
   WriteFileMessage,
+  ExtensionMessage,
 } from "../../../types/messaging";
 
 export const checkCapturePermissions = async ({ 
@@ -126,7 +127,7 @@ export const handleRecordingError = async (request: RecordingErrorMessage): Prom
 
 export const handleGetStreamingData = async (): Promise<void> => {
   const data = await getStreamingData();
-  sendMessageRecord({ type: "streaming-data", data: JSON.stringify(data) });
+  sendMessageRecord({ type: "streaming-data", data: JSON.stringify(data) } as ExtensionMessage);
 };
 
 export const videoReady = async (): Promise<void> => {

@@ -1,4 +1,5 @@
 import { sendMessageTab } from "../tabManagement";
+import type { ExtensionMessage } from "../../../types/messaging";
 
 export const requestDownload = async (
   base64: string,
@@ -24,7 +25,7 @@ export const requestDownload = async (
           type: "download-video",
           base64,
           title,
-        });
+        } as ExtensionMessage);
       }
     };
 

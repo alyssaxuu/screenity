@@ -28,7 +28,7 @@ export const handleTabUpdate = async (
             type: "recording-check",
             force: true,
             recordingStartTime,
-          });
+          } as ExtensionMessage);
         } else if (tabRecordedID && tabRecordedID !== tabId) {
           sendMessageTab(tabId, { type: "hide-popup-recording" });
         }

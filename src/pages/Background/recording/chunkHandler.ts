@@ -40,7 +40,7 @@ export const handleChunks = async (
 
   try {
     if (chunks.length === 0) {
-      sendMessageTab(sandboxTab, { type: "make-video-tab", override });
+      sendMessageTab(sandboxTab, { type: "make-video-tab", override } as ExtensionMessage);
       return;
     }
 
@@ -58,7 +58,7 @@ export const handleChunks = async (
       type: "chunk-count",
       count: chunks.length,
       override,
-    });
+    } as ExtensionMessage);
 
     if (bannerSupport) {
       sendMessageTab(sandboxTab, { type: "banner-support" });
@@ -73,7 +73,7 @@ export const handleChunks = async (
           const response = await sendMessageTab(sandboxTab, {
             type: "new-chunk-tab",
             chunks: batch,
-          });
+          } as ExtensionMessage);
           if (response) return true;
         } catch (err) {}
         await delay(retryDelay);
@@ -133,7 +133,7 @@ export const newChunk = async (
       type: "new-chunk-tab",
       chunk: (request as any).chunk,
       index: (request as any).index,
-    });
+    } as ExtensionMessage);
 
     sendResponse({ status: "ok" });
   } catch (err) {

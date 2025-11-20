@@ -43,10 +43,10 @@ export const stopRecording = async (): Promise<void> => {
       if (!tab.id) return;
       chrome.tabs.onUpdated.addListener(function _(
         tabId: number,
-        changeInfo: TabChangeInfo | undefined,
+        changeInfo: TabChangeInfo,
         updatedTab: chrome.tabs.Tab
       ) {
-        if (tabId === tab.id && changeInfo?.status === "complete" && tab.id) {
+        if (tab.id && tabId === tab.id && changeInfo.status === "complete") {
           chrome.tabs.onUpdated.removeListener(_);
           chrome.storage.local.set({ sandboxTab: tab.id });
           waitForContentScript(tab.id)
@@ -73,10 +73,10 @@ export const stopRecording = async (): Promise<void> => {
       if (!tab.id) return;
       chrome.tabs.onUpdated.addListener(function _(
         tabId: number,
-        changeInfo: TabChangeInfo | undefined,
+        changeInfo: TabChangeInfo,
         updatedTab: chrome.tabs.Tab
       ) {
-        if (tabId === tab.id && changeInfo?.status === "complete" && tab.id) {
+        if (tab.id && tabId === tab.id && changeInfo.status === "complete") {
           chrome.tabs.onUpdated.removeListener(_);
           chrome.storage.local.set({ sandboxTab: tab.id });
           waitForContentScript(tab.id)
@@ -101,10 +101,10 @@ export const stopRecording = async (): Promise<void> => {
       if (!tab.id) return;
       chrome.tabs.onUpdated.addListener(function _(
         tabId: number,
-        changeInfo: TabChangeInfo | undefined,
+        changeInfo: TabChangeInfo,
         updatedTab: chrome.tabs.Tab
       ) {
-        if (tabId === tab.id && changeInfo?.status === "complete" && tab.id) {
+        if (tab.id && tabId === tab.id && changeInfo.status === "complete") {
           chrome.tabs.onUpdated.removeListener(_);
           chrome.storage.local.set({ sandboxTab: tab.id });
           waitForContentScript(tab.id)
@@ -139,7 +139,8 @@ import type { ExtensionMessage } from "../../../types/messaging";
 
 export const handleStopRecordingTab = async (request: ExtensionMessage): Promise<void> => {
   chrome.action.setIcon({ path: "assets/icon-34.png" });
-  if (request.memoryError) {
+  const requestWithMemory = request as ExtensionMessage & { memoryError?: boolean };
+  if (requestWithMemory.memoryError) {
     chrome.storage.local.set({
       recording: false,
       restarting: false,

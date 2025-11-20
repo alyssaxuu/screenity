@@ -1,4 +1,5 @@
 import { sendMessageRecord } from "./sendMessageRecord";
+import type { ExtensionMessage } from "../../../types/messaging";
 
 export const startRecording = async (): Promise<void> => {
   chrome.storage.local.set({
@@ -35,7 +36,7 @@ export const startRecording = async (): Promise<void> => {
   }
 
   if (customRegion) {
-    sendMessageRecord({ type: "start-recording-tab", region: true });
+    sendMessageRecord({ type: "start-recording-tab", region: true } as ExtensionMessage);
   } else {
     sendMessageRecord({ type: "start-recording-tab" });
   }
