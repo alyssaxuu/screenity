@@ -219,11 +219,14 @@ const Background = (props: BackgroundProps) => {
       const flipHorizontal = false;
       const foregroundThresholdProbability = 0.6;
 
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+
       const ratio = img.width / img.height;
-      canvasRef.current.width = innerHeight * ratio;
-      canvasRef.current.height = innerHeight;
+      canvas.width = innerHeight * ratio;
+      canvas.height = innerHeight;
       await bodySegmentation.drawBokehEffect(
-        canvasRef.current,
+        canvas,
         img,
         people,
         foregroundThresholdProbability,
