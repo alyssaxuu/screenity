@@ -223,6 +223,9 @@ export default class BunnyTusUploader {
       await this.refreshTusAuth();
       await this.initTusUpload();
       this.status = "ready";
+      if (!this.videoId || !this.mediaId) {
+        throw new Error("Failed to initialize videoId and mediaId");
+      }
       return { videoId: this.videoId, mediaId: this.mediaId };
     } catch (err) {
       this.status = "error";
@@ -244,6 +247,9 @@ export default class BunnyTusUploader {
   }
 
   async initTusUpload(): Promise<void> {
+    if (!this.signature || !this.expires || !this.libraryId || !this.videoId) {
+      throw new Error("Missing required TUS auth parameters");
+    }
     const res = await fetch("https://video.bunnycdn.com/tusupload", {
       method: "POST",
       headers: {
@@ -254,7 +260,7 @@ export default class BunnyTusUploader {
         LibraryId: String(this.libraryId),
         VideoId: this.videoId,
         "Upload-Metadata": `filetype ${btoa("video/webm")},title ${btoa(
-          this.metadata.title
+          String(this.metadata.title || "")
         )}`,
       },
     });
@@ -321,11 +327,11 @@ export default class BunnyTusUploader {
           const safeThumbnail = await Promise.race<Blob | string>([
             thumbPromise,
             new Promise<string>((_, reject) =>
-              setTimeout(() => reject("thumbnail-timeout"), 1500)
+              setTimeout(() => reject(new Error("thumbnail-timeout")), 1500)
             ),
-          ]);
+          ]).catch(() => null);
 
-          if (safeThumbnail instanceof Blob) {
+          if (safeThumbnail && safeThumbnail instanceof Blob) {
             this.metaThumbnail = safeThumbnail;
           }
         }
@@ -437,20 +443,21 @@ export default class BunnyTusUploader {
 
           throw new Error(`Upload failed (${res.status}): ${errorText}`);
         }
-      } catch (err) {
-        if (attempt === this.MAX_RETRIES) {
-          console.error(
-            `❌ Failed to upload chunk after ${this.MAX_RETRIES} retries:`,
-            err
+        } catch (err) {
+          const error = err instanceof Error ? err : new Error(String(err));
+          if (attempt === this.MAX_RETRIES) {
+            console.error(
+              `❌ Failed to upload chunk after ${this.MAX_RETRIES} retries:`,
+              error
+            );
+            throw error;
+          }
+          console.warn(
+            `⚠️ Upload attempt ${attempt + 1}/${
+              this.MAX_RETRIES + 1
+            } failed, retrying...`,
+            error.message
           );
-          throw err;
-        }
-        console.warn(
-          `⚠️ Upload attempt ${attempt + 1}/${
-            this.MAX_RETRIES + 1
-          } failed, retrying...`,
-          err.message
-        );
         await new Promise((r) =>
           setTimeout(r, this.RETRY_DELAY * Math.pow(2, attempt))
         );
@@ -539,6 +546,10 @@ export default class BunnyTusUploader {
       throw new Error(
         "Cannot finalize upload with zero bytes. No chunks were successfully uploaded."
       );
+    }
+
+    if (!this.uploadUrl || !this.signature || this.expires === null || !this.libraryId || !this.videoId) {
+      throw new Error("Uploader not properly initialized for finalization");
     }
 
     const res = await fetch(this.uploadUrl, {
