@@ -11,6 +11,7 @@ import hasAudio from "./utils/hasAudio";
 import muteVideo from "./utils/muteVideo";
 import reencodeVideo from "./utils/reencodeVideo";
 import toGIF from "./utils/toGIF";
+import toWebM from "./utils/toWebM";
 
 const Sandbox = () => {
   const iframeRef = useRef(null);
@@ -108,7 +109,12 @@ const Sandbox = () => {
       try {
         const blob = await base64ToBlob(ffmpegInstance.current, message.base64);
         const base64 = await toBase64(blob);
-        sendMessage({ type: "updated-blob", base64: base64, topLevel: true });
+        sendMessage({
+          type: "updated-blob",
+          base64: base64,
+          topLevel: true,
+          edited: false,
+        });
       } catch (error) {
         sendMessage({ type: "ffmpeg-error", error: JSON.stringify(error) });
       }
@@ -211,6 +217,26 @@ const Sandbox = () => {
         sendMessage({ type: "download-gif", base64: base64 });
       } catch (error) {
         sendMessage({ type: "ffmpeg-error", error: JSON.stringify(error) });
+      }
+    } else if (message.type === "to-webm") {
+      try {
+        const blob = await toWebM(
+          ffmpegInstance.current,
+          message.blob,
+          message.duration
+        );
+        const base64 = await toBase64(blob);
+
+        sendMessage({
+          type: "download-webm",
+          base64,
+          topLevel: true,
+        });
+      } catch (error) {
+        sendMessage({
+          type: "ffmpeg-error",
+          error: JSON.stringify(error),
+        });
       }
     }
   };

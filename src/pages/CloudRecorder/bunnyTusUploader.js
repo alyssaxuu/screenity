@@ -59,8 +59,13 @@ export default class BunnyTusUploader {
     this.CHUNK_SIZE = options.chunkSize || 512 * 1024; // 512KB default
     this.MAX_RETRIES = options.maxRetries || 5;
     this.RETRY_DELAY = options.retryDelay || 1000;
+    this.UPLOAD_TIMEOUT_MS = options.uploadTimeoutMs || 20000;
+    this.HEARTBEAT_INTERVAL_MS = options.heartbeatIntervalMs || 10000;
+    this.HEARTBEAT_LAG_MS = options.heartbeatLagMs || 30000;
     this.TOKEN_REFRESH_THRESHOLD = options.tokenRefreshThreshold || 300;
     this.MAX_QUEUE_SIZE = options.maxQueueSize || 100;
+    this.onProgress = options.onProgress || null;
+    this.onStall = options.onStall || null;
 
     this.uploadUrl = null;
     this.offset = 0;
@@ -77,11 +82,15 @@ export default class BunnyTusUploader {
     this.metadata = {};
     this.pendingUploads = [];
     this.userToken = null;
+    this.heartbeatTimer = null;
+    this.lastProgressAt = Date.now();
+    this.stalled = false;
 
     this.chunkQueue = [];
     this.isProcessingQueue = false;
     this.queueProcessingPromise = null;
     this.queuedBytes = 0;
+    this._hasExtractedMeta = true; // Skip in-flight thumbnail extraction to avoid timeouts/noise
   }
 
   async initialize(
@@ -160,6 +169,7 @@ export default class BunnyTusUploader {
 
       await this.refreshTusAuth();
       await this.initTusUpload();
+      this.startHeartbeat();
       this.status = "ready";
       return { videoId: this.videoId, mediaId: this.mediaId };
     } catch (err) {
@@ -246,29 +256,8 @@ export default class BunnyTusUploader {
       await this.waitForPendingUploads();
     }
 
-    if (!this._hasExtractedMeta && chunk.size > 128 * 1024) {
-      try {
-        const blob = new Blob([chunk], { type: "video/webm" });
-
-        if (this.metadata.type === "screen") {
-          const thumbPromise = getThumbnailFromBlob(blob);
-
-          // Add timeout safety
-          const safeThumbnail = await Promise.race([
-            thumbPromise,
-            new Promise((_, reject) =>
-              setTimeout(() => reject("thumbnail-timeout"), 1500)
-            ),
-          ]);
-
-          this.metaThumbnail = safeThumbnail;
-        }
-
-        this._hasExtractedMeta = true;
-      } catch (err) {
-        console.warn("⚠️ Failed to extract metadata from chunk:", err);
-      }
-    }
+    // Thumbnail extraction disabled in-flight to reduce timeouts/noise.
+    this._hasExtractedMeta = true;
   }
 
   async checkAuthExpiration() {
@@ -292,6 +281,12 @@ export default class BunnyTusUploader {
         const currentOffset = this.offset;
         this.offset += data.length;
 
+        const controller = new AbortController();
+        const timeout = setTimeout(
+          () => controller.abort("upload-timeout"),
+          this.UPLOAD_TIMEOUT_MS
+        );
+
         const res = await fetch(this.uploadUrl, {
           method: "PATCH",
           headers: {
@@ -304,7 +299,9 @@ export default class BunnyTusUploader {
             VideoId: this.videoId,
           },
           body: data,
+          signal: controller.signal,
         });
+        clearTimeout(timeout);
 
         if (res.ok || res.status === 204) {
           // Verify server offset matches our expectation
@@ -325,9 +322,27 @@ export default class BunnyTusUploader {
             this.offset = expectedOffset;
           }
 
+          this.recordProgress(data.length);
           return;
         } else {
           const errorText = await res.text();
+
+          // If the TUS session was invalidated (404), flag as fatal so callers can fall back.
+          if (res.status === 404) {
+            this.status = "error";
+            this.error = "tus-session-missing";
+            this.stalled = true;
+            if (typeof this.onStall === "function") {
+              this.onStall({
+                mediaId: this.mediaId,
+                videoId: this.videoId,
+                offset: this.offset,
+                diff: Date.now() - this.lastProgressAt,
+                reason: "tus-404",
+              });
+            }
+            throw new Error("TUS session missing (404).");
+          }
 
           // Handle offset mismatch errors (409 Conflict)
           if (
@@ -369,6 +384,9 @@ export default class BunnyTusUploader {
           throw new Error(`Upload failed (${res.status}): ${errorText}`);
         }
       } catch (err) {
+        if (err?.name === "AbortError") {
+          console.warn("⚠️ Upload chunk timed out");
+        }
         if (attempt === this.MAX_RETRIES) {
           console.error(
             `❌ Failed to upload chunk after ${this.MAX_RETRIES} retries:`,
@@ -382,8 +400,9 @@ export default class BunnyTusUploader {
           } failed, retrying...`,
           err.message
         );
+        const jitter = Math.random() * 300;
         await new Promise((r) =>
-          setTimeout(r, this.RETRY_DELAY * Math.pow(2, attempt))
+          setTimeout(r, this.RETRY_DELAY * Math.pow(2, attempt) + jitter)
         );
       }
     }
@@ -434,6 +453,12 @@ export default class BunnyTusUploader {
       this.isProcessingQueue ||
       this.pendingUploads.length > 0
     ) {
+      if (this.stalled && this.lastProgressAt) {
+        const diff = Date.now() - this.lastProgressAt;
+        if (diff > this.HEARTBEAT_LAG_MS * 2) {
+          break;
+        }
+      }
       if (this.chunkQueue.length && !this.isProcessingQueue) {
         await this.processQueue();
       }
@@ -468,6 +493,34 @@ export default class BunnyTusUploader {
       );
     }
 
+    // Re-validate offset with server to avoid partial finalization
+    try {
+      const headRes = await fetch(this.uploadUrl, {
+        method: "HEAD",
+        headers: {
+          "Tus-Resumable": "1.0.0",
+          AuthorizationSignature: this.signature,
+          AuthorizationExpire: String(this.expires),
+          LibraryId: String(this.libraryId),
+          VideoId: this.videoId,
+        },
+      });
+
+      if (headRes.ok) {
+        const serverOffset = parseInt(
+          headRes.headers.get("Upload-Offset") || "0"
+        );
+        if (serverOffset !== this.offset) {
+          console.warn(
+            `⚠️ Finalize correcting offset from ${this.offset} to ${serverOffset}`
+          );
+          this.offset = serverOffset;
+        }
+      }
+    } catch (err) {
+      console.warn("⚠️ Failed to verify offset before finalize:", err);
+    }
+
     const res = await fetch(this.uploadUrl, {
       method: "PATCH",
       headers: {
@@ -484,6 +537,7 @@ export default class BunnyTusUploader {
 
     if (!res.ok && res.status !== 204) throw new Error("Finalization failed");
     this.status = "completed";
+    this.stopHeartbeat();
   }
 
   getMeta() {
@@ -503,6 +557,8 @@ export default class BunnyTusUploader {
       height: this.metaHeight || null,
       thumbnail: this.metaThumbnail || null,
       sceneId: this.sceneId || null,
+      lastProgressAt: this.lastProgressAt,
+      stalled: this.stalled,
     };
   }
 
@@ -526,6 +582,65 @@ export default class BunnyTusUploader {
     this.chunkQueue = [];
     this.queuedBytes = 0;
     this.pendingUploads = [];
+    this.stopHeartbeat();
+  }
+
+  startHeartbeat() {
+    this.stopHeartbeat();
+    this.lastProgressAt = Date.now();
+    this.stalled = false;
+    this.heartbeatTimer = setInterval(() => {
+      const now = Date.now();
+      const diff = now - this.lastProgressAt;
+      if (diff > this.HEARTBEAT_LAG_MS) {
+        this.stalled = true;
+        if (typeof this.onStall === "function") {
+          this.onStall({
+            mediaId: this.mediaId,
+            videoId: this.videoId,
+            offset: this.offset,
+            diff,
+          });
+        }
+      }
+    }, this.HEARTBEAT_INTERVAL_MS);
+  }
+
+  stopHeartbeat() {
+    if (this.heartbeatTimer) clearInterval(this.heartbeatTimer);
+    this.heartbeatTimer = null;
+  }
+
+  recordProgress(bytes) {
+    this.lastProgressAt = Date.now();
+    this.stalled = false;
+    if (typeof this.onProgress === "function") {
+      try {
+        this.onProgress({
+          bytes,
+          offset: this.offset,
+          videoId: this.videoId,
+          mediaId: this.mediaId,
+          at: this.lastProgressAt,
+        });
+      } catch (err) {
+        console.warn("Progress callback failed:", err);
+      }
+    }
+
+    // Journal offsets locally to aid recovery
+    if (typeof chrome !== "undefined" && chrome.storage?.local) {
+      const key = `uploadJournal-${this.mediaId}`;
+      chrome.storage.local.set({
+        [key]: {
+          offset: this.offset,
+          updatedAt: this.lastProgressAt,
+          videoId: this.videoId,
+          mediaId: this.mediaId,
+          stalled: this.stalled,
+        },
+      });
+    }
   }
 }
 

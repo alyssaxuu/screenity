@@ -29,7 +29,9 @@ export const stopRecording = async () => {
   chrome.storage.local.set({ recordingStartTime: 0 });
 
   // Check if browser supports WebCodecs for Mediabunny
-  const hasWebCodecs = supportsWebCodecs();
+  //const hasWebCodecs = supportsWebCodecs();
+  // FLAG: Force old FFMPEG for now
+  const hasWebCodecs = false;
 
   if (isSubscribed) {
     chrome.alarms.clear("recording-alarm");

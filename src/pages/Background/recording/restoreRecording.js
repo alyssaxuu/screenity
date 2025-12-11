@@ -15,7 +15,8 @@ export const checkRestore = async () => {
 };
 
 export const restoreRecording = async () => {
-  const hasWebCodecs = supportsWebCodecs();
+  //const hasWebCodecs = supportsWebCodecs();
+  const hasWebCodecs = false; // FLAG: Force old FFMPEG for now
 
   let editorUrl, messageType;
 

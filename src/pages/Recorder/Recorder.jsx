@@ -91,6 +91,14 @@ const Recorder = () => {
 
   const isRecording = useRef(false);
 
+  // Keep-alive mechanism to prevent Chrome from freezing this background tab
+  const keepAliveAudioCtx = useRef(null);
+  const keepAliveOscillator = useRef(null);
+
+  // Session state for recovery and diagnostics
+  const recordingStartTime = useRef(null);
+  const sessionHeartbeat = useRef(null);
+
   debug("Recorder component mounted");
 
   async function canFitChunk(byteLength) {
@@ -119,6 +127,109 @@ const Recorder = () => {
       return !lowStorageAbort.current;
     }
   }
+
+  /**
+   * Start silent audio playback to prevent Chrome from freezing this tab.
+   * Chrome throttles/freezes background tabs after ~5 minutes of inactivity,
+   * which would stop our recording. Playing silent audio keeps the tab active.
+   */
+  const startTabKeepAlive = () => {
+    try {
+      if (keepAliveAudioCtx.current) return; // Already running
+
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      keepAliveAudioCtx.current = ctx;
+
+      // Create a silent oscillator (inaudible frequency at zero gain)
+      const oscillator = ctx.createOscillator();
+      const gainNode = ctx.createGain();
+
+      oscillator.frequency.value = 0; // DC signal (no audible tone)
+      gainNode.gain.value = 0; // Completely silent
+
+      oscillator.connect(gainNode);
+      gainNode.connect(ctx.destination);
+      oscillator.start();
+
+      keepAliveOscillator.current = oscillator;
+
+      // Request Chrome not to discard this tab
+      chrome.runtime
+        .sendMessage({ type: "set-tab-auto-discardable", discardable: false })
+        .catch(() => {});
+
+      debug("Tab keep-alive started");
+    } catch (err) {
+      debugWarn("Failed to start tab keep-alive:", err);
+    }
+  };
+
+  /**
+   * Stop the silent audio playback when recording ends.
+   */
+  const stopTabKeepAlive = () => {
+    try {
+      if (keepAliveOscillator.current) {
+        keepAliveOscillator.current.stop();
+        keepAliveOscillator.current.disconnect();
+        keepAliveOscillator.current = null;
+      }
+      if (keepAliveAudioCtx.current) {
+        keepAliveAudioCtx.current.close();
+        keepAliveAudioCtx.current = null;
+      }
+
+      // Allow Chrome to discard this tab again if needed
+      chrome.runtime
+        .sendMessage({ type: "set-tab-auto-discardable", discardable: true })
+        .catch(() => {});
+
+      debug("Tab keep-alive stopped");
+    } catch (err) {
+      debugWarn("Failed to stop tab keep-alive:", err);
+    }
+  };
+
+  /**
+   * Persist recording session state for recovery and diagnostics.
+   */
+  const persistSessionState = async (status = "recording") => {
+    try {
+      await chrome.storage.local.set({
+        freeRecorderSession: {
+          status,
+          chunkCount: savedCount.current,
+          lastChunkTime: lastTimecode.current,
+          startedAt: recordingStartTime.current,
+          updatedAt: Date.now(),
+        },
+      });
+    } catch (err) {
+      debugWarn("Failed to persist session state:", err);
+    }
+  };
+
+  /**
+   * Start a heartbeat to periodically persist session state.
+   */
+  const startSessionHeartbeat = () => {
+    if (sessionHeartbeat.current) clearInterval(sessionHeartbeat.current);
+    sessionHeartbeat.current = setInterval(() => {
+      if (isRecording.current) {
+        persistSessionState("recording");
+      }
+    }, 10000); // Every 10 seconds
+  };
+
+  /**
+   * Stop the session heartbeat.
+   */
+  const stopSessionHeartbeat = () => {
+    if (sessionHeartbeat.current) {
+      clearInterval(sessionHeartbeat.current);
+      sessionHeartbeat.current = null;
+    }
+  };
 
   async function saveChunk(e, i) {
     const ts = e.timecode ?? 0;
@@ -251,6 +362,12 @@ const Recorder = () => {
 
     debug("startRecording()");
 
+    // Start silent audio to prevent Chrome from freezing this background tab
+    startTabKeepAlive();
+
+    // Record the start time for session tracking
+    recordingStartTime.current = Date.now();
+
     navigator.storage.persist();
     if (
       !helperVideoStream.current ||
@@ -258,6 +375,7 @@ const Recorder = () => {
     ) {
       debugError("No video tracks available in helperVideoStream");
       sendRecordingError("No video tracks available");
+      stopTabKeepAlive();
       return;
     }
 
@@ -286,7 +404,7 @@ const Recorder = () => {
     });
 
     // FLAG: Force old MediaRecorder for testing
-    const FORCE_MEDIARECORDER = false;
+    const FORCE_MEDIARECORDER = true;
 
     const canUseWebCodecs =
       !FORCE_MEDIARECORDER &&
@@ -319,6 +437,10 @@ const Recorder = () => {
     isRecording.current = true;
     isRestarting.current = false;
     index.current = 0;
+
+    // Start session heartbeat for recovery tracking
+    startSessionHeartbeat();
+    persistSessionState("recording");
 
     const handleChunk = async (data, timestampMs) => {
       if (useWebCodecs.current) {
@@ -562,31 +684,77 @@ const Recorder = () => {
       const track = helperAudioStream.current.getAudioTracks()[0];
       if (track) {
         track.onended = () => {
-          debugWarn("helperAudioStream audio track ended");
-          chrome.storage.local.set({ recording: false });
-          sendStopRecording();
+          // Log detailed diagnostics for debugging
+          const diagnosticInfo = {
+            reason: "audio-track-ended",
+            savedChunks: savedCount.current,
+            lastTimecode: lastTimecode.current,
+            recordingDuration: recordingStartTime.current
+              ? Date.now() - recordingStartTime.current
+              : null,
+            trackLabel: track?.label || null,
+            trackReadyState: track?.readyState || null,
+          };
+          console.warn(
+            "[Recorder] Audio track ended unexpectedly",
+            diagnosticInfo
+          );
+          chrome.storage.local.set({
+            recording: false,
+            lastTrackEndEvent: diagnosticInfo,
+          });
+          sendStopRecording("audio-track-ended");
         };
       }
     }
 
     liveStream.current.getVideoTracks()[0].onended = () => {
-      debugWarn("liveStream video track ended");
+      const track = liveStream.current?.getVideoTracks()[0];
+      // Log detailed diagnostics for debugging
+      const diagnosticInfo = {
+        reason: "liveStream-video-track-ended",
+        savedChunks: savedCount.current,
+        lastTimecode: lastTimecode.current,
+        recordingDuration: recordingStartTime.current
+          ? Date.now() - recordingStartTime.current
+          : null,
+        trackLabel: track?.label || null,
+        trackReadyState: track?.readyState || null,
+      };
+      console.warn("[Recorder] liveStream video track ended", diagnosticInfo);
       chrome.storage.local.set({
         recording: false,
         restarting: false,
         tabRecordedID: null,
+        lastTrackEndEvent: diagnosticInfo,
       });
-      sendStopRecording();
+      sendStopRecording("video-track-ended");
     };
 
     helperVideoStream.current.getVideoTracks()[0].onended = () => {
-      debugWarn("helperVideoStream video track ended");
+      const track = helperVideoStream.current?.getVideoTracks()[0];
+      // Log detailed diagnostics for debugging
+      const diagnosticInfo = {
+        reason: "helperVideoStream-video-track-ended",
+        savedChunks: savedCount.current,
+        lastTimecode: lastTimecode.current,
+        recordingDuration: recordingStartTime.current
+          ? Date.now() - recordingStartTime.current
+          : null,
+        trackLabel: track?.label || null,
+        trackReadyState: track?.readyState || null,
+      };
+      console.warn(
+        "[Recorder] helperVideoStream video track ended",
+        diagnosticInfo
+      );
       chrome.storage.local.set({
         recording: false,
         restarting: false,
         tabRecordedID: null,
+        lastTrackEndEvent: diagnosticInfo,
       });
-      sendStopRecording();
+      sendStopRecording("video-track-ended");
     };
   }
 
@@ -654,6 +822,10 @@ const Recorder = () => {
     isFinishing.current = true;
     isRecording.current = false;
 
+    // Stop the session heartbeat and persist final state
+    stopSessionHeartbeat();
+    persistSessionState("stopping");
+
     try {
       if (
         useWebCodecs.current &&
@@ -677,6 +849,12 @@ const Recorder = () => {
     await waitForDrain();
     recorder.current = null;
 
+    // Stop the silent audio keep-alive
+    stopTabKeepAlive();
+
+    // Clear session state after successful stop
+    persistSessionState("completed");
+
     if (!isRestarting.current) {
       debug("Stopping tracks and clearing streams");
       liveStream.current?.getTracks().forEach((t) => t.stop());
@@ -693,6 +871,12 @@ const Recorder = () => {
     debug("dismissRecording()");
     uiClosing.current = true;
     isRecording.current = false;
+
+    // Clean up keep-alive and session tracking
+    stopTabKeepAlive();
+    stopSessionHeartbeat();
+    persistSessionState("dismissed");
+
     window.close();
   };
 
@@ -1090,6 +1274,15 @@ const Recorder = () => {
     tabID.current = streamId;
   };
 
+  // Cleanup on component unmount
+  useEffect(() => {
+    return () => {
+      debug("Component unmounting - cleaning up");
+      stopTabKeepAlive();
+      stopSessionHeartbeat();
+    };
+  }, []);
+
   useEffect(() => {
     const handleClose = (e) => {
       debug("beforeunload event", {
@@ -1098,6 +1291,8 @@ const Recorder = () => {
       });
       if (uiClosing.current || !isRecording.current) return;
 
+      // Stop recording - note: beforeunload can't reliably wait for async
+      // The keep-alive and session state will help with recovery if needed
       stopRecording();
 
       e.preventDefault();

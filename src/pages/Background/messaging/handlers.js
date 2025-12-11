@@ -57,6 +57,32 @@ const API_BASE = process.env.SCREENITY_API_BASE_URL;
 const CLOUD_FEATURES_ENABLED =
   process.env.SCREENITY_ENABLE_CLOUD_FEATURES === "true";
 
+let activeRecordingSession = null;
+let recordingTabListener = null;
+
+const clearRecordingSession = () => {
+  activeRecordingSession = null;
+  if (recordingTabListener) {
+    chrome.tabs.onRemoved.removeListener(recordingTabListener);
+    recordingTabListener = null;
+  }
+};
+
+const registerRecordingTabListener = (tabId) => {
+  if (!tabId || recordingTabListener) return;
+  recordingTabListener = (closedTabId) => {
+    if (closedTabId === tabId) {
+      chrome.runtime.sendMessage({
+        type: "stop-recording-tab",
+        reason: "recording-tab-closed",
+        tabId: closedTabId,
+      });
+      clearRecordingSession();
+    }
+  };
+  chrome.tabs.onRemoved.addListener(recordingTabListener);
+};
+
 export const copyToClipboard = (text) => {
   if (!text) return;
   chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
@@ -104,7 +130,29 @@ export const setupHandlers = () => {
     async (message, sender) => await handleGetStreamingData(message, sender)
   );
   registerMessage("cancel-recording", (message) => cancelRecording(message));
-  registerMessage("stop-recording-tab", (message, sendResponse) => {
+  registerMessage("stop-recording-tab", (message, sender, sendResponse) => {
+    try {
+      const reason = message?.reason || "unknown";
+      const senderTabId = message?.tabId || sender?.tab?.id || null;
+      const senderUrl = sender?.url || null;
+      const stack = new Error().stack;
+      console.warn("[Screenity][BG] stop-recording-tab received", {
+        reason,
+        senderTabId,
+        senderUrl,
+      });
+      chrome.storage.local.set({
+        lastStopRecordingEvent: {
+          reason,
+          senderTabId,
+          senderUrl,
+          stack,
+          ts: Date.now(),
+        },
+      });
+    } catch (err) {
+      console.warn("[Screenity][BG] stop-recording-tab logging failed", err);
+    }
     handleStopRecordingTab(message);
     sendResponse({ ok: true });
     return true;
@@ -236,6 +284,21 @@ export const setupHandlers = () => {
     }
   );
   registerMessage("is-pinned", async () => await isPinned());
+
+  // Prevent Chrome from discarding the CloudRecorder tab during recording
+  registerMessage("set-tab-auto-discardable", async ({ payload }, sender) => {
+    try {
+      const tabId = sender?.tab?.id;
+      if (tabId) {
+        await chrome.tabs.update(tabId, {
+          autoDiscardable: payload.discardable,
+        });
+      }
+    } catch (err) {
+      console.warn("Failed to set tab autoDiscardable:", err);
+    }
+  });
+
   registerMessage(
     "save-to-drive",
     async (message) => await handleSaveToDrive(message, false)
@@ -911,4 +974,49 @@ export const setupHandlers = () => {
     });
     return true;
   });
+  registerMessage(
+    "register-recording-session",
+    (message, sender, sendResponse) => {
+      const incoming = message.session || {};
+      if (
+        activeRecordingSession &&
+        activeRecordingSession.id &&
+        incoming.id &&
+        activeRecordingSession.id !== incoming.id
+      ) {
+        sendResponse({
+          ok: false,
+          error: "Another recording session is already active",
+          activeRecordingSession,
+        });
+        return true;
+      }
+
+      const tabId = incoming.tabId || sender?.tab?.id || null;
+      activeRecordingSession = { ...incoming, tabId };
+      registerRecordingTabListener(tabId);
+      sendResponse({ ok: true, session: activeRecordingSession });
+      return true;
+    }
+  );
+
+  registerMessage(
+    "clear-recording-session",
+    (message, sender, sendResponse) => {
+      clearRecordingSession();
+      sendResponse({ ok: true });
+      return true;
+    }
+  );
+
+  registerMessage(
+    "restore-recording-session",
+    async (message, sender, sendResponse) => {
+      const { recorderSession } = await chrome.storage.local.get([
+        "recorderSession",
+      ]);
+      sendResponse({ recorderSession: recorderSession || null });
+      return true;
+    }
+  );
 };

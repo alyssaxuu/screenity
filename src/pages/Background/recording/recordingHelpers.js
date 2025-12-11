@@ -79,7 +79,18 @@ export const handleRecordingComplete = async () => {
 };
 
 export const handleRecordingError = async (request) => {
+  console.log("handleRecordingError called with request:", request);
   const { activeTab } = await chrome.storage.local.get(["activeTab"]);
+
+  // For stream-ended, we just notify the user but DON'T stop the recording
+  // The user can decide whether to continue or stop
+  if (request.error === "stream-ended") {
+    sendMessageTab(activeTab, {
+      type: "stream-ended-warning",
+      message: request.why || "Screen sharing stopped unexpectedly.",
+    }).catch(() => {});
+    return; // Don't continue with the normal error handling
+  }
 
   sendMessageRecord({ type: "recording-error" }).then(() => {
     sendMessageTab(activeTab, { type: "stop-pending" });

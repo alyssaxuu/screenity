@@ -3,21 +3,32 @@ import { sendMessageTab } from "../tabManagement";
 export const handleTabUpdate = async (tabId, changeInfo, tab) => {
   try {
     if (changeInfo.status === "complete") {
-      const { recording } = await chrome.storage.local.get(["recording"]);
-      const { restarting } = await chrome.storage.local.get(["restarting"]);
-      const { tabRecordedID } = await chrome.storage.local.get([
+      const {
+        recording,
+        restarting,
+        tabRecordedID,
+        pendingRecording,
+        recordingStartTime,
+        recorderSession,
+      } = await chrome.storage.local.get([
+        "recording",
+        "restarting",
         "tabRecordedID",
-      ]);
-      const { pendingRecording } = await chrome.storage.local.get([
         "pendingRecording",
-      ]);
-      const { recordingStartTime } = await chrome.storage.local.get([
         "recordingStartTime",
+        "recorderSession",
       ]);
 
-      if (!recording && !restarting && !pendingRecording) {
+      // Check both recording flag AND recorderSession to avoid race conditions
+      // recorderSession persists even if the SW restarts
+      const isActivelyRecording =
+        recording ||
+        (recorderSession && recorderSession.status === "recording");
+      const isPendingOrRestarting = restarting || pendingRecording;
+
+      if (!isActivelyRecording && !isPendingOrRestarting) {
         sendMessageTab(tabId, { type: "recording-ended" });
-      } else if (recording) {
+      } else if (isActivelyRecording) {
         if (tabRecordedID && tabRecordedID === tabId) {
           sendMessageTab(tabId, {
             type: "recording-check",

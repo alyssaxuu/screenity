@@ -31,6 +31,7 @@ const CloudRecorder = () => {
 
   const isTab = useRef(false);
   const tabID = useRef(null);
+  const recordingTabId = useRef(null);
   const tabPreferred = useRef(false);
 
   const screenStream = useRef(null);
@@ -74,6 +75,23 @@ const CloudRecorder = () => {
 
   const consecutiveScreenFailures = useRef(0);
   const consecutiveCameraFailures = useRef(0);
+  const firstChunkTime = useRef(null);
+
+  const recorderSession = useRef(null);
+  const sessionHeartbeat = useRef(null);
+  const chunkStallTimer = useRef(null);
+  const uploadHeartbeatTimer = useRef(null);
+  const lastUploadProgress = useRef({
+    screen: 0,
+    camera: 0,
+    ts: 0,
+  });
+  const stallNotified = useRef(false);
+  const fatalErrorRef = useRef(false);
+  const idbReadyRef = useRef(false);
+  const recoveryAttempted = useRef(false);
+  const screenTrackLostRef = useRef(false);
+  const screenTrackMonitor = useRef(null);
 
   // This checks if the recording was previously initialized
   const isInit = useRef(false);
@@ -82,23 +100,424 @@ const CloudRecorder = () => {
   const destination = useRef(null);
 
   const keepAliveInterval = useRef(null);
+  const keepAliveAudioCtx = useRef(null);
+  const keepAliveOscillator = useRef(null);
 
-  const startKeepAlive = () => {
-    if (keepAliveInterval.current) clearInterval(keepAliveInterval.current);
+  // Note: We no longer try to "keep alive" the service worker with pings.
+  // Instead, we persist recording state to chrome.storage.local so the SW can
+  // recover context when it restarts. The CloudRecorder tab is the source of truth.
+  // However, we DO need to keep the tab itself alive using silent audio to prevent
+  // Chrome from freezing/discarding this background tab.
 
-    keepAliveInterval.current = setInterval(async () => {
-      try {
-        const auth = await chrome.runtime.sendMessage({ type: "refresh-auth" });
+  /**
+   * Start silent audio playback to prevent Chrome from freezing this tab.
+   * Chrome throttles/freezes background tabs after ~5 minutes of inactivity,
+   * which would stop our recording. Playing silent audio keeps the tab active.
+   */
+  const startTabKeepAlive = () => {
+    try {
+      if (keepAliveAudioCtx.current) return; // Already running
 
-        if (!auth?.authenticated) {
-          console.warn("Auth expired or refresh failed");
-          chrome.runtime.sendMessage({ type: "auth-expired" });
-        }
-      } catch (err) {
-        console.error("❌ Failed to check auth via background", err);
-      }
-    }, 1000 * 60 * 5); // every 5 minutes
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      keepAliveAudioCtx.current = ctx;
+
+      // Create a silent oscillator (inaudible frequency at zero gain)
+      const oscillator = ctx.createOscillator();
+      const gainNode = ctx.createGain();
+
+      oscillator.frequency.value = 0; // DC signal (no audible tone)
+      gainNode.gain.value = 0; // Completely silent
+
+      oscillator.connect(gainNode);
+      gainNode.connect(ctx.destination);
+      oscillator.start();
+
+      keepAliveOscillator.current = oscillator;
+
+      // Also request that Chrome not discard this tab
+      chrome.runtime.sendMessage({
+        type: "set-tab-auto-discardable",
+        discardable: false,
+      });
+
+      console.log("[CloudRecorder] Tab keep-alive started");
+    } catch (err) {
+      console.warn("[CloudRecorder] Failed to start tab keep-alive:", err);
+    }
   };
+
+  /**
+   * Stop the silent audio playback when recording ends.
+   */
+  const stopTabKeepAlive = () => {
+    try {
+      if (keepAliveOscillator.current) {
+        keepAliveOscillator.current.stop();
+        keepAliveOscillator.current.disconnect();
+        keepAliveOscillator.current = null;
+      }
+      if (keepAliveAudioCtx.current) {
+        keepAliveAudioCtx.current.close();
+        keepAliveAudioCtx.current = null;
+      }
+
+      // Allow Chrome to discard this tab again if needed
+      chrome.runtime.sendMessage({
+        type: "set-tab-auto-discardable",
+        discardable: true,
+      });
+
+      console.log("[CloudRecorder] Tab keep-alive stopped");
+    } catch (err) {
+      console.warn("[CloudRecorder] Failed to stop tab keep-alive:", err);
+    }
+  };
+
+  const logScreenTrackEvent = async (event, track) => {
+    try {
+      const settings = track?.getSettings?.() || {};
+      const now = Date.now();
+      const data = {
+        event,
+        ts: now,
+        label: track?.label || null,
+        readyState: track?.readyState || null,
+        muted: track?.muted || false,
+        settings,
+      };
+      const { screenTrackLog = [] } = await chrome.storage.local.get([
+        "screenTrackLog",
+      ]);
+      const next = [...screenTrackLog, data].slice(-50);
+      chrome.storage.local.set({ screenTrackLog: next });
+    } catch (err) {
+      console.warn("Failed to log screen track event", err);
+    }
+  };
+
+  const bindScreenTrack = (track) => {
+    if (!track) return;
+    screenTrackLostRef.current = false;
+    logScreenTrackEvent("track-start", track);
+
+    track.onended = () => {
+      screenTrackLostRef.current = true;
+      logScreenTrackEvent("track-ended", track);
+      const label = track?.label || null;
+
+      // Collect diagnostic info to understand WHY the track ended
+      const diagnosticInfo = {
+        reason: "screen-track-ended",
+        tabId: recordingTabId.current || null,
+        label,
+        readyState: track?.readyState || null,
+        ts: Date.now(),
+        isTab: isTab.current,
+        recordingType: recordingType.current,
+        isIframe: IS_IFRAME_CONTEXT,
+        documentHidden: document.hidden,
+        documentVisibility: document.visibilityState,
+        recorderState: screenRecorder.current?.state || null,
+        hasChunks: hasChunks.current,
+        chunkCount: index.current,
+        lastChunkTime: lastTimecode.current,
+        timeSinceLastChunk: lastTimecode.current
+          ? Date.now() - lastTimecode.current
+          : null,
+      };
+
+      console.error("🔴 Screen track ended unexpectedly!", diagnosticInfo);
+
+      chrome.storage.local.set({
+        screenTrackLost: true,
+        lastTrackEndedEvent: diagnosticInfo,
+        lastTrackEnded: diagnosticInfo,
+      });
+
+      // When screen track ends, we MUST stop the recording
+      // Otherwise we'd be recording black/frozen video with no way for user to know
+      if (!isFinishing.current && !sentLast.current) {
+        console.warn("⚠️ Screen track ended - stopping recording");
+        stopRecording(true, "screen-track-ended");
+      }
+    };
+
+    track.onmute = () => {
+      screenTrackLostRef.current = true;
+      logScreenTrackEvent("track-muted", track);
+    };
+    track.onunmute = () => {
+      screenTrackLostRef.current = false;
+      logScreenTrackEvent("track-unmuted", track);
+    };
+
+    startScreenTrackMonitor();
+  };
+
+  const startScreenTrackMonitor = () => {
+    if (screenTrackMonitor.current) clearInterval(screenTrackMonitor.current);
+    screenTrackMonitor.current = setInterval(() => {
+      const track = screenStream.current?.getVideoTracks?.()[0] || null;
+      if (!track) return;
+      if (track.readyState === "ended" && !screenTrackLostRef.current) {
+        screenTrackLostRef.current = true;
+        logScreenTrackEvent("monitor-ended", track);
+
+        // Stop the recording when track dies
+        if (!isFinishing.current && !sentLast.current) {
+          console.warn(
+            "⚠️ Screen track monitor detected ended track - stopping recording"
+          );
+          stopRecording(true, "screen-track-monitor-ended");
+        }
+      }
+    }, 5000);
+  };
+
+  const ensureChunkStoreReady = async () => {
+    if (idbReadyRef.current) return true;
+    try {
+      await chunksStore.setItem("__probe", { ts: Date.now() });
+      await chunksStore.removeItem("__probe");
+      idbReadyRef.current = true;
+      return true;
+    } catch (err) {
+      fatalErrorRef.current = true;
+      sendRecordingError(
+        "Local storage is blocked (IndexedDB unavailable). Recording cannot start."
+      );
+      return false;
+    }
+  };
+
+  const persistSessionState = async (overrides = {}) => {
+    if (!recorderSession.current) return;
+    const nextState = {
+      ...recorderSession.current,
+      lastChunkIndex: index.current - 1,
+      lastChunkTime: lastTimecode.current || null,
+      lastUploadOffset: {
+        screen: screenUploader.current?.offset || 0,
+        camera: cameraUploader.current?.offset || 0,
+      },
+      updatedAt: Date.now(),
+      ...overrides,
+    };
+    recorderSession.current = nextState;
+    try {
+      await chrome.storage.local.set({ recorderSession: nextState });
+    } catch (err) {
+      console.warn("Failed to persist recorder session state:", err);
+    }
+  };
+
+  const startRecorderSession = async (meta = {}) => {
+    const session = {
+      id: crypto.randomUUID(),
+      startedAt: Date.now(),
+      tabId: recordingTabId.current || null,
+      tabCaptureId: tabID.current || null,
+      isTab: isTab.current,
+      region: Boolean(regionRef.current),
+      status: "recording",
+      ...meta,
+    };
+    recorderSession.current = session;
+    await chrome.storage.local.set({ recorderSession: session });
+    try {
+      const result = await chrome.runtime.sendMessage({
+        type: "register-recording-session",
+        session,
+      });
+      if (result?.ok === false) {
+        fatalErrorRef.current = true;
+        recorderSession.current = null;
+        chrome.storage.local.remove("recorderSession");
+        sendRecordingError(
+          result?.error ||
+            "Another Screenity recorder is already running. Please close it and try again."
+        );
+        return false;
+      }
+    } catch (err) {
+      console.warn(
+        "Failed to register recording session with background:",
+        err
+      );
+    }
+    return true;
+  };
+
+  const finalizeRecorderSession = async (status = "completed") => {
+    if (!recorderSession.current) return;
+    await chrome.storage.local.set({
+      recorderSession: {
+        ...recorderSession.current,
+        status,
+        finishedAt: Date.now(),
+      },
+    });
+    chrome.runtime.sendMessage({ type: "clear-recording-session" });
+    recorderSession.current = null;
+  };
+
+  const startChunkWatchdog = () => {
+    if (chunkStallTimer.current) clearInterval(chunkStallTimer.current);
+    chunkStallTimer.current = setInterval(() => {
+      if (!hasChunks.current || fatalErrorRef.current) return;
+      const last = lastTimecode.current || 0;
+      if (!last) return;
+      if (Date.now() - last > 15000) {
+        if (!stallNotified.current) {
+          stallNotified.current = true;
+          chrome.runtime.sendMessage({
+            type: "recording-error",
+            error: "stream-warning",
+            why: "No video data received for 15 seconds. Recording may be stalled.",
+          });
+        }
+      }
+    }, 5000);
+  };
+
+  const startUploadHeartbeat = () => {
+    if (uploadHeartbeatTimer.current)
+      clearInterval(uploadHeartbeatTimer.current);
+    uploadHeartbeatTimer.current = setInterval(() => {
+      const now = Date.now();
+      const screenOffset = screenUploader.current?.offset || 0;
+      const cameraOffset = cameraUploader.current?.offset || 0;
+      const { screen, camera, ts } = lastUploadProgress.current;
+
+      if (screenOffset !== screen || cameraOffset !== camera) {
+        lastUploadProgress.current = {
+          screen: screenOffset,
+          camera: cameraOffset,
+          ts: now,
+        };
+        stallNotified.current = false;
+        persistSessionState();
+        return;
+      }
+
+      if (
+        hasChunks.current &&
+        ts &&
+        now - ts > 30000 &&
+        !stallNotified.current
+      ) {
+        stallNotified.current = true;
+        chrome.runtime.sendMessage({
+          type: "upload-stalled",
+          offset: { screen: screenOffset, camera: cameraOffset },
+        });
+      } else if (
+        hasChunks.current &&
+        stallNotified.current &&
+        ts &&
+        now - ts > 45000
+      ) {
+        exportLocalRecovery("upload-stalled");
+      }
+    }, 5000);
+  };
+
+  const stopAllIntervals = () => {
+    if (sessionHeartbeat.current) clearInterval(sessionHeartbeat.current);
+    if (chunkStallTimer.current) clearInterval(chunkStallTimer.current);
+    if (uploadHeartbeatTimer.current)
+      clearInterval(uploadHeartbeatTimer.current);
+    if (screenTrackMonitor.current) clearInterval(screenTrackMonitor.current);
+    sessionHeartbeat.current = null;
+    chunkStallTimer.current = null;
+    uploadHeartbeatTimer.current = null;
+    screenTrackMonitor.current = null;
+  };
+
+  const exportLocalRecovery = async (reason = "upload failed") => {
+    try {
+      let blob =
+        createBlobFromChunks(screenChunks.current, "video/webm") ||
+        createBlobFromChunks(cameraChunks.current, "video/webm");
+      if (!blob) {
+        const recovered = [];
+        await chunksStore.iterate((value) => {
+          recovered.push(value);
+        });
+        recovered.sort((a, b) => a.index - b.index);
+        blob = createBlobFromChunks(
+          recovered.map((c) => c.chunk),
+          "video/webm"
+        );
+      }
+      if (!blob) return;
+      const objectUrl = URL.createObjectURL(blob);
+      try {
+        await chrome.downloads.download({
+          url: objectUrl,
+          filename: `Screenity-Recovery-${new Date().toISOString()}-${reason}.webm`,
+          saveAs: false,
+        });
+        chrome.runtime.sendMessage({
+          type: "show-toast",
+          message: "Upload stalled. A recovery file was saved locally.",
+        });
+      } finally {
+        URL.revokeObjectURL(objectUrl);
+      }
+    } catch (err) {
+      console.warn("Failed to export local recovery:", err);
+    }
+  };
+
+  const tryRecoverPreviousSession = useCallback(async () => {
+    if (recoveryAttempted.current) return;
+    recoveryAttempted.current = true;
+    try {
+      const { recorderSession: storedSession } = await chrome.storage.local.get(
+        ["recorderSession"]
+      );
+
+      const chunkCount = await chunksStore.length().catch(() => 0);
+      if (
+        storedSession &&
+        storedSession.status === "recording" &&
+        chunkCount > 0
+      ) {
+        const recovered = [];
+        await chunksStore.iterate((value) => {
+          recovered.push(value);
+        });
+        recovered.sort((a, b) => a.index - b.index);
+        const blob = createBlobFromChunks(
+          recovered.map((c) => c.chunk),
+          "video/webm"
+        );
+        if (blob) {
+          const objectUrl = URL.createObjectURL(blob);
+          try {
+            await chrome.downloads.download({
+              url: objectUrl,
+              filename: `Screenity-Recovered-${new Date().toISOString()}.webm`,
+              saveAs: false,
+            });
+            chrome.runtime.sendMessage({
+              type: "show-toast",
+              message: "Recovered unsaved recording from the previous session.",
+            });
+          } finally {
+            URL.revokeObjectURL(objectUrl);
+          }
+        }
+        await chunksStore.clear();
+        await chrome.storage.local.set({
+          recorderSession: { ...storedSession, status: "recovered" },
+        });
+      }
+    } catch (err) {
+      console.warn("Recovery check failed:", err);
+    }
+  }, []);
 
   const attachMicToStream = (videoStream, micStream) => {
     if (!videoStream || !micStream) return videoStream;
@@ -113,7 +532,7 @@ const CloudRecorder = () => {
       const minMemory = 26214400;
       if (data.quota < minMemory) {
         chrome.storage.local.set({ memoryError: true });
-        sendStopRecording();
+        sendStopRecording("low-storage-quota");
       }
     });
   };
@@ -206,6 +625,9 @@ const CloudRecorder = () => {
   const dismissRecording = async (restarting = false) => {
     setInitProject(false);
 
+    // Stop the silent audio keep-alive
+    stopTabKeepAlive();
+
     const { projectId, multiMode, multiSceneCount, recordingToScene } =
       await chrome.storage.local.get([
         "projectId",
@@ -238,6 +660,7 @@ const CloudRecorder = () => {
     }
 
     cleanupTimers();
+    stopAllIntervals();
 
     isRestarting.current = true;
 
@@ -275,7 +698,8 @@ const CloudRecorder = () => {
 
       uploadMetaRef.current = null;
 
-      window.close();
+      // FLAG: decide whether to close or not
+      //window.close();
       return;
     }
 
@@ -301,7 +725,9 @@ const CloudRecorder = () => {
     }
     uploadMetaRef.current = null;
     isInit.current = false;
-    window.close();
+
+    // FLAG: decide whether to close or not
+    //window.close();
   };
 
   const restartRecording = async () => {
@@ -340,8 +766,29 @@ const CloudRecorder = () => {
         throw new Error("Missing projectId");
       }
 
+      const onStall = (payload) => {
+        stallNotified.current = true;
+        chrome.runtime.sendMessage({
+          type: "upload-stalled",
+          offset: {
+            screen: payload?.offset || screenUploader.current?.offset || 0,
+            camera: cameraUploader.current?.offset || 0,
+          },
+        });
+      };
+
       if (screenStream.current) {
-        screenUploader.current = new BunnyTusUploader();
+        screenUploader.current = new BunnyTusUploader({
+          onProgress: ({ offset }) => {
+            lastUploadProgress.current = {
+              ...lastUploadProgress.current,
+              screen: offset,
+              ts: Date.now(),
+            };
+            persistSessionState();
+          },
+          onStall,
+        });
         const track = screenStream.current.getVideoTracks()[0];
         let width, height;
         if (regionRef.current && target.current) {
@@ -362,7 +809,17 @@ const CloudRecorder = () => {
       }
 
       if (cameraStream.current) {
-        cameraUploader.current = new BunnyTusUploader();
+        cameraUploader.current = new BunnyTusUploader({
+          onProgress: ({ offset }) => {
+            lastUploadProgress.current = {
+              ...lastUploadProgress.current,
+              camera: offset,
+              ts: Date.now(),
+            };
+            persistSessionState();
+          },
+          onStall,
+        });
         const track = cameraStream.current.getVideoTracks()[0];
         if (track?.readyState === "ended") {
           throw new Error("Camera track has ended");
@@ -410,7 +867,21 @@ const CloudRecorder = () => {
 
   const startRecording = async () => {
     setInitProject(false);
-    startKeepAlive();
+    // Start silent audio to prevent Chrome from freezing this background tab
+    startTabKeepAlive();
+
+    const storageReady = await ensureChunkStoreReady();
+    if (!storageReady) return;
+
+    const pinned = await chrome.runtime
+      .sendMessage({ type: "is-pinned" })
+      .catch(() => true);
+    if (pinned === false) {
+      sendRecordingError(
+        "Screenity must stay pinned to record. Pin the extension and try again."
+      );
+      return;
+    }
 
     if (!uploadersInitialized.current) {
       sendRecordingError(
@@ -431,12 +902,38 @@ const CloudRecorder = () => {
       return;
     }
 
+    if (isTab.current && recordingTabId.current) {
+      const tabAlive = await chrome.tabs
+        .get(recordingTabId.current)
+        .then(() => true)
+        .catch(() => false);
+      if (!tabAlive) {
+        sendRecordingError(
+          "The tab you selected for recording was closed. Please start again."
+        );
+        return;
+      }
+    }
+
+    if (!recorderSession.current) {
+      const registered = await startRecorderSession({ projectId });
+      if (!registered) return;
+    }
+
     if (!screenUploader.current && !cameraUploader.current) {
       sendRecordingError("Uploaders not ready. Please restart recording.");
       return;
     }
 
-    await chunksStore.clear();
+    try {
+      await chunksStore.clear();
+    } catch (err) {
+      fatalErrorRef.current = true;
+      sendRecordingError(
+        "Unable to initialize local buffer (IndexedDB issue)."
+      );
+      return;
+    }
     lastTimecode.current = 0;
     hasChunks.current = false;
     index.current = 0;
@@ -476,7 +973,7 @@ const CloudRecorder = () => {
                 sendRecordingError(
                   "Recording failed - no video data being captured. Please try again."
                 );
-                sendStopRecording();
+                sendStopRecording("empty-screen-chunk");
               }
               return;
             }
@@ -489,17 +986,29 @@ const CloudRecorder = () => {
             if (!hasChunks.current) {
               hasChunks.current = true;
               lastTimecode.current = timestamp;
+              firstChunkTime.current = timestamp;
             } else if (timestamp < lastTimecode.current) {
               return; // Skip duplicate
             } else {
               lastTimecode.current = timestamp;
             }
 
-            await chunksStore.setItem(`chunk_${index.current}`, {
-              index: index.current,
-              chunk: blob,
-              timestamp,
-            });
+            await chunksStore
+              .setItem(`chunk_${index.current}`, {
+                index: index.current,
+                chunk: blob,
+                timestamp,
+              })
+              .catch((err) => {
+                fatalErrorRef.current = true;
+                sendRecordingError(
+                  "Could not buffer recording data locally (IndexedDB blocked)."
+                );
+                sendStopRecording();
+                throw err;
+              });
+
+            persistSessionState({ lastChunkIndex: index.current });
 
             if (uploadersInitialized.current && screenUploader.current) {
               try {
@@ -515,10 +1024,11 @@ const CloudRecorder = () => {
                 console.error("Failed to upload chunk to Bunny:", uploadErr);
                 consecutiveScreenFailures.current++;
                 if (consecutiveScreenFailures.current > 3) {
+                  stallNotified.current = true;
                   sendRecordingError(
-                    "Screen upload failed repeatedly. Stopping recording."
+                    "Screen upload failed repeatedly. Continuing locally; upload will retry on finalize."
                   );
-                  sendStopRecording();
+                  screenUploader.current?.pause?.();
                 }
               }
             }
@@ -537,14 +1047,7 @@ const CloudRecorder = () => {
         // Start recording with 2-second time slices
         screenRecorder.current.start(2000);
 
-        screenStream.current.getVideoTracks()[0].onended = () => {
-          chrome.storage.local.set({
-            recording: false,
-            restarting: false,
-          });
-          cleanupTimers();
-          sendStopRecording();
-        };
+        bindScreenTrack(screenStream.current.getVideoTracks()[0]);
       }
 
       // Audio recorder setup (for transcription)
@@ -616,8 +1119,10 @@ const CloudRecorder = () => {
                 );
                 consecutiveCameraFailures.current++;
                 if (consecutiveCameraFailures.current > 3) {
-                  console.error("Camera upload failing repeatedly");
-                  // Don't stop recording, just log - camera is secondary
+                  console.error(
+                    "Camera upload failing repeatedly; pausing camera uploader"
+                  );
+                  cameraUploader.current?.pause?.();
                 }
               }
             }
@@ -660,7 +1165,7 @@ const CloudRecorder = () => {
           chrome.runtime.sendMessage({
             type: "time-stopped",
           });
-          sendStopRecording();
+          sendStopRecording("max-duration");
         }
       }, 1000);
 
@@ -669,6 +1174,7 @@ const CloudRecorder = () => {
       screenTimer.current.warned = warned;
 
       chrome.storage.local.set({ recording: true });
+      persistSessionState({ status: "recording" });
       setStarted(true);
     } catch (err) {
       sendRecordingError("Recording failed: " + err.message);
@@ -685,6 +1191,14 @@ const CloudRecorder = () => {
       cameraTimer.current.paused = false;
       cameraTimer.current.total = 0;
     }
+
+    lastUploadProgress.current = {
+      screen: screenUploader.current?.offset || 0,
+      camera: cameraUploader.current?.offset || 0,
+      ts: Date.now(),
+    };
+    startChunkWatchdog();
+    startUploadHeartbeat();
   };
 
   function cleanupTimers() {
@@ -773,6 +1287,10 @@ const CloudRecorder = () => {
     return {
       screen: getDuration(screenTimer.current),
       camera: getDuration(cameraTimer.current),
+      fallbackMs:
+        firstChunkTime.current && lastTimecode.current
+          ? Math.max(0, lastTimecode.current - firstChunkTime.current)
+          : null,
     };
   };
 
@@ -820,21 +1338,70 @@ const CloudRecorder = () => {
   };
 
   useEffect(() => {
-    const onHide = () => {
+    const onHide = (event) => {
+      // Only finalize if the page is actually being unloaded (persisted = false)
+      // Don't finalize just because the tab went to background
+      // event.persisted indicates if the page might be restored from bfcache
+      const isActualUnload = !event.persisted;
+
       // Only finalize if an active recording really exists
       const hasActiveRecorder =
         screenRecorder.current?.state === "recording" ||
         cameraRecorder.current?.state === "recording" ||
         audioRecorder.current?.state === "recording";
 
-      if (hasActiveRecorder && !sentLast.current) {
-        console.warn("⚠️ Recorder page hiding — finalizing");
-        stopRecording(true);
+      if (hasActiveRecorder && !sentLast.current && isActualUnload) {
+        console.warn("⚠️ Recorder page unloading — finalizing");
+        // Use sendBeacon or sync storage write for reliability
+        navigator.sendBeacon?.(
+          `${API_BASE}/log/recorder-unload`,
+          JSON.stringify({ reason: "pagehide", ts: Date.now() })
+        );
+        stopRecording(true, "pagehide-unload");
       }
     };
 
     window.addEventListener("pagehide", onHide);
     return () => window.removeEventListener("pagehide", onHide);
+  }, []);
+
+  useEffect(() => {
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "hidden") {
+        persistSessionState({ status: "hidden" });
+      }
+    };
+
+    const onBeforeUnload = () => {
+      if (hasChunks.current) {
+        persistSessionState({ status: "unload" });
+      }
+    };
+
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    window.addEventListener("beforeunload", onBeforeUnload);
+
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      window.removeEventListener("beforeunload", onBeforeUnload);
+    };
+  }, []);
+
+  useEffect(() => {
+    tryRecoverPreviousSession();
+  }, [tryRecoverPreviousSession]);
+
+  useEffect(() => {
+    return () => {
+      stopAllIntervals();
+      stopTabKeepAlive(); // Clean up keep-alive on unmount
+    };
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      stopAllIntervals();
+    };
   }, []);
 
   const createSceneOrHandleMultiMode = async (
@@ -987,13 +1554,36 @@ const CloudRecorder = () => {
     return avg < silenceThreshold; // true if basically silent
   };
 
-  const stopRecording = async (shouldFinalize = true) => {
+  const stopRecording = async (shouldFinalize = true, reason = "unknown") => {
     if (isFinishing.current || sentLast.current) return;
+
+    console.debug("[Screenity] stopRecording invoked", {
+      reason,
+      shouldFinalize,
+      screenState: screenRecorder.current?.state,
+      cameraState: cameraRecorder.current?.state,
+      audioState: audioRecorder.current?.state,
+      screenOffset: screenUploader.current?.offset || 0,
+      cameraOffset: cameraUploader.current?.offset || 0,
+      chunkCount: screenChunks.current.length + cameraChunks.current.length,
+    });
+    chrome.storage.local.set({
+      lastStopRecordingEvent: {
+        reason,
+        screenOffset: screenUploader.current?.offset || 0,
+        cameraOffset: cameraUploader.current?.offset || 0,
+        chunkCount: screenChunks.current.length + cameraChunks.current.length,
+        ts: Date.now(),
+      },
+    });
 
     if (keepAliveInterval.current) {
       clearInterval(keepAliveInterval.current);
       keepAliveInterval.current = null;
     }
+
+    // Stop the silent audio keep-alive since we're done recording
+    stopTabKeepAlive();
 
     const { projectId, recordingToScene, multiMode } =
       await chrome.storage.local.get([
@@ -1001,6 +1591,8 @@ const CloudRecorder = () => {
         "recordingToScene",
         "multiMode",
       ]);
+
+    await persistSessionState({ status: "stopping" });
 
     if (shouldFinalize) {
       if (recordingToScene) {
@@ -1021,6 +1613,7 @@ const CloudRecorder = () => {
     }
     isFinishing.current = true;
     chrome.storage.local.set({ recording: false });
+    stopAllIntervals();
 
     await stopAllRecorders();
 
@@ -1028,10 +1621,16 @@ const CloudRecorder = () => {
 
     await flushPendingChunks();
 
-    await Promise.allSettled([
-      screenUploader.current?.finalize?.(),
-      cameraUploader.current?.finalize?.(),
-    ]);
+    let finalizeError = null;
+    try {
+      await Promise.allSettled([
+        screenUploader.current?.finalize?.(),
+        cameraUploader.current?.finalize?.(),
+      ]);
+    } catch (err) {
+      finalizeError = err;
+      console.warn("Finalize threw an error:", err);
+    }
 
     const { sceneId } = await chrome.storage.local.get(["sceneId"]);
 
@@ -1051,27 +1650,57 @@ const CloudRecorder = () => {
 
     cleanupTimers();
 
-    if (!shouldFinalize) return;
+    if (!shouldFinalize) {
+      await finalizeRecorderSession("cancelled");
+      return;
+    }
+
+    if (finalizeError) {
+      await exportLocalRecovery("finalize-error");
+      await finalizeRecorderSession("failed");
+      sendRecordingError(
+        "Upload failed to finalize. A recovery copy was downloaded."
+      );
+      return;
+    }
 
     // Validate that at least one media source was successfully uploaded
+    const hasAnyScreenData = (uploadMeta.screen?.offset || 0) > 0;
+    const hasAnyCameraData = (uploadMeta.camera?.offset || 0) > 0;
     const hasValidScreen =
-      uploadMeta.screen?.status === "completed" &&
+      hasAnyScreenData &&
       uploadMeta.screen?.mediaId &&
       uploadMeta.screen?.videoId;
     const hasValidCamera =
-      uploadMeta.camera?.status === "completed" &&
+      hasAnyCameraData &&
       uploadMeta.camera?.mediaId &&
       uploadMeta.camera?.videoId;
 
     // Warn if upload size seems suspiciously small for recording duration
     const screenDuration = durations.screen || 0;
     const cameraDuration = durations.camera || 0;
-    if (hasValidScreen && screenDuration > 5) {
+    const fallbackSeconds = durations.fallbackMs
+      ? durations.fallbackMs / 1000
+      : 0;
+    const effectiveScreenDuration =
+      screenDuration < MIN_DURATION_SECONDS && fallbackSeconds > 0
+        ? fallbackSeconds
+        : screenDuration;
+    const effectiveCameraDuration =
+      cameraDuration < MIN_DURATION_SECONDS && fallbackSeconds > 0
+        ? fallbackSeconds
+        : cameraDuration;
+
+    const usedDurations = {
+      screen: effectiveScreenDuration || screenDuration,
+      camera: effectiveCameraDuration || cameraDuration,
+    };
+    if (hasValidScreen && effectiveScreenDuration > 5) {
       const screenOffset = uploadMeta.screen?.offset || 0;
-      const minExpectedSize = screenDuration * 50000; // ~50KB/sec minimum
+      const minExpectedSize = effectiveScreenDuration * 50000; // ~50KB/sec minimum
       if (screenOffset < minExpectedSize) {
         console.warn(
-          `⚠️ Screen upload size (${screenOffset} bytes) seems small for ${screenDuration}s recording. Expected at least ${minExpectedSize} bytes.`
+          `⚠️ Screen upload size (${screenOffset} bytes) seems small for ${effectiveScreenDuration}s recording. Expected at least ${minExpectedSize} bytes.`
         );
       }
     }
@@ -1083,9 +1712,20 @@ const CloudRecorder = () => {
       const cameraOffset = uploadMeta.camera?.offset || 0;
       const screenError = uploadMeta.screen?.error || "none";
       const cameraError = uploadMeta.camera?.error || "none";
-      throw new Error(
-        `No media was successfully uploaded. Screen: ${screenStatus} (${screenOffset} bytes, error: ${screenError}), Camera: ${cameraStatus} (${cameraOffset} bytes, error: ${cameraError})`
-      );
+      // If we see bytes on Bunny (offset > 0) but status is not completed, treat as success with a warning.
+      if (hasAnyScreenData || hasAnyCameraData) {
+        console.warn(
+          "Uploads have data but were not marked completed. Proceeding with scene creation.",
+          { screenStatus, cameraStatus, screenOffset, cameraOffset }
+        );
+      } else {
+        await exportLocalRecovery("no-upload");
+        await finalizeRecorderSession("failed");
+        sendRecordingError(
+          `No media was successfully uploaded. Screen: ${screenStatus} (${screenOffset} bytes, error: ${screenError}), Camera: ${cameraStatus} (${cameraOffset} bytes, error: ${cameraError})`
+        );
+        return;
+      }
     }
 
     // Create final audio blob from chunks
@@ -1102,19 +1742,22 @@ const CloudRecorder = () => {
       sentLast.current = true;
       const silent = audioBlob ? await isAudioSilent(audioBlob) : true;
       try {
-        await createSceneOrHandleMultiMode(uploadMeta, durations, silent);
+        await createSceneOrHandleMultiMode(uploadMeta, usedDurations, silent);
 
         if (!silent && audioBlob) {
           await handleTranscription(uploadMeta, projectId);
         }
 
         chrome.runtime.sendMessage({ type: "video-ready", uploadMeta });
+        await chunksStore.clear().catch(() => {});
 
         if (!IS_IFRAME_CONTEXT) {
-          window.close();
+          // FLAG: decide whether to close or not
+          //window.close();
         } else {
           window.location.reload();
         }
+        await finalizeRecorderSession("completed");
       } catch (err) {
         console.error("❌ Failed to create scene:", err);
 
@@ -1148,11 +1791,14 @@ const CloudRecorder = () => {
         // Give user time to see the error message
         setTimeout(() => {
           if (!IS_IFRAME_CONTEXT) {
-            window.close();
+            // FLAG: decide whether to close or not
+            //window.close();
           } else {
             window.location.reload();
           }
         }, 3000);
+        await exportLocalRecovery("scene-error");
+        await finalizeRecorderSession("failed");
       }
     }
   };
@@ -1250,13 +1896,7 @@ const CloudRecorder = () => {
             src.connect(ctx.destination);
           }
 
-          screenStream.current.getVideoTracks()[0].onended = () => {
-            chrome.storage.local.set({
-              recording: false,
-              restarting: false,
-            });
-            sendStopRecording();
-          };
+          bindScreenTrack(screenStream.current.getVideoTracks()[0]);
         } catch (err) {
           sendRecordingError("Failed to access region stream: " + err.message);
           return;
@@ -1395,13 +2035,7 @@ const CloudRecorder = () => {
             src.connect(ctx.destination);
           }
 
-          screenStream.current.getVideoTracks()[0].onended = () => {
-            chrome.storage.local.set({
-              recording: false,
-              restarting: false,
-            });
-            sendStopRecording();
-          };
+          bindScreenTrack(screenStream.current.getVideoTracks()[0]);
         } catch (err) {
           sendRecordingError("Failed to access screen stream: " + err.message);
           return;
@@ -1642,6 +2276,7 @@ const CloudRecorder = () => {
       } else if (!request.region) {
         if (!tabPreferred.current) {
           isTab.current = request.isTab;
+          recordingTabId.current = request.tabID || null;
           if (request.isTab) getStreamID(request.tabID);
         } else {
           isTab.current = false;
@@ -1673,7 +2308,7 @@ const CloudRecorder = () => {
       }
     } else if (request.type === "stop-recording-tab") {
       if (!isInit.current) return;
-      stopRecording();
+      stopRecording(true, request.reason || "message-stop");
     } else if (request.type === "set-mic-active-tab") {
       if (!isInit.current) return;
       setMic(request);

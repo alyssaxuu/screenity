@@ -38,6 +38,9 @@ const openRecorderTab = async (
       active: switchTab,
     })
     .then((tab) => {
+      // Prevent Chrome from discarding this tab during recording
+      chrome.tabs.update(tab.id, { autoDiscardable: false }).catch(() => {});
+
       chrome.storage.local.set({
         recordingTab: tab.id,
         offscreen: false,

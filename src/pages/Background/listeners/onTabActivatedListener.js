@@ -2,25 +2,37 @@ import { sendMessageTab } from "../tabManagement";
 
 export const handleTabActivation = async (activeInfo) => {
   try {
-    const { recordingStartTime } = await chrome.storage.local.get([
+    const {
+      recordingStartTime,
+      recording,
+      restarting,
+      pendingRecording,
+      recorderSession,
+    } = await chrome.storage.local.get([
       "recordingStartTime",
+      "recording",
+      "restarting",
+      "pendingRecording",
+      "recorderSession",
     ]);
 
     // Get the activated tab
     const tab = await chrome.tabs.get(activeInfo.tabId);
 
-    // Check if currently recording or restarting
-    const { recording } = await chrome.storage.local.get(["recording"]);
-    const { restarting } = await chrome.storage.local.get(["restarting"]);
-    const { pendingRecording } = await chrome.storage.local.get([
-      "pendingRecording",
-    ]);
+    // Check both recording flag AND recorderSession to avoid race conditions
+    // recorderSession persists even if the SW restarts
+    const isActivelyRecording =
+      recording || (recorderSession && recorderSession.status === "recording");
 
-    if (recording) {
+    if (isActivelyRecording) {
       // Check if region recording and if the current tab is the recording tab
-      const { tabRecordedID } = await chrome.storage.local.get([
-        "tabRecordedID",
-      ]);
+      const { tabRecordedID, region, customRegion, recordingType } =
+        await chrome.storage.local.get([
+          "tabRecordedID",
+          "region",
+          "customRegion",
+          "recordingType",
+        ]);
       if (tabRecordedID && tabRecordedID !== activeInfo.tabId) {
         sendMessageTab(activeInfo.tabId, { type: "hide-popup-recording" });
       } else if (
@@ -34,18 +46,13 @@ export const handleTabActivation = async (activeInfo) => {
       }
 
       // Check if it's region or customRegion recording
-      const { region } = await chrome.storage.local.get(["region"]);
-      const { customRegion } = await chrome.storage.local.get(["customRegion"]);
-      const { recordingType } = await chrome.storage.local.get([
-        "recordingType",
-      ]);
       if (!region && !customRegion && recordingType !== "region") {
         sendMessageTab(activeInfo.tabId, {
           type: "recording-check",
           recordingStartTime,
         });
       }
-    } else if (!recording && !restarting && !pendingRecording) {
+    } else if (!isActivelyRecording && !restarting && !pendingRecording) {
       sendMessageTab(activeInfo.tabId, { type: "recording-ended" });
     }
 

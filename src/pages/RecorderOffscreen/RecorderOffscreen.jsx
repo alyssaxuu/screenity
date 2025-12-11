@@ -336,21 +336,55 @@ const RecorderOffscreen = () => {
     };
 
     liveStream.current.getVideoTracks()[0].onended = () => {
+      const track = liveStream.current?.getVideoTracks()[0];
+      // Log detailed diagnostics for debugging
+      const diagnosticInfo = {
+        reason: "liveStream-video-track-ended-offscreen",
+        savedChunks: savedCount.current,
+        lastTimecode: lastTimecode.current,
+        trackLabel: track?.label || null,
+        trackReadyState: track?.readyState || null,
+      };
+      console.warn(
+        "[RecorderOffscreen] liveStream video track ended",
+        diagnosticInfo
+      );
       chrome.storage.local.set({
         recording: false,
         restarting: false,
         tabRecordedID: null,
+        lastTrackEndEvent: diagnosticInfo,
       });
-      chrome.runtime.sendMessage({ type: "stop-recording-tab" });
+      chrome.runtime.sendMessage({
+        type: "stop-recording-tab",
+        reason: "video-track-ended",
+      });
     };
 
     helperVideoStream.current.getVideoTracks()[0].onended = () => {
+      const track = helperVideoStream.current?.getVideoTracks()[0];
+      // Log detailed diagnostics for debugging
+      const diagnosticInfo = {
+        reason: "helperVideoStream-video-track-ended-offscreen",
+        savedChunks: savedCount.current,
+        lastTimecode: lastTimecode.current,
+        trackLabel: track?.label || null,
+        trackReadyState: track?.readyState || null,
+      };
+      console.warn(
+        "[RecorderOffscreen] helperVideoStream video track ended",
+        diagnosticInfo
+      );
       chrome.storage.local.set({
         recording: false,
         restarting: false,
         tabRecordedID: null,
+        lastTrackEndEvent: diagnosticInfo,
       });
-      chrome.runtime.sendMessage({ type: "stop-recording-tab" });
+      chrome.runtime.sendMessage({
+        type: "stop-recording-tab",
+        reason: "video-track-ended",
+      });
     };
   }
 

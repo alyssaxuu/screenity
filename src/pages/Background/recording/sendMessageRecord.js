@@ -4,6 +4,10 @@ export const sendMessageRecord = (message, responseCallback = null) => {
   return new Promise((resolve, reject) => {
     chrome.storage.local.get(["recordingTab", "offscreen"], (result) => {
       if (chrome.runtime.lastError) {
+        console.warn(
+          "sendMessageRecord: storage error",
+          chrome.runtime.lastError.message
+        );
         return reject(chrome.runtime.lastError.message);
       }
 
@@ -15,10 +19,40 @@ export const sendMessageRecord = (message, responseCallback = null) => {
             responseCallback ? responseCallback(response) : resolve(response);
           }
         });
-      } else {
+      } else if (result.recordingTab) {
         sendMessageTab(result.recordingTab, message, responseCallback)
           .then(resolve)
-          .catch(reject);
+          .catch((err) => {
+            console.warn(
+              "sendMessageRecord: failed to message recordingTab",
+              result.recordingTab,
+              err
+            );
+            reject(err);
+          });
+      } else {
+        // No recordingTab set - check if there's an active recorderSession
+        // This can happen if the service worker restarted and lost in-memory state
+        chrome.storage.local.get(["recorderSession"], (sessionResult) => {
+          if (
+            sessionResult.recorderSession &&
+            sessionResult.recorderSession.tabId
+          ) {
+            // Try the tab from the persisted session
+            sendMessageTab(
+              sessionResult.recorderSession.tabId,
+              message,
+              responseCallback
+            )
+              .then(resolve)
+              .catch(reject);
+          } else {
+            console.warn(
+              "sendMessageRecord: no recordingTab or recorderSession available"
+            );
+            reject(new Error("No recording tab available"));
+          }
+        });
       }
     });
   });

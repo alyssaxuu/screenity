@@ -82,13 +82,31 @@ export const setupHandlers = () => {
     }));
   });
 
-  registerMessage("recording-ended", () => {
+  registerMessage("recording-ended", async () => {
     const state = getState();
-    if (
-      !state.showPopup
-      // &&
-      // !state.pendingRecording
-    ) {
+
+    // Double-check with storage before resetting UI
+    // This prevents false positives when service worker restarts with stale state
+    const { recording, recorderSession, pendingRecording } =
+      await chrome.storage.local.get([
+        "recording",
+        "recorderSession",
+        "pendingRecording",
+      ]);
+
+    const isActuallyRecording =
+      recording || (recorderSession && recorderSession.status === "recording");
+
+    // Only reset if we're truly not recording
+    if (isActuallyRecording || pendingRecording) {
+      // Recording is actually still active - ignore this stale message
+      console.warn(
+        "Ignoring stale recording-ended message - recording still active"
+      );
+      return;
+    }
+
+    if (!state.showPopup) {
       setContentState((prev) => ({
         ...prev,
         showExtension: false,
@@ -219,6 +237,20 @@ export const setupHandlers = () => {
         state.dismissRecording();
       }
     );
+  });
+
+  registerMessage("stream-ended-warning", (message) => {
+    const state = getState();
+    // Show a toast warning but don't stop the recording
+    // The user can decide whether to continue or stop manually
+    if (state.openToast) {
+      state.openToast(
+        message.message ||
+          "Screen sharing stopped. Stop recording to save your video.",
+        () => {},
+        10000 // Show for 10 seconds
+      );
+    }
   });
 
   registerMessage("backup-error", () => {

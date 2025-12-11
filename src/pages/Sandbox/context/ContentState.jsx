@@ -702,7 +702,7 @@ const ContentState = (props) => {
         ...prev,
         blob: blob,
         mp4ready: true,
-        hasBeenEdited: true,
+        hasBeenEdited: event.data.edited === false ? prev.hasBeenEdited : true,
         isFfmpegRunning: false,
         reencoding: false,
         trimming: false,
@@ -1192,6 +1192,20 @@ const ContentState = (props) => {
 
       setContentState((prevState) => ({
         ...prevState,
+        downloadingWEBM: false,
+        isFfmpegRunning: false,
+        saved: true,
+      }));
+      return;
+    }
+
+    // ➜ ADD THIS: If untouched + already webm → skip FFmpeg entirely
+    if (!contentState.hasBeenEdited && contentState.webm) {
+      const url = URL.createObjectURL(contentState.webm);
+      await requestDownload(url, ".webm");
+
+      setContentState((prev) => ({
+        ...prev,
         downloadingWEBM: false,
         isFfmpegRunning: false,
         saved: true,

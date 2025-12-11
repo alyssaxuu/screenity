@@ -19,8 +19,13 @@ export function sendRecordingError(why, cancel = false) {
 }
 
 export function sendStopRecording(reason = "generic") {
+  const payload =
+    typeof reason === "string"
+      ? { reason }
+      : { ...(reason || {}), reason: reason?.reason || "generic" };
+
   chrome.runtime.sendMessage({
     type: "stop-recording-tab",
-    reason,
+    ...payload,
   });
 }
