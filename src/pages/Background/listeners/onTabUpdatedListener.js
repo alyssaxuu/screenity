@@ -17,6 +17,9 @@ export const handleTabUpdate = async (tabId, changeInfo, tab) => {
         "pendingRecording",
         "recordingStartTime",
         "recorderSession",
+        "paused",
+        "pausedAt",
+        "totalPausedMs",
       ]);
 
       // Check both recording flag AND recorderSession to avoid race conditions
@@ -41,20 +44,25 @@ export const handleTabUpdate = async (tabId, changeInfo, tab) => {
       }
 
       if (recordingStartTime) {
-        // Check if alarm
+        const now = Date.now();
+        const basePaused = totalPausedMs || 0;
+        const extraPaused =
+          paused && pausedAt ? Math.max(0, now - pausedAt) : 0;
+
+        const elapsed = Math.max(
+          0,
+          Math.floor(
+            (now - recordingStartTime - basePaused - extraPaused) / 1000
+          )
+        );
+
         const { alarm } = await chrome.storage.local.get(["alarm"]);
         if (alarm) {
           const { alarmTime } = await chrome.storage.local.get(["alarmTime"]);
-          const seconds = parseFloat(alarmTime);
-          const time = Math.floor((Date.now() - recordingStartTime) / 1000);
-          const remaining = seconds - time;
-          sendMessageTab(tabId, {
-            type: "time",
-            time: remaining,
-          });
+          const remaining = Math.max(0, Math.floor(alarmTime - elapsed));
+          sendMessageTab(activeInfo.tabId, { type: "time", time: remaining });
         } else {
-          const time = Math.floor((Date.now() - recordingStartTime) / 1000);
-          sendMessageTab(tabId, { type: "time", time: time });
+          sendMessageTab(activeInfo.tabId, { type: "time", time: elapsed });
         }
       }
 

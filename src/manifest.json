@@ -101,7 +101,7 @@
     "managed_schema": "schema.json"
   },
   "externally_connectable": {
-    "matches": ["https://app.screenity.io/*"]
+    "matches": ["https://app.screenity.io/*", "http://localhost:3000/*"]
   },
   "optional_permissions": [
     "offscreen",

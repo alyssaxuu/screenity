@@ -164,6 +164,9 @@ const ContentState = (props) => {
       recording: false,
       restarting: false,
       tabRecordedID: null,
+      pausedAt: null,
+      paused: false,
+      totalPausedMs: 0,
     });
     setContentState((prevContentState) => ({
       ...prevContentState,
@@ -202,9 +205,15 @@ const ContentState = (props) => {
   const pauseRecording = useCallback((dismiss) => {
     chrome.runtime.sendMessage({ type: "pause-recording-tab" });
 
+    const now = Date.now();
+    chrome.storage.local.set({
+      paused: true,
+      pausedAt: now,
+    });
+
     setTimeout(() => {
-      setContentState((prevContentState) => ({
-        ...prevContentState,
+      setContentState((prev) => ({
+        ...prev,
         paused: true,
       }));
       if (!dismiss) {
@@ -218,8 +227,22 @@ const ContentState = (props) => {
 
   const resumeRecording = useCallback(() => {
     chrome.runtime.sendMessage({ type: "resume-recording-tab" });
-    setContentState((prevContentState) => ({
-      ...prevContentState,
+
+    const now = Date.now();
+    chrome.storage.local.get(["pausedAt", "totalPausedMs"], (s) => {
+      const pausedAt = s.pausedAt || now;
+      const totalPausedMs = s.totalPausedMs || 0;
+      const additional = Math.max(0, now - pausedAt);
+
+      chrome.storage.local.set({
+        paused: false,
+        pausedAt: null,
+        totalPausedMs: totalPausedMs + additional,
+      });
+    });
+
+    setContentState((prev) => ({
+      ...prev,
       paused: false,
     }));
   });
@@ -242,6 +265,11 @@ const ContentState = (props) => {
       blurMode: false,
       drawingMode: false,
     }));
+    chrome.storage.local.set({
+      paused: false,
+      pausedAt: null,
+      totalPausedMs: 0,
+    });
     // Remove blur from all elements
     const elements = document.querySelectorAll(".screenity-blur");
     elements.forEach((element) => {
@@ -673,6 +701,22 @@ const ContentState = (props) => {
     }));
     chrome.storage.local.set({ askForPermissions: false });
   });
+
+  useEffect(() => {
+    const onChanged = (changes, area) => {
+      if (area !== "local") return;
+
+      if (changes.paused) {
+        setContentState((prev) => ({
+          ...prev,
+          paused: Boolean(changes.paused.newValue),
+        }));
+      }
+    };
+
+    chrome.storage.onChanged.addListener(onChanged);
+    return () => chrome.storage.onChanged.removeListener(onChanged);
+  }, []);
 
   useEffect(() => {
     const handleMessage = (event) => {

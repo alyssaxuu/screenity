@@ -286,14 +286,14 @@ export const setupHandlers = () => {
   registerMessage("is-pinned", async () => await isPinned());
 
   // Prevent Chrome from discarding the CloudRecorder tab during recording
-  registerMessage("set-tab-auto-discardable", async ({ payload }, sender) => {
+  registerMessage("set-tab-auto-discardable", async (message, sender) => {
     try {
       const tabId = sender?.tab?.id;
-      if (tabId) {
-        await chrome.tabs.update(tabId, {
-          autoDiscardable: payload.discardable,
-        });
-      }
+      const discardable = message?.discardable;
+
+      if (!tabId || typeof discardable !== "boolean") return;
+
+      await chrome.tabs.update(tabId, { autoDiscardable: discardable });
     } catch (err) {
       console.warn("Failed to set tab autoDiscardable:", err);
     }

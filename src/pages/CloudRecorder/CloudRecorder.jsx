@@ -699,7 +699,7 @@ const CloudRecorder = () => {
       uploadMetaRef.current = null;
 
       // FLAG: decide whether to close or not
-      //window.close();
+      // window.close();
       return;
     }
 
@@ -727,7 +727,18 @@ const CloudRecorder = () => {
     isInit.current = false;
 
     // FLAG: decide whether to close or not
-    //window.close();
+    if (!IS_IFRAME_CONTEXT) {
+      try {
+        window.close();
+      } catch {}
+      return;
+    }
+    // iframe context
+    try {
+      window.parent.postMessage({ type: "screenity-exit", mode }, "*");
+    } catch {}
+    // fallback
+    window.location.reload();
   };
 
   const restartRecording = async () => {
@@ -1805,31 +1816,31 @@ const CloudRecorder = () => {
 
   const startAudioStream = async (id) => {
     const audioStreamOptions = {
-      audio: {
-        deviceId: id ? { exact: id } : undefined,
-      },
+      audio: { deviceId: id ? { exact: id } : undefined },
     };
 
     try {
-      const stream = await navigator.mediaDevices.getUserMedia(
-        audioStreamOptions
-      );
-      return stream;
+      return await navigator.mediaDevices.getUserMedia(audioStreamOptions);
     } catch (err) {
       console.warn(
         "⚠️ Failed to access audio with deviceId, trying fallback:",
         err
       );
-
-      // Fallback without deviceId
       try {
-        const fallbackStream = await navigator.mediaDevices.getUserMedia({
-          audio: true,
-        });
-        return fallbackStream;
+        return await navigator.mediaDevices.getUserMedia({ audio: true });
       } catch (err2) {
-        console.error("❌ Failed to access audio stream:", err2);
-        sendRecordingError("Failed to access audio stream: " + err2.message);
+        console.warn(
+          "⚠️ Microphone blocked/unavailable; continuing without mic:",
+          err2
+        );
+
+        // Optional: small non-fatal UI signal
+        chrome.runtime.sendMessage({
+          type: "show-toast",
+          message:
+            "Microphone permission is blocked. Recording will be silent.",
+        });
+
         return null;
       }
     }
@@ -1924,10 +1935,22 @@ const CloudRecorder = () => {
               cameraConstraints
             );
           } catch (err) {
-            sendRecordingError(
-              "Failed to access camera stream: " + err.message
+            console.warn(
+              "⚠️ Camera permission denied — continuing without camera:",
+              err
             );
-            return;
+            cameraStream.current = null;
+
+            // keep UI consistent (optional)
+            await chrome.storage.local.set({ cameraActive: false });
+
+            // only fatal if the user is doing camera-only recording
+            if (data.recordingType === "camera") {
+              sendRecordingError(
+                "Camera permission is blocked. Please allow camera access to record."
+              );
+              return;
+            }
           }
         }
 
@@ -2063,10 +2086,22 @@ const CloudRecorder = () => {
               cameraConstraints
             );
           } catch (err) {
-            sendRecordingError(
-              "Failed to access camera stream: " + err.message
+            console.warn(
+              "⚠️ Camera permission denied — continuing without camera:",
+              err
             );
-            return;
+            cameraStream.current = null;
+
+            // keep UI consistent (optional)
+            await chrome.storage.local.set({ cameraActive: false });
+
+            // only fatal if the user is doing camera-only recording
+            if (data.recordingType === "camera") {
+              sendRecordingError(
+                "Camera permission is blocked. Please allow camera access to record."
+              );
+              return;
+            }
           }
         }
       }
