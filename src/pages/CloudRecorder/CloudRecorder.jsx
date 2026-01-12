@@ -92,6 +92,7 @@ const CloudRecorder = () => {
   const recoveryAttempted = useRef(false);
   const screenTrackLostRef = useRef(false);
   const screenTrackMonitor = useRef(null);
+  const pausedStateRef = useRef(false);
 
   // This checks if the recording was previously initialized
   const isInit = useRef(false);
@@ -557,6 +558,14 @@ const CloudRecorder = () => {
     }
   };
 
+  const setRecordingTimingState = async (nextState) => {
+    try {
+      await chrome.storage.local.set(nextState);
+    } catch (err) {
+      console.warn("Failed to persist recording timing state:", err);
+    }
+  };
+
   const flushPendingChunks = async () => {
     if (screenUploader.current) {
       try {
@@ -627,6 +636,14 @@ const CloudRecorder = () => {
 
     // Stop the silent audio keep-alive
     stopTabKeepAlive();
+    await setRecordingTimingState({
+      recording: false,
+      paused: false,
+      recordingStartTime: null,
+      pausedAt: null,
+      totalPausedMs: 0,
+    });
+    pausedStateRef.current = false;
 
     const { projectId, multiMode, multiSceneCount, recordingToScene } =
       await chrome.storage.local.get([
@@ -1184,7 +1201,15 @@ const CloudRecorder = () => {
       screenTimer.current.notificationInterval = timerInterval;
       screenTimer.current.warned = warned;
 
-      chrome.storage.local.set({ recording: true });
+      const recordingStartTime = Date.now();
+      await setRecordingTimingState({
+        recording: true,
+        paused: false,
+        recordingStartTime,
+        pausedAt: null,
+        totalPausedMs: 0,
+      });
+      pausedStateRef.current = false;
       persistSessionState({ status: "recording" });
       setStarted(true);
     } catch (err) {
@@ -1623,7 +1648,14 @@ const CloudRecorder = () => {
       }
     }
     isFinishing.current = true;
-    chrome.storage.local.set({ recording: false });
+    await setRecordingTimingState({
+      recording: false,
+      paused: false,
+      recordingStartTime: null,
+      pausedAt: null,
+      totalPausedMs: 0,
+    });
+    pausedStateRef.current = false;
     stopAllIntervals();
 
     await stopAllRecorders();
@@ -2357,6 +2389,7 @@ const CloudRecorder = () => {
       return true;
     } else if (request.type === "pause-recording-tab") {
       if (!isInit.current) return;
+      if (pausedStateRef.current) return;
 
       // Pause all active recorders
       if (
@@ -2387,8 +2420,14 @@ const CloudRecorder = () => {
         cameraTimer.current.total += now - cameraTimer.current.start;
         cameraTimer.current.paused = true;
       }
+      pausedStateRef.current = true;
+      void setRecordingTimingState({
+        paused: true,
+        pausedAt: now,
+      });
     } else if (request.type === "resume-recording-tab") {
       if (!isInit.current) return;
+      if (!pausedStateRef.current) return;
 
       // Resume all paused recorders
       if (screenRecorder.current && screenRecorder.current.state === "paused") {
@@ -2410,6 +2449,23 @@ const CloudRecorder = () => {
         cameraTimer.current.start = now;
         cameraTimer.current.paused = false;
       }
+      pausedStateRef.current = false;
+      void (async () => {
+        try {
+          const { pausedAt, totalPausedMs } = await chrome.storage.local.get([
+            "pausedAt",
+            "totalPausedMs",
+          ]);
+          const additional = pausedAt ? Math.max(0, now - pausedAt) : 0;
+          await setRecordingTimingState({
+            paused: false,
+            pausedAt: null,
+            totalPausedMs: (totalPausedMs || 0) + additional,
+          });
+        } catch (err) {
+          console.warn("Failed to update resume timing state:", err);
+        }
+      })();
     } else if (request.type === "dismiss-recording") {
       if (!isInit.current) return;
       dismissRecording();

@@ -5,6 +5,9 @@ export const handleTabUpdate = async (tabId, changeInfo, tab) => {
     if (changeInfo.status === "complete") {
       const {
         recording,
+        paused,
+        pausedAt,
+        totalPausedMs,
         restarting,
         tabRecordedID,
         pendingRecording,
@@ -12,14 +15,14 @@ export const handleTabUpdate = async (tabId, changeInfo, tab) => {
         recorderSession,
       } = await chrome.storage.local.get([
         "recording",
+        "paused",
+        "pausedAt",
+        "totalPausedMs",
         "restarting",
         "tabRecordedID",
         "pendingRecording",
         "recordingStartTime",
         "recorderSession",
-        "paused",
-        "pausedAt",
-        "totalPausedMs",
       ]);
 
       // Check both recording flag AND recorderSession to avoid race conditions
@@ -60,9 +63,9 @@ export const handleTabUpdate = async (tabId, changeInfo, tab) => {
         if (alarm) {
           const { alarmTime } = await chrome.storage.local.get(["alarmTime"]);
           const remaining = Math.max(0, Math.floor(alarmTime - elapsed));
-          sendMessageTab(activeInfo.tabId, { type: "time", time: remaining });
+          sendMessageTab(tabId, { type: "time", time: remaining });
         } else {
-          sendMessageTab(activeInfo.tabId, { type: "time", time: elapsed });
+          sendMessageTab(tabId, { type: "time", time: elapsed });
         }
       }
 

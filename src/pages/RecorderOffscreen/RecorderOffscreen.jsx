@@ -20,6 +20,7 @@ const RecorderOffscreen = () => {
   const index = useRef(0);
   const lastTimecode = useRef(0);
   const hasChunks = useRef(false);
+  const pausedStateRef = useRef(false);
 
   const [started, setStarted] = useState(false);
 
@@ -56,6 +57,17 @@ const RecorderOffscreen = () => {
   const MIN_HEADROOM = 25 * 1024 * 1024;
   const MAX_PENDING_BYTES = 8 * 1024 * 1024;
   const pendingBytes = useRef(0);
+
+  const setRecordingTimingState = async (nextState) => {
+    try {
+      await chrome.storage.local.set(nextState);
+    } catch (err) {
+      console.warn(
+        "[RecorderOffscreen] Failed to persist recording timing state",
+        err
+      );
+    }
+  };
 
   async function canFitChunk(byteLength) {
     const now = performance.now();
@@ -260,11 +272,6 @@ const RecorderOffscreen = () => {
       return;
     }
 
-    chrome.storage.local.set({
-      recording: true,
-      restarting: false,
-    });
-
     isRestarting.current = false;
     index.current = 0;
 
@@ -278,6 +285,20 @@ const RecorderOffscreen = () => {
       });
       return;
     }
+
+    const recordingStartTime = Date.now();
+    await setRecordingTimingState({
+      recording: true,
+      paused: false,
+      recordingStartTime,
+      pausedAt: null,
+      totalPausedMs: 0,
+    });
+    pausedStateRef.current = false;
+    chrome.storage.local.set({
+      recording: true,
+      restarting: false,
+    });
 
     recorder.current.onerror = (ev) => {
       chrome.runtime.sendMessage({
@@ -390,6 +411,14 @@ const RecorderOffscreen = () => {
 
   async function stopRecording() {
     isFinishing.current = true;
+    await setRecordingTimingState({
+      recording: false,
+      paused: false,
+      recordingStartTime: null,
+      pausedAt: null,
+      totalPausedMs: 0,
+    });
+    pausedStateRef.current = false;
     if (recorder.current) {
       try {
         recorder.current.requestData();
@@ -416,6 +445,14 @@ const RecorderOffscreen = () => {
   }
 
   const dismissRecording = async () => {
+    await setRecordingTimingState({
+      recording: false,
+      paused: false,
+      recordingStartTime: null,
+      pausedAt: null,
+      totalPausedMs: 0,
+    });
+    pausedStateRef.current = false;
     isRestarting.current = true;
     if (recorder.current !== null) {
       recorder.current.stop();
@@ -426,6 +463,7 @@ const RecorderOffscreen = () => {
 
   const restartRecording = async () => {
     isRestarting.current = true;
+    pausedStateRef.current = false;
     if (recorder.current !== null) {
       recorder.current.stop();
     }
@@ -719,10 +757,39 @@ const RecorderOffscreen = () => {
         setAudioOutputVolume(request.volume);
       } else if (request.type === "pause-recording-tab") {
         if (!recorder.current) return;
+        if (pausedStateRef.current) return;
+        const now = Date.now();
         recorder.current.pause();
+        pausedStateRef.current = true;
+        void setRecordingTimingState({
+          paused: true,
+          pausedAt: now,
+        });
       } else if (request.type === "resume-recording-tab") {
         if (!recorder.current) return;
+        if (!pausedStateRef.current) return;
         recorder.current.resume();
+        const now = Date.now();
+        pausedStateRef.current = false;
+        void (async () => {
+          try {
+            const { pausedAt, totalPausedMs } = await chrome.storage.local.get([
+              "pausedAt",
+              "totalPausedMs",
+            ]);
+            const additional = pausedAt ? Math.max(0, now - pausedAt) : 0;
+            await setRecordingTimingState({
+              paused: false,
+              pausedAt: null,
+              totalPausedMs: (totalPausedMs || 0) + additional,
+            });
+          } catch (err) {
+            console.warn(
+              "[RecorderOffscreen] Failed to update resume timing state",
+              err
+            );
+          }
+        })();
       } else if (request.type === "dismiss-recording") {
         dismissRecording();
       }

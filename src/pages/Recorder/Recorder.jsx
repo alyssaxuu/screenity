@@ -90,16 +90,24 @@ const Recorder = () => {
   const uiClosing = useRef(false);
 
   const isRecording = useRef(false);
+  const pausedStateRef = useRef(false);
 
   // Keep-alive mechanism to prevent Chrome from freezing this background tab
   const keepAliveAudioCtx = useRef(null);
   const keepAliveOscillator = useRef(null);
 
-  // Session state for recovery and diagnostics
   const recordingStartTime = useRef(null);
   const sessionHeartbeat = useRef(null);
 
   debug("Recorder component mounted");
+
+  const setRecordingTimingState = async (nextState) => {
+    try {
+      await chrome.storage.local.set(nextState);
+    } catch (err) {
+      debugWarn("Failed to persist recording timing state", err);
+    }
+  };
 
   async function canFitChunk(byteLength) {
     const now = performance.now();
@@ -429,10 +437,15 @@ const Recorder = () => {
       fps,
     });
 
-    chrome.storage.local.set({
+    await setRecordingTimingState({
       recording: true,
-      restarting: false,
+      paused: false,
+      recordingStartTime: recordingStartTime.current,
+      pausedAt: null,
+      totalPausedMs: 0,
     });
+    pausedStateRef.current = false;
+    chrome.storage.local.set({ restarting: false });
 
     isRecording.current = true;
     isRestarting.current = false;
@@ -825,6 +838,14 @@ const Recorder = () => {
     // Stop the session heartbeat and persist final state
     stopSessionHeartbeat();
     persistSessionState("stopping");
+    await setRecordingTimingState({
+      recording: false,
+      paused: false,
+      recordingStartTime: null,
+      pausedAt: null,
+      totalPausedMs: 0,
+    });
+    pausedStateRef.current = false;
 
     try {
       if (
@@ -867,7 +888,7 @@ const Recorder = () => {
     }
   }
 
-  const dismissRecording = () => {
+  const dismissRecording = async () => {
     debug("dismissRecording()");
     uiClosing.current = true;
     isRecording.current = false;
@@ -876,6 +897,14 @@ const Recorder = () => {
     stopTabKeepAlive();
     stopSessionHeartbeat();
     persistSessionState("dismissed");
+    await setRecordingTimingState({
+      recording: false,
+      paused: false,
+      recordingStartTime: null,
+      pausedAt: null,
+      totalPausedMs: 0,
+    });
+    pausedStateRef.current = false;
 
     window.close();
   };
@@ -892,6 +921,7 @@ const Recorder = () => {
     isRecording.current = false;
     sentLast.current = false;
     isFinishing.current = false;
+    pausedStateRef.current = false;
 
     try {
       if (
@@ -1339,6 +1369,7 @@ const Recorder = () => {
         setAudioOutputVolume(request.volume);
       } else if (request.type === "pause-recording-tab") {
         if (!recorder.current) return;
+        if (pausedStateRef.current) return;
         if (
           useWebCodecs.current &&
           recorder.current instanceof WebCodecsRecorder
@@ -1349,8 +1380,15 @@ const Recorder = () => {
           debug("Pausing MediaRecorder");
           recorder.current.pause();
         }
+        const now = Date.now();
+        pausedStateRef.current = true;
+        void setRecordingTimingState({
+          paused: true,
+          pausedAt: now,
+        });
       } else if (request.type === "resume-recording-tab") {
         if (!recorder.current) return;
+        if (!pausedStateRef.current) return;
         if (
           useWebCodecs.current &&
           recorder.current instanceof WebCodecsRecorder
@@ -1361,6 +1399,24 @@ const Recorder = () => {
           debug("Resuming MediaRecorder");
           recorder.current.resume();
         }
+        const now = Date.now();
+        pausedStateRef.current = false;
+        void (async () => {
+          try {
+            const { pausedAt, totalPausedMs } = await chrome.storage.local.get([
+              "pausedAt",
+              "totalPausedMs",
+            ]);
+            const additional = pausedAt ? Math.max(0, now - pausedAt) : 0;
+            await setRecordingTimingState({
+              paused: false,
+              pausedAt: null,
+              totalPausedMs: (totalPausedMs || 0) + additional,
+            });
+          } catch (err) {
+            debugWarn("Failed to update resume timing state", err);
+          }
+        })();
       } else if (request.type === "dismiss-recording") {
         dismissRecording();
       }

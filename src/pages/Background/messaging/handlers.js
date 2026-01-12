@@ -959,17 +959,27 @@ export const setupHandlers = () => {
     return await loginWithWebsite();
   });
   registerMessage("sync-recording-state", async (message, sendResponse) => {
-    const { recording, paused, recordingStartTime, pendingRecording } =
-      await chrome.storage.local.get([
-        "recording",
-        "paused",
-        "recordingStartTime",
-        "pendingRecording",
-      ]);
+    const {
+      recording,
+      paused,
+      recordingStartTime,
+      pausedAt,
+      totalPausedMs,
+      pendingRecording,
+    } = await chrome.storage.local.get([
+      "recording",
+      "paused",
+      "recordingStartTime",
+      "pausedAt",
+      "totalPausedMs",
+      "pendingRecording",
+    ]);
     sendResponse({
       recording: Boolean(recording),
       paused: Boolean(paused),
       recordingStartTime: recordingStartTime || null,
+      pausedAt: pausedAt || null,
+      totalPausedMs: totalPausedMs || 0,
       pendingRecording: Boolean(pendingRecording),
     });
     return true;

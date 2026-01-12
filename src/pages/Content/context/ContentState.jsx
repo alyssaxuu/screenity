@@ -99,17 +99,14 @@ const ContentState = (props) => {
       pendingRecording: false,
       preparingRecording: false,
     }));
-    chrome.storage.local.set({
-      recording: true,
-      restarting: false,
-    });
+    chrome.storage.local.set({ restarting: false });
 
     // This cannot be triggered from here because the user might not have the page focused
     //chrome.runtime.sendMessage({ type: "start-recording" });
   }, []);
 
   const restartRecording = useCallback(() => {
-    chrome.storage.local.set({ recording: false, restarting: true });
+    chrome.storage.local.set({ restarting: true });
     setTimeout(() => {
       chrome.runtime.sendMessage({ type: "discard-backup-restart" });
       chrome.runtime.sendMessage({ type: "restart-recording-tab" });
@@ -161,12 +158,8 @@ const ContentState = (props) => {
   const stopRecording = useCallback(() => {
     chrome.runtime.sendMessage({ type: "clear-recording-alarm" });
     chrome.storage.local.set({
-      recording: false,
       restarting: false,
       tabRecordedID: null,
-      pausedAt: null,
-      paused: false,
-      totalPausedMs: 0,
     });
     setContentState((prevContentState) => ({
       ...prevContentState,
@@ -203,13 +196,8 @@ const ContentState = (props) => {
   });
 
   const pauseRecording = useCallback((dismiss) => {
+    if (contentStateRef.current?.paused) return;
     chrome.runtime.sendMessage({ type: "pause-recording-tab" });
-
-    const now = Date.now();
-    chrome.storage.local.set({
-      paused: true,
-      pausedAt: now,
-    });
 
     setTimeout(() => {
       setContentState((prev) => ({
@@ -226,20 +214,8 @@ const ContentState = (props) => {
   });
 
   const resumeRecording = useCallback(() => {
+    if (!contentStateRef.current?.paused) return;
     chrome.runtime.sendMessage({ type: "resume-recording-tab" });
-
-    const now = Date.now();
-    chrome.storage.local.get(["pausedAt", "totalPausedMs"], (s) => {
-      const pausedAt = s.pausedAt || now;
-      const totalPausedMs = s.totalPausedMs || 0;
-      const additional = Math.max(0, now - pausedAt);
-
-      chrome.storage.local.set({
-        paused: false,
-        pausedAt: null,
-        totalPausedMs: totalPausedMs + additional,
-      });
-    });
 
     setContentState((prev) => ({
       ...prev,
@@ -265,11 +241,6 @@ const ContentState = (props) => {
       blurMode: false,
       drawingMode: false,
     }));
-    chrome.storage.local.set({
-      paused: false,
-      pausedAt: null,
-      totalPausedMs: 0,
-    });
     // Remove blur from all elements
     const elements = document.querySelectorAll(".screenity-blur");
     elements.forEach((element) => {
@@ -593,7 +564,9 @@ const ContentState = (props) => {
 
   const tryDismissRecording = useCallback(() => {
     if (contentStateRef.current.askDismiss) {
-      contentStateRef.current.pauseRecording(true);
+      if (!contentStateRef.current.paused) {
+        contentStateRef.current.pauseRecording(true);
+      }
       contentStateRef.current.openModal(
         chrome.i18n.getMessage("discardModalTitle"),
         chrome.i18n.getMessage("discardModalDescription"),
@@ -701,22 +674,6 @@ const ContentState = (props) => {
     }));
     chrome.storage.local.set({ askForPermissions: false });
   });
-
-  useEffect(() => {
-    const onChanged = (changes, area) => {
-      if (area !== "local") return;
-
-      if (changes.paused) {
-        setContentState((prev) => ({
-          ...prev,
-          paused: Boolean(changes.paused.newValue),
-        }));
-      }
-    };
-
-    chrome.storage.onChanged.addListener(onChanged);
-    return () => chrome.storage.onChanged.removeListener(onChanged);
-  }, []);
 
   useEffect(() => {
     const handleMessage = (event) => {
@@ -1016,26 +973,82 @@ const ContentState = (props) => {
     }
   }, [contentState.openModal]);
 
-  // Count up every second
-  useEffect(() => {
-    if (contentState.recording && !contentState.paused && !contentState.alarm) {
-      setTimer((timer) => timer + 1);
-      const interval = setInterval(() => {
-        setTimer((timer) => timer + 1);
-      }, 1000);
-      return () => clearInterval(interval);
-    } else if (
-      contentState.alarm &&
-      !contentState.paused &&
-      contentState.recording &&
-      contentState.timer > 0
-    ) {
-      const interval = setInterval(() => {
-        setTimer((timer) => timer - 1);
-      }, 1000);
-      return () => clearInterval(interval);
+  const updateTimerFromStorage = useCallback(async () => {
+    const {
+      recording,
+      recordingStartTime,
+      paused,
+      pausedAt,
+      totalPausedMs,
+    } = await chrome.storage.local.get([
+      "recording",
+      "recordingStartTime",
+      "paused",
+      "pausedAt",
+      "totalPausedMs",
+    ]);
+
+    if (!recording || !recordingStartTime) {
+      setTimer(0);
+      return;
     }
-  }, [contentState.recording, contentState.paused]);
+
+    const now = Date.now();
+    const basePaused = totalPausedMs || 0;
+    const extraPaused =
+      paused && pausedAt ? Math.max(0, now - pausedAt) : 0;
+    const elapsedSeconds = Math.max(
+      0,
+      Math.floor((now - recordingStartTime - basePaused - extraPaused) / 1000)
+    );
+
+    if (contentStateRef.current?.alarm) {
+      const alarmTime = contentStateRef.current?.alarmTime || 0;
+      setTimer(Math.max(0, alarmTime - elapsedSeconds));
+      return;
+    }
+
+    setTimer(elapsedSeconds);
+  }, []);
+
+  useEffect(() => {
+    updateTimerFromStorage();
+    const interval = setInterval(() => {
+      updateTimerFromStorage();
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [updateTimerFromStorage]);
+
+  useEffect(() => {
+    const onChanged = (changes, area) => {
+      if (area !== "local") return;
+
+      if (changes.paused) {
+        setContentState((prev) => ({
+          ...prev,
+          paused: Boolean(changes.paused.newValue),
+        }));
+      }
+      if (changes.recording) {
+        setContentState((prev) => ({
+          ...prev,
+          recording: Boolean(changes.recording.newValue),
+        }));
+      }
+      if (
+        changes.paused ||
+        changes.recording ||
+        changes.recordingStartTime ||
+        changes.pausedAt ||
+        changes.totalPausedMs
+      ) {
+        updateTimerFromStorage();
+      }
+    };
+
+    chrome.storage.onChanged.addListener(onChanged);
+    return () => chrome.storage.onChanged.removeListener(onChanged);
+  }, [updateTimerFromStorage]);
 
   useEffect(() => {
     if (!contentState.customRegion) {
@@ -1076,22 +1089,6 @@ const ContentState = (props) => {
     }
   }, []);
 
-  // Check recording start time
-  useEffect(() => {
-    chrome.storage.local.get(["recordingStartTime"], (result) => {
-      if (result.recordingStartTime && contentStateRef.current.recording) {
-        const recordingStartTime = result.recordingStartTime;
-        const currentTime = new Date().getTime();
-        const timeElapsed = currentTime - recordingStartTime;
-        const timeElapsedSeconds = Math.floor(timeElapsed / 1000);
-        if (contentState.alarm) {
-          setTimer(contentState.alarmTime - timeElapsedSeconds);
-        } else {
-          setTimer(timeElapsedSeconds);
-        }
-      }
-    });
-  }, []);
 
   useEffect(() => {
     if (contentState.pushToTalk) {

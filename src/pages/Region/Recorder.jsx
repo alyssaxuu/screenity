@@ -23,6 +23,7 @@ const Recorder = () => {
   const lastTimecode = useRef(0);
   const hasChunks = useRef(false);
   const lastSize = useRef(0);
+  const pausedStateRef = useRef(false);
 
   // Main stream (recording)
   const liveStream = useRef(null);
@@ -59,6 +60,17 @@ const Recorder = () => {
   const MIN_HEADROOM = 25 * 1024 * 1024;
   const MAX_PENDING_BYTES = 8 * 1024 * 1024;
   const pendingBytes = useRef(0);
+
+  const setRecordingTimingState = async (nextState) => {
+    try {
+      await chrome.storage.local.set(nextState);
+    } catch (err) {
+      console.warn(
+        "[Region Recorder] Failed to persist recording timing state",
+        err
+      );
+    }
+  };
 
   async function canFitChunk(byteLength) {
     const now = performance.now();
@@ -320,11 +332,6 @@ const Recorder = () => {
       return;
     }
 
-    chrome.storage.local.set({
-      recording: true,
-      restarting: false,
-    });
-
     isRestarting.current = false;
     index.current = 0;
     recordingRef.current = true;
@@ -345,6 +352,20 @@ const Recorder = () => {
       window.location.reload();
       return;
     }
+
+    const recordingStartTime = Date.now();
+    await setRecordingTimingState({
+      recording: true,
+      paused: false,
+      recordingStartTime,
+      pausedAt: null,
+      totalPausedMs: 0,
+    });
+    pausedStateRef.current = false;
+    chrome.storage.local.set({
+      recording: true,
+      restarting: false,
+    });
 
     recorder.current.onerror = (ev) => {
       chrome.runtime.sendMessage({
@@ -489,6 +510,14 @@ const Recorder = () => {
   async function stopRecording() {
     isFinishing.current = true;
     regionRef.current = false;
+    await setRecordingTimingState({
+      recording: false,
+      paused: false,
+      recordingStartTime: null,
+      pausedAt: null,
+      totalPausedMs: 0,
+    });
+    pausedStateRef.current = false;
 
     if (recorder.current) {
       try {
@@ -529,6 +558,14 @@ const Recorder = () => {
 
   const dismissRecording = async () => {
     regionRef.current = false;
+    await setRecordingTimingState({
+      recording: false,
+      paused: false,
+      recordingStartTime: null,
+      pausedAt: null,
+      totalPausedMs: 0,
+    });
+    pausedStateRef.current = false;
     chrome.runtime.sendMessage({ type: "handle-dismiss" });
     isRestarting.current = true;
     isDismissing.current = true;
@@ -561,6 +598,7 @@ const Recorder = () => {
   const restartRecording = async () => {
     isRestarting.current = true;
     isDismissing.current = false;
+    pausedStateRef.current = false;
     if (recorder.current) {
       recorder.current.stop();
     }
@@ -827,10 +865,39 @@ const Recorder = () => {
         setAudioOutputVolume(request.volume);
       } else if (request.type === "pause-recording-tab") {
         if (!recorder.current) return;
+        if (pausedStateRef.current) return;
         recorder.current.pause();
+        const now = Date.now();
+        pausedStateRef.current = true;
+        void setRecordingTimingState({
+          paused: true,
+          pausedAt: now,
+        });
       } else if (request.type === "resume-recording-tab") {
         if (!recorder.current) return;
+        if (!pausedStateRef.current) return;
         recorder.current.resume();
+        const now = Date.now();
+        pausedStateRef.current = false;
+        void (async () => {
+          try {
+            const { pausedAt, totalPausedMs } = await chrome.storage.local.get([
+              "pausedAt",
+              "totalPausedMs",
+            ]);
+            const additional = pausedAt ? Math.max(0, now - pausedAt) : 0;
+            await setRecordingTimingState({
+              paused: false,
+              pausedAt: null,
+              totalPausedMs: (totalPausedMs || 0) + additional,
+            });
+          } catch (err) {
+            console.warn(
+              "[Region Recorder] Failed to update resume timing state",
+              err
+            );
+          }
+        })();
       } else if (request.type === "dismiss-recording") {
         dismissRecording();
       }

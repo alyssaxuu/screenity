@@ -13,6 +13,7 @@ export const updateFromStorage = (check = true, id = null) => {
       "cameraActive",
       "micActive",
       "recording",
+      "paused",
       "backgroundEffect",
       "backgroundEffectsActive",
       "toolbarPosition",
@@ -122,6 +123,10 @@ export const updateFromStorage = (check = true, id = null) => {
           result.recording !== undefined && result.recording !== null
             ? result.recording
             : prevContentState.recording,
+        paused:
+          result.paused !== undefined && result.paused !== null
+            ? result.paused
+            : prevContentState.paused,
         recordingType:
           result.recordingType !== undefined && result.recordingType !== null
             ? result.recordingType

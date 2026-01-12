@@ -5,18 +5,21 @@ export const handleTabActivation = async (activeInfo) => {
     const {
       recordingStartTime,
       recording,
+      paused,
+      pausedAt,
+      totalPausedMs,
       restarting,
       pendingRecording,
       recorderSession,
     } = await chrome.storage.local.get([
       "recordingStartTime",
       "recording",
-      "restarting",
-      "pendingRecording",
-      "recorderSession",
       "paused",
       "pausedAt",
       "totalPausedMs",
+      "restarting",
+      "pendingRecording",
+      "recorderSession",
     ]);
 
     // Get the activated tab

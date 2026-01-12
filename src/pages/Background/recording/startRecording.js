@@ -2,9 +2,7 @@ import { sendMessageRecord } from "./sendMessageRecord";
 
 export const startRecording = async () => {
   chrome.storage.local.set({
-    recordingStartTime: Date.now(),
     restarting: false,
-    recording: true,
   });
 
   // Check if customRegion is set
@@ -57,7 +55,6 @@ export const startAfterCountdown = async () => {
 
     // If there is an active recording tab or offscreen document, begin recording
     if (recordingTab !== null || offscreen) {
-      await chrome.storage.local.set({ recording: true });
       startRecording();
     }
   } catch (error) {
