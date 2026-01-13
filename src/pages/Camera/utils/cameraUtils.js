@@ -1,5 +1,6 @@
 import { getContextRefs } from "../context/CameraContext";
 import { setPipMode } from "./uiState";
+import { getUserMediaWithFallback } from "../../utils/mediaDeviceFallback";
 
 const CLOUD_FEATURES_ENABLED =
   process.env.SCREENITY_ENABLE_CLOUD_FEATURES === "true";
@@ -41,7 +42,47 @@ export const getCameraStream = async (
   }
 
   try {
-    const stream = await navigator.mediaDevices.getUserMedia(constraints);
+    const desiredVideoId = constraints?.video?.deviceId?.exact || null;
+    let desiredVideoLabel = "";
+
+    if (desiredVideoId) {
+      const { defaultVideoInputLabel, videoinput, videoInput } =
+        await chrome.storage.local.get([
+          "defaultVideoInputLabel",
+          "videoinput",
+          "videoInput",
+        ]);
+      const storedDevices = Array.isArray(videoinput)
+        ? videoinput
+        : Array.isArray(videoInput)
+        ? videoInput
+        : [];
+      desiredVideoLabel =
+        defaultVideoInputLabel ||
+        storedDevices.find((device) => device.deviceId === desiredVideoId)
+          ?.label ||
+        "";
+    }
+
+    const stream = await getUserMediaWithFallback({
+      constraints,
+      fallbacks:
+        desiredVideoId && desiredVideoLabel
+          ? [
+              {
+                kind: "videoinput",
+                desiredDeviceId: desiredVideoId,
+                desiredLabel: desiredVideoLabel,
+                onResolved: (resolvedId) => {
+                  chrome.storage.local.set({
+                    defaultVideoInput: resolvedId,
+                    defaultVideoInputLabel: desiredVideoLabel,
+                  });
+                },
+              },
+            ]
+          : [],
+    });
 
     streamRef.current = stream;
 

@@ -5,6 +5,7 @@ import { getBitrates, getResolutionForQuality } from "./recorderConfig";
 import BunnyTusUploader from "./bunnyTusUploader";
 import localforage from "localforage";
 import { createVideoProject } from "./createVideoProject";
+import { getUserMediaWithFallback } from "../utils/mediaDeviceFallback";
 
 localforage.config({
   driver: localforage.INDEXEDDB,
@@ -1847,12 +1848,41 @@ const CloudRecorder = () => {
   };
 
   const startAudioStream = async (id) => {
+    const useExact = id && id !== "none";
     const audioStreamOptions = {
-      audio: { deviceId: id ? { exact: id } : undefined },
+      audio: useExact ? { deviceId: { exact: id } } : true,
     };
 
     try {
-      return await navigator.mediaDevices.getUserMedia(audioStreamOptions);
+      const { defaultAudioInputLabel, audioinput } =
+        await chrome.storage.local.get([
+          "defaultAudioInputLabel",
+          "audioinput",
+        ]);
+      const desiredLabel =
+        defaultAudioInputLabel ||
+        audioinput?.find((device) => device.deviceId === id)?.label ||
+        "";
+
+      return await getUserMediaWithFallback({
+        constraints: audioStreamOptions,
+        fallbacks:
+          useExact && desiredLabel
+            ? [
+                {
+                  kind: "audioinput",
+                  desiredDeviceId: id,
+                  desiredLabel,
+                  onResolved: (resolvedId) => {
+                    chrome.storage.local.set({
+                      defaultAudioInput: resolvedId,
+                      defaultAudioInputLabel: desiredLabel,
+                    });
+                  },
+                },
+              ]
+            : [],
+      });
     } catch (err) {
       console.warn(
         "⚠️ Failed to access audio with deviceId, trying fallback:",
@@ -1876,6 +1906,41 @@ const CloudRecorder = () => {
         return null;
       }
     }
+  };
+
+  const getVideoStreamWithFallback = async (constraints, deviceId) => {
+    if (!deviceId || deviceId === "none") {
+      return navigator.mediaDevices.getUserMedia(constraints);
+    }
+    const { defaultVideoInputLabel, videoinput } =
+      await chrome.storage.local.get([
+        "defaultVideoInputLabel",
+        "videoinput",
+      ]);
+    const desiredLabel =
+      defaultVideoInputLabel ||
+      videoinput?.find((device) => device.deviceId === deviceId)?.label ||
+      "";
+
+    return getUserMediaWithFallback({
+      constraints,
+      fallbacks:
+        deviceId && desiredLabel
+          ? [
+              {
+                kind: "videoinput",
+                desiredDeviceId: deviceId,
+                desiredLabel,
+                onResolved: (resolvedId) => {
+                  chrome.storage.local.set({
+                    defaultVideoInput: resolvedId,
+                    defaultVideoInputLabel: desiredLabel,
+                  });
+                },
+              },
+            ]
+          : [],
+    });
   };
 
   const startStream = async (data, id, permissions, permissions2) => {
@@ -1963,8 +2028,9 @@ const CloudRecorder = () => {
           };
 
           try {
-            cameraStream.current = await navigator.mediaDevices.getUserMedia(
-              cameraConstraints
+            cameraStream.current = await getVideoStreamWithFallback(
+              cameraConstraints,
+              defaultVideoInput
             );
           } catch (err) {
             console.warn(
@@ -2114,8 +2180,9 @@ const CloudRecorder = () => {
           };
 
           try {
-            cameraStream.current = await navigator.mediaDevices.getUserMedia(
-              cameraConstraints
+            cameraStream.current = await getVideoStreamWithFallback(
+              cameraConstraints,
+              defaultVideoInput
             );
           } catch (err) {
             console.warn(

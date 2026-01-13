@@ -614,6 +614,37 @@ const ContentState = (props) => {
         microphonePermission: microphonePermission,
       }));
 
+      const audioInputById = Array.isArray(audioInput)
+        ? Object.fromEntries(
+            audioInput.map((device) => [device.deviceId, device.label])
+          )
+        : {};
+      const videoInputById = Array.isArray(videoInput)
+        ? Object.fromEntries(
+            videoInput.map((device) => [device.deviceId, device.label])
+          )
+        : {};
+
+      const defaultAudioInputLabel =
+        audioInputById[contentStateRef.current.defaultAudioInput] || "";
+      const defaultVideoInputLabel =
+        videoInputById[contentStateRef.current.defaultVideoInput] || "";
+
+      setContentState((prevContentState) => ({
+        ...prevContentState,
+        defaultAudioInputLabel:
+          defaultAudioInputLabel || prevContentState.defaultAudioInputLabel,
+        defaultVideoInputLabel:
+          defaultVideoInputLabel || prevContentState.defaultVideoInputLabel,
+      }));
+
+      chrome.storage.local.set({
+        defaultAudioInputLabel:
+          defaultAudioInputLabel || contentStateRef.current.defaultAudioInputLabel,
+        defaultVideoInputLabel:
+          defaultVideoInputLabel || contentStateRef.current.defaultVideoInputLabel,
+      });
+
       chrome.runtime.sendMessage({
         type: "switch-camera",
         id: contentStateRef.current.defaultVideoInput,
@@ -627,10 +658,12 @@ const ContentState = (props) => {
           setContentState((prevContentState) => ({
             ...prevContentState,
             defaultAudioInput: audioInput[0].deviceId,
+            defaultAudioInputLabel: audioInput[0].label || "",
             micActive: true,
           }));
           chrome.storage.local.set({
             defaultAudioInput: audioInput[0].deviceId,
+            defaultAudioInputLabel: audioInput[0].label || "",
             micActive: true,
           });
         }
@@ -638,10 +671,12 @@ const ContentState = (props) => {
           setContentState((prevContentState) => ({
             ...prevContentState,
             defaultVideoInput: videoInput[0].deviceId,
+            defaultVideoInputLabel: videoInput[0].label || "",
             cameraActive: true,
           }));
           chrome.storage.local.set({
             defaultVideoInput: videoInput[0].deviceId,
+            defaultVideoInputLabel: videoInput[0].label || "",
             cameraActive: true,
           });
         }
@@ -737,6 +772,8 @@ const ContentState = (props) => {
     setDevices: false,
     defaultAudioInput: "none",
     defaultVideoInput: "none",
+    defaultAudioInputLabel: "",
+    defaultVideoInputLabel: "",
     cameraActive: false,
     micActive: false,
     sortBy: "newest",

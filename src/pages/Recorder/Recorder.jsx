@@ -5,6 +5,7 @@ import { createMediaRecorder } from "./mediaRecorderUtils";
 import { sendRecordingError, sendStopRecording } from "./messaging";
 import { getBitrates, getResolutionForQuality } from "./recorderConfig";
 import { WebCodecsRecorder } from "./webcodecs/WebCodecsRecorder";
+import { getUserMediaWithFallback } from "../utils/mediaDeviceFallback";
 
 localforage.config({
   driver: localforage.INDEXEDDB,
@@ -962,17 +963,47 @@ const Recorder = () => {
 
   async function startAudioStream(id) {
     debug("startAudioStream()", { id });
+    const useExact = id && id !== "none";
     const audioStreamOptions = {
       mimeType: "video/webm;codecs=vp8,opus",
-      audio: {
-        deviceId: {
-          exact: id,
-        },
-      },
+      audio: useExact
+        ? {
+            deviceId: {
+              exact: id,
+            },
+          }
+        : true,
     };
 
-    const result = await navigator.mediaDevices
-      .getUserMedia(audioStreamOptions)
+    const { defaultAudioInputLabel, audioinput } =
+      await chrome.storage.local.get([
+        "defaultAudioInputLabel",
+        "audioinput",
+      ]);
+    const desiredLabel =
+      defaultAudioInputLabel ||
+      audioinput?.find((device) => device.deviceId === id)?.label ||
+      "";
+
+    const result = await getUserMediaWithFallback({
+      constraints: audioStreamOptions,
+      fallbacks:
+        useExact && desiredLabel
+          ? [
+              {
+                kind: "audioinput",
+                desiredDeviceId: id,
+                desiredLabel,
+                onResolved: (resolvedId) => {
+                  chrome.storage.local.set({
+                    defaultAudioInput: resolvedId,
+                    defaultAudioInputLabel: desiredLabel,
+                  });
+                },
+              },
+            ]
+          : [],
+    })
       .then((stream) => {
         debug("startAudioStream() got stream with exact device", {
           hasAudio: stream.getAudioTracks().length,
@@ -1092,7 +1123,83 @@ const Recorder = () => {
       data.recordingType === "camera"
     ) {
       debug("Requesting camera userStream");
-      userStream = await navigator.mediaDevices.getUserMedia(userConstraints);
+      const {
+        defaultAudioInputLabel,
+        defaultVideoInputLabel,
+        audioinput,
+        videoinput,
+      } = await chrome.storage.local.get([
+        "defaultAudioInputLabel",
+        "defaultVideoInputLabel",
+        "audioinput",
+        "videoinput",
+      ]);
+      const desiredAudioLabel =
+        defaultAudioInputLabel ||
+        audioinput?.find(
+          (device) => device.deviceId === data.defaultAudioInput
+        )?.label ||
+        "";
+      const desiredVideoLabel =
+        defaultVideoInputLabel ||
+        videoinput?.find(
+          (device) => device.deviceId === data.defaultVideoInput
+        )?.label ||
+        "";
+
+      const hasAudioDevice =
+        data.defaultAudioInput && data.defaultAudioInput !== "none";
+      const hasVideoDevice =
+        data.defaultVideoInput && data.defaultVideoInput !== "none";
+      const cameraConstraints = {
+        ...userConstraints,
+        audio:
+          userConstraints.audio && hasAudioDevice
+            ? {
+                ...userConstraints.audio,
+                deviceId: { exact: data.defaultAudioInput },
+              }
+            : userConstraints.audio,
+        video:
+          userConstraints.video && hasVideoDevice
+            ? {
+                ...userConstraints.video,
+                deviceId: { exact: data.defaultVideoInput },
+              }
+            : userConstraints.video,
+      };
+
+      userStream = await getUserMediaWithFallback({
+        constraints: cameraConstraints,
+        fallbacks: [
+          hasVideoDevice && desiredVideoLabel
+            ? {
+                kind: "videoinput",
+                desiredDeviceId: data.defaultVideoInput,
+                desiredLabel: desiredVideoLabel,
+                onResolved: (resolvedId) => {
+                  chrome.storage.local.set({
+                    defaultVideoInput: resolvedId,
+                    defaultVideoInputLabel: desiredVideoLabel,
+                  });
+                },
+              }
+            : null,
+          hasAudioDevice && desiredAudioLabel
+            ? {
+                kind: "audioinput",
+                desiredDeviceId: data.defaultAudioInput,
+                desiredLabel: desiredAudioLabel,
+                onResolved: (resolvedId) => {
+                  chrome.storage.local.set({
+                    defaultAudioInput: resolvedId,
+                    defaultAudioInputLabel: desiredAudioLabel,
+                  });
+                },
+              }
+            : null,
+        ].filter(Boolean),
+      });
       debug("Camera userStream acquired", {
         videoTracks: userStream.getVideoTracks().length,
         audioTracks: userStream.getAudioTracks().length,

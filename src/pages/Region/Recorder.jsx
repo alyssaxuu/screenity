@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useCallback } from "react";
+import { getUserMediaWithFallback } from "../utils/mediaDeviceFallback";
 
 import localforage from "localforage";
 
@@ -611,17 +612,47 @@ const Recorder = () => {
   };
 
   async function startAudioStream(id) {
+    const useExact = id && id !== "none";
     const audioStreamOptions = {
       mimeType: "video/webm;codecs=vp8,opus",
-      audio: {
-        deviceId: {
-          exact: id,
-        },
-      },
+      audio: useExact
+        ? {
+            deviceId: {
+              exact: id,
+            },
+          }
+        : true,
     };
 
-    const result = await navigator.mediaDevices
-      .getUserMedia(audioStreamOptions)
+    const { defaultAudioInputLabel, audioinput } =
+      await chrome.storage.local.get([
+        "defaultAudioInputLabel",
+        "audioinput",
+      ]);
+    const desiredLabel =
+      defaultAudioInputLabel ||
+      audioinput?.find((device) => device.deviceId === id)?.label ||
+      "";
+
+    const result = await getUserMediaWithFallback({
+      constraints: audioStreamOptions,
+      fallbacks:
+        useExact && desiredLabel
+          ? [
+              {
+                kind: "audioinput",
+                desiredDeviceId: id,
+                desiredLabel,
+                onResolved: (resolvedId) => {
+                  chrome.storage.local.set({
+                    defaultAudioInput: resolvedId,
+                    defaultAudioInputLabel: desiredLabel,
+                  });
+                },
+              },
+            ]
+          : [],
+    })
       .then((stream) => {
         return stream;
       })

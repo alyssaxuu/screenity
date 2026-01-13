@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef, useCallback } from "react";
 import localforage from "localforage";
+import { getUserMediaWithFallback } from "../utils/mediaDeviceFallback";
 
 localforage.config({
   driver: localforage.INDEXEDDB,
@@ -472,17 +473,47 @@ const RecorderOffscreen = () => {
   };
 
   async function startAudioStream(id) {
+    const useExact = id && id !== "none";
     const audioStreamOptions = {
       mimeType: "video/webm;codecs=vp8,opus",
-      audio: {
-        deviceId: {
-          exact: id,
-        },
-      },
+      audio: useExact
+        ? {
+            deviceId: {
+              exact: id,
+            },
+          }
+        : true,
     };
 
-    const result = await navigator.mediaDevices
-      .getUserMedia(audioStreamOptions)
+    const { defaultAudioInputLabel, audioinput } =
+      await chrome.storage.local.get([
+        "defaultAudioInputLabel",
+        "audioinput",
+      ]);
+    const desiredLabel =
+      defaultAudioInputLabel ||
+      audioinput?.find((device) => device.deviceId === id)?.label ||
+      "";
+
+    const result = await getUserMediaWithFallback({
+      constraints: audioStreamOptions,
+      fallbacks:
+        useExact && desiredLabel
+          ? [
+              {
+                kind: "audioinput",
+                desiredDeviceId: id,
+                desiredLabel,
+                onResolved: (resolvedId) => {
+                  chrome.storage.local.set({
+                    defaultAudioInput: resolvedId,
+                    defaultAudioInputLabel: desiredLabel,
+                  });
+                },
+              },
+            ]
+          : [],
+    })
       .then((stream) => {
         return stream;
       })
@@ -589,7 +620,83 @@ const RecorderOffscreen = () => {
         permissions2.state != "denied" &&
         data.recordingType === "camera"
       ) {
-        userStream = await navigator.mediaDevices.getUserMedia(userConstraints);
+        const {
+          defaultAudioInputLabel,
+          defaultVideoInputLabel,
+          audioinput,
+          videoinput,
+        } = await chrome.storage.local.get([
+          "defaultAudioInputLabel",
+          "defaultVideoInputLabel",
+          "audioinput",
+          "videoinput",
+        ]);
+        const desiredAudioLabel =
+          defaultAudioInputLabel ||
+          audioinput?.find(
+            (device) => device.deviceId === data.defaultAudioInput
+          )?.label ||
+          "";
+        const desiredVideoLabel =
+          defaultVideoInputLabel ||
+          videoinput?.find(
+            (device) => device.deviceId === data.defaultVideoInput
+          )?.label ||
+          "";
+
+        const hasAudioDevice =
+          data.defaultAudioInput && data.defaultAudioInput !== "none";
+        const hasVideoDevice =
+          data.defaultVideoInput && data.defaultVideoInput !== "none";
+        const cameraConstraints = {
+          ...userConstraints,
+          audio:
+            userConstraints.audio && hasAudioDevice
+              ? {
+                  ...userConstraints.audio,
+                  deviceId: { exact: data.defaultAudioInput },
+                }
+              : userConstraints.audio,
+          video:
+            userConstraints.video && hasVideoDevice
+              ? {
+                  ...userConstraints.video,
+                  deviceId: { exact: data.defaultVideoInput },
+                }
+              : userConstraints.video,
+        };
+
+        userStream = await getUserMediaWithFallback({
+          constraints: cameraConstraints,
+          fallbacks: [
+            hasVideoDevice && desiredVideoLabel
+              ? {
+                  kind: "videoinput",
+                  desiredDeviceId: data.defaultVideoInput,
+                  desiredLabel: desiredVideoLabel,
+                  onResolved: (resolvedId) => {
+                    chrome.storage.local.set({
+                      defaultVideoInput: resolvedId,
+                      defaultVideoInputLabel: desiredVideoLabel,
+                    });
+                  },
+                }
+              : null,
+            hasAudioDevice && desiredAudioLabel
+              ? {
+                  kind: "audioinput",
+                  desiredDeviceId: data.defaultAudioInput,
+                  desiredLabel: desiredAudioLabel,
+                  onResolved: (resolvedId) => {
+                    chrome.storage.local.set({
+                      defaultAudioInput: resolvedId,
+                      defaultAudioInputLabel: desiredAudioLabel,
+                    });
+                  },
+                }
+              : null,
+          ].filter(Boolean),
+        });
       }
 
       // Create an audio context, destination, and stream

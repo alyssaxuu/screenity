@@ -169,24 +169,26 @@ const Dropdown = (props) => {
             });
             setLabel(chrome.i18n.getMessage("noCameraDropdownLabel"));
           } else {
+            const selectedLabel =
+              contentState.videoInput.find(
+                (device) => device.deviceId === newValue
+              )?.label || "";
             setContentState((prevContentState) => ({
               ...prevContentState,
               defaultVideoInput: newValue,
+              defaultVideoInputLabel: selectedLabel,
               cameraActive: true,
             }));
             chrome.storage.local.set({
               defaultVideoInput: newValue,
+              defaultVideoInputLabel: selectedLabel,
               cameraActive: true,
             });
             chrome.runtime.sendMessage({
               type: "switch-camera",
               id: newValue,
             });
-            setLabel(
-              contentState.videoInput.find(
-                (device) => device.deviceId === newValue
-              ).label
-            );
+            setLabel(selectedLabel);
           }
         } else {
           if (newValue === "none") {
@@ -199,20 +201,22 @@ const Dropdown = (props) => {
             });
             setLabel(chrome.i18n.getMessage("noMicrophoneDropdownLabel"));
           } else {
+            const selectedLabel =
+              contentState.audioInput.find(
+                (device) => device.deviceId === newValue
+              )?.label || "";
             setContentState((prevContentState) => ({
               ...prevContentState,
               defaultAudioInput: newValue,
+              defaultAudioInputLabel: selectedLabel,
               micActive: true,
             }));
             chrome.storage.local.set({
               defaultAudioInput: newValue,
+              defaultAudioInputLabel: selectedLabel,
               micActive: true,
             });
-            setLabel(
-              contentState.audioInput.find(
-                (device) => device.deviceId === newValue
-              ).label
-            );
+            setLabel(selectedLabel);
           }
         }
       }}

@@ -22,6 +22,8 @@ export const updateFromStorage = (check = true, id = null) => {
       "videoInput",
       "defaultAudioInput",
       "defaultVideoInput",
+      "defaultAudioInputLabel",
+      "defaultVideoInputLabel",
       "cameraDimensions",
       "cameraFlipped",
       "cameraActive",
@@ -111,6 +113,16 @@ export const updateFromStorage = (check = true, id = null) => {
           result.defaultVideoInput !== null
             ? result.defaultVideoInput
             : prevContentState.defaultVideoInput,
+        defaultAudioInputLabel:
+          result.defaultAudioInputLabel !== undefined &&
+          result.defaultAudioInputLabel !== null
+            ? result.defaultAudioInputLabel
+            : prevContentState.defaultAudioInputLabel,
+        defaultVideoInputLabel:
+          result.defaultVideoInputLabel !== undefined &&
+          result.defaultVideoInputLabel !== null
+            ? result.defaultVideoInputLabel
+            : prevContentState.defaultVideoInputLabel,
         cameraDimensions:
           result.cameraDimensions !== undefined &&
           result.cameraDimensions !== null
