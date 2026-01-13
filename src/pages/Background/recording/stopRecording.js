@@ -8,17 +8,34 @@ import { supportsWebCodecs } from "../utils/featureDetection";
 export const stopRecording = async () => {
   chrome.action.setIcon({ path: "assets/icon-34.png" });
   chrome.storage.local.set({ restarting: false });
-  const { recordingStartTime, isSubscribed } = await chrome.storage.local.get([
+  const {
+    recordingStartTime,
+    isSubscribed,
+    paused,
+    pausedAt,
+    totalPausedMs,
+  } = await chrome.storage.local.get([
     "recordingStartTime",
     "isSubscribed",
+    "paused",
+    "pausedAt",
+    "totalPausedMs",
   ]);
 
-  let duration = Date.now() - recordingStartTime;
-  const maxDuration = 7 * 60 * 1000;
+  const startTime = Number(recordingStartTime);
+  const now = Date.now();
+  const basePaused = Number(totalPausedMs) || 0;
+  const pausedAtMs = Number(pausedAt);
+  const extraPaused =
+    paused && Number.isFinite(pausedAtMs) && pausedAtMs > 0
+      ? Math.max(0, now - pausedAtMs)
+      : 0;
 
-  if (recordingStartTime === 0) {
-    duration = 0;
-  }
+  let duration =
+    Number.isFinite(startTime) && startTime > 0
+      ? Math.max(0, now - startTime - basePaused - extraPaused)
+      : 0;
+  const maxDuration = 7 * 60 * 1000;
 
   chrome.storage.local.set({
     recording: false,
