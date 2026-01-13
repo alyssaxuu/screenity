@@ -28,6 +28,7 @@ const BlurToolbar = (props) => {
         <ToolTrigger
           type="button"
           content={chrome.i18n.getMessage("clearBlurredElementsTooltip")}
+          shortcut="0"
           onClick={() => {
             // Remove class screenity-blur from all elements
             const blurredElements =

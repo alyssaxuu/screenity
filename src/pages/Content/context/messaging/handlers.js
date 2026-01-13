@@ -71,15 +71,63 @@ export const setupHandlers = () => {
   registerMessage("stop-recording-tab", () => {
     const state = getState();
     if (!state.recording) return;
+    state.stopRecording();
+  });
 
-    chrome.storage.local.set({ recording: false });
+  registerMessage("toggle-drawing-mode", () => {
+    const nextDrawingMode = !contentStateRef.current.drawingMode;
     setContentState((prev) => ({
       ...prev,
-      recording: false,
-      paused: false,
-      showExtension: false,
-      showPopup: true,
+      drawingMode: nextDrawingMode,
+      blurMode: nextDrawingMode ? false : prev.blurMode,
     }));
+    chrome.storage.local.set({
+      drawingMode: nextDrawingMode,
+      blurMode: nextDrawingMode ? false : contentStateRef.current.blurMode,
+    });
+  });
+
+  registerMessage("toggle-blur-mode", () => {
+    const nextBlurMode = !contentStateRef.current.blurMode;
+    setContentState((prev) => ({
+      ...prev,
+      blurMode: nextBlurMode,
+      drawingMode: nextBlurMode ? false : prev.drawingMode,
+    }));
+    chrome.storage.local.set({
+      blurMode: nextBlurMode,
+      drawingMode: nextBlurMode ? false : contentStateRef.current.drawingMode,
+    });
+  });
+
+  registerMessage("toggle-hide-ui", () => {
+    const nextHideUI = !contentStateRef.current.hideUI;
+    setContentState((prev) => ({
+      ...prev,
+      hideUI: nextHideUI,
+      hideToolbar: nextHideUI ? true : prev.hideToolbar,
+      hideUIAlerts: nextHideUI ? true : prev.hideUIAlerts,
+    }));
+    chrome.storage.local.set({
+      hideUI: nextHideUI,
+      ...(nextHideUI
+        ? { hideToolbar: true, hideUIAlerts: true }
+        : {}),
+    });
+  });
+
+  registerMessage("toggle-cursor-mode", () => {
+    const state = getState();
+    const nextMode =
+      contentStateRef.current.cursorMode === "none" ? "cursor" : "";
+    if (state?.setToolbarMode) {
+      state.setToolbarMode(nextMode);
+    } else {
+      setContentState((prev) => ({
+        ...prev,
+        toolbarMode: nextMode,
+      }));
+    }
   });
 
   registerMessage("recording-ended", async () => {
@@ -159,11 +207,23 @@ export const setupHandlers = () => {
     const cancelRecordingCommand = message.commands.find(
       (command) => command.name === "cancel-recording"
     );
+    const toggleDrawingModeCommand = message.commands.find(
+      (command) => command.name === "toggle-drawing-mode"
+    );
+    const toggleBlurModeCommand = message.commands.find(
+      (command) => command.name === "toggle-blur-mode"
+    );
+    const toggleCursorModeCommand = message.commands.find(
+      (command) => command.name === "toggle-cursor-mode"
+    );
 
     setContentState((prev) => ({
       ...prev,
       recordingShortcut: startRecordingCommand.shortcut,
       dismissRecordingShortcut: cancelRecordingCommand.shortcut,
+      toggleDrawingModeShortcut: toggleDrawingModeCommand?.shortcut || "",
+      toggleBlurModeShortcut: toggleBlurModeCommand?.shortcut || "",
+      toggleCursorModeShortcut: toggleCursorModeCommand?.shortcut || "",
     }));
   });
 

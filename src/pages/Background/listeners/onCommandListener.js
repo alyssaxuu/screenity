@@ -4,6 +4,7 @@ import { sendMessageTab, getCurrentTab } from "../tabManagement";
 export const onCommandListener = () => {
   chrome.commands.onCommand.addListener(async (command) => {
     const activeTab = await getCurrentTab();
+    if (!activeTab || !activeTab.id) return;
 
     if (command === "start-recording") {
       // Validate if it's possible to inject into content
@@ -46,6 +47,16 @@ export const onCommandListener = () => {
       sendMessageTab(activeTab.id, { type: "cancel-recording" });
     } else if (command === "pause-recording") {
       sendMessageTab(activeTab.id, { type: "pause-recording" });
+    } else if (command === "stop-recording") {
+      sendMessageTab(activeTab.id, { type: "stop-recording-tab" });
+    } else if (command === "toggle-drawing-mode") {
+      sendMessageTab(activeTab.id, { type: "toggle-drawing-mode" });
+    } else if (command === "toggle-blur-mode") {
+      sendMessageTab(activeTab.id, { type: "toggle-blur-mode" });
+    } else if (command === "toggle-hide-ui") {
+      sendMessageTab(activeTab.id, { type: "toggle-hide-ui" });
+    } else if (command === "toggle-cursor-mode") {
+      sendMessageTab(activeTab.id, { type: "toggle-cursor-mode" });
     }
   });
 };

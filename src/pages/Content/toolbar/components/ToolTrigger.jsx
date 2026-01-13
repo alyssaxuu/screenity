@@ -9,7 +9,7 @@ const ToolTrigger = (props) => {
   const resume = props.resume ? " resume" : "";
 
   return (
-    <TooltipWrap content={props.content}>
+    <TooltipWrap content={props.content} shortcut={props.shortcut}>
       {props.type === "button" ? (
         <Toolbar.Button
           className={"ToolbarButton" + grab + resume}

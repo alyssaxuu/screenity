@@ -5,29 +5,37 @@ import { contentStateContext } from "../context/ContentState";
 
 const CursorModes = () => {
   const [contentState, setContentState] = useContext(contentStateContext);
-  const modeRef = useRef(null);
-  const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
+  const effectsRef = useRef(new Set());
 
   useEffect(() => {
-    modeRef.current = contentState.cursorMode;
-  }, [contentState.cursorMode]);
+    const nextEffects = Array.isArray(contentState.cursorEffects)
+      ? contentState.cursorEffects
+      : [];
+    effectsRef.current = new Set(nextEffects);
+  }, [contentState.cursorEffects]);
 
   const mouseDownHandler = (e) => {
-    if (modeRef.current === "target") {
-      document.querySelector(".cursor-click-target").style.transform =
+    if (effectsRef.current.has("target")) {
+      const target = document.querySelector(".cursor-click-target");
+      if (!target) return;
+      target.style.transform =
         "translate(-50%, -50%) scale(1)";
-      document.querySelector(".cursor-click-target").style.opacity = "1";
+      target.style.opacity = "1";
     }
   };
 
   const mouseUpHandler = (e) => {
-    if (modeRef.current === "target") {
-      document.querySelector(".cursor-click-target").style.transform =
+    if (effectsRef.current.has("target")) {
+      const target = document.querySelector(".cursor-click-target");
+      if (!target) return;
+      target.style.transform =
         "translate(-50%, -50%) scale(0)";
-      document.querySelector(".cursor-click-target").style.opacity = "0";
+      target.style.opacity = "0";
 
       window.setTimeout(() => {
-        document.querySelector(".cursor-click-target").style.transform =
+        const targetReset = document.querySelector(".cursor-click-target");
+        if (!targetReset) return;
+        targetReset.style.transform =
           "translate(-50%, -50%) scale(1)";
       }, 350);
     }
@@ -44,21 +52,35 @@ const CursorModes = () => {
     const scrollTop = window.scrollY;
     const scrollLeft = window.scrollX;
 
-    const cursorElement =
-      modeRef.current === "target"
-        ? document.querySelector(".cursor-click-target")
-        : modeRef.current === "highlight"
-        ? document.querySelector(".cursor-highlight")
-        : document.querySelector(".spotlight");
+    if (effectsRef.current.has("target")) {
+      const target = document.querySelector(".cursor-click-target");
+      if (target) {
+        target.style.top = lastMouseRef.current.y + scrollTop + "px";
+        target.style.left = lastMouseRef.current.x + scrollLeft + "px";
+      }
+    }
 
-    if (cursorElement) {
-      cursorElement.style.top = lastMouseRef.current.y + scrollTop + "px";
-      cursorElement.style.left = lastMouseRef.current.x + scrollLeft + "px";
+    if (effectsRef.current.has("highlight")) {
+      const highlight = document.querySelector(".cursor-highlight");
+      if (highlight) {
+        highlight.style.top = lastMouseRef.current.y + scrollTop + "px";
+        highlight.style.left = lastMouseRef.current.x + scrollLeft + "px";
+      }
+    }
+
+    if (effectsRef.current.has("spotlight")) {
+      const spotlight = document.querySelector(".spotlight");
+      if (spotlight) {
+        spotlight.style.top = lastMouseRef.current.y + scrollTop + "px";
+        spotlight.style.left = lastMouseRef.current.x + scrollLeft + "px";
+      }
     }
   };
 
   const mouseMoveHandler = (e) => {
-    setLastMousePosition({ x: e.clientX, y: e.clientY });
+    const next = { x: e.clientX, y: e.clientY };
+    lastMouseRef.current = next;
+    setLastMousePosition(next);
     updateCursorPosition();
   };
 
@@ -88,7 +110,9 @@ const CursorModes = () => {
         style={{
           display: "block",
           visibility:
-            contentState.cursorMode === "highlight" ? "visible" : "hidden",
+            contentState.cursorEffects?.includes("highlight")
+              ? "visible"
+              : "hidden",
           position: "absolute",
           top: 0,
           left: 0,
@@ -108,7 +132,9 @@ const CursorModes = () => {
         style={{
           display: "block",
           visibility:
-            contentState.cursorMode === "target" ? "visible" : "hidden",
+            contentState.cursorEffects?.includes("target")
+              ? "visible"
+              : "hidden",
           position: "absolute",
           top: 0,
           opacity: 0,
@@ -130,9 +156,11 @@ const CursorModes = () => {
         className="spotlight"
         style={{
           position: "absolute",
-          display: contentState.cursorMode === "spotlight" ? "block" : "none",
-          top: mousePosition.y + "px",
-          left: mousePosition.x + "px",
+          display: contentState.cursorEffects?.includes("spotlight")
+            ? "block"
+            : "none",
+          top: lastMousePosition.y + "px",
+          left: lastMousePosition.x + "px",
           width: "100px",
           height: "100px",
           borderRadius: "50%",

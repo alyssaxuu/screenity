@@ -84,6 +84,21 @@
         "default": "Alt+Shift+M"
       },
       "description": "Pause/Resume recording"
+    },
+    "stop-recording": {
+      "description": "Stop recording"
+    },
+    "toggle-drawing-mode": {
+      "description": "Toggle drawing mode"
+    },
+    "toggle-blur-mode": {
+      "description": "Toggle blur mode"
+    },
+    "toggle-hide-ui": {
+      "description": "Toggle hide UI"
+    },
+    "toggle-cursor-mode": {
+      "description": "Toggle cursor options"
     }
   },
   "permissions": [

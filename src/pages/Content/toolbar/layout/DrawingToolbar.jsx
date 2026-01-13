@@ -121,6 +121,7 @@ const DrawingToolbar = (props) => {
           type="toggle"
           value="select"
           content={chrome.i18n.getMessage("selectToolTooltip")}
+          shortcut="1"
         >
           <TransformIcon />
         </ToolTrigger>
@@ -128,6 +129,7 @@ const DrawingToolbar = (props) => {
           type="toggle"
           value="pen"
           content={chrome.i18n.getMessage("penToolTooltip")}
+          shortcut="2"
         >
           <DrawIcon />
         </ToolTrigger>
@@ -135,6 +137,7 @@ const DrawingToolbar = (props) => {
           type="toggle"
           value="highlighter"
           content={chrome.i18n.getMessage("highlighterToolTooltip")}
+          shortcut="3"
         >
           <HighlighterIcon />
         </ToolTrigger>
@@ -142,14 +145,16 @@ const DrawingToolbar = (props) => {
           type="toggle"
           value="eraser"
           content={chrome.i18n.getMessage("eraserToolTooltip")}
+          shortcut="4"
         >
           <EraserIcon />
         </ToolTrigger>
-        <RadialMenu />
+        <RadialMenu shortcut="5" />
         <ToolTrigger
           type="toggle"
           value="text"
           content={chrome.i18n.getMessage("textToolTooltip")}
+          shortcut="6"
         >
           <TextIcon />
         </ToolTrigger>
@@ -158,6 +163,7 @@ const DrawingToolbar = (props) => {
           type="toggle"
           value="shape"
           content={chrome.i18n.getMessage("shapeToolTooltip")}
+          shortcut="7"
         >
           {contentState.shape === "rectangle" && contentState.shapeFill ? (
             <RectangleFilledIcon />
@@ -177,6 +183,7 @@ const DrawingToolbar = (props) => {
           type="toggle"
           value="arrow"
           content={chrome.i18n.getMessage("arrowToolTooltip")}
+          shortcut="8"
         >
           <ArrowIcon />
         </ToolTrigger>
@@ -184,6 +191,7 @@ const DrawingToolbar = (props) => {
           type="button"
           value="image"
           content={chrome.i18n.getMessage("imageToolTooltip")}
+          shortcut="9"
           onClick={(e) => imageFileInput.current.click()}
         >
           <ImageIcon />
@@ -193,6 +201,7 @@ const DrawingToolbar = (props) => {
             accept="image/*"
             style={{ display: "none" }}
             ref={imageFileInput}
+            data-image-upload="true"
             onChange={handleImageChange}
           />
         </ToolTrigger>
@@ -217,6 +226,7 @@ const DrawingToolbar = (props) => {
       <ToolTrigger
         type="button"
         content={chrome.i18n.getMessage("clearCanvasTooltip")}
+        shortcut="0"
         disabled={
           contentState.canvas
             ? contentState.canvas.getObjects().length === 0

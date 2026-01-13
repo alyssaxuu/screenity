@@ -47,6 +47,7 @@ const ToolbarWrap = () => {
   const [contentState, setContentState, t, setT] =
     useContext(contentStateContext);
   const [mode, setMode] = React.useState("");
+  const modeRef = React.useRef(mode);
   const [hovering, setHovering] = React.useState(false);
   const DragRef = React.useRef(null);
   const ToolbarRef = React.useRef(null);
@@ -60,6 +61,18 @@ const ToolbarWrap = () => {
   const [forceTransparent, setForceTransparent] = React.useState("");
   const [visuallyHidden, setVisuallyHidden] = useState(false);
   const timeRef = React.useRef("");
+
+  useEffect(() => {
+    modeRef.current = mode;
+  }, [mode]);
+
+  useEffect(() => {
+    setContentState((prev) => ({
+      ...prev,
+      setToolbarMode: setMode,
+      toolbarMode: mode,
+    }));
+  }, [mode, setContentState]);
 
   useEffect(() => {
     if (contentState.toolbarHover && contentState.hideUI) {
@@ -314,6 +327,21 @@ const ToolbarWrap = () => {
   }, [contentState.drawingMode, contentState.blurMode, contentState.openToast]);
 
   useEffect(() => {
+    let nextMode = modeRef.current;
+    if (contentState.drawingMode) {
+      nextMode = "draw";
+    } else if (contentState.blurMode) {
+      nextMode = "blur";
+    } else if (modeRef.current === "draw" || modeRef.current === "blur") {
+      nextMode = "";
+    }
+
+    if (nextMode !== modeRef.current) {
+      setMode(nextMode);
+    }
+  }, [contentState.drawingMode, contentState.blurMode]);
+
+  useEffect(() => {
     if (mode === "draw") {
       setContentState((prevContentState) => ({
         ...prevContentState,
@@ -540,6 +568,7 @@ const ToolbarWrap = () => {
                 type="mode"
                 content={chrome.i18n.getMessage("toggleDrawingToolsTooltip")}
                 value="draw"
+                shortcut={contentState.toggleDrawingModeShortcut}
               >
                 {mode === "draw" && <CloseButtonToolbar />}
                 {mode !== "draw" && <DrawIcon />}
@@ -551,6 +580,7 @@ const ToolbarWrap = () => {
                 type="mode"
                 content={chrome.i18n.getMessage("toggleBlurToolTooltip")}
                 value="blur"
+                shortcut={contentState.toggleBlurModeShortcut}
               >
                 {mode === "blur" && <CloseButtonToolbar />}
                 {mode !== "blur" && <BlurIcon />}
@@ -563,6 +593,7 @@ const ToolbarWrap = () => {
                 type="mode"
                 content={chrome.i18n.getMessage("toggleCursorOptionsTooltip")}
                 value="cursor"
+                shortcut={contentState.toggleCursorModeShortcut}
               >
                 {contentState.cursorMode === "target" && <TargetCursorIcon />}
                 {contentState.cursorMode === "highlight" && (

@@ -16,6 +16,20 @@ export const contentStateRef = { current: null };
 export let setContentState = () => {};
 export let setTimer = () => {};
 
+const CURSOR_EFFECTS = ["target", "highlight", "spotlight"];
+
+const normalizeCursorEffects = (effects) => {
+  if (!Array.isArray(effects)) return [];
+  return effects.filter((effect) => CURSOR_EFFECTS.includes(effect));
+};
+
+const deriveCursorMode = (effects, fallbackMode) => {
+  if (effects.length === 0) return "none";
+  if (effects.length === 1) return effects[0];
+  if (fallbackMode && effects.includes(fallbackMode)) return fallbackMode;
+  return effects[0] || "none";
+};
+
 const ContentState = (props) => {
   const [timer, setTimerInternal] = React.useState(0);
   const CLOUD_FEATURES_ENABLED =
@@ -714,6 +728,7 @@ const ContentState = (props) => {
     resumeRecording: resumeRecording,
     dismissRecording: dismissRecording,
     startStreaming: startStreaming,
+    setToolbarMode: null,
     openModal: null,
     openToast: null,
     timeWarning: false,
@@ -775,7 +790,11 @@ const ContentState = (props) => {
     askMicrophone: true,
     recordingShortcut: "⌥⇧W",
     recordingShortcut: "⌥⇧D",
+    toggleDrawingModeShortcut: "",
+    toggleBlurModeShortcut: "",
+    toggleCursorModeShortcut: "",
     cursorMode: "none",
+    cursorEffects: [],
     shape: "rectangle",
     shapeFill: false,
     pushToTalk: false,
@@ -1033,6 +1052,32 @@ const ContentState = (props) => {
         setContentState((prev) => ({
           ...prev,
           recording: Boolean(changes.recording.newValue),
+        }));
+      }
+      if (changes.cursorEffects) {
+        const nextEffects = normalizeCursorEffects(
+          changes.cursorEffects.newValue
+        );
+        const fallbackMode =
+          changes.cursorMode?.newValue ||
+          contentStateRef.current?.cursorMode ||
+          "none";
+        const nextMode = deriveCursorMode(nextEffects, fallbackMode);
+        setContentState((prev) => ({
+          ...prev,
+          cursorEffects: nextEffects,
+          cursorMode: nextMode,
+        }));
+      } else if (changes.cursorMode) {
+        const mode = changes.cursorMode.newValue || "none";
+        const fallbackEffects = mode !== "none" ? [mode] : [];
+        setContentState((prev) => ({
+          ...prev,
+          cursorMode: mode,
+          cursorEffects:
+            Array.isArray(prev.cursorEffects) && prev.cursorEffects.length > 0
+              ? prev.cursorEffects
+              : fallbackEffects,
         }));
       }
       if (

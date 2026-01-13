@@ -9,6 +9,10 @@ const TooltipWrap = (props) => {
   const [contentState, setContentState] = useContext(contentStateContext);
   const classname = props.name ? props.name : "";
   const [override, setOverride] = useState("");
+  const content =
+    props.shortcut && props.content
+      ? `${props.content} (${props.shortcut})`
+      : props.content;
 
   useEffect(() => {
     // Check if hideUI is set
@@ -46,7 +50,7 @@ const TooltipWrap = (props) => {
                   display: override === "override" ? "none" : "block",
                 }}
               >
-                {props.content}
+                {content}
               </Tooltip.Content>
             </Tooltip.Portal>
           </Tooltip.Root>

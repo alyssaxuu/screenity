@@ -1,6 +1,20 @@
 import { setContentState } from "../ContentState";
 import { checkRecording } from "./checkRecording";
 
+const CURSOR_EFFECTS = ["target", "highlight", "spotlight"];
+
+const normalizeCursorEffects = (effects) => {
+  if (!Array.isArray(effects)) return [];
+  return effects.filter((effect) => CURSOR_EFFECTS.includes(effect));
+};
+
+const deriveCursorMode = (effects, fallbackMode) => {
+  if (effects.length === 0) return "none";
+  if (effects.length === 1) return effects[0];
+  if (fallbackMode && effects.includes(fallbackMode)) return fallbackMode;
+  return effects[0] || "none";
+};
+
 export const updateFromStorage = (check = true, id = null) => {
   chrome.storage.local.get(
     [
@@ -30,6 +44,7 @@ export const updateFromStorage = (check = true, id = null) => {
       "pendingRecording",
       "askForPermissions",
       "cursorMode",
+      "cursorEffects",
       "pushToTalk",
       "askMicrophone",
       "offscreenRecording",
@@ -63,6 +78,19 @@ export const updateFromStorage = (check = true, id = null) => {
       "hasSubscribedBefore",
     ],
     (result) => {
+      const storedEffects = normalizeCursorEffects(result.cursorEffects);
+      const hasStoredEffects = Array.isArray(result.cursorEffects);
+      const legacyMode =
+        result.cursorMode !== undefined && result.cursorMode !== null
+          ? result.cursorMode
+          : "none";
+      const cursorEffects = hasStoredEffects
+        ? storedEffects
+        : legacyMode !== "none"
+        ? [legacyMode]
+        : [];
+      const cursorMode = deriveCursorMode(cursorEffects, legacyMode);
+
       setContentState((prevContentState) => ({
         ...prevContentState,
         audioInput:
@@ -173,10 +201,11 @@ export const updateFromStorage = (check = true, id = null) => {
           result.askForPermissions !== null
             ? result.askForPermissions
             : prevContentState.askForPermissions,
-        cursorMode:
-          result.cursorMode !== undefined && result.cursorMode !== null
-            ? result.cursorMode
-            : prevContentState.cursorMode,
+        cursorMode: cursorMode || prevContentState.cursorMode,
+        cursorEffects:
+          cursorEffects.length > 0 || hasStoredEffects
+            ? cursorEffects
+            : prevContentState.cursorEffects,
         pushToTalk:
           result.pushToTalk !== undefined && result.pushToTalk !== null
             ? result.pushToTalk
@@ -297,6 +326,13 @@ export const updateFromStorage = (check = true, id = null) => {
 
       if (result.backupSetup === undefined || result.backupSetup === null) {
         chrome.storage.local.set({ backupSetup: false });
+      }
+
+      if (!hasStoredEffects && legacyMode) {
+        chrome.storage.local.set({
+          cursorEffects: cursorEffects,
+          cursorMode: cursorMode,
+        });
       }
 
       if (result.backgroundEffectsActive) {

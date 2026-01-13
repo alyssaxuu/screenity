@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from "react";
 
 import * as Popover from "@radix-ui/react-popover";
-import * as Tooltip from "@radix-ui/react-tooltip";
 
 // Icons
 import { EyeDropperIcon } from "./SVG";
@@ -24,17 +23,7 @@ const RadialMenu = (props) => {
   const [fullwheel, setFullWheel] = useState(false);
   const [open, setOpen] = useState(false);
   const [eyeDropperActive, setEyeDropperActive] = useState(false);
-  const [override, setOverride] = useState("");
   const [renderColorWheel, setRenderColorWheel] = useState(false);
-
-  useEffect(() => {
-    // Check if hideUI is set
-    if (contentState.hideUI) {
-      setOverride("override");
-    } else {
-      setOverride("");
-    }
-  }, [contentState.hideUI]);
 
   // Colors in menu
   const [colors, setColors] = useState([
@@ -93,34 +82,16 @@ const RadialMenu = (props) => {
 
   return (
     <Popover.Root open={open} onOpenChange={() => setOpen(!open)}>
-      <Popover.Trigger as="div" ref={ref}>
-        <Tooltip.Provider>
-          <Tooltip.Root delayDuration={700}>
-            <Tooltip.Trigger asChild>
-              <div className="ToolbarButton" component="div" ref={buttonRef}>
-                <div
-                  className="ColorPicker"
-                  style={{ backgroundColor: contentState.color }}
-                ></div>
-              </div>
-            </Tooltip.Trigger>
-            <Tooltip.Portal
-              container={
-                document.getElementsByClassName("screenity-shadow-dom")[0]
-              }
-            >
-              <Tooltip.Content
-                className={"TooltipContent" + " " + override}
-                style={{
-                  display: override === "override" ? "none" : "block",
-                }}
-              >
-                Color and stroke
-              </Tooltip.Content>
-            </Tooltip.Portal>
-          </Tooltip.Root>
-        </Tooltip.Provider>
-      </Popover.Trigger>
+      <TooltipWrap content="Color and stroke" shortcut={props.shortcut}>
+        <Popover.Trigger as="div" ref={ref} data-color-trigger="true">
+          <div className="ToolbarButton" component="div" ref={buttonRef}>
+            <div
+              className="ColorPicker"
+              style={{ backgroundColor: contentState.color }}
+            ></div>
+          </div>
+        </Popover.Trigger>
+      </TooltipWrap>
       <Popover.Portal forceMount container={ref.current}>
         <Popover.Content avoidCollisions={false} asChild onOpenAutoFocus>
           <div
