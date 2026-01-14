@@ -2,6 +2,9 @@ import { sendMessageTab, getCurrentTab } from "../tabManagement";
 
 // Main command listener
 export const onCommandListener = () => {
+  let lastToggleDrawingAt = 0;
+  const TOGGLE_DRAWING_COOLDOWN_MS = 400;
+
   chrome.commands.onCommand.addListener(async (command) => {
     const activeTab = await getCurrentTab();
     if (!activeTab || !activeTab.id) return;
@@ -50,6 +53,11 @@ export const onCommandListener = () => {
     } else if (command === "stop-recording") {
       sendMessageTab(activeTab.id, { type: "stop-recording-tab" });
     } else if (command === "toggle-drawing-mode") {
+      const now = Date.now();
+      if (now - lastToggleDrawingAt < TOGGLE_DRAWING_COOLDOWN_MS) {
+        return;
+      }
+      lastToggleDrawingAt = now;
       sendMessageTab(activeTab.id, { type: "toggle-drawing-mode" });
     } else if (command === "toggle-blur-mode") {
       sendMessageTab(activeTab.id, { type: "toggle-blur-mode" });

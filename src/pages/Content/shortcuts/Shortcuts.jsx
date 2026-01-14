@@ -34,10 +34,7 @@ const Shortcuts = ({ shortcuts }) => {
   });
   */
 
-  // In-app shortcuts (number keys) for Screenity tools.
-  // 1: select, 2: pen, 3: highlighter, 4: eraser, 5: color picker
-  // 6: text, 7: shape (rectangle), 8: arrow, 9: image, 0: clear
-  // Cursor effects: 0 clears, 1 target, 2 highlight, 3 spotlight
+  // in-app shortcuts for screenity tools
   useEffect(() => {
     const getDeepActiveElement = () => {
       let active = document.activeElement;
@@ -126,8 +123,8 @@ const Shortcuts = ({ shortcuts }) => {
     const openImagePicker = () => {
       const shadowRoot = getShadowRoot();
       const fileInput = shadowRoot
-        ? shadowRoot.querySelector("[data-image-upload=\"true\"]")
-        : document.querySelector("[data-image-upload=\"true\"]");
+        ? shadowRoot.querySelector('[data-image-upload="true"]')
+        : document.querySelector('[data-image-upload="true"]');
       if (fileInput) {
         fileInput.click();
       }
@@ -183,10 +180,7 @@ const Shortcuts = ({ shortcuts }) => {
           undoCanvas(state, setContentState);
           return;
         }
-        if (
-          (key === "z" && event.shiftKey) ||
-          key === "y"
-        ) {
+        if ((key === "z" && event.shiftKey) || key === "y") {
           event.preventDefault();
           event.stopPropagation();
           event.stopImmediatePropagation();

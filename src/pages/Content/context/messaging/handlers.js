@@ -5,7 +5,6 @@ import {
 } from "../../../../messaging/messageRouter";
 import { setContentState, contentStateRef } from "../ContentState";
 import { updateFromStorage } from "../utils/updateFromStorage";
-import { setTimer } from "../ContentState";
 
 import { checkAuthStatus } from "../utils/checkAuthStatus";
 
@@ -15,6 +14,8 @@ const CLOUD_FEATURES_ENABLED =
 const getState = () => contentStateRef.current;
 
 export const setupHandlers = () => {
+  let lastToggleDrawingAt = 0;
+  const TOGGLE_DRAWING_COOLDOWN_MS = 400;
   // Initialize message router
   if (!window.__screenityHandlersInitialized) {
     messageRouter();
@@ -22,12 +23,9 @@ export const setupHandlers = () => {
   }
 
   // Register content message handlers
-  registerMessage("time", (message) => {
-    chrome.storage.local.get(["recording"], (result) => {
-      if (result.recording) {
-        setTimer(message.time);
-      }
-    });
+  registerMessage("time", () => {
+    // Timer is driven by ContentState's storage-based tick.
+    // Ignore external timer pushes to avoid jitter/skips.
   });
 
   registerMessage("toggle-popup", () => {
@@ -75,16 +73,20 @@ export const setupHandlers = () => {
   });
 
   registerMessage("toggle-drawing-mode", () => {
+    const now = Date.now();
+    if (now - lastToggleDrawingAt < TOGGLE_DRAWING_COOLDOWN_MS) {
+      return;
+    }
+    lastToggleDrawingAt = now;
+    if (document.hidden || !document.hasFocus()) {
+      return;
+    }
     const nextDrawingMode = !contentStateRef.current.drawingMode;
     setContentState((prev) => ({
       ...prev,
       drawingMode: nextDrawingMode,
       blurMode: nextDrawingMode ? false : prev.blurMode,
     }));
-    chrome.storage.local.set({
-      drawingMode: nextDrawingMode,
-      blurMode: nextDrawingMode ? false : contentStateRef.current.blurMode,
-    });
   });
 
   registerMessage("toggle-blur-mode", () => {
@@ -330,13 +332,6 @@ export const setupHandlers = () => {
   });
 
   registerMessage("recording-check", (message, sender) => {
-    const { recordingStartTime } = message;
-
-    if (recordingStartTime) {
-      const time = Math.floor((Date.now() - recordingStartTime) / 1000);
-      setTimer(time);
-    }
-
     const state = getState();
 
     if (!message.force) {

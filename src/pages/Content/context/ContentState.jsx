@@ -1,4 +1,10 @@
-import React, { createContext, useState, useEffect, useCallback } from "react";
+import React, {
+  createContext,
+  useState,
+  useEffect,
+  useCallback,
+  useRef,
+} from "react";
 
 import { updateFromStorage } from "./utils/updateFromStorage";
 
@@ -41,6 +47,29 @@ const ContentState = (props) => {
   const [URL2, setURL2] = useState(
     "https://help.screenity.io/troubleshooting/9Jy5RGjNrBB42hqUdREQ7W/how-to-grant-screenity-permission-to-record-your-camera-and-microphone/x6U69TnrbMjy5CQ96Er2E9"
   );
+  const startBeepRef = useRef(null);
+  const stopBeepRef = useRef(null);
+  const prevRecordingRef = useRef(null);
+  const hydratedRef = useRef(false);
+  const suppressStopBeepRef = useRef(false);
+  const suppressStartBeepRef = useRef(false);
+  const tabIdRef = useRef(null);
+  const activeTabRef = useRef(null);
+  const tabRecordedIdRef = useRef(null);
+
+  const isTargetTab = useCallback(() => {
+    const tabId = tabIdRef.current;
+    const tabRecordedID = tabRecordedIdRef.current;
+    const activeTab = activeTabRef.current;
+
+    if (tabRecordedID != null) {
+      return tabId != null && tabId === tabRecordedID;
+    }
+    if (activeTab != null) {
+      return tabId != null && tabId === activeTab;
+    }
+    return true;
+  }, []);
 
   // Check if the user is logged in
   const verifyUser = async () => {
@@ -75,6 +104,19 @@ const ContentState = (props) => {
   }, []);
 
   useEffect(() => {
+    chrome.runtime.sendMessage({ type: "get-tab-id" }, (response) => {
+      if (response?.tabId !== undefined && response?.tabId !== null) {
+        tabIdRef.current = response.tabId;
+      }
+    });
+
+    chrome.storage.local.get(["activeTab", "tabRecordedID"], (result) => {
+      activeTabRef.current = result.activeTab ?? null;
+      tabRecordedIdRef.current = result.tabRecordedID ?? null;
+    });
+  }, []);
+
+  useEffect(() => {
     const locale = chrome.i18n.getMessage("@@ui_locale");
     if (!locale.includes("en")) {
       setURL(
@@ -91,6 +133,9 @@ const ContentState = (props) => {
   }, []);
 
   const startRecording = useCallback(() => {
+    const shouldClearCountdown =
+      !contentStateRef.current?.isCountdownVisible &&
+      !contentStateRef.current?.countdownActive;
     if (contentStateRef.current.alarm) {
       if (contentStateRef.current.alarmTime === 0) {
         setContentState((prevContentState) => ({
@@ -112,6 +157,9 @@ const ContentState = (props) => {
       timeWarning: false,
       pendingRecording: false,
       preparingRecording: false,
+      ...(shouldClearCountdown
+        ? { countdownActive: false, isCountdownVisible: false }
+        : {}),
     }));
     chrome.storage.local.set({ restarting: false });
 
@@ -203,10 +251,6 @@ const ContentState = (props) => {
         }, 200);
       }
     });
-    // Play beep sound at 50% volume
-    const audio = new Audio(chrome.runtime.getURL("/assets/sounds/beep.mp3"));
-    audio.volume = 0.5;
-    audio.play();
   });
 
   const pauseRecording = useCallback((dismiss) => {
@@ -238,6 +282,7 @@ const ContentState = (props) => {
   });
 
   const dismissRecording = useCallback(() => {
+    suppressStopBeepRef.current = true;
     chrome.storage.local.set({ restarting: false });
     chrome.runtime.sendMessage({ type: "dismiss-recording-tab" });
     setContentState((prevContentState) => ({
@@ -640,9 +685,11 @@ const ContentState = (props) => {
 
       chrome.storage.local.set({
         defaultAudioInputLabel:
-          defaultAudioInputLabel || contentStateRef.current.defaultAudioInputLabel,
+          defaultAudioInputLabel ||
+          contentStateRef.current.defaultAudioInputLabel,
         defaultVideoInputLabel:
-          defaultVideoInputLabel || contentStateRef.current.defaultVideoInputLabel,
+          defaultVideoInputLabel ||
+          contentStateRef.current.defaultVideoInputLabel,
       });
 
       chrome.runtime.sendMessage({
@@ -874,12 +921,9 @@ const ContentState = (props) => {
     showProSplash: false,
     hasSubscribedBefore: false,
     startRecordingAfterCountdown: () => {
-      playBeepSound();
-      setTimeout(() => {
-        if (!contentStateRef.current.countdownCancelled) {
-          contentStateRef.current.startRecording();
-        }
-      }, 500);
+      if (!contentStateRef.current.countdownCancelled) {
+        contentStateRef.current.startRecording();
+      }
     },
     cancelCountdown: () => {
       setContentState((prev) => ({
@@ -900,6 +944,12 @@ const ContentState = (props) => {
         countdownCancelled: false,
       }));
     },
+    onCountdownFinished: () => {
+      if (!contentStateRef.current?.countdownCancelled && isTargetTab()) {
+        suppressStartBeepRef.current = true;
+        playBeep(startBeepRef, "assets/sounds/beep2.mp3");
+      }
+    },
   });
   contentStateRef.current = contentState;
 
@@ -916,18 +966,65 @@ const ContentState = (props) => {
     }
   };
 
-  const playBeepSound = () => {
-    const audio = new Audio(chrome.runtime.getURL("/assets/sounds/beep2.mp3"));
+  const playBeep = (ref, filename) => {
+    if (!ref.current) {
+      ref.current = new Audio(chrome.runtime.getURL(filename));
+    }
+    const audio = ref.current;
     audio.volume = 0.5;
-    audio.play();
+    try {
+      audio.currentTime = 0;
+    } catch {}
+    const playPromise = audio.play();
+    if (playPromise?.catch) {
+      playPromise.catch((error) => {
+        console.warn("Beep playback failed:", error);
+      });
+    }
   };
 
   useEffect(() => {
     chrome.runtime.sendMessage({ type: "sync-recording-state" }, (state) => {
       if (!state) return;
       setContentState((prev) => ({ ...prev, ...state }));
+      setTimeout(() => {
+        hydratedRef.current = true;
+        prevRecordingRef.current = Boolean(state.recording);
+      }, 0);
     });
   }, []);
+
+  useEffect(() => {
+    const isRecording = Boolean(contentState.recording);
+    if (!hydratedRef.current) {
+      prevRecordingRef.current = isRecording;
+      return;
+    }
+    if (prevRecordingRef.current === null) {
+      prevRecordingRef.current = isRecording;
+      return;
+    }
+    if (!isTargetTab()) {
+      prevRecordingRef.current = isRecording;
+      return;
+    }
+
+    if (prevRecordingRef.current === false && isRecording === true) {
+      if (suppressStartBeepRef.current) {
+        suppressStartBeepRef.current = false;
+      } else {
+        playBeep(startBeepRef, "assets/sounds/beep2.mp3");
+      }
+    } else if (prevRecordingRef.current === true && isRecording === false) {
+      if (suppressStopBeepRef.current) {
+        suppressStopBeepRef.current = false;
+      } else {
+        playBeep(stopBeepRef, "assets/sounds/beep.mp3");
+      }
+    }
+
+    prevRecordingRef.current = isRecording;
+  }, [contentState.recording, isTargetTab]);
 
   useEffect(() => {
     if (!CLOUD_FEATURES_ENABLED) return;
@@ -1030,19 +1127,14 @@ const ContentState = (props) => {
   }, [contentState.openModal]);
 
   const updateTimerFromStorage = useCallback(async () => {
-    const {
-      recording,
-      recordingStartTime,
-      paused,
-      pausedAt,
-      totalPausedMs,
-    } = await chrome.storage.local.get([
-      "recording",
-      "recordingStartTime",
-      "paused",
-      "pausedAt",
-      "totalPausedMs",
-    ]);
+    const { recording, recordingStartTime, paused, pausedAt, totalPausedMs } =
+      await chrome.storage.local.get([
+        "recording",
+        "recordingStartTime",
+        "paused",
+        "pausedAt",
+        "totalPausedMs",
+      ]);
 
     if (!recording || !recordingStartTime) {
       setTimer(0);
@@ -1051,8 +1143,7 @@ const ContentState = (props) => {
 
     const now = Date.now();
     const basePaused = totalPausedMs || 0;
-    const extraPaused =
-      paused && pausedAt ? Math.max(0, now - pausedAt) : 0;
+    const extraPaused = paused && pausedAt ? Math.max(0, now - pausedAt) : 0;
     const elapsedSeconds = Math.max(
       0,
       Math.floor((now - recordingStartTime - basePaused - extraPaused) / 1000)
@@ -1064,7 +1155,22 @@ const ContentState = (props) => {
       return;
     }
 
-    setTimer(elapsedSeconds);
+    setTimer((prev) => {
+      if (!Number.isFinite(prev)) {
+        return elapsedSeconds;
+      }
+      if (elapsedSeconds <= prev) {
+        return elapsedSeconds;
+      }
+      const delta = elapsedSeconds - prev;
+      if (delta <= 1) {
+        return elapsedSeconds;
+      }
+      if (delta <= 3) {
+        return prev + 1;
+      }
+      return elapsedSeconds;
+    });
   }, []);
 
   useEffect(() => {
@@ -1079,6 +1185,12 @@ const ContentState = (props) => {
     const onChanged = (changes, area) => {
       if (area !== "local") return;
 
+      if (changes.activeTab) {
+        activeTabRef.current = changes.activeTab.newValue ?? null;
+      }
+      if (changes.tabRecordedID) {
+        tabRecordedIdRef.current = changes.tabRecordedID.newValue ?? null;
+      }
       if (changes.paused) {
         setContentState((prev) => ({
           ...prev,
@@ -1086,9 +1198,27 @@ const ContentState = (props) => {
         }));
       }
       if (changes.recording) {
+        const isRecording = Boolean(changes.recording.newValue);
+        if (isRecording && !isTargetTab()) {
+          setContentState((prev) => ({
+            ...prev,
+            recording: false,
+          }));
+          return;
+        }
+        const shouldHideCountdown =
+          isRecording &&
+          !contentStateRef.current?.isCountdownVisible &&
+          !contentStateRef.current?.countdownActive;
         setContentState((prev) => ({
           ...prev,
-          recording: Boolean(changes.recording.newValue),
+          recording: isRecording,
+          ...(shouldHideCountdown
+            ? {
+                countdownActive: false,
+                isCountdownVisible: false,
+              }
+            : {}),
         }));
       }
       if (changes.cursorEffects) {
@@ -1130,7 +1260,7 @@ const ContentState = (props) => {
 
     chrome.storage.onChanged.addListener(onChanged);
     return () => chrome.storage.onChanged.removeListener(onChanged);
-  }, [updateTimerFromStorage]);
+  }, [isTargetTab, updateTimerFromStorage]);
 
   useEffect(() => {
     if (!contentState.customRegion) {
@@ -1170,7 +1300,6 @@ const ContentState = (props) => {
       chrome.storage.local.set({ qualityValue: suggested });
     }
   }, []);
-
 
   useEffect(() => {
     if (contentState.pushToTalk) {

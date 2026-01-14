@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef, useCallback } from "react";
 import RecorderUI from "./RecorderUI";
-import { sendRecordingError, sendStopRecording } from "./messaging";
+import { sendRecordingError as sendRecordingErrorBase, sendStopRecording } from "./messaging";
 import { getBitrates, getResolutionForQuality } from "./recorderConfig";
 import BunnyTusUploader from "./bunnyTusUploader";
 import localforage from "localforage";
@@ -47,6 +47,7 @@ const CloudRecorder = () => {
   const screenUploader = useRef(null);
   const cameraUploader = useRef(null);
   const uploadMetaRef = useRef(null);
+  const emptyCleanupRef = useRef(false);
 
   const backupRef = useRef(false);
   const audioInputGain = useRef(null);
@@ -632,8 +633,65 @@ const CloudRecorder = () => {
     });
   };
 
+  const cleanupIfEmptyUploads = async (reason) => {
+    if (emptyCleanupRef.current) return;
+    const screenOffset = screenUploader.current?.offset ?? null;
+    const cameraOffset = cameraUploader.current?.offset ?? null;
+    const hasScreen = screenOffset !== null;
+    const hasCamera = cameraOffset !== null;
+
+    if (!hasScreen && !hasCamera) return;
+
+    const isEmpty =
+      (!hasScreen || screenOffset === 0) && (!hasCamera || cameraOffset === 0);
+
+    if (!isEmpty) return;
+
+    emptyCleanupRef.current = true;
+
+    console.warn("[Screenity] empty upload cleanup", {
+      reason,
+      screenOffset,
+      cameraOffset,
+    });
+
+    await Promise.allSettled([
+      screenUploader.current?.abort?.(),
+      cameraUploader.current?.abort?.(),
+    ]);
+
+    try {
+      const { projectId, recordingToScene } = await chrome.storage.local.get([
+        "projectId",
+        "recordingToScene",
+      ]);
+      const uploadMeta =
+        uploadMetaRef.current || {
+          screen: screenUploader.current?.getMeta?.() || null,
+          camera: cameraUploader.current?.getMeta?.() || null,
+          audio: null,
+          sceneId:
+            screenUploader.current?.getMeta?.()?.sceneId ||
+            cameraUploader.current?.getMeta?.()?.sceneId ||
+            null,
+        };
+
+      if (projectId && uploadMeta) {
+        await deleteProject(projectId, uploadMeta, !recordingToScene);
+      }
+    } catch (err) {
+      console.warn("❌ Failed to cleanup empty upload:", err);
+    }
+  };
+
+  const sendRecordingError = (why, cancel = false) => {
+    void cleanupIfEmptyUploads("error");
+    sendRecordingErrorBase(why, cancel);
+  };
+
   const dismissRecording = async (restarting = false) => {
     setInitProject(false);
+    await cleanupIfEmptyUploads(restarting ? "restart" : "dismiss");
 
     // Stop the silent audio keep-alive
     stopTabKeepAlive();
@@ -784,6 +842,7 @@ const CloudRecorder = () => {
 
   const initializeUploaders = async () => {
     try {
+      emptyCleanupRef.current = false;
       const { projectId } = await chrome.storage.local.get(["projectId"]);
 
       const sceneId = crypto.randomUUID();
@@ -1763,6 +1822,7 @@ const CloudRecorder = () => {
           { screenStatus, cameraStatus, screenOffset, cameraOffset }
         );
       } else {
+        await cleanupIfEmptyUploads("no-upload");
         await exportLocalRecovery("no-upload");
         await finalizeRecorderSession("failed");
         sendRecordingError(
@@ -1796,8 +1856,9 @@ const CloudRecorder = () => {
         await chunksStore.clear().catch(() => {});
 
         if (!IS_IFRAME_CONTEXT) {
-          // FLAG: decide whether to close or not
-          //window.close();
+          try {
+            window.close();
+          } catch {}
         } else {
           window.location.reload();
         }
@@ -1835,8 +1896,9 @@ const CloudRecorder = () => {
         // Give user time to see the error message
         setTimeout(() => {
           if (!IS_IFRAME_CONTEXT) {
-            // FLAG: decide whether to close or not
-            //window.close();
+            try {
+              window.close();
+            } catch {}
           } else {
             window.location.reload();
           }
@@ -2431,9 +2493,9 @@ const CloudRecorder = () => {
       if (!isInit.current) return;
 
       if (IS_IFRAME_CONTEXT) {
-        if (request.region) setTimeout(() => startRecording(), 100);
+        if (request.region) setTimeout(() => startRecording(), 10);
       } else if (!regionRef.current) {
-        setTimeout(() => startRecording(), 100);
+        setTimeout(() => startRecording(), 10);
       }
     } else if (request.type === "restart-recording-tab") {
       if (!isInit.current) return;

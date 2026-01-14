@@ -11,6 +11,11 @@ import fixWebmDuration from "fix-webm-duration";
 import { default as fixWebmDurationFallback } from "webm-duration-fix";
 
 import localforage from "localforage";
+import {
+  formatLocalTimestamp,
+  getHostnameFromUrl,
+  sanitizeFilenameBase,
+} from "../../utils/filenameHelpers";
 
 localforage.config({
   driver: localforage.INDEXEDDB,
@@ -88,6 +93,7 @@ const ContentState = (props) => {
     chunkIndex: 0,
     bannerSupport: false,
     backupBlob: null,
+    recordingMeta: null,
   };
 
   const [contentState, setContentState] = useState(defaultState);
@@ -127,21 +133,51 @@ const ContentState = (props) => {
   //   }
   // }, []);
 
-  // Generate a title based on the current time (e.g. Screenity video - Sep 4 2021 10:00 AM)
+  // Generate a title based on the current time unless this is a tab recording
   useEffect(() => {
-    const date = new Date();
-    const formattedDate = date.toLocaleString("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-      hour: "numeric",
-      minute: "2-digit",
-      hour12: true,
-    });
-    setContentState((prevState) => ({
-      ...prevState,
-      title: `Screenity video - ${formattedDate}`,
-    }));
+    const loadInitialTitle = async () => {
+      const date = new Date();
+      const formattedDate = date.toLocaleString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+        hour12: true,
+      });
+      const fallbackTitle = `Screenity video - ${formattedDate}`;
+
+      try {
+        const { recordingMeta } = await chrome.storage.local.get([
+          "recordingMeta",
+        ]);
+        if (recordingMeta?.type === "tab") {
+          const baseTitle = sanitizeFilenameBase(
+            recordingMeta.title?.trim() ||
+              getHostnameFromUrl(recordingMeta.url) ||
+              fallbackTitle
+          );
+          const timestamp = formatLocalTimestamp(recordingMeta.startedAt);
+          setContentState((prevState) => ({
+            ...prevState,
+            title: `${baseTitle} — ${timestamp}`,
+            recordingMeta,
+          }));
+          chrome.storage.local.remove(["recordingMeta"]);
+          return;
+        }
+      } catch (error) {
+        console.warn("Failed to load recording meta:", error);
+      }
+
+      setContentState((prevState) => ({
+        ...prevState,
+        title: fallbackTitle,
+        recordingMeta: null,
+      }));
+    };
+
+    loadInitialTitle();
   }, []);
 
   // Show a popup when attempting to close the tab if the user has not downloaded their video
@@ -1063,8 +1099,31 @@ const ContentState = (props) => {
   };
 
   const requestDownload = async (url, ext) => {
-    const title =
-      contentStateRef.current.title.replace(/[\/\\:?~<>|*]/g, " ").trim() + ext;
+    let recordingMeta = contentStateRef.current.recordingMeta;
+    if (!recordingMeta) {
+      try {
+        const stored = await chrome.storage.local.get(["recordingMeta"]);
+        if (stored.recordingMeta?.type === "tab") {
+          recordingMeta = stored.recordingMeta;
+          chrome.storage.local.remove(["recordingMeta"]);
+        }
+      } catch (error) {
+        console.warn("Failed to load recording meta for download:", error);
+      }
+    }
+    const currentTitle = contentStateRef.current.title || "";
+    const safeTitle = currentTitle || "Screenity recording";
+    let title = safeTitle.replace(/[\/\\:?~<>|*]/g, " ").trim() + ext;
+
+    if (recordingMeta?.type === "tab") {
+      const baseTitle = sanitizeFilenameBase(
+        currentTitle && currentTitle.trim().length > 0
+          ? currentTitle
+          : recordingMeta.title || getHostnameFromUrl(recordingMeta.url)
+      );
+      const timestamp = formatLocalTimestamp(recordingMeta.startedAt);
+      title = `${baseTitle} — ${timestamp}${ext}`;
+    }
 
     const revoke = () => {
       try {

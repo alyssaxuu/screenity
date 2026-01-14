@@ -57,6 +57,30 @@ const API_BASE = process.env.SCREENITY_API_BASE_URL;
 const CLOUD_FEATURES_ENABLED =
   process.env.SCREENITY_ENABLE_CLOUD_FEATURES === "true";
 
+const ensureAudioOffscreen = async () => {
+  if (!chrome.offscreen) return false;
+  try {
+    const contexts = await chrome.runtime.getContexts({});
+    const audioUrl = chrome.runtime.getURL("audiooffscreen.html");
+    const hasAudioOffscreen = contexts.some(
+      (context) =>
+        context.contextType === "OFFSCREEN_DOCUMENT" &&
+        context.documentUrl === audioUrl
+    );
+    if (!hasAudioOffscreen) {
+      await chrome.offscreen.createDocument({
+        url: "audiooffscreen.html",
+        reasons: ["AUDIO_PLAYBACK"],
+        justification: "Play short UI beep sounds.",
+      });
+    }
+    return true;
+  } catch (error) {
+    console.warn("Failed to ensure audio offscreen document", error);
+    return false;
+  }
+};
+
 let activeRecordingSession = null;
 let recordingTabListener = null;
 
@@ -952,6 +976,18 @@ export const setupHandlers = () => {
   });
   registerMessage("clear-recording-alarm", async () => {
     await chrome.alarms.clear("recording-alarm");
+  });
+  registerMessage("get-tab-id", (message, sender, sendResponse) => {
+    sendResponse({ tabId: sender?.tab?.id ?? null });
+    return true;
+  });
+  registerMessage("play-beep", async (message, sender, sendResponse) => {
+    const ok = await ensureAudioOffscreen();
+    if (ok) {
+      chrome.runtime.sendMessage({ type: "play-beep-offscreen" });
+    }
+    if (sendResponse) sendResponse({ ok });
+    return true;
   });
   registerMessage("refresh-auth", async () => {
     if (!CLOUD_FEATURES_ENABLED)

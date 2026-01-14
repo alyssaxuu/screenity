@@ -30,6 +30,13 @@ const entryPoints = {
     "RecorderOffscreen",
     "index.jsx"
   ),
+  audiooffscreen: path.join(
+    __dirname,
+    "src",
+    "pages",
+    "AudioOffscreen",
+    "index.js"
+  ),
   camera: path.join(__dirname, "src", "pages", "Camera", "index.jsx"),
   waveform: path.join(__dirname, "src", "pages", "Waveform", "index.jsx"),
   sandbox: path.join(__dirname, "src", "pages", "Sandbox", "index.jsx"),
@@ -67,6 +74,7 @@ const htmlPlugins = Object.keys(entryPoints)
     const folderNameMap = {
       cloudrecorder: "CloudRecorder",
       recorderoffscreen: "RecorderOffscreen",
+      audiooffscreen: "AudioOffscreen",
       editorwebcodecs: "EditorWebCodecs",
       editorviewer: "EditorViewer",
     };

@@ -10,9 +10,22 @@ export const startRecording = async () => {
 
   const { recordingType } = await chrome.storage.local.get(["recordingType"]);
 
-  if (recordingType === "region") {
+  if (recordingType === "region" || recordingType === "tab") {
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
       const tab = tabs[0];
+      if (tab) {
+        const title = tab.title || "";
+        const url = tab.url || "";
+        chrome.storage.local.set({
+          recordingMeta: {
+            type: "tab",
+            title,
+            url,
+            startedAt: Date.now(),
+          },
+        });
+      }
+
       if (tab && tab.url) {
         try {
           const url = new URL(tab.url);
@@ -28,6 +41,8 @@ export const startRecording = async () => {
         }
       }
     });
+  } else {
+    chrome.storage.local.remove(["recordingMeta"]);
   }
 
   if (customRegion) {

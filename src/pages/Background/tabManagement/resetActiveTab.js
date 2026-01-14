@@ -13,7 +13,7 @@ export const restartActiveTab = async () => {
       sendMessageTab(activeTab.id, { type: "ready-to-record" });
 
       const { countdown } = await chrome.storage.local.get(["countdown"]);
-      const delay = countdown ? 3500 : 500;
+      const delay = countdown ? 3120 : 300;
 
       setTimeout(() => {
         if (countdown) {
@@ -73,7 +73,7 @@ export const resetActiveTab = async (forceRestart = false) => {
         sendMessageTab(targetTabId, { type: "ready-to-record" });
 
         const { countdown } = await chrome.storage.local.get(["countdown"]);
-        const delay = countdown ? 3500 : 500;
+        const delay = countdown ? 3120 : 300;
 
         setTimeout(() => {
           if (countdown) {

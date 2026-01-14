@@ -68,9 +68,6 @@ export const updateFromStorage = (check = true, id = null) => {
       "backupSetup",
       "qualityValue",
       "fpsValue",
-      "countdownActive",
-      "countdownCancelled",
-      "isCountdownVisible",
       "multiMode",
       "multiSceneCount",
       "sortBy",
@@ -303,9 +300,6 @@ export const updateFromStorage = (check = true, id = null) => {
           result.fpsValue !== undefined && result.fpsValue !== null
             ? result.fpsValue
             : prevContentState.fpsValue,
-        countdownActive: result.countdownActive || false,
-        countdownCancelled: result.countdownCancelled || false,
-        isCountdownVisible: result.isCountdownVisible || false,
         multiMode: result.multiMode || false,
         multiSceneCount: result.multiSceneCount || 0,
         wasLoggedIn: result.wasLoggedIn || false,

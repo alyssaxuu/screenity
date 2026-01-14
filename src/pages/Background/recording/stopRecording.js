@@ -53,6 +53,7 @@ export const stopRecording = async () => {
   if (isSubscribed) {
     chrome.alarms.clear("recording-alarm");
     discardOffscreenDocuments();
+    chrome.storage.local.remove(["recordingMeta"]);
   } else if (hasWebCodecs) {
     // Use Mediabunny (editorwebcodecs.html) when WebCodecs is supported
     chrome.tabs.create({ url: "editorwebcodecs.html", active: true }, (tab) => {

@@ -13,6 +13,7 @@ export const discardRecording = async () => {
     sandboxTab: null,
     recording: false,
   });
+  chrome.storage.local.remove(["recordingMeta"]);
 
   chrome.runtime.sendMessage({ type: "discard-backup" });
   chrome.runtime.sendMessage({ type: "turn-off-pip" });

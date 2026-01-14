@@ -11,23 +11,58 @@ const Countdown = () => {
   const [isTransforming, setIsTransforming] = useState(false);
   const [isRotating, setIsRotating] = useState(false);
 
-  const timers = useRef([]);
+  const END_HOLD_MS = 1000;
+  const START_AFTER_BEEP_MS = 120;
+  const HIDE_AFTER_END_MS = 0;
 
-  // Cleanup function to clear all timers
+  const intervalRef = useRef(null);
+  const activeRef = useRef(false);
+  const cancelledRef = useRef(false);
+  const wasVisibleRef = useRef(false);
+  const startRef = useRef(null);
+  const finishRef = useRef(null);
+  const resetRef = useRef(null);
+  const completedRef = useRef(false);
+  const hideTimeoutRef = useRef(null);
+  const finishTimeoutRef = useRef(null);
+  const startTimeoutRef = useRef(null);
+
   const cleanupTimers = () => {
-    timers.current.forEach((timer) => {
-      if (timer.type === "interval") {
-        clearInterval(timer.id);
-      } else {
-        clearTimeout(timer.id);
-      }
-    });
-    timers.current = [];
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+    if (hideTimeoutRef.current) {
+      clearTimeout(hideTimeoutRef.current);
+      hideTimeoutRef.current = null;
+    }
+    if (finishTimeoutRef.current) {
+      clearTimeout(finishTimeoutRef.current);
+      finishTimeoutRef.current = null;
+    }
+    if (startTimeoutRef.current) {
+      clearTimeout(startTimeoutRef.current);
+      startTimeoutRef.current = null;
+    }
   };
+
+  useEffect(() => {
+    activeRef.current = contentState.countdownActive;
+    cancelledRef.current = contentState.countdownCancelled;
+    startRef.current = contentState.startRecordingAfterCountdown;
+    finishRef.current = contentState.onCountdownFinished;
+    resetRef.current = contentState.resetCountdown;
+  }, [
+    contentState.countdownActive,
+    contentState.countdownCancelled,
+    contentState.startRecordingAfterCountdown,
+    contentState.onCountdownFinished,
+    contentState.resetCountdown,
+  ]);
 
   // Handle cancellation
   const handleCancel = () => {
-    if (contentState.countdownActive) {
+    if (contentState.countdownActive || contentState.isCountdownVisible) {
       cleanupTimers();
       setCount(COUNTDOWN_TIME);
       setIsTransforming(false);
@@ -38,72 +73,94 @@ const Countdown = () => {
 
   // Countdown logic
   useEffect(() => {
-    if (contentState.countdownActive && count > 1) {
-      const intervalId = setInterval(() => {
-        if (!contentState.countdownCancelled) {
-          setCount((prev) => prev - 1);
+    if (!contentState.countdownActive) {
+      cleanupTimers();
+      return;
+    }
+
+    cleanupTimers();
+    intervalRef.current = setInterval(() => {
+      setCount((prev) => (prev > 1 ? prev - 1 : 1));
+    }, 1000);
+
+    return cleanupTimers;
+  }, [contentState.countdownActive]);
+
+  useEffect(() => {
+    if (!activeRef.current || cancelledRef.current) {
+      return;
+    }
+    if (count !== 1) {
+      return;
+    }
+    if (completedRef.current) {
+      return;
+    }
+    completedRef.current = true;
+
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+
+    if (!cancelledRef.current && activeRef.current) {
+      finishTimeoutRef.current = setTimeout(() => {
+        if (cancelledRef.current || !activeRef.current) {
+          finishTimeoutRef.current = null;
+          return;
         }
-      }, 1000);
-
-      timers.current.push({ id: intervalId, type: "interval" });
-
-      return () => {
-        clearInterval(intervalId);
-        timers.current = timers.current.filter((t) => t.id !== intervalId);
-      };
-    } else if (contentState.countdownActive && count === 1) {
-      const timeoutId = setTimeout(() => {
-        if (!contentState.countdownCancelled && contentState.countdownActive) {
-          contentState.startRecordingAfterCountdown();
+        finishRef.current?.();
+        startTimeoutRef.current = setTimeout(() => {
+          startRef.current?.();
+          startTimeoutRef.current = null;
+        }, START_AFTER_BEEP_MS);
+        hideTimeoutRef.current = setTimeout(() => {
           setContentState((prev) => ({
             ...prev,
             isCountdownVisible: false,
             countdownActive: false,
           }));
-        }
-      }, 1000);
-
-      timers.current.push({ id: timeoutId, type: "timeout" });
-
-      return () => {
-        clearTimeout(timeoutId);
-        timers.current = timers.current.filter((t) => t.id !== timeoutId);
-      };
+          hideTimeoutRef.current = null;
+        }, HIDE_AFTER_END_MS);
+        finishTimeoutRef.current = null;
+      }, END_HOLD_MS);
     }
-  }, [contentState.countdownActive, count, setContentState, contentState]);
+  }, [count, setContentState]);
 
   // Start animation when countdown becomes visible
   useEffect(() => {
-    if (contentState.isCountdownVisible) {
-      contentState.resetCountdown(); // Reset cancelled state
+    if (contentState.isCountdownVisible && !wasVisibleRef.current) {
+      resetRef.current?.();
+      completedRef.current = false;
       setCount(COUNTDOWN_TIME);
       setIsTransforming(true);
 
       const rotateId = setTimeout(() => {
-        if (!contentState.countdownCancelled) {
+        if (!cancelledRef.current) {
           setIsRotating(true);
         }
       }, 10);
 
       const transformId = setTimeout(() => {
-        if (!contentState.countdownCancelled) {
+        if (!cancelledRef.current) {
           setIsTransforming(false);
         }
       }, (COUNTDOWN_TIME * 1000) / 2);
 
-      timers.current.push(
-        { id: rotateId, type: "timeout" },
-        { id: transformId, type: "timeout" }
-      );
-
       return () => {
         clearTimeout(rotateId);
         clearTimeout(transformId);
-        timers.current = timers.current.filter(
-          (t) => t.id !== rotateId && t.id !== transformId
-        );
       };
     }
+
+    if (!contentState.isCountdownVisible) {
+      setIsRotating(false);
+      setIsTransforming(false);
+    }
+  }, [contentState.isCountdownVisible]);
+
+  useEffect(() => {
+    wasVisibleRef.current = contentState.isCountdownVisible;
   }, [contentState.isCountdownVisible]);
 
   // Cleanup on unmount

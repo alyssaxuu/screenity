@@ -16,6 +16,7 @@ export const handleDismiss = async () => {
 
     chrome.action.setIcon({ path: "assets/icon-34.png" });
     chrome.runtime.sendMessage({ type: "turn-off-pip" });
+    chrome.storage.local.remove(["recordingMeta"]);
   } catch (error) {
     console.error("Failed to handle dismiss:", error);
   }
@@ -34,6 +35,7 @@ export const cancelRecording = async () => {
     focusTab(activeTab);
     discardOffscreenDocuments();
     chrome.runtime.sendMessage({ type: "turn-off-pip" });
+    chrome.storage.local.remove(["recordingMeta"]);
   } catch (error) {
     console.error("Failed to cancel recording:", error.message);
   }
