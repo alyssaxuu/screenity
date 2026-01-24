@@ -67,6 +67,7 @@ export default class BunnyTusUploader {
     this.onProgress = options.onProgress || null;
     this.onStall = options.onStall || null;
 
+    this.totalBytes = 0;
     this.uploadUrl = null;
     this.offset = 0;
     this.projectId = null;
@@ -119,6 +120,7 @@ export default class BunnyTusUploader {
       this.status = "initializing";
       this.error = null;
       this.offset = 0;
+      this.totalBytes = 0;
 
       // Validate reuse object if provided
       if (reuse) {
@@ -244,6 +246,7 @@ export default class BunnyTusUploader {
       const subChunk = chunk.slice(i, i + this.CHUNK_SIZE);
       this.chunkQueue.push(subChunk);
       this.queuedBytes += subChunk.size;
+      this.totalBytes += subChunk.size;
     }
 
     // Always ensure queue is processing
@@ -279,7 +282,6 @@ export default class BunnyTusUploader {
     for (let attempt = 0; attempt <= this.MAX_RETRIES; attempt++) {
       try {
         const currentOffset = this.offset;
-        this.offset += data.length;
 
         const controller = new AbortController();
         const timeout = setTimeout(
@@ -304,22 +306,13 @@ export default class BunnyTusUploader {
         clearTimeout(timeout);
 
         if (res.ok || res.status === 204) {
-          // Verify server offset matches our expectation
-          const serverOffset = res.headers.get("Upload-Offset");
-          const expectedOffset = currentOffset + data.length;
-
-          if (serverOffset) {
-            const actualOffset = parseInt(serverOffset);
-            if (actualOffset !== expectedOffset) {
-              console.warn(
-                `⚠️ Offset mismatch! Expected: ${expectedOffset}, Server: ${actualOffset}`
-              );
-              this.offset = actualOffset;
-            } else {
-              this.offset = expectedOffset;
-            }
+          // Server is the source of truth
+          const serverOffsetHeader = res.headers.get("Upload-Offset");
+          if (serverOffsetHeader) {
+            this.offset = parseInt(serverOffsetHeader, 10);
           } else {
-            this.offset = expectedOffset;
+            // Fallback if Bunny doesn't return it for some reason
+            this.offset = currentOffset + data.length;
           }
 
           this.recordProgress(data.length);
@@ -484,16 +477,8 @@ export default class BunnyTusUploader {
     await this.waitForPendingUploads();
     await this.checkAuthExpiration();
 
-    // Validate that we actually uploaded data
-    if (this.offset === 0) {
-      this.status = "error";
-      this.error = "No data uploaded - offset is 0";
-      throw new Error(
-        "Cannot finalize upload with zero bytes. No chunks were successfully uploaded."
-      );
-    }
-
     // Re-validate offset with server to avoid partial finalization
+    let serverOffset = null;
     try {
       const headRes = await fetch(this.uploadUrl, {
         method: "HEAD",
@@ -507,27 +492,51 @@ export default class BunnyTusUploader {
       });
 
       if (headRes.ok) {
-        const serverOffset = parseInt(
-          headRes.headers.get("Upload-Offset") || "0"
+        serverOffset = parseInt(
+          headRes.headers.get("Upload-Offset") || "0",
+          10
         );
-        if (serverOffset !== this.offset) {
-          console.warn(
-            `⚠️ Finalize correcting offset from ${this.offset} to ${serverOffset}`
-          );
-          this.offset = serverOffset;
-        }
+        this.offset = serverOffset;
       }
     } catch (err) {
-      console.warn("⚠️ Failed to verify offset before finalize:", err);
+      console.warn("⚠️ Failed HEAD before finalize:", err);
     }
 
+    // If server didn't receive everything, don't "finalize" into a ghost upload.
+    if (serverOffset === null) {
+      throw new Error("Finalize failed: could not verify server offset.");
+    }
+
+    if (serverOffset === 0) {
+      this.status = "error";
+      this.error = "server-offset-0";
+      throw new Error("Finalize failed: server has 0 bytes.");
+    }
+
+    if (serverOffset < this.totalBytes) {
+      this.status = "error";
+      this.error = `incomplete-upload server=${serverOffset} expected=${this.totalBytes}`;
+      throw new Error(
+        `Finalize blocked: upload incomplete (server ${serverOffset} / expected ${this.totalBytes}).`
+      );
+    }
+
+    if (serverOffset > this.totalBytes) {
+      this.status = "error";
+      this.error = `invalid-length server=${serverOffset} expected=${this.totalBytes}`;
+      throw new Error(
+        `Finalize blocked: serverOffset (${serverOffset}) exceeds expected totalBytes (${this.totalBytes}).`
+      );
+    }
+
+    // Now we can safely complete the tus upload by declaring the final length
     const res = await fetch(this.uploadUrl, {
       method: "PATCH",
       headers: {
         "Tus-Resumable": "1.0.0",
         "Content-Type": "application/offset+octet-stream",
-        "Upload-Offset": String(this.offset),
-        "Upload-Length": String(this.offset),
+        "Upload-Offset": String(serverOffset),
+        "Upload-Length": String(this.totalBytes),
         AuthorizationSignature: this.signature,
         AuthorizationExpire: String(this.expires),
         LibraryId: String(this.libraryId),
@@ -581,6 +590,7 @@ export default class BunnyTusUploader {
     this.uploadUrl = null;
     this.chunkQueue = [];
     this.queuedBytes = 0;
+    this.totalBytes = 0;
     this.pendingUploads = [];
     this.stopHeartbeat();
   }

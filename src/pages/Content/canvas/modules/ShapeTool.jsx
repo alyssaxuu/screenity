@@ -1,101 +1,131 @@
-import React from "react";
-
 import { fabric } from "fabric";
 
-const ShapeTool = (canvas, toolSettings, setToolSettings, saveCanvas) => {
-  const tool = toolSettings;
-  let shape;
-  let isDown = false;
-  let origX;
-  let origY;
+const ShapeTool = (canvas, contentStateRef, setContentState, saveCanvas) => {
+  const getState = () => contentStateRef.current;
 
-  const onMouseDown = (o) => {
-    if (tool.tool !== "shape") return;
-    isDown = true;
-    const pointer = canvas.getPointer(o.e);
-    origX = pointer.x;
-    origY = pointer.y;
-    if (tool.shape === "rectangle") {
-      shape = new fabric.Rect({
+  let shape = null;
+  let isDown = false;
+  let origX = 0;
+  let origY = 0;
+
+  const makeShape = (state, pointer) => {
+    const color = state.color;
+    const strokeWidth = (state.strokeWidth || 2) * 6;
+    const fill = state.shapeFill ? color : "transparent";
+
+    if (state.shape === "rectangle") {
+      return new fabric.Rect({
         left: origX,
         top: origY,
         originX: "left",
         originY: "top",
-        width: pointer.x - origX,
-        height: pointer.y - origY,
+        width: 0,
+        height: 0,
         strokeUniform: true,
         angle: 0,
-        fill: tool.shapeFill ? toolSettings.color : "transparent",
+        fill,
         noScaleCache: false,
-        stroke: toolSettings.color,
-        strokeWidth: toolSettings.strokeWidth * 6,
+        stroke: color,
+        strokeWidth,
       });
-    } else if (tool.shape === "triangle") {
-      shape = new fabric.Triangle({
+    }
+
+    if (state.shape === "triangle") {
+      return new fabric.Triangle({
         left: origX,
         top: origY,
         originX: "left",
         originY: "top",
         strokeMilterLimit: 8,
         objectCaching: false,
-        width: pointer.x - origX,
-        height: pointer.y - origY,
+        width: 0,
+        height: 0,
         strokeUniform: true,
         angle: 0,
-        fill: tool.shapeFill ? toolSettings.color : "transparent",
+        fill,
         noScaleCache: false,
-        stroke: toolSettings.color,
-        strokeWidth: toolSettings.strokeWidth * 6,
-      });
-    } else if (tool.shape === "circle") {
-      shape = new fabric.Circle({
-        left: origX,
-        top: origY,
-        originX: "left",
-        originY: "top",
-        radius: Math.abs(pointer.x - origX) / 2,
-        strokeUniform: true,
-        angle: 0,
-        fill: tool.shapeFill ? toolSettings.color : "transparent",
-        noScaleCache: false,
-        stroke: toolSettings.color,
-        strokeWidth: toolSettings.strokeWidth * 6,
+        stroke: color,
+        strokeWidth,
       });
     }
-    canvas.add(shape);
+
+    // circle
+    return new fabric.Circle({
+      left: origX,
+      top: origY,
+      originX: "left",
+      originY: "top",
+      radius: 0,
+      strokeUniform: true,
+      angle: 0,
+      fill,
+      noScaleCache: false,
+      stroke: color,
+      strokeWidth,
+    });
   };
 
-  const onMouseMove = (o) => {
-    if (tool.tool !== "shape") return;
-    if (!isDown) return;
+  const onMouseDown = (o) => {
+    const state = getState();
+    if (!state?.drawingMode) return;
+    if (state.tool !== "shape") return;
+
+    isDown = true;
+
     const pointer = canvas.getPointer(o.e);
+    origX = pointer.x;
+    origY = pointer.y;
 
-    if (origX > pointer.x) {
-      shape.set({ left: Math.abs(pointer.x) });
-    }
-    if (origY > pointer.y) {
-      shape.set({ top: Math.abs(pointer.y) });
-    }
-
-    if (tool.shape === "rectangle" || tool.shape === "triangle") {
-      shape.set({ width: Math.abs(origX - pointer.x) });
-      shape.set({ height: Math.abs(origY - pointer.y) });
-    } else if (tool.shape === "circle") {
-      shape.set({
-        radius: Math.abs(pointer.x - origX) / 2,
-      });
-    }
-
+    shape = makeShape(state, pointer);
+    canvas.add(shape);
     canvas.requestRenderAll();
   };
 
-  const onMouseUp = (o) => {
-    if (tool.tool !== "shape") return;
+  const onMouseMove = (o) => {
+    const state = getState();
+    if (!state?.drawingMode) return;
+    if (state.tool !== "shape") return;
+    if (!isDown || !shape) return;
+
+    const pointer = canvas.getPointer(o.e);
+
+    // Handle dragging “backwards”
+    const left = Math.min(origX, pointer.x);
+    const top = Math.min(origY, pointer.y);
+    const w = Math.abs(pointer.x - origX);
+    const h = Math.abs(pointer.y - origY);
+
+    shape.set({ left, top });
+
+    if (state.shape === "rectangle" || state.shape === "triangle") {
+      shape.set({ width: w, height: h });
+    } else if (state.shape === "circle") {
+      // Use min dimension so it stays circular
+      const r = Math.min(w, h) / 2;
+      shape.set({ radius: r });
+    }
+
+    shape.setCoords();
+    canvas.requestRenderAll();
+  };
+
+  const onMouseUp = () => {
+    const state = getState();
+    if (!state?.drawingMode) return;
+    if (state.tool !== "shape") return;
+    if (!isDown) return;
+
     isDown = false;
-    canvas.renderAll();
-    saveCanvas({ ...toolSettings, tool: "select" }, setToolSettings);
-    canvas.setActiveObject(shape);
-    canvas.renderAll();
+
+    canvas.requestRenderAll();
+
+    // Save with latest state (not stale snapshot)
+    saveCanvas({ ...state, tool: "select" }, setContentState);
+
+    if (shape) {
+      canvas.setActiveObject(shape);
+      canvas.requestRenderAll();
+    }
   };
 
   canvas.on("mouse:down", onMouseDown);
@@ -103,7 +133,7 @@ const ShapeTool = (canvas, toolSettings, setToolSettings, saveCanvas) => {
   canvas.on("mouse:up", onMouseUp);
 
   return {
-    removeEventListeners: function () {
+    removeEventListeners: () => {
       canvas.off("mouse:down", onMouseDown);
       canvas.off("mouse:move", onMouseMove);
       canvas.off("mouse:up", onMouseUp);

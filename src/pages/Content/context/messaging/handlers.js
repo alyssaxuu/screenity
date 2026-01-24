@@ -14,6 +14,8 @@ const CLOUD_FEATURES_ENABLED =
 const getState = () => contentStateRef.current;
 
 export const setupHandlers = () => {
+  if (window.__screenitySetupHandlersRan) return;
+  window.__screenitySetupHandlersRan = true;
   let lastToggleDrawingAt = 0;
   const TOGGLE_DRAWING_COOLDOWN_MS = 400;
   // Initialize message router
@@ -87,6 +89,26 @@ export const setupHandlers = () => {
       drawingMode: nextDrawingMode,
       blurMode: nextDrawingMode ? false : prev.blurMode,
     }));
+
+    registerMessage("toggle-drawing-mode", () => {
+      const now = Date.now();
+      if (now - lastToggleDrawingAt < TOGGLE_DRAWING_COOLDOWN_MS) return;
+      lastToggleDrawingAt = now;
+      if (document.hidden || !document.hasFocus()) return;
+
+      const nextDrawingMode = !contentStateRef.current.drawingMode;
+
+      setContentState((prev) => ({
+        ...prev,
+        drawingMode: nextDrawingMode,
+        blurMode: nextDrawingMode ? false : prev.blurMode,
+      }));
+
+      chrome.storage.local.set({
+        drawingMode: nextDrawingMode,
+        ...(nextDrawingMode ? { blurMode: false } : {}),
+      });
+    });
   });
 
   registerMessage("toggle-blur-mode", () => {
@@ -112,9 +134,7 @@ export const setupHandlers = () => {
     }));
     chrome.storage.local.set({
       hideUI: nextHideUI,
-      ...(nextHideUI
-        ? { hideToolbar: true, hideUIAlerts: true }
-        : {}),
+      ...(nextHideUI ? { hideToolbar: true, hideUIAlerts: true } : {}),
     });
   });
 
@@ -151,7 +171,7 @@ export const setupHandlers = () => {
     if (isActuallyRecording || pendingRecording) {
       // Recording is actually still active - ignore this stale message
       console.warn(
-        "Ignoring stale recording-ended message - recording still active"
+        "Ignoring stale recording-ended message - recording still active",
       );
       return;
     }
@@ -204,19 +224,19 @@ export const setupHandlers = () => {
     if (!message) return;
 
     const startRecordingCommand = message.commands.find(
-      (command) => command.name === "start-recording"
+      (command) => command.name === "start-recording",
     );
     const cancelRecordingCommand = message.commands.find(
-      (command) => command.name === "cancel-recording"
+      (command) => command.name === "cancel-recording",
     );
     const toggleDrawingModeCommand = message.commands.find(
-      (command) => command.name === "toggle-drawing-mode"
+      (command) => command.name === "toggle-drawing-mode",
     );
     const toggleBlurModeCommand = message.commands.find(
-      (command) => command.name === "toggle-blur-mode"
+      (command) => command.name === "toggle-blur-mode",
     );
     const toggleCursorModeCommand = message.commands.find(
-      (command) => command.name === "toggle-cursor-mode"
+      (command) => command.name === "toggle-cursor-mode",
     );
 
     setContentState((prev) => ({
@@ -297,7 +317,7 @@ export const setupHandlers = () => {
       },
       () => {
         state.dismissRecording();
-      }
+      },
     );
   });
 
@@ -310,7 +330,7 @@ export const setupHandlers = () => {
         message.message ||
           "Screen sharing stopped. Stop recording to save your video.",
         () => {},
-        10000 // Show for 10 seconds
+        10000, // Show for 10 seconds
       );
     }
   });
@@ -327,7 +347,7 @@ export const setupHandlers = () => {
       },
       () => {
         state.dismissRecording();
-      }
+      },
     );
   });
 
@@ -390,7 +410,7 @@ export const setupHandlers = () => {
       if (state.openToast) {
         state.openToast(
           chrome.i18n.getMessage("readyRecordSceneToast"),
-          () => {}
+          () => {},
         );
       }
     }, 1000);
@@ -410,7 +430,7 @@ export const setupHandlers = () => {
         state.openToast(
           chrome.i18n.getMessage("reachingRecordingLimitToast"),
           () => {},
-          5000
+          5000,
         );
       }
     }
@@ -428,7 +448,7 @@ export const setupHandlers = () => {
         state.openToast(
           chrome.i18n.getMessage("recordingLimitReachedToast"),
           () => {},
-          5000
+          5000,
         );
       }
     }
@@ -488,7 +508,7 @@ export const setupHandlers = () => {
   registerMessage("update-project-loading", (message, sender) => {
     window.postMessage(
       { source: "update-project-loading", multiMode: message.multiMode },
-      "*"
+      "*",
     );
 
     if (!message.multiMode) {
@@ -509,7 +529,7 @@ export const setupHandlers = () => {
         newProject: message.newProject,
         sceneId: message.sceneId,
       },
-      "*"
+      "*",
     );
   });
   registerMessage("clear-project-recording", (message) => {

@@ -42,10 +42,10 @@ const ContentState = (props) => {
     process.env.SCREENITY_ENABLE_CLOUD_FEATURES === "true";
   setTimer = setTimerInternal;
   const [URL, setURL] = useState(
-    "https://help.screenity.io/getting-started/77KizPC8MHVGfpKpqdux9D/why-does-screenity-ask-for-permissions/9AAE8zJ6iiUtCAtjn4SUT1"
+    "https://help.screenity.io/getting-started/77KizPC8MHVGfpKpqdux9D/why-does-screenity-ask-for-permissions/9AAE8zJ6iiUtCAtjn4SUT1",
   );
   const [URL2, setURL2] = useState(
-    "https://help.screenity.io/troubleshooting/9Jy5RGjNrBB42hqUdREQ7W/how-to-grant-screenity-permission-to-record-your-camera-and-microphone/x6U69TnrbMjy5CQ96Er2E9"
+    "https://help.screenity.io/troubleshooting/9Jy5RGjNrBB42hqUdREQ7W/how-to-grant-screenity-permission-to-record-your-camera-and-microphone/x6U69TnrbMjy5CQ96Er2E9",
   );
   const startBeepRef = useRef(null);
   const stopBeepRef = useRef(null);
@@ -122,12 +122,12 @@ const ContentState = (props) => {
       setURL(
         "https://translate.google.com/translate?sl=en&tl=" +
           locale +
-          "&u=https://help.screenity.io/getting-started/77KizPC8MHVGfpKpqdux9D/why-does-screenity-ask-for-permissions/9AAE8zJ6iiUtCAtjn4SUT1"
+          "&u=https://help.screenity.io/getting-started/77KizPC8MHVGfpKpqdux9D/why-does-screenity-ask-for-permissions/9AAE8zJ6iiUtCAtjn4SUT1",
       );
       setURL2(
         "https://translate.google.com/translate?sl=en&tl=" +
           locale +
-          "&u=https://help.screenity.io/troubleshooting/9Jy5RGjNrBB42hqUdREQ7W/how-to-grant-screenity-permission-to-record-your-camera-and-microphone/x6U69TnrbMjy5CQ96Er2E9"
+          "&u=https://help.screenity.io/troubleshooting/9Jy5RGjNrBB42hqUdREQ7W/how-to-grant-screenity-permission-to-record-your-camera-and-microphone/x6U69TnrbMjy5CQ96Er2E9",
       );
     }
   }, []);
@@ -181,7 +181,7 @@ const ContentState = (props) => {
           {
             type: "restart-recording",
           },
-          "*"
+          "*",
         );
       }
       if (contentStateRef.current.alarm) {
@@ -222,6 +222,10 @@ const ContentState = (props) => {
     chrome.storage.local.set({
       restarting: false,
       tabRecordedID: null,
+      drawingMode: false,
+      blurMode: false,
+      cursorMode: "none",
+      cursorEffects: [],
     });
     setContentState((prevContentState) => ({
       ...prevContentState,
@@ -236,6 +240,11 @@ const ContentState = (props) => {
       time: 0,
       timer: 0,
       preparingRecording: false,
+      drawingMode: false,
+      blurMode: false,
+      toolbarMode: "",
+      cursorMode: "none",
+      cursorEffects: [],
     }));
     // Remove blur from all elements
     const elements = document.querySelectorAll(".screenity-blur");
@@ -265,7 +274,7 @@ const ContentState = (props) => {
       if (!dismiss) {
         contentStateRef.current.openToast(
           chrome.i18n.getMessage("pausedRecordingToast"),
-          function () {}
+          function () {},
         );
       }
     }, 100);
@@ -359,7 +368,7 @@ const ContentState = (props) => {
         },
         (response) => {
           resolve(response.status === "ok");
-        }
+        },
       );
     });
   }, []);
@@ -393,7 +402,7 @@ const ContentState = (props) => {
           () => {
             window.open(process.env.SCREENITY_APP_BASE, "_blank");
           },
-          () => {}
+          () => {},
         );
       } else if (!success) {
         const isSubError = error === "Subscription inactive";
@@ -427,7 +436,7 @@ const ContentState = (props) => {
           async () => {
             window.location.reload(); // or retry logic
           },
-          () => {}
+          () => {},
         );
       }
 
@@ -462,7 +471,7 @@ const ContentState = (props) => {
         null,
         chrome.i18n.getMessage("learnMoreDot"),
         URL,
-        true
+        true,
       );
       setContentState((prevContentState) => ({
         ...prevContentState,
@@ -512,7 +521,7 @@ const ContentState = (props) => {
           () => {},
           null,
           chrome.i18n.getMessage("learnMoreDot"),
-          helpURL
+          helpURL,
         );
       }
       setContentState((prevContentState) => ({
@@ -537,7 +546,7 @@ const ContentState = (props) => {
           width: contentStateRef.current.regionWidth,
           height: contentStateRef.current.regionHeight,
         },
-        "*"
+        "*",
       );
     }
 
@@ -584,7 +593,7 @@ const ContentState = (props) => {
             askMicrophone: false,
           }));
           chrome.storage.local.set({ askMicrophone: false });
-        }
+        },
       );
     } else {
       chrome.runtime.sendMessage({
@@ -617,7 +626,7 @@ const ContentState = (props) => {
       },
       () => {
         contentState.resumeRecording();
-      }
+      },
     );
   });
 
@@ -636,7 +645,7 @@ const ContentState = (props) => {
         },
         () => {
           contentStateRef.current.resumeRecording();
-        }
+        },
       );
     } else {
       contentStateRef.current.dismissRecording();
@@ -661,12 +670,12 @@ const ContentState = (props) => {
 
       const audioInputById = Array.isArray(audioInput)
         ? Object.fromEntries(
-            audioInput.map((device) => [device.deviceId, device.label])
+            audioInput.map((device) => [device.deviceId, device.label]),
           )
         : {};
       const videoInputById = Array.isArray(videoInput)
         ? Object.fromEntries(
-            videoInput.map((device) => [device.deviceId, device.label])
+            videoInput.map((device) => [device.deviceId, device.label]),
           )
         : {};
 
@@ -757,7 +766,7 @@ const ContentState = (props) => {
           chrome.i18n.getMessage("learnMoreDot"),
           URL2,
           true,
-          false
+          false,
         );
       }
     }
@@ -1043,7 +1052,7 @@ const ContentState = (props) => {
             null,
             () => {
               chrome.storage.local.set({ firstTimePro: false });
-            }
+            },
           );
         }, 300);
       }
@@ -1090,10 +1099,10 @@ const ContentState = (props) => {
           chrome.i18n.getMessage("audioWarningTitle"),
           chrome.i18n.getMessage(
             "audioWarningDescription",
-            chrome.i18n.getMessage("tabType")
+            chrome.i18n.getMessage("tabType"),
           ),
           "AudioIcon",
-          10000
+          10000,
         );
         // Check if url contains "playground.html" and "chrome-extension://"
       } else if (
@@ -1105,7 +1114,7 @@ const ContentState = (props) => {
           chrome.i18n.getMessage("extensionNotSupportedTitle"),
           chrome.i18n.getMessage("extensionNotSupportedDescription"),
           "NotSupportedIcon",
-          10000
+          10000,
         );
       }
     }
@@ -1146,7 +1155,7 @@ const ContentState = (props) => {
     const extraPaused = paused && pausedAt ? Math.max(0, now - pausedAt) : 0;
     const elapsedSeconds = Math.max(
       0,
-      Math.floor((now - recordingStartTime - basePaused - extraPaused) / 1000)
+      Math.floor((now - recordingStartTime - basePaused - extraPaused) / 1000),
     );
 
     if (contentStateRef.current?.alarm) {
@@ -1223,7 +1232,7 @@ const ContentState = (props) => {
       }
       if (changes.cursorEffects) {
         const nextEffects = normalizeCursorEffects(
-          changes.cursorEffects.newValue
+          changes.cursorEffects.newValue,
         );
         const fallbackMode =
           changes.cursorMode?.newValue ||
@@ -1283,6 +1292,8 @@ const ContentState = (props) => {
   }, [contentState.hideToolbar, contentState.hideUI]);
 
   useEffect(() => {
+    if (window.__screenitySetupHandlersInitialized) return;
+    window.__screenitySetupHandlersInitialized = true;
     setupHandlers();
   }, []);
 

@@ -326,20 +326,28 @@ const ToolbarWrap = () => {
     }
   }, [contentState.drawingMode, contentState.blurMode, contentState.openToast]);
 
-  useEffect(() => {
-    let nextMode = modeRef.current;
-    if (contentState.drawingMode) {
-      nextMode = "draw";
-    } else if (contentState.blurMode) {
-      nextMode = "blur";
-    } else if (modeRef.current === "draw" || modeRef.current === "blur") {
-      nextMode = "";
-    }
+  // useEffect(() => {
+  //   let nextMode = modeRef.current;
+  //   if (contentState.drawingMode) {
+  //     nextMode = "draw";
+  //   } else if (contentState.blurMode) {
+  //     nextMode = "blur";
+  //   } else if (modeRef.current === "draw" || modeRef.current === "blur") {
+  //     nextMode = "";
+  //   }
 
-    if (nextMode !== modeRef.current) {
-      setMode(nextMode);
-    }
-  }, [contentState.drawingMode, contentState.blurMode]);
+  //   if (nextMode !== modeRef.current) {
+  //     setMode(nextMode);
+  //   }
+  // }, [contentState.drawingMode, contentState.blurMode]);
+
+  useEffect(() => {
+    // one-time init
+    if (contentState.drawingMode) setMode("draw");
+    else if (contentState.blurMode) setMode("blur");
+    else setMode("");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     if (mode === "draw") {
@@ -440,7 +448,7 @@ const ToolbarWrap = () => {
                 if (contentState.openToast) {
                   contentState.openToast(
                     chrome.i18n.getMessage("reopenToolbarToast"),
-                    () => {}
+                    () => {},
                   );
                 }
 

@@ -1,9 +1,43 @@
 import { fabric } from "fabric";
 
-const TextTool = (canvas, toolSettings, setToolSettings, saveCanvas) => {
-  // Add interactive text on click, start editing
+const TextTool = (canvas, contentStateRef, setContentState, saveCanvas) => {
+  const getState = () => contentStateRef.current;
+
+  // Track the currently-created textbox so we can finalize it cleanly
+  let activeCreatedText = null;
+
+  const finalizeIfNeeded = () => {
+    if (!activeCreatedText) return;
+
+    const text = activeCreatedText;
+    const currentActive = canvas.getActiveObject();
+
+    // If user clicked away / ended editing
+    if (currentActive !== text) {
+      if ((text.text || "").trim() === "") {
+        canvas.remove(text);
+      } else {
+        // Save using latest state
+        saveCanvas({ ...getState(), canvas }, setContentState);
+      }
+      activeCreatedText = null;
+      canvas.requestRenderAll();
+    }
+  };
+
+  const onCanvasMouseDownCapture = (o) => {
+    // This runs on any mouse down to potentially finalize the last text.
+    // But don't interfere if user is still editing that text.
+    finalizeIfNeeded();
+  };
+
   const onMouseDown = (o) => {
-    if (toolSettings.tool !== "text") return;
+    const state = getState();
+    if (!state?.drawingMode) return;
+    if (state.tool !== "text") return;
+
+    // Before creating a new one, finalize previous if any
+    finalizeIfNeeded();
 
     const pointer = canvas.getPointer(o.e);
     const x = pointer.x;
@@ -14,7 +48,7 @@ const TextTool = (canvas, toolSettings, setToolSettings, saveCanvas) => {
       top: y,
       fontFamily: "Satoshi-Medium",
       fontSize: 20,
-      fill: toolSettings.color,
+      fill: state.color,
       fontWeight: "normal",
       fontStyle: "normal",
       originX: "left",
@@ -25,111 +59,90 @@ const TextTool = (canvas, toolSettings, setToolSettings, saveCanvas) => {
       skipAutoWidthAdjustment: false,
       perPixelTargetFind: false,
     });
-    // Blue selection box while editing
+
     text.on("editing:entered", () => {
       text.borderColor = "#0D99FF";
     });
 
     canvas.add(text);
     canvas.setActiveObject(text);
+
+    // Start editing
     text.enterEditing();
     text.selectAll();
 
-    // Set tool back to cursor
-    setToolSettings({
-      ...toolSettings,
-      tool: "select",
-    });
+    activeCreatedText = text;
 
-    // When user clicks off of text, save canvas
-    canvas.on("mouse:down", () => {
-      if (canvas.getActiveObject() !== text) {
-        // Check if text is empty, if so, remove it
-        if (text.text === "") {
-          canvas.remove(text);
-        } else {
-          saveCanvas(canvas);
-        }
-      }
-    });
+    // Set tool back to select (use latest state)
+    setContentState((prev) => ({
+      ...prev,
+      tool: "select",
+    }));
+
+    canvas.requestRenderAll();
   };
 
   const onKeyPress = (event) => {
-    if (canvas.getActiveObject() === null) return;
-    // check if getactiveobject is an object
-    if (typeof canvas.getActiveObject() !== "object") return;
+    const obj = canvas.getActiveObject();
+    if (!obj || typeof obj !== "object") return;
 
-    // Check if the active object is a textbox and if the user is editing it
-    if (
-      canvas.getActiveObject().type !== "textbox" ||
-      !canvas.getActiveObject().isEditing
-    )
-      return;
+    if (obj.type !== "textbox" || !obj.isEditing) return;
 
-    // Get the active text object
-    var text = canvas.getActiveObject();
+    const text = obj;
 
-    // Check if the user has explicitly set the width of the textbox
+    // If user explicitly resized, skip
     if (text.skipAutoWidthAdjustment) return;
 
-    // Get text in current line of text
-    var currentLine = text._textLines[text._textLines.length - 1];
-    // current line to string
-    currentLine = currentLine.join("");
+    // Guard: _textLines might not exist at some moments
+    const lines = text._textLines || [];
+    if (lines.length === 0) return;
 
-    // Check if the user is backspacing
-    if (event.keyCode === 8 && currentLine.length > 0) {
-      // Remove the last character from the current line
+    let currentLine = lines[lines.length - 1].join("");
+
+    // Backspace
+    if (event.key === "Backspace" && currentLine.length > 0) {
       currentLine = currentLine.slice(0, -1);
+    } else if (event.key && event.key.length === 1) {
+      currentLine += event.key;
     } else {
-      // Add the pressed character to the current line
-      var charCode = event.charCode || event.keyCode;
-      var character = String.fromCharCode(charCode);
-      currentLine += character;
+      // ignore other keys
+      return;
     }
 
-    var newText = currentLine;
+    // Measure
+    const tempCanvas = document.createElement("canvas");
+    const tempCtx = tempCanvas.getContext("2d");
+    tempCtx.font = `${text.fontSize}px ${text.fontFamily}`;
+    const textMetrics = tempCtx.measureText(currentLine);
 
-    // Create a temporary canvas to measure the text width
-    var tempCanvas = document.createElement("canvas");
-    var tempCtx = tempCanvas.getContext("2d");
-    tempCtx.font = text.fontSize + "px " + text.fontFamily;
-    var textMetrics = tempCtx.measureText(newText);
+    const maxLineWidth = getMaxLineWidth(lines, text);
 
-    // Adjust the width of the text if necessary
-    var textWidth = Math.max(text.width, textMetrics.width + 2);
+    // Expand width if needed
     if (textMetrics.width > text.width) {
+      const nextWidth = Math.max(text.width, textMetrics.width + 2);
       text.set({
-        left: text.left - (textWidth - text.width) / 2,
+        left: text.left - (nextWidth - text.width) / 2,
+        width: nextWidth,
       });
-
-      canvas.renderAll();
-      text.set("width", textWidth);
-    } else {
-      var maxLineWidth = getMaxLineWidth(text._textLines, text);
-      if (textMetrics.width < maxLineWidth) {
-        text.set({
-          left: text.left + (text.width - maxLineWidth) / 2,
-        });
-
-        canvas.renderAll();
-        text.set("width", maxLineWidth);
-      }
+    } else if (textMetrics.width < maxLineWidth) {
+      text.set({
+        left: text.left + (text.width - maxLineWidth) / 2,
+        width: maxLineWidth,
+      });
     }
 
-    canvas.renderAll();
+    canvas.requestRenderAll();
   };
 
   function getMaxLineWidth(textLines, text) {
-    var maxLineWidth = 0;
-    var tempCanvas = document.createElement("canvas");
-    var tempCtx = tempCanvas.getContext("2d");
-    tempCtx.font = text.fontSize + "px " + text.fontFamily;
+    let maxLineWidth = 0;
+    const tempCanvas = document.createElement("canvas");
+    const tempCtx = tempCanvas.getContext("2d");
+    tempCtx.font = `${text.fontSize}px ${text.fontFamily}`;
 
-    for (var i = 0; i < textLines.length; i++) {
-      var line = textLines[i].join("");
-      var lineMetrics = tempCtx.measureText(line);
-      var lineWidth = lineMetrics.width;
+    for (let i = 0; i < textLines.length; i++) {
+      const line = textLines[i].join("");
+      const lineWidth = tempCtx.measureText(line).width;
       maxLineWidth = Math.max(maxLineWidth, lineWidth);
     }
 
@@ -137,44 +150,41 @@ const TextTool = (canvas, toolSettings, setToolSettings, saveCanvas) => {
   }
 
   const onResize = (e) => {
-    // Check if the active object is a textbox
-    if (e.target.type !== "textbox") return;
-
-    // Set flag to skip auto width adjustment
-    var text = e.target;
-    text.skipAutoWidthAdjustment = true;
-    canvas.renderAll();
+    if (e?.target?.type !== "textbox") return;
+    e.target.skipAutoWidthAdjustment = true;
+    canvas.requestRenderAll();
   };
 
-  canvas.on("mouse:down", onMouseDown);
-  document.addEventListener("keydown", onKeyPress);
-  canvas.on("object:resizing", onResize);
-  canvas.on("mouse:move", function (event) {
-    var pointer = canvas.getPointer(event.e);
-    var isHoveringTextbox = false;
+  // Hover logic: DON'T use anonymous mouse:move that you later nuke.
+  const onMouseMove = (event) => {
+    const pointer = canvas.getPointer(event.e);
+    let hoveringTextbox = false;
 
-    canvas.forEachObject(function (obj) {
+    canvas.forEachObject((obj) => {
       if (obj.type === "textbox" && obj.containsPoint(pointer)) {
-        isHoveringTextbox = true;
-        return false;
+        hoveringTextbox = true;
       }
     });
 
-    if (isHoveringTextbox) {
-      // Disable perPixelTargetFind when hovering over a textbox
-      canvas.perPixelTargetFind = false;
-    } else {
-      // Re-enable perPixelTargetFind when mouse leaves the textbox
-      canvas.perPixelTargetFind = true;
-    }
-  });
+    canvas.perPixelTargetFind = !hoveringTextbox;
+  };
+
+  // Attach listeners once
+  // Note: we attach the “finalize” handler too, but it’s cheap.
+  canvas.on("mouse:down", onCanvasMouseDownCapture);
+  canvas.on("mouse:down", onMouseDown);
+
+  document.addEventListener("keydown", onKeyPress);
+  canvas.on("object:resizing", onResize);
+  canvas.on("mouse:move", onMouseMove);
 
   return {
     removeEventListeners: () => {
+      canvas.off("mouse:down", onCanvasMouseDownCapture);
       canvas.off("mouse:down", onMouseDown);
       document.removeEventListener("keydown", onKeyPress);
       canvas.off("object:resizing", onResize);
-      canvas.off("mouse:move");
+      canvas.off("mouse:move", onMouseMove);
     },
   };
 };

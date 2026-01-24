@@ -1,134 +1,130 @@
-import React from "react";
-
-import { fabric } from "fabric";
 import { saveCanvas } from "./History";
 
-const EraserTool = (canvas, toolSettings, setToolSettings) => {
-  const tool = toolSettings;
+const EraserTool = (canvas, contentStateRef, setContentState) => {
+  const getState = () => contentStateRef.current;
 
-  const removeEventListeners = () => {
-    canvas.off("mouse:down");
-    canvas.off("mouse:move");
-    canvas.off("mouse:up");
-    document.removeEventListener("keydown", onKeyDown);
-  };
-
-  // Eraser that deletes objects as the cursor moves (and while it is clicked, dragging) over them
-  // Store objecs in an array, then delete them on mouse up
   let objectsToDelete = [];
   let isDown = false;
 
-  if (tool.tool === "eraser") {
-    // Make all objects unselectable. If a group, only set the group to unselectable, not the objects inside
+  const setEraserHitTestMode = (enabled) => {
+    // enabled: perPixelTargetFind true, selectable false
     canvas.forEachObject((object) => {
-      object.set({ selectable: false, perPixelTargetFind: true });
+      object.set({
+        selectable: false,
+        perPixelTargetFind: enabled ? true : false,
+      });
     });
+  };
 
-    canvas.renderAll();
-  }
-
-  // Mouse down
   const onMouseDown = (o) => {
-    if (tool.tool !== "eraser") return;
-    objectsToDelete = [];
+    const state = getState();
+    if (!state?.drawingMode) return;
+    if (state.tool !== "eraser") return;
 
+    objectsToDelete = [];
     isDown = true;
+
+    setEraserHitTestMode(true);
 
     if (!o.target) return;
 
-    // Make all objects unselectable. If a group, only set the group to unselectable, not the objects inside
-    canvas.forEachObject((object) => {
-      object.set({ selectable: false, perPixelTargetFind: true });
-    });
-
-    // Add object to array, and set its opacity to .5
     objectsToDelete.push(o.target);
     o.target.set({ opacity: 0.5 });
 
-    canvas.renderAll();
+    canvas.requestRenderAll();
   };
 
-  // Mouse move
   const onMouseMove = (o) => {
-    if (tool.tool !== "eraser") return;
-
-    // Make all objects unselectable. If a group, only set the group to unselectable, not the objects inside
-    canvas.forEachObject((object) => {
-      object.set({ selectable: false, perPixelTargetFind: true });
-    });
+    const state = getState();
+    if (!state?.drawingMode) return;
+    if (state.tool !== "eraser") return;
 
     if (!isDown) return;
     if (!o.target) return;
 
-    // Add object to array, and set its opacity to .5
-    objectsToDelete.push(o.target);
-    o.target.set({ opacity: 0.5 });
+    // avoid duplicates (optional but nice)
+    if (!objectsToDelete.includes(o.target)) {
+      objectsToDelete.push(o.target);
+      o.target.set({ opacity: 0.5 });
+    }
 
-    canvas.renderAll();
+    canvas.requestRenderAll();
   };
 
-  // Mouse up
-  const onMouseUp = (o) => {
-    if (tool.tool !== "eraser") return;
-    // Delete all objects in the array. Make sure to delete groups
+  const onMouseUp = () => {
+    const state = getState();
+    if (!state?.drawingMode) return;
+    if (state.tool !== "eraser") return;
+
+    // delete collected
     objectsToDelete.forEach((object) => {
+      if (!object) return;
+
       if (object.type === "group") {
-        // If object is a group, delete it and all objects inside
-        object.forEachObject((object) => {
-          canvas.remove(object);
-        });
+        // remove group children then group
+        object._objects?.forEach((child) => canvas.remove(child));
         canvas.remove(object);
       } else {
         canvas.remove(object);
       }
     });
 
-    canvas.renderAll();
+    // restore opacities if any remained (in case duplicates / removed objects)
+    canvas.getObjects().forEach((obj) => {
+      if (obj?.opacity === 0.5) obj.set({ opacity: 1 });
+    });
 
     objectsToDelete = [];
     isDown = false;
 
-    // Make all objects on the canvas selectable
-    canvas.forEachObject((object) => {
-      object.set({ selectable: true, perPixelTargetFind: false });
-    });
+    // Selection logic is handled by your CanvasWrap effect (based on tool),
+    // so we don't force selectable=true here.
+    canvas.requestRenderAll();
 
-    saveCanvas(toolSettings, setToolSettings);
+    saveCanvas(contentStateRef, setContentState);
   };
 
-  // Detect pressing the delete or backspace key
   const onKeyDown = (e) => {
-    if (e.keyCode === 8 || e.keyCode === 46) {
-      // if multiple objects are selected
-      const activeGroup = canvas.getActiveObjects();
+    const state = getState();
+    if (!state?.drawingMode) return;
+    if (state.tool !== "eraser") return;
+
+    if (e.key === "Backspace" || e.key === "Delete") {
+      const activeObjects = canvas.getActiveObjects();
       const activeObject = canvas.getActiveObject();
 
-      if (activeGroup & !activeObject) {
-        if (activeGroup.isEditing) return;
+      // If text editing, don't delete
+      if (activeObject?.isEditing) return;
+
+      if (activeObjects && activeObjects.length > 1 && !activeObject) {
         canvas.discardActiveObject();
-        activeGroup.forEach((object) => {
-          canvas.remove(object);
-        });
-        saveCanvas(toolSettings, setToolSettings);
+        activeObjects.forEach((obj) => canvas.remove(obj));
+        saveCanvas(contentStateRef, setContentState);
+        canvas.requestRenderAll();
+        return;
       }
 
       if (activeObject) {
-        // Check if not in text editing mode
-        if (activeObject.isEditing) return;
         canvas.remove(activeObject);
-        saveCanvas(toolSettings, setToolSettings);
+        saveCanvas(contentStateRef, setContentState);
+        canvas.requestRenderAll();
       }
     }
   };
 
-  // Add event listeners
+  // Attach listeners once
   document.addEventListener("keydown", onKeyDown);
   canvas.on("mouse:down", onMouseDown);
   canvas.on("mouse:move", onMouseMove);
   canvas.on("mouse:up", onMouseUp);
 
   return {
-    removeEventListeners,
+    removeEventListeners: () => {
+      canvas.off("mouse:down", onMouseDown);
+      canvas.off("mouse:move", onMouseMove);
+      canvas.off("mouse:up", onMouseUp);
+      document.removeEventListener("keydown", onKeyDown);
+    },
   };
 };
 

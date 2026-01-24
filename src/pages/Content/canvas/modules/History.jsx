@@ -1,57 +1,70 @@
 import { fabric } from "fabric";
 
+const getState = (stateOrRef) =>
+  stateOrRef && stateOrRef.current ? stateOrRef.current : stateOrRef;
+
 // Undo and redo functionality for Fabric.js
-const undoCanvas = (toolSettings, setToolSettings) => {
-  if (!toolSettings.canvas) return;
-  const canvas = toolSettings.canvas;
-  if (toolSettings.undoStack.length > 0) {
-    const undoStack = [...toolSettings.undoStack];
-    const redoStack = [...toolSettings.redoStack];
+const undoCanvas = (stateOrRef, setToolSettings) => {
+  const state = getState(stateOrRef);
+  if (!state?.canvas) return;
+
+  const canvas = state.canvas;
+
+  if (state.undoStack?.length > 0) {
+    const undoStack = [...state.undoStack];
+    const redoStack = [...(state.redoStack || [])];
+
     const lastItem = undoStack.pop();
     redoStack.push(lastItem);
-    // penultimate item is the last item before the last item
+
     const penultimateItem = undoStack[undoStack.length - 1];
+    if (!penultimateItem) {
+      // nothing meaningful to load
+      setToolSettings({ ...state, undoStack, redoStack });
+      return;
+    }
+
     canvas.clear();
     canvas.renderAll();
+
     canvas.loadFromJSON(penultimateItem, () => {
-      // De-select everything
       canvas.discardActiveObject();
       canvas.renderAll();
     });
-    setToolSettings({
-      ...toolSettings,
-      undoStack,
-      redoStack,
-    });
+
+    setToolSettings({ ...state, undoStack, redoStack });
   }
 };
 
-const redoCanvas = (toolSettings, setToolSettings) => {
-  if (!toolSettings.canvas) return;
-  const canvas = toolSettings.canvas;
-  if (toolSettings.redoStack.length > 0) {
-    const undoStack = [...toolSettings.undoStack];
-    const redoStack = [...toolSettings.redoStack];
+const redoCanvas = (stateOrRef, setToolSettings) => {
+  const state = getState(stateOrRef);
+  if (!state?.canvas) return;
+
+  const canvas = state.canvas;
+
+  if (state.redoStack?.length > 0) {
+    const undoStack = [...(state.undoStack || [])];
+    const redoStack = [...state.redoStack];
+
     const lastItem = redoStack.pop();
     undoStack.push(lastItem);
+
     canvas.loadFromJSON(lastItem, () => {
-      // De-select everything
       canvas.discardActiveObject();
       canvas.renderAll();
     });
-    setToolSettings({
-      ...toolSettings,
-      undoStack,
-      redoStack,
-    });
+
+    setToolSettings({ ...state, undoStack, redoStack });
   }
 };
 
-const saveCanvas = (toolSettings, setToolSettings) => {
-  if (!toolSettings.canvas) return;
-  const canvas = toolSettings.canvas;
+const saveCanvas = (stateOrRef, setToolSettings) => {
+  const state = getState(stateOrRef);
+  if (!state?.canvas) return;
 
-  let json = canvas.toJSON([
+  const canvas = state.canvas;
+
+  const json = canvas.toJSON([
     "id",
     "selectable",
     "evented",
@@ -66,19 +79,19 @@ const saveCanvas = (toolSettings, setToolSettings) => {
   ]);
 
   const jsonString = JSON.stringify(json);
-  const undoStack = [...toolSettings.undoStack, jsonString];
+  const undoStack = [...(state.undoStack || []), jsonString];
+
   setToolSettings({
-    ...toolSettings,
+    ...state,
     undoStack,
     redoStack: [],
   });
 };
 
-const checkChanges = (canvas, toolSettings, setToolSettings) => {
-  // Check when objects are modified (after action is completed) to save the canvas
-
-  const onChange = (e) => {
-    saveCanvas(toolSettings, setToolSettings);
+const checkChanges = (canvas, stateRef, setToolSettings) => {
+  const onChange = () => {
+    // always save with latest state
+    saveCanvas(stateRef, setToolSettings);
   };
 
   canvas.on("object:modified", onChange);

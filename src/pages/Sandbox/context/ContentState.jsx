@@ -108,7 +108,7 @@ const ContentState = (props) => {
 
     items.sort((a, b) => (a.timestamp ?? 0) - (b.timestamp ?? 0));
     const parts = items.map((c) =>
-      c.chunk instanceof Blob ? c.chunk : new Blob([c.chunk])
+      c.chunk instanceof Blob ? c.chunk : new Blob([c.chunk]),
     );
 
     const first = parts[0];
@@ -155,7 +155,7 @@ const ContentState = (props) => {
           const baseTitle = sanitizeFilenameBase(
             recordingMeta.title?.trim() ||
               getHostnameFromUrl(recordingMeta.url) ||
-              fallbackTitle
+              fallbackTitle,
           );
           const timestamp = formatLocalTimestamp(recordingMeta.startedAt);
           setContentState((prevState) => ({
@@ -362,7 +362,7 @@ const ContentState = (props) => {
     }
 
     const { recordingDuration } = await chrome.storage.local.get(
-      "recordingDuration"
+      "recordingDuration",
     );
 
     // Check if token is present
@@ -418,7 +418,7 @@ const ContentState = (props) => {
               };
               reader.readAsDataURL(fixedWebm);
             },
-            { logger: false }
+            { logger: false },
           );
         } else {
           const fixedWebm = await fixWebmDurationFallback(blob, {
@@ -509,7 +509,7 @@ const ContentState = (props) => {
             chrome.i18n.getMessage("learnMoreDot"),
             () => {
               chrome.runtime.sendMessage({ type: "memory-limit-help" });
-            }
+            },
           );
         }
       });
@@ -538,12 +538,18 @@ const ContentState = (props) => {
               ...prevState,
               chunkIndex: prevState.chunkIndex + 1,
             }));
-          })
+          }),
         );
 
         sendResponse({ status: "ok" });
-      } catch (error) {
-        console.error("Error processing batch", error);
+      } catch (err) {
+        console.error("Error processing batch", err);
+        try {
+          sendResponse?.({
+            status: "error",
+            error: String(err?.message || err),
+          });
+        } catch {}
       }
     })();
 
@@ -575,9 +581,23 @@ const ContentState = (props) => {
     // All chunks received, reconstruct video
     checkMemory();
     reconstructVideo();
-    if (sendResponse !== null) {
-      sendResponse({ status: "ok" });
-    }
+
+    setTimeout(() => {
+      const s = contentStateRef.current;
+      const complete = s?.chunkCount > 0 && s?.chunkIndex >= s?.chunkCount;
+      if (complete && !s?.ready && s?.rawBlob) {
+        setContentState((prev) => ({
+          ...prev,
+          webm: prev.webm || prev.rawBlob,
+          ready: true,
+          noffmpeg: true,
+          isFfmpegRunning: false,
+        }));
+        chrome.runtime.sendMessage({ type: "recording-complete" });
+      }
+    }, 30000);
+
+    if (sendResponse) sendResponse({ status: "ok" });
   };
 
   const toBase64 = (blob) => {
@@ -698,7 +718,7 @@ const ContentState = (props) => {
       videoChunks.current,
       contentState,
       contentStateRef.current,
-    ]
+    ],
   );
 
   useEffect(() => {
@@ -847,6 +867,22 @@ const ContentState = (props) => {
       //     contentState.loadFFmpeg();
       //   });
       // }
+    } else if (event.data.type === "ffmpeg-error") {
+      console.warn("FFmpeg error:", event.data.error);
+
+      // Fallback: allow playback/download using webm/rawBlob even if conversion fails
+      setContentState((prev) => ({
+        ...prev,
+        noffmpeg: true,
+        ffmpegLoaded: true, // treat as “done trying”
+        isFfmpegRunning: false,
+        processingProgress: 0,
+        ...(prev.rawBlob || prev.webm
+          ? { ready: true, webm: prev.webm || prev.rawBlob }
+          : {}),
+      }));
+
+      chrome.runtime.sendMessage({ type: "recording-complete" });
     } else if (event.data.type === "crop-update") {
       setContentState((prevContentState) => ({
         ...prevContentState,
@@ -1119,7 +1155,7 @@ const ContentState = (props) => {
       const baseTitle = sanitizeFilenameBase(
         currentTitle && currentTitle.trim().length > 0
           ? currentTitle
-          : recordingMeta.title || getHostnameFromUrl(recordingMeta.url)
+          : recordingMeta.title || getHostnameFromUrl(recordingMeta.url),
       );
       const timestamp = formatLocalTimestamp(recordingMeta.startedAt);
       title = `${baseTitle} — ${timestamp}${ext}`;
@@ -1161,7 +1197,7 @@ const ContentState = (props) => {
           } else {
             resolve(id);
           }
-        }
+        },
       );
     });
 

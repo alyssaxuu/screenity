@@ -98,7 +98,7 @@ const Sandbox = () => {
           message.audio,
           message.duration,
           message.volume,
-          message.replaceAudio
+          message.replaceAudio,
         );
         const base64 = await toBase64(blob);
         sendMessage({ type: "updated-blob", base64: base64, topLevel: true });
@@ -122,7 +122,7 @@ const Sandbox = () => {
       try {
         const arrayBuffer = await blobToArrayBuffer(
           ffmpegInstance.current,
-          message.blob
+          message.blob,
         );
         sendMessage({ type: "updated-array-buffer", arrayBuffer: arrayBuffer });
       } catch (error) {
@@ -151,7 +151,7 @@ const Sandbox = () => {
           message.endTime,
           message.cut,
           message.duration,
-          message.encode
+          message.encode,
         );
         const base64 = await toBase64(blob);
         sendMessage({
@@ -167,7 +167,7 @@ const Sandbox = () => {
         const blob = await getFrame(
           ffmpegInstance.current,
           message.blob,
-          message.time
+          message.time,
         );
         sendMessage({ type: "new-frame", frame: blob });
       } catch (error) {
@@ -187,7 +187,7 @@ const Sandbox = () => {
           message.blob,
           message.startTime,
           message.endTime,
-          message.duration
+          message.duration,
         );
         const base64 = await toBase64(blob);
         sendMessage({
@@ -203,7 +203,7 @@ const Sandbox = () => {
         const blob = await reencodeVideo(
           ffmpegInstance.current,
           message.blob,
-          message.duration
+          message.duration,
         );
         const base64 = await toBase64(blob);
         sendMessage({ type: "updated-blob", base64: base64, topLevel: true });
@@ -223,7 +223,7 @@ const Sandbox = () => {
         const blob = await toWebM(
           ffmpegInstance.current,
           message.blob,
-          message.duration
+          message.duration,
         );
         const base64 = await toBase64(blob);
 
@@ -242,15 +242,9 @@ const Sandbox = () => {
   };
 
   useEffect(() => {
-    window.addEventListener("message", (event) => {
-      onMessage(event.data);
-    });
-
-    return () => {
-      window.removeEventListener("message", (event) => {
-        onMessage(event.data);
-      });
-    };
+    const handler = (event) => onMessage(event.data);
+    window.addEventListener("message", handler);
+    return () => window.removeEventListener("message", handler);
   }, []);
 
   return (
