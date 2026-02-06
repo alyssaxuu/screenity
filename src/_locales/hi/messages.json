@@ -1075,7 +1075,7 @@
     "description": "Modal message shown when the storage limit is reached"
   },
   "storageLimitReachedDescription": {
-    "message": "आपने अपनी पूरी 50 GB स्टोरेज का उपयोग कर लिया है। कृपया रिकॉर्डिंग जारी रखने के लिए पुराने वीडियो या सीन हटाएं।",
+    "message": "आपने अपनी पूरी 100 GB स्टोरेज का उपयोग कर लिया है। कृपया रिकॉर्डिंग जारी रखने के लिए पुराने वीडियो या सीन हटाएं।",
     "description": "Modal description shown when the storage limit is reached"
   },
   "manageStorageButtonLabel": {

@@ -1074,7 +1074,7 @@
     "description": "Modal message shown when the storage limit is reached"
   },
   "storageLimitReachedDescription": {
-    "message": "გამოიყენე მთელი 50 GB. წაშალე ძველი ვიდეოები ან სცენები გასაგრძელებლად.",
+    "message": "გამოიყენე მთელი 100 GB. წაშალე ძველი ვიდეოები ან სცენები გასაგრძელებლად.",
     "description": "Modal description shown when the storage limit is reached"
   },
   "manageStorageButtonLabel": {

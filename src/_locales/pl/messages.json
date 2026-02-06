@@ -1075,7 +1075,7 @@
     "description": "Modal message shown when the storage limit is reached"
   },
   "storageLimitReachedDescription": {
-    "message": "Wykorzystałaś całe 50 GB miejsca. Usuń stare nagrania lub sceny, aby kontynuować.",
+    "message": "Wykorzystałaś całe 100 GB miejsca. Usuń stare nagrania lub sceny, aby kontynuować.",
     "description": "Modal description shown when the storage limit is reached"
   },
   "manageStorageButtonLabel": {

@@ -1075,7 +1075,7 @@
     "description": "Modal message shown when the storage limit is reached"
   },
   "storageLimitReachedDescription": {
-    "message": "50GB 저장 공간을 모두 사용하셨습니다. 계속 녹화하려면 이전 영상이나 장면을 삭제해 주세요.",
+    "message": "100GB 저장 공간을 모두 사용하셨습니다. 계속 녹화하려면 이전 영상이나 장면을 삭제해 주세요.",
     "description": "Modal description shown when the storage limit is reached"
   },
   "manageStorageButtonLabel": {

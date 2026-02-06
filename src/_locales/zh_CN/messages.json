@@ -1070,7 +1070,7 @@
     "description": "Modal message shown when the storage limit is reached"
   },
   "storageLimitReachedDescription": {
-    "message": "你已使用完全部 50 GB 存储空间。请删除旧的视频或片段以继续录制。",
+    "message": "你已使用完全部 100 GB 存储空间。请删除旧的视频或片段以继续录制。",
     "description": "Modal description shown when the storage limit is reached"
   },
   "manageStorageButtonLabel": {

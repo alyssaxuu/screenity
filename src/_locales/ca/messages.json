@@ -1074,7 +1074,7 @@
     "description": "Modal message shown when the storage limit is reached"
   },
   "storageLimitReachedDescription": {
-    "message": "Has utilitzat els 50 GB d'emmagatzematge. Elimina projectes o escenes antics per continuar gravant.",
+    "message": "Has utilitzat els 100 GB d'emmagatzematge. Elimina projectes o escenes antics per continuar gravant.",
     "description": "Modal description shown when the storage limit is reached"
   },
   "manageStorageButtonLabel": {

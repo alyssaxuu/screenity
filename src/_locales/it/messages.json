@@ -1060,7 +1060,7 @@
     "description": "Modal message shown when the storage limit is reached"
   },
   "storageLimitReachedDescription": {
-    "message": "Hai usato 50 GB di archiviazione. Elimina vecchi video o scene per continuare a registrare.",
+    "message": "Hai usato 100 GB di archiviazione. Elimina vecchi video o scene per continuare a registrare.",
     "description": "Modal description shown when the storage limit is reached"
   },
   "manageStorageButtonLabel": {

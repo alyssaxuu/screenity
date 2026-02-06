@@ -96,8 +96,16 @@ const ContentState = (props) => {
     recordingMeta: null,
   };
 
-  const [contentState, setContentState] = useState(defaultState);
+  const [contentState, _setContentState] = useState(defaultState);
   const contentStateRef = useRef(contentState);
+
+  const setContentState = useCallback((updater) => {
+    _setContentState((prev) => {
+      const next = typeof updater === "function" ? updater(prev) : updater;
+      contentStateRef.current = next;
+      return next;
+    });
+  }, []);
 
   const buildBlobFromChunks = async () => {
     const items = [];
@@ -119,9 +127,9 @@ const ContentState = (props) => {
     reconstructVideo(blob);
   };
 
-  useEffect(() => {
-    contentStateRef.current = contentState;
-  }, [contentState]);
+  // useEffect(() => {
+  //   contentStateRef.current = contentState;
+  // }, [contentState]);
 
   // Check if the user is offline
   // useEffect(() => {
@@ -807,7 +815,7 @@ const ContentState = (props) => {
       const blob = base64ToUint8Array(base64);
       // Download the blob
       const url = URL.createObjectURL(blob);
-      requestDownload(url, ".mp4");
+      await requestDownload(url, ".mp4");
       setContentState((prevContentState) => ({
         ...prevContentState,
         saved: true,
@@ -822,7 +830,7 @@ const ContentState = (props) => {
       const blob = base64ToUint8Array(base64);
       // Download the blob
       const url = URL.createObjectURL(blob);
-      requestDownload(url, ".gif");
+      await requestDownload(url, ".gif");
       setContentState((prevContentState) => ({
         ...prevContentState,
         saved: true,
@@ -1134,32 +1142,24 @@ const ContentState = (props) => {
     return true;
   };
 
-  const requestDownload = async (url, ext) => {
-    let recordingMeta = contentStateRef.current.recordingMeta;
-    if (!recordingMeta) {
-      try {
-        const stored = await chrome.storage.local.get(["recordingMeta"]);
-        if (stored.recordingMeta?.type === "tab") {
-          recordingMeta = stored.recordingMeta;
-          chrome.storage.local.remove(["recordingMeta"]);
-        }
-      } catch (error) {
-        console.warn("Failed to load recording meta for download:", error);
-      }
-    }
-    const currentTitle = contentStateRef.current.title || "";
-    const safeTitle = currentTitle || "Screenity recording";
-    let title = safeTitle.replace(/[\/\\:?~<>|*]/g, " ").trim() + ext;
+  const sanitizeDownloadFilename = (name, { maxLen = 180 } = {}) => {
+    let out = String(name ?? "");
+    out = out.replace(/[\\/:*?"<>|]/g, " ");
+    out = out.replace(/[\u0000-\u001F\u007F]/g, " ");
+    out = out.replace(/\s+/g, " ").trim();
+    out = out.replace(/[. ]+$/g, "");
 
-    if (recordingMeta?.type === "tab") {
-      const baseTitle = sanitizeFilenameBase(
-        currentTitle && currentTitle.trim().length > 0
-          ? currentTitle
-          : recordingMeta.title || getHostnameFromUrl(recordingMeta.url),
-      );
-      const timestamp = formatLocalTimestamp(recordingMeta.startedAt);
-      title = `${baseTitle} — ${timestamp}${ext}`;
-    }
+    if (!out) out = "Screenity recording";
+    if (out.length > maxLen) out = out.slice(0, maxLen).trim();
+
+    return out;
+  };
+
+  const requestDownload = async (url, ext) => {
+    const rawTitle = contentStateRef.current.title || "Screenity recording";
+
+    const base = sanitizeDownloadFilename(rawTitle);
+    const filename = `${base}${ext}`;
 
     const revoke = () => {
       try {
@@ -1177,7 +1177,7 @@ const ContentState = (props) => {
           chrome.runtime.sendMessage({
             type: "request-download",
             base64: reader.result,
-            title,
+            title: filename,
           });
           revoke();
           resolve();
@@ -1187,18 +1187,14 @@ const ContentState = (props) => {
       return;
     }
 
-    // Normal Chrome download – capture the id so we only react to this download
     const downloadId = await new Promise((resolve, reject) => {
-      chrome.downloads.download(
-        { url, filename: title, saveAs: true },
-        (id) => {
-          if (chrome.runtime.lastError || !id) {
-            reject(chrome.runtime.lastError || new Error("Download failed"));
-          } else {
-            resolve(id);
-          }
-        },
-      );
+      chrome.downloads.download({ url, filename, saveAs: true }, (id) => {
+        if (chrome.runtime.lastError || !id) {
+          reject(chrome.runtime.lastError || new Error("Download failed"));
+        } else {
+          resolve(id);
+        }
+      });
     });
 
     await new Promise((resolve) => {
@@ -1211,7 +1207,6 @@ const ContentState = (props) => {
           resolve();
         };
 
-        // If download got interrupted (but not canceled by user), fallback to base64 route
         if (
           delta.state.current === "interrupted" &&
           delta.error?.current !== "USER_CANCELED"
@@ -1225,7 +1220,7 @@ const ContentState = (props) => {
                 chrome.runtime.sendMessage({
                   type: "request-download",
                   base64: reader.result,
-                  title,
+                  title: filename,
                 });
                 res();
               };
@@ -1238,7 +1233,6 @@ const ContentState = (props) => {
           delta.state.current === "complete" ||
           delta.state.current === "interrupted"
         ) {
-          // complete or user canceled
           done();
         }
       };
@@ -1248,25 +1242,27 @@ const ContentState = (props) => {
   };
 
   const download = async () => {
-    if (contentState.isFfmpegRunning || contentState.downloading) {
-      return;
-    }
+    if (contentState.isFfmpegRunning || contentState.downloading) return;
 
-    setContentState((prevState) => ({
-      ...prevState,
+    setContentState((prev) => ({
+      ...prev,
       downloading: true,
       isFfmpegRunning: true,
     }));
 
-    const url = URL.createObjectURL(contentState.blob);
-    requestDownload(url, ".mp4");
-
-    setContentState((prevState) => ({
-      ...prevState,
-      downloading: false,
-      isFfmpegRunning: false,
-      saved: true,
-    }));
+    try {
+      const url = URL.createObjectURL(contentState.blob);
+      await requestDownload(url, ".mp4");
+      setContentState((prev) => ({ ...prev, saved: true }));
+    } catch (err) {
+      console.error("MP4 download failed:", err);
+    } finally {
+      setContentState((prev) => ({
+        ...prev,
+        downloading: false,
+        isFfmpegRunning: false,
+      }));
+    }
   };
 
   const downloadWEBM = async () => {

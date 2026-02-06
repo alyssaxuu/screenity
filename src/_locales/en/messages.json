@@ -1070,7 +1070,7 @@
     "description": "Modal message shown when the storage limit is reached"
   },
   "storageLimitReachedDescription": {
-    "message": "You’ve used your full 50 GB of storage. Please delete old videos or scenes to continue recording.",
+    "message": "You’ve used your full 100 GB of storage. Please delete old videos or scenes to continue recording.",
     "description": "Modal description shown when the storage limit is reached"
   },
   "manageStorageButtonLabel": {

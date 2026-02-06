@@ -1075,7 +1075,7 @@
     "description": "Modal message shown when the storage limit is reached"
   },
   "storageLimitReachedDescription": {
-    "message": "Kamu telah menggunakan seluruh 50 GB penyimpanan. Hapus video atau adegan lama untuk melanjutkan merekam.",
+    "message": "Kamu telah menggunakan seluruh 100 GB penyimpanan. Hapus video atau adegan lama untuk melanjutkan merekam.",
     "description": "Modal description shown when the storage limit is reached"
   },
   "manageStorageButtonLabel": {

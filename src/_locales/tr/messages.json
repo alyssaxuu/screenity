@@ -1074,7 +1074,7 @@
     "description": "Modal message shown when the storage limit is reached"
   },
   "storageLimitReachedDescription": {
-    "message": "50 GB depolama alanınızın tamamını kullandınız. Lütfen kayıt yapmaya devam etmek için eski videoları veya sahneleri silin.",
+    "message": "100 GB depolama alanınızın tamamını kullandınız. Lütfen kayıt yapmaya devam etmek için eski videoları veya sahneleri silin.",
     "description": "Modal description shown when the storage limit is reached"
   },
   "manageStorageButtonLabel": {

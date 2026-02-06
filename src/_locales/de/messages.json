@@ -1074,7 +1074,7 @@
     "description": "Modal message shown when the storage limit is reached"
   },
   "storageLimitReachedDescription": {
-    "message": "Du hast deine 50 GB Speicher ausgeschöpft. Bitte lösche alte Videos oder Szenen, um weiter aufzunehmen.",
+    "message": "Du hast deine 100 GB Speicher ausgeschöpft. Bitte lösche alte Videos oder Szenen, um weiter aufzunehmen.",
     "description": "Modal description shown when the storage limit is reached"
   },
   "manageStorageButtonLabel": {

@@ -1070,7 +1070,7 @@
     "description": "Modal message shown when the storage limit is reached"
   },
   "storageLimitReachedDescription": {
-    "message": "您已使用完 50 GB 的儲存空間。請刪除舊影片或場景以繼續錄製。",
+    "message": "您已使用完 100 GB 的儲存空間。請刪除舊影片或場景以繼續錄製。",
     "description": "Modal description shown when the storage limit is reached"
   },
   "manageStorageButtonLabel": {

@@ -1072,7 +1072,7 @@
     "description": "Modal message shown when the storage limit is reached"
   },
   "storageLimitReachedDescription": {
-    "message": "Você usou 50 GB de armazenamento. Exclua vídeos ou cenas antigas para continuar gravando.",
+    "message": "Você usou 100 GB de armazenamento. Exclua vídeos ou cenas antigas para continuar gravando.",
     "description": "Modal description shown when the storage limit is reached"
   },
   "manageStorageButtonLabel": {

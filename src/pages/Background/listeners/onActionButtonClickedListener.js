@@ -111,8 +111,6 @@ export const onActionButtonClickedListener = () => {
       const { recording } = await chrome.storage.local.get(["recording"]);
 
       if (recording) {
-        stopRecording();
-        sendMessageRecord({ type: "stop-recording-tab" });
         await handleTabMessaging(tab);
       } else {
         // Reset storage keys before opening the popup
