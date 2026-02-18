@@ -1,5 +1,7 @@
 import { sendMessageTab } from "../tabManagement";
 
+let missingRecordingTabLogged = false;
+
 export const sendMessageRecord = (message, responseCallback = null) => {
   return new Promise((resolve, reject) => {
     chrome.storage.local.get(["recordingTab", "offscreen"], (result) => {
@@ -21,13 +23,19 @@ export const sendMessageRecord = (message, responseCallback = null) => {
         });
       } else if (result.recordingTab) {
         sendMessageTab(result.recordingTab, message, responseCallback)
-          .then(resolve)
+          .then((res) => {
+            missingRecordingTabLogged = false;
+            resolve(res);
+          })
           .catch((err) => {
-            console.warn(
-              "sendMessageRecord: failed to message recordingTab",
-              result.recordingTab,
-              err
-            );
+            if (!missingRecordingTabLogged) {
+              missingRecordingTabLogged = true;
+              console.warn(
+                "sendMessageRecord: recordingTab unavailable, stopping retries",
+                result.recordingTab,
+                err
+              );
+            }
             reject(err);
           });
       } else {
@@ -44,12 +52,28 @@ export const sendMessageRecord = (message, responseCallback = null) => {
               message,
               responseCallback
             )
-              .then(resolve)
-              .catch(reject);
+              .then((res) => {
+                missingRecordingTabLogged = false;
+                resolve(res);
+              })
+              .catch((err) => {
+                if (!missingRecordingTabLogged) {
+                  missingRecordingTabLogged = true;
+                  console.warn(
+                    "sendMessageRecord: recorderSession tab unavailable, stopping retries",
+                    sessionResult.recorderSession.tabId,
+                    err
+                  );
+                }
+                reject(err);
+              });
           } else {
-            console.warn(
-              "sendMessageRecord: no recordingTab or recorderSession available"
-            );
+            if (!missingRecordingTabLogged) {
+              missingRecordingTabLogged = true;
+              console.warn(
+                "sendMessageRecord: no recordingTab or recorderSession available"
+              );
+            }
             reject(new Error("No recording tab available"));
           }
         });

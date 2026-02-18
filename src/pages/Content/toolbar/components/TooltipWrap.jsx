@@ -25,7 +25,7 @@ const TooltipWrap = (props) => {
 
   return (
     <div className={classname} style={props.style}>
-      {props.content == "" ? (
+      {props.content == "" || props.disabled ? (
         <div>{props.children}</div>
       ) : (
         <Tooltip.Provider>

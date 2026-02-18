@@ -59,7 +59,7 @@ const Recorder = () => {
           {
             type: "screenity-permissions",
             success: false,
-            error: err.name,
+            error: "PermissionDenied",
           },
           "*"
         );
@@ -114,6 +114,8 @@ const Recorder = () => {
       // Save in Chrome local storage
       chrome.storage.local.set({
         // Set available devices
+        audioInput: audioinput,
+        videoInput: videoinput,
         audioinput: audioinput,
         audiooutput: audiooutput,
         videoinput: videoinput,
@@ -163,9 +165,15 @@ const Recorder = () => {
 
   // Post message listener
   useEffect(() => {
-    window.addEventListener("message", (event) => {
+    const handleMessage = (event) => {
       onMessage(event.data);
-    });
+    };
+
+    window.addEventListener("message", handleMessage);
+
+    return () => {
+      window.removeEventListener("message", handleMessage);
+    };
   }, []);
 
   return <div></div>;

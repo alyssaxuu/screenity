@@ -1,5 +1,11 @@
 import React, { useEffect, useRef, useCallback } from "react";
 import { getUserMediaWithFallback } from "../utils/mediaDeviceFallback";
+import {
+  debugRecordingEvent,
+  resetRecordingDebugSession,
+  isRecordingDebugEnabled,
+  hydrateRecordingDebugFlag,
+} from "../utils/recordingDebug";
 
 import localforage from "localforage";
 
@@ -8,6 +14,100 @@ localforage.config({
   name: "screenity",
   version: 1,
 });
+
+const DEBUG_RECORDER = globalThis.SCREENITY_DEBUG_RECORDER === true;
+const logPrefix = "[Region Recorder]";
+
+const debug = (...args) => {
+  if (!DEBUG_RECORDER && !isRecordingDebugEnabled()) return;
+  // eslint-disable-next-line no-console
+  console.log(logPrefix, ...args);
+};
+
+const logCaptureContext = (label, stream) => {
+  if (!DEBUG_RECORDER && !isRecordingDebugEnabled()) return;
+  const videoTracks =
+    stream && typeof stream.getVideoTracks === "function"
+      ? stream.getVideoTracks()
+      : [];
+
+  debug(`${label} environment`, {
+    devicePixelRatio: window.devicePixelRatio,
+    screen: { width: window.screen?.width, height: window.screen?.height },
+    inner: { width: window.innerWidth, height: window.innerHeight },
+  });
+
+  videoTracks.forEach((track, index) => {
+    const settings =
+      typeof track.getSettings === "function" ? track.getSettings() : {};
+    const constraints =
+      typeof track.getConstraints === "function" ? track.getConstraints() : {};
+    const capabilities =
+      typeof track.getCapabilities === "function"
+        ? track.getCapabilities()
+        : {};
+    debug(`${label} videoTrack[${index}]`, {
+      label: track.label,
+      settings,
+      constraints,
+      capabilities,
+    });
+  });
+};
+
+const buildTrackSnapshot = (track) => {
+  if (!track) return null;
+  const settings =
+    typeof track.getSettings === "function" ? track.getSettings() : {};
+  const constraints =
+    typeof track.getConstraints === "function" ? track.getConstraints() : {};
+  const capabilities =
+    typeof track.getCapabilities === "function"
+      ? track.getCapabilities()
+      : {};
+  return { label: track.label, settings, constraints, capabilities };
+};
+
+const logRecordingSnapshot = (label, data) => {
+  if (!DEBUG_RECORDER && !isRecordingDebugEnabled()) return;
+  debug(`Recording snapshot: ${label}`, data);
+};
+
+const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
+
+const computeTargetVideoBps = (width, height, fps) => {
+  const pixels = Number(width) * Number(height);
+  const rate = Number.isFinite(fps) && fps > 0 ? fps : 30;
+  const target = Math.round(pixels * rate * 0.1);
+  return clamp(target, 6_000_000, 24_000_000);
+};
+
+const selectMimeType = (preferredCodec) => {
+  const preferred = (preferredCodec || "").toLowerCase();
+  const mimeTypes = [
+    "video/webm;codecs=vp9,opus",
+    "video/webm;codecs=vp9",
+    "video/webm;codecs=vp8,opus",
+    "video/webm;codecs=vp8",
+    "video/webm;codecs=avc1",
+    "video/webm;codecs=h264",
+    "video/webm",
+  ];
+  const ordered = preferred
+    ? mimeTypes
+        .filter((type) => type.includes(preferred))
+        .concat(mimeTypes.filter((type) => !type.includes(preferred)))
+    : mimeTypes;
+  return ordered.find((type) => MediaRecorder.isTypeSupported(type)) || null;
+};
+
+const getCodecLabel = (mimeType) => {
+  if (!mimeType) return "unknown";
+  if (mimeType.includes("vp9")) return "vp9";
+  if (mimeType.includes("vp8")) return "vp8";
+  if (mimeType.includes("avc1") || mimeType.includes("h264")) return "h264";
+  return "unknown";
+};
 
 // Get chunks store
 const chunksStore = localforage.createInstance({
@@ -42,6 +142,7 @@ const Recorder = () => {
   const audioOutputGain = useRef(null);
 
   const recorder = useRef(null);
+  const recdbgSessionRef = useRef(null);
 
   // Target
   const target = useRef(null);
@@ -210,9 +311,7 @@ const Recorder = () => {
         restartRecording();
       }
     };
-    window.addEventListener("message", (event) => {
-      onMessage(event);
-    });
+    window.addEventListener("message", onMessage);
 
     return () => {
       window.removeEventListener("message", onMessage);
@@ -234,6 +333,19 @@ const Recorder = () => {
     draining.current = false;
     lowStorageAbort.current = false;
     pendingBytes.current = 0;
+
+    await hydrateRecordingDebugFlag();
+
+    const debugSession = resetRecordingDebugSession(recdbgSessionRef);
+    if (debugSession) {
+      chrome.storage.local.set({
+        recordingDebugSessionId: debugSession.sessionId,
+        recordingDebugStartMs: debugSession.startTimeMs,
+      });
+      debugRecordingEvent(recdbgSessionRef, "session-start", {
+        recordingType: "region",
+      });
+    }
     // Check if the stream actually has data in it
     try {
       if (helperVideoStream.current.getVideoTracks().length === 0) {
@@ -287,40 +399,232 @@ const Recorder = () => {
         videoBitsPerSecond = 500000;
       }
 
-      // List all mimeTypes
-      const mimeTypes = [
-        "video/webm;codecs=avc1",
-        "video/webm;codecs=vp8,opus",
-        "video/webm;codecs=vp9,opus",
-        "video/webm;codecs=vp9",
-        "video/webm;codecs=vp8",
-        "video/webm;codecs=h264",
-        "video/webm",
-      ];
+      videoBitsPerSecond = computeTargetVideoBps(width, height, fps);
 
-      // Check if the browser supports any of the mimeTypes, make sure to select the first one that is supported from the list
-      let mimeType = mimeTypes.find((mimeType) =>
-        MediaRecorder.isTypeSupported(mimeType)
-      );
+      let recorderToken = 0;
+      let codecFallbackTriggered = false;
+      let mediaRecorderStartAt = Date.now();
+      let recdbgChunkCount = 0;
+      let recdbgTotalBytes = 0;
 
-      // If no mimeType is supported, throw an error
-      if (!mimeType) {
-        chrome.runtime.sendMessage({
-          type: "recording-error",
-          error: "stream-error",
-          why: "No supported mimeTypes available",
+      const resetChunkState = async () => {
+        await chunksStore.clear();
+        index.current = 0;
+        pending.current = [];
+        pendingBytes.current = 0;
+        savedCount.current = 0;
+        hasChunks.current = false;
+        lastTimecode.current = 0;
+        lastSize.current = 0;
+        sentLast.current = false;
+      };
+
+      const startMediaRecorderWithCodec = async (codec) => {
+        const mimeType = selectMimeType(codec);
+        if (!mimeType) {
+          chrome.runtime.sendMessage({
+            type: "recording-error",
+            error: "stream-error",
+            why: `No supported mimeTypes available for ${codec}`,
+          });
+
+          // Reload this iframe
+          window.location.reload();
+          return false;
+        }
+
+        recorderToken += 1;
+        const token = recorderToken;
+        recdbgChunkCount = 0;
+        recdbgTotalBytes = 0;
+        mediaRecorderStartAt = Date.now();
+
+        recorder.current = new MediaRecorder(liveStream.current, {
+          mimeType: mimeType,
+          audioBitsPerSecond: audioBitsPerSecond,
+          videoBitsPerSecond: videoBitsPerSecond,
+        });
+        debug("MediaRecorder config", {
+          mimeType: recorder.current?.mimeType,
+          audioBitsPerSecond,
+          videoBitsPerSecond,
         });
 
-        // Reload this iframe
-        window.location.reload();
-        return;
-      }
+        try {
+          recorder.current.start(1000);
+        } catch (err) {
+          chrome.runtime.sendMessage({
+            type: "recording-error",
+            error: "stream-error",
+            why: JSON.stringify(err),
+          });
 
-      recorder.current = new MediaRecorder(liveStream.current, {
-        mimeType: mimeType,
-        audioBitsPerSecond: audioBitsPerSecond,
-        videoBitsPerSecond: videoBitsPerSecond,
-      });
+          // Reload this iframe
+          window.location.reload();
+          return false;
+        }
+
+        debugRecordingEvent(recdbgSessionRef, "recorder-start", {
+          encoder: "mediarecorder",
+          codec: getCodecLabel(mimeType),
+          mimeType: recorder.current?.mimeType,
+          audioBitsPerSecond,
+          videoBitsPerSecond,
+          width,
+          height,
+          fps,
+          timesliceMs: 1000,
+        });
+
+        setTimeout(() => {
+          if (token !== recorderToken) return;
+          const afterTrack = liveStream.current?.getVideoTracks?.()[0] ?? null;
+          logRecordingSnapshot("after-start-500ms", {
+            capture: buildTrackSnapshot(afterTrack),
+          });
+          debugRecordingEvent(recdbgSessionRef, "after-start-500ms", {
+            capture: buildTrackSnapshot(afterTrack),
+          });
+        }, 500);
+
+        setTimeout(() => {
+          if (token !== recorderToken) return;
+          const afterTrack = liveStream.current?.getVideoTracks?.()[0] ?? null;
+          debugRecordingEvent(recdbgSessionRef, "after-start-1500ms", {
+            capture: buildTrackSnapshot(afterTrack),
+          });
+        }, 1500);
+
+        recorder.current.onerror = (ev) => {
+          if (token !== recorderToken) return;
+          chrome.runtime.sendMessage({
+            type: "recording-error",
+            error: "mediarecorder",
+            why: String(ev?.error || "unknown"),
+          });
+        };
+
+        recorder.current.onstop = async () => {
+          if (token !== recorderToken) return;
+          try {
+            recorder.current.requestData();
+          } catch {}
+
+          regionRef.current = false;
+          recordingRef.current = false;
+
+          if (isRestarting.current) return;
+
+          await waitForDrain();
+
+          if (!sentLast.current) {
+            sentLast.current = true;
+            isFinished.current = true;
+            chrome.runtime.sendMessage({ type: "video-ready" });
+            isFinishing.current = false;
+            window.location.reload();
+          }
+        };
+
+        recorder.current.ondataavailable = async (e) => {
+          if (token !== recorderToken) return;
+          if (!e || !e.data || !e.data.size) {
+            if (recorder.current && recorder.current.state === "inactive") {
+              chrome.storage.local.set({
+                recording: false,
+                restarting: false,
+                tabRecordedID: null,
+              });
+              chrome.runtime.sendMessage({ type: "stop-recording-tab" });
+            }
+            return;
+          }
+
+          if (lowStorageAbort.current) {
+            return;
+          }
+
+          recdbgChunkCount += 1;
+          recdbgTotalBytes += e.data.size || 0;
+          const elapsedSec = Math.max(
+            0.001,
+            (Date.now() - mediaRecorderStartAt) / 1000,
+          );
+          const derivedMbps = (recdbgTotalBytes * 8) / elapsedSec / 1e6;
+
+          if (recdbgChunkCount <= 3) {
+            debugRecordingEvent(recdbgSessionRef, "chunk", {
+              index: recdbgChunkCount,
+              size: e.data.size,
+              timecode: e.timecode ?? 0,
+            });
+          }
+
+          if (recdbgChunkCount % 3 === 0) {
+            debugRecordingEvent(recdbgSessionRef, "bitrate", {
+              codec: getCodecLabel(mimeType),
+              elapsedSec,
+              derivedMbps,
+              bytes: recdbgTotalBytes,
+              targetVideoBps: videoBitsPerSecond,
+            });
+          }
+
+          if (
+            !codecFallbackTriggered &&
+            (recdbgChunkCount >= 3 || elapsedSec >= 3)
+          ) {
+            if (derivedMbps < 5) {
+              codecFallbackTriggered = true;
+              debugRecordingEvent(recdbgSessionRef, "codec-fallback", {
+                from: getCodecLabel(mimeType),
+                to: "vp8",
+                derivedMbps,
+              });
+              recorderToken += 1;
+              await resetChunkState();
+              try {
+                recorder.current.stop();
+              } catch {}
+              await startMediaRecorderWithCodec("vp8");
+              return;
+            }
+          }
+
+          if (!hasChunks.current) {
+            hasChunks.current = true;
+            lastTimecode.current = e.timecode ?? 0;
+            lastSize.current = e.data.size;
+          }
+
+          pending.current.push(e);
+          pendingBytes.current += e.data.size;
+
+          if (pendingBytes.current > MAX_PENDING_BYTES) {
+            try {
+              recorder.current.pause();
+              await drainQueue();
+              recorder.current.resume();
+            } catch {}
+          }
+
+          void drainQueue();
+        };
+
+        recorder.current.addEventListener("stop", () => {
+          if (token !== recorderToken) return;
+          debugRecordingEvent(recdbgSessionRef, "recorder-stop", {
+            count: recdbgChunkCount,
+            totalBytes: recdbgTotalBytes,
+            encoder: "mediarecorder",
+            codec: getCodecLabel(mimeType),
+          });
+        });
+
+        return true;
+      };
+
+      await startMediaRecorderWithCodec("vp9");
     } catch (err) {
       chrome.runtime.sendMessage({
         type: "recording-error",
@@ -338,21 +642,21 @@ const Recorder = () => {
     recordingRef.current = true;
     isDismissing.current = false;
 
-    try {
-      recorder.current.start(1000);
-    } catch (err) {
-      chrome.storage.local.set({
-        recording: false,
-        restarting: false,
-        tabRecordedID: null,
-        memoryError: true,
-      });
-      chrome.runtime.sendMessage({ type: "stop-recording-tab" });
-
-      // Reload this iframe
-      window.location.reload();
-      return;
-    }
+    const preTrack = liveStream.current?.getVideoTracks?.()[0] ?? null;
+    logRecordingSnapshot("before-start", {
+      capture: buildTrackSnapshot(preTrack),
+      bitrates: { audioBitsPerSecond, videoBitsPerSecond },
+      timesliceMs: 1000,
+      devicePixelRatio: window.devicePixelRatio,
+      screen: { width: window.screen?.width, height: window.screen?.height },
+      inner: { width: window.innerWidth, height: window.innerHeight },
+    });
+    debugRecordingEvent(recdbgSessionRef, "before-start", {
+      capture: buildTrackSnapshot(preTrack),
+      bitrates: { audioBitsPerSecond, videoBitsPerSecond },
+      timesliceMs: 1000,
+      encoder: "mediarecorder",
+    });
 
     const recordingStartTime = Date.now();
     await setRecordingTimingState({
@@ -367,35 +671,6 @@ const Recorder = () => {
       recording: true,
       restarting: false,
     });
-
-    recorder.current.onerror = (ev) => {
-      chrome.runtime.sendMessage({
-        type: "recording-error",
-        error: "mediarecorder",
-        why: String(ev?.error || "unknown"),
-      });
-    };
-
-    recorder.current.onstop = async () => {
-      try {
-        recorder.current.requestData();
-      } catch {}
-
-      regionRef.current = false;
-      recordingRef.current = false;
-
-      if (isRestarting.current) return;
-
-      await waitForDrain();
-
-      if (!sentLast.current) {
-        sentLast.current = true;
-        isFinished.current = true;
-        chrome.runtime.sendMessage({ type: "video-ready" });
-        isFinishing.current = false;
-        window.location.reload();
-      }
-    };
 
     const checkMaxMemory = () => {
       try {
@@ -425,43 +700,6 @@ const Recorder = () => {
         // Reload this iframe
         window.location.reload();
       }
-    };
-
-    recorder.current.ondataavailable = async (e) => {
-      if (!e || !e.data || !e.data.size) {
-        if (recorder.current && recorder.current.state === "inactive") {
-          chrome.storage.local.set({
-            recording: false,
-            restarting: false,
-            tabRecordedID: null,
-          });
-          chrome.runtime.sendMessage({ type: "stop-recording-tab" });
-        }
-        return;
-      }
-
-      if (lowStorageAbort.current) {
-        return;
-      }
-
-      if (!hasChunks.current) {
-        hasChunks.current = true;
-        lastTimecode.current = e.timecode ?? 0;
-        lastSize.current = e.data.size;
-      }
-
-      pending.current.push(e);
-      pendingBytes.current += e.data.size;
-
-      if (pendingBytes.current > MAX_PENDING_BYTES) {
-        try {
-          recorder.current.pause();
-          await drainQueue();
-          recorder.current.resume();
-        } catch {}
-      }
-
-      void drainQueue();
     };
 
     recorder.current.onpause = () => {
@@ -736,7 +974,16 @@ const Recorder = () => {
           },
         },
       };
+      debug("getDisplayMedia constraints", constraints);
       stream = await navigator.mediaDevices.getDisplayMedia(constraints);
+      logCaptureContext("region display stream", stream);
+      debugRecordingEvent(recdbgSessionRef, "capture-region", {
+        constraints,
+        tracks: stream.getVideoTracks().map((track) => buildTrackSnapshot(track)),
+        devicePixelRatio: window.devicePixelRatio,
+        screen: { width: window.screen?.width, height: window.screen?.height },
+        inner: { width: window.innerWidth, height: window.innerHeight },
+      });
 
       helperVideoStream.current = stream;
 
@@ -848,7 +1095,7 @@ const Recorder = () => {
   }, []);
 
   useEffect(() => {
-    window.addEventListener("beforeunload", (e) => {
+    const onBeforeUnload = (e) => {
       if (recordingRef.current && regionRef.current) {
         e.preventDefault();
         e.returnValue = "";
@@ -856,7 +1103,13 @@ const Recorder = () => {
         // Save and stop recording
         stopRecording();
       }
-    });
+    };
+
+    window.addEventListener("beforeunload", onBeforeUnload);
+
+    return () => {
+      window.removeEventListener("beforeunload", onBeforeUnload);
+    };
   }, []);
 
   const setMic = async (result) => {

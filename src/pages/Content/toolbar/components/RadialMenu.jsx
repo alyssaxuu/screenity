@@ -82,7 +82,11 @@ const RadialMenu = (props) => {
 
   return (
     <Popover.Root open={open} onOpenChange={() => setOpen(!open)}>
-      <TooltipWrap content="Color and stroke" shortcut={props.shortcut}>
+      <TooltipWrap
+        content="Color and stroke"
+        shortcut={props.shortcut}
+        disabled={!open}
+      >
         <Popover.Trigger as="div" ref={ref} data-color-trigger="true">
           <div className="ToolbarButton" component="div" ref={buttonRef}>
             <div

@@ -1,6 +1,7 @@
 import { base64ToUint8Array } from "../utils/base64ToUint8Array";
 import { sendMessageTab } from "../tabManagement";
 import signIn from "../modules/signIn";
+import { chunksStore } from "../recording/chunkHandler";
 
 const findOrCreateScreenityFolder = async (token) => {
   const headers = new Headers({
@@ -153,11 +154,23 @@ export const handleSaveToDrive = async (request, fallback = false) => {
       const chunks = [];
       await chunksStore.iterate((value) => chunks.push(value));
 
-      let array = [];
-      let lastTimestamp = 0;
+      if (!chunks.length) {
+        throw new Error("No local chunks available for fallback upload");
+      }
+
+      chunks.sort((a, b) => {
+        if (typeof a?.index !== "number") return -1;
+        if (typeof b?.index !== "number") return 1;
+        return a.index - b.index;
+      });
+
+      const array = [];
+      let lastTimestamp = -1;
       for (const chunk of chunks) {
-        if (chunk.timestamp < lastTimestamp) continue;
-        lastTimestamp = chunk.timestamp;
+        const ts =
+          typeof chunk.timestamp === "number" ? chunk.timestamp : lastTimestamp;
+        if (ts < lastTimestamp) continue;
+        lastTimestamp = ts;
         array.push(chunk.chunk);
       }
 

@@ -6,6 +6,12 @@ import { sendRecordingError, sendStopRecording } from "./messaging";
 import { getBitrates, getResolutionForQuality } from "./recorderConfig";
 import { WebCodecsRecorder } from "./webcodecs/WebCodecsRecorder";
 import { getUserMediaWithFallback } from "../utils/mediaDeviceFallback";
+import {
+  debugRecordingEvent,
+  resetRecordingDebugSession,
+  isRecordingDebugEnabled,
+  hydrateRecordingDebugFlag,
+} from "../utils/recordingDebug";
 
 localforage.config({
   driver: localforage.INDEXEDDB,
@@ -23,26 +29,113 @@ document.body.style.willChange = "contents";
 //   window.SCREENITY_DEBUG_RECORDER = true;
 const DEBUG_RECORDER =
   typeof window !== "undefined" ? !!window.SCREENITY_DEBUG_RECORDER : false;
-
 const logPrefix = "[Screenity Recorder]";
 
 function debug(...args) {
-  if (!DEBUG_RECORDER) return;
+  if (!DEBUG_RECORDER && !isRecordingDebugEnabled()) return;
   // eslint-disable-next-line no-console
   console.log(logPrefix, ...args);
 }
 
 function debugWarn(...args) {
-  if (!DEBUG_RECORDER) return;
+  if (!DEBUG_RECORDER && !isRecordingDebugEnabled()) return;
   // eslint-disable-next-line no-console
   console.warn(logPrefix, ...args);
 }
 
 function debugError(...args) {
-  if (!DEBUG_RECORDER) return;
+  if (!DEBUG_RECORDER && !isRecordingDebugEnabled()) return;
   // eslint-disable-next-line no-console
   console.error(logPrefix, ...args);
 }
+
+function logCaptureContext(label, stream) {
+  if (!DEBUG_RECORDER && !isRecordingDebugEnabled()) return;
+  const videoTracks =
+    stream && typeof stream.getVideoTracks === "function"
+      ? stream.getVideoTracks()
+      : [];
+
+  debug(`${label} environment`, {
+    devicePixelRatio: window.devicePixelRatio,
+    screen: { width: window.screen?.width, height: window.screen?.height },
+    inner: { width: window.innerWidth, height: window.innerHeight },
+  });
+
+  videoTracks.forEach((track, index) => {
+    const settings =
+      typeof track.getSettings === "function" ? track.getSettings() : {};
+    const constraints =
+      typeof track.getConstraints === "function" ? track.getConstraints() : {};
+    const capabilities =
+      typeof track.getCapabilities === "function"
+        ? track.getCapabilities()
+        : {};
+    debug(`${label} videoTrack[${index}]`, {
+      label: track.label,
+      settings,
+      constraints,
+      capabilities,
+    });
+  });
+}
+
+function buildTrackSnapshot(track) {
+  if (!track) return null;
+  const settings =
+    typeof track.getSettings === "function" ? track.getSettings() : {};
+  const constraints =
+    typeof track.getConstraints === "function" ? track.getConstraints() : {};
+  const capabilities =
+    typeof track.getCapabilities === "function" ? track.getCapabilities() : {};
+  return {
+    label: track.label,
+    settings,
+    constraints,
+    capabilities,
+  };
+}
+
+function logRecordingSnapshot(label, data) {
+  if (!DEBUG_RECORDER && !isRecordingDebugEnabled()) return;
+  debug(`Recording snapshot: ${label}`, data);
+}
+
+const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
+
+const computeTargetVideoBps = (width, height, fps) => {
+  const pixels = Number(width) * Number(height);
+  const rate = Number.isFinite(fps) && fps > 0 ? fps : 30;
+  const target = Math.round(pixels * rate * 0.1);
+  return clamp(target, 6_000_000, 24_000_000);
+};
+
+const selectMimeType = (preferredCodec) => {
+  const preferred = (preferredCodec || "").toLowerCase();
+  const mimeTypes = [
+    "video/webm;codecs=vp9,opus",
+    "video/webm;codecs=vp9",
+    "video/webm;codecs=vp8,opus",
+    "video/webm;codecs=vp8",
+    "video/webm;codecs=avc1",
+    "video/webm;codecs=h264",
+    "video/webm",
+  ];
+  const ordered = preferred
+    ? mimeTypes
+        .filter((type) => type.includes(preferred))
+        .concat(mimeTypes.filter((type) => !type.includes(preferred)))
+    : mimeTypes;
+  return ordered.find((type) => MediaRecorder.isTypeSupported(type)) || null;
+};
+
+const getCodecLabel = (mimeType) => {
+  if (!mimeType) return "unknown";
+  if (mimeType.includes("vp9")) return "vp9";
+  if (mimeType.includes("vp8")) return "vp8";
+  if (mimeType.includes("avc1") || mimeType.includes("h264")) return "h264";
+  return "unknown";
+};
 
 const Recorder = () => {
   const isRestarting = useRef(false);
@@ -70,6 +163,7 @@ const Recorder = () => {
 
   const recorder = useRef(null);
   const useWebCodecs = useRef(false);
+  const recdbgSessionRef = useRef(null);
 
   const isTab = useRef(false);
   const tabID = useRef(null);
@@ -371,6 +465,19 @@ const Recorder = () => {
 
     debug("startRecording()");
 
+    await hydrateRecordingDebugFlag();
+
+    const debugSession = resetRecordingDebugSession(recdbgSessionRef);
+    if (debugSession) {
+      chrome.storage.local.set({
+        recordingDebugSessionId: debugSession.sessionId,
+        recordingDebugStartMs: debugSession.startTimeMs,
+      });
+      debugRecordingEvent(recdbgSessionRef, "session-start", {
+        recordingType: "free-local",
+      });
+    }
+
     // Start silent audio to prevent Chrome from freezing this background tab
     startTabKeepAlive();
 
@@ -403,13 +510,14 @@ const Recorder = () => {
     isFinishing.current = false;
 
     const { qualityValue } = await chrome.storage.local.get(["qualityValue"]);
-    const { audioBitsPerSecond, videoBitsPerSecond } =
+    const { audioBitsPerSecond, videoBitsPerSecond: bitratePreset } =
       getBitrates(qualityValue);
+    let videoBitsPerSecond = bitratePreset;
 
     debug("Bitrates resolved", {
       qualityValue,
       audioBitsPerSecond,
-      videoBitsPerSecond,
+      bitratePreset,
     });
 
     // FLAG: Force old MediaRecorder for testing
@@ -430,12 +538,43 @@ const Recorder = () => {
     let fps = parseInt(fpsValue);
     if (Number.isNaN(fps)) fps = 30;
 
+    videoBitsPerSecond = computeTargetVideoBps(width, height, fps);
+    debug("Video bitrate target", {
+      bitratePreset,
+      videoBitsPerSecond,
+    });
+
     debug("Recorder capabilities", {
       canUseWebCodecs,
       FORCE_MEDIARECORDER,
       width,
       height,
       fps,
+    });
+    if (DEBUG_RECORDER) {
+      debug("Recorder video track settings", settings);
+    }
+
+    const trackSnapshot = buildTrackSnapshot(videoTrack);
+    logRecordingSnapshot("before-start", {
+      capture: trackSnapshot,
+      bitrates: { audioBitsPerSecond, videoBitsPerSecond },
+      fps,
+      width,
+      height,
+      timesliceMs: 1000,
+      devicePixelRatio: window.devicePixelRatio,
+      screen: { width: window.screen?.width, height: window.screen?.height },
+      inner: { width: window.innerWidth, height: window.innerHeight },
+    });
+    debugRecordingEvent(recdbgSessionRef, "before-start", {
+      capture: trackSnapshot,
+      bitrates: { audioBitsPerSecond, videoBitsPerSecond },
+      fps,
+      width,
+      height,
+      timesliceMs: 1000,
+      encoder: useWebCodecs.current ? "webcodecs" : "mediarecorder",
     });
 
     await setRecordingTimingState({
@@ -551,6 +690,9 @@ const Recorder = () => {
       void drainQueue();
     };
 
+    let recdbgChunkCount = 0;
+    let recdbgTotalBytes = 0;
+
     try {
       if (canUseWebCodecs) {
         useWebCodecs.current = true;
@@ -595,6 +737,20 @@ const Recorder = () => {
                 timestampMs,
               });
             }
+            recdbgChunkCount += 1;
+            recdbgTotalBytes += blob.size || 0;
+            if (recdbgChunkCount <= 3) {
+              debugRecordingEvent(recdbgSessionRef, "chunk", {
+                index: recdbgChunkCount,
+                size: blob.size,
+                timecode: timestampMs,
+              });
+            } else if (recdbgChunkCount % 10 === 0) {
+              debugRecordingEvent(recdbgSessionRef, "chunk-progress", {
+                count: recdbgChunkCount,
+                totalBytes: recdbgTotalBytes,
+              });
+            }
             handleChunk(blob, timestampMs);
           },
           onError: (err) => {
@@ -604,6 +760,11 @@ const Recorder = () => {
           onStop: async () => {
             debug("WebCodecsRecorder onStop()");
             await waitForDrain();
+            debugRecordingEvent(recdbgSessionRef, "recorder-stop", {
+              count: recdbgChunkCount,
+              totalBytes: recdbgTotalBytes,
+              encoder: "webcodecs",
+            });
           },
         });
 
@@ -619,74 +780,237 @@ const Recorder = () => {
           recorder.current = null;
           return await startRecording();
         }
+
+        debugRecordingEvent(recdbgSessionRef, "recorder-start", {
+          encoder: "webcodecs",
+          codec: "webcodecs",
+          width,
+          height,
+          fps,
+          videoBitrate: videoBitsPerSecond,
+          audioBitrate: hasAudioTrack ? audioBitsPerSecond : undefined,
+        });
+
+        setTimeout(() => {
+          const afterTrack = liveStream.current?.getVideoTracks?.()[0] ?? null;
+          logRecordingSnapshot("after-start-500ms", {
+            capture: buildTrackSnapshot(afterTrack),
+          });
+          debugRecordingEvent(recdbgSessionRef, "after-start-500ms", {
+            capture: buildTrackSnapshot(afterTrack),
+          });
+        }, 500);
+
+        setTimeout(() => {
+          const afterTrack = liveStream.current?.getVideoTracks?.()[0] ?? null;
+          debugRecordingEvent(recdbgSessionRef, "after-start-1500ms", {
+            capture: buildTrackSnapshot(afterTrack),
+          });
+        }, 1500);
       } else {
         debug("Using MediaRecorder fallback");
         useWebCodecs.current = false;
-        recorder.current = createMediaRecorder(liveStream.current, {
-          audioBitsPerSecond,
-          videoBitsPerSecond,
-        });
+        let recorderToken = 0;
+        let codecFallbackTriggered = false;
+        let mediaRecorderStartAt = Date.now();
+        let recdbgChunkCount = 0;
+        let recdbgTotalBytes = 0;
+        let activeCodec = "vp9";
+        let activeMimeType = null;
 
-        try {
-          recorder.current.start(1000);
-          debug("MediaRecorder.start(1000) called");
-        } catch (err) {
-          debugError("Failed to start MediaRecorder", err);
-          sendRecordingError(
-            "Failed to start recording: " + JSON.stringify(err)
-          );
-          return;
-        }
-
-        recorder.current.onerror = (ev) => {
-          debugError("MediaRecorder.onerror", ev);
-          chrome.runtime.sendMessage({
-            type: "recording-error",
-            error: "mediarecorder",
-            why: String(ev?.error || "unknown"),
-          });
+        const resetChunkState = async () => {
+          await chunksStore.clear();
+          index.current = 0;
+          pending.current = [];
+          pendingBytes.current = 0;
+          savedCount.current = 0;
+          hasChunks.current = false;
+          lastTimecode.current = 0;
+          lastSize.current = 0;
+          sentLast.current = false;
         };
 
-        recorder.current.onstop = async () => {
-          debug("MediaRecorder.onstop");
-          try {
-            recorder.current.requestData();
-          } catch {}
-          if (isRestarting.current) return;
-          await waitForDrain();
-          if (!sentLast.current) {
-            sentLast.current = true;
-            isFinishing.current = false;
-            chrome.runtime.sendMessage({ type: "video-ready" });
-          }
-        };
-
-        recorder.current.ondataavailable = async (e) => {
-          if (!e || !e.data || !e.data.size) {
-            debugWarn("MediaRecorder.ondataavailable with empty data", e);
-            if (
-              recorder.current instanceof MediaRecorder &&
-              recorder.current.state === "inactive"
-            ) {
-              chrome.storage.local.set({
-                recording: false,
-                restarting: false,
-                tabRecordedID: null,
-              });
-              sendStopRecording();
-            }
+        const startMediaRecorderWithCodec = async (codec) => {
+          activeCodec = codec;
+          activeMimeType = selectMimeType(codec);
+          if (!activeMimeType) {
+            sendRecordingError(`No supported mimeType for ${codec}`);
             return;
           }
 
+          recorderToken += 1;
+          const token = recorderToken;
+          recdbgChunkCount = 0;
+          recdbgTotalBytes = 0;
+          mediaRecorderStartAt = Date.now();
+
+          recorder.current = createMediaRecorder(liveStream.current, {
+            audioBitsPerSecond,
+            videoBitsPerSecond,
+            mimeType: activeMimeType,
+          });
+
           if (DEBUG_RECORDER) {
-            debug("MediaRecorder.ondataavailable", {
-              size: e.data.size,
-              timecode: e.timecode ?? 0,
+            debug("MediaRecorder config", {
+              mimeType: recorder.current?.mimeType,
+              audioBitsPerSecond,
+              videoBitsPerSecond,
             });
           }
 
-          await handleChunk(e.data, e.timecode ?? 0);
+          try {
+            recorder.current.start(1000);
+            debug("MediaRecorder.start(1000) called");
+          } catch (err) {
+            debugError("Failed to start MediaRecorder", err);
+            sendRecordingError(
+              "Failed to start recording: " + JSON.stringify(err)
+            );
+            return;
+          }
+
+          debugRecordingEvent(recdbgSessionRef, "recorder-start", {
+            encoder: "mediarecorder",
+            codec: activeCodec,
+            mimeType: recorder.current?.mimeType,
+            audioBitsPerSecond,
+            videoBitsPerSecond,
+            width,
+            height,
+            fps,
+            timesliceMs: 1000,
+          });
+
+          recorder.current.onerror = (ev) => {
+            if (token !== recorderToken) return;
+            debugError("MediaRecorder.onerror", ev);
+            chrome.runtime.sendMessage({
+              type: "recording-error",
+              error: "mediarecorder",
+              why: String(ev?.error || "unknown"),
+            });
+          };
+
+          setTimeout(() => {
+            if (token !== recorderToken) return;
+            const afterTrack = liveStream.current?.getVideoTracks?.()[0] ?? null;
+            logRecordingSnapshot("after-start-500ms", {
+              capture: buildTrackSnapshot(afterTrack),
+            });
+            debugRecordingEvent(recdbgSessionRef, "after-start-500ms", {
+              capture: buildTrackSnapshot(afterTrack),
+            });
+          }, 500);
+
+          setTimeout(() => {
+            if (token !== recorderToken) return;
+            const afterTrack = liveStream.current?.getVideoTracks?.()[0] ?? null;
+            debugRecordingEvent(recdbgSessionRef, "after-start-1500ms", {
+              capture: buildTrackSnapshot(afterTrack),
+            });
+          }, 1500);
+
+          recorder.current.onstop = async () => {
+            if (token !== recorderToken) return;
+            debug("MediaRecorder.onstop");
+            try {
+              recorder.current.requestData();
+            } catch {}
+            if (isRestarting.current) return;
+            await waitForDrain();
+            if (!sentLast.current) {
+              sentLast.current = true;
+              isFinishing.current = false;
+              chrome.runtime.sendMessage({ type: "video-ready" });
+            }
+          };
+
+          recorder.current.ondataavailable = async (e) => {
+            if (token !== recorderToken) return;
+            if (!e || !e.data || !e.data.size) {
+              debugWarn("MediaRecorder.ondataavailable with empty data", e);
+              if (
+                recorder.current instanceof MediaRecorder &&
+                recorder.current.state === "inactive"
+              ) {
+                chrome.storage.local.set({
+                  recording: false,
+                  restarting: false,
+                  tabRecordedID: null,
+                });
+                sendStopRecording();
+              }
+              return;
+            }
+
+            if (DEBUG_RECORDER) {
+              debug("MediaRecorder.ondataavailable", {
+                size: e.data.size,
+                timecode: e.timecode ?? 0,
+              });
+            }
+
+            recdbgChunkCount += 1;
+            recdbgTotalBytes += e.data.size || 0;
+            const elapsedSec = Math.max(
+              0.001,
+              (Date.now() - mediaRecorderStartAt) / 1000
+            );
+            const derivedMbps = (recdbgTotalBytes * 8) / elapsedSec / 1e6;
+
+            if (recdbgChunkCount <= 3) {
+              debugRecordingEvent(recdbgSessionRef, "chunk", {
+                index: recdbgChunkCount,
+                size: e.data.size,
+                timecode: e.timecode ?? 0,
+              });
+            }
+
+            if (recdbgChunkCount % 3 === 0) {
+              debugRecordingEvent(recdbgSessionRef, "bitrate", {
+                codec: activeCodec,
+                elapsedSec,
+                derivedMbps,
+                bytes: recdbgTotalBytes,
+                targetVideoBps: videoBitsPerSecond,
+              });
+            }
+
+            if (
+              !codecFallbackTriggered &&
+              (recdbgChunkCount >= 3 || elapsedSec >= 3)
+            ) {
+              if (derivedMbps < 5) {
+                codecFallbackTriggered = true;
+                debugRecordingEvent(recdbgSessionRef, "codec-fallback", {
+                  from: activeCodec,
+                  to: "vp8",
+                  derivedMbps,
+                });
+                await resetChunkState();
+                try {
+                  recorder.current.stop();
+                } catch {}
+                await startMediaRecorderWithCodec("vp8");
+                return;
+              }
+            }
+
+            await handleChunk(e.data, e.timecode ?? 0);
+          };
+
+          recorder.current.addEventListener("stop", () => {
+            if (token !== recorderToken) return;
+            debugRecordingEvent(recdbgSessionRef, "recorder-stop", {
+              count: recdbgChunkCount,
+              totalBytes: recdbgTotalBytes,
+              encoder: "mediarecorder",
+              codec: activeCodec,
+            });
+          });
         };
+
+        await startMediaRecorderWithCodec("vp9");
       }
     } catch (err) {
       debugError("startRecording() top-level error", err);
@@ -1204,6 +1528,16 @@ const Recorder = () => {
         videoTracks: userStream.getVideoTracks().length,
         audioTracks: userStream.getAudioTracks().length,
       });
+      logCaptureContext("camera userStream", userStream);
+      debugRecordingEvent(recdbgSessionRef, "capture-camera", {
+        constraints: userConstraints,
+        tracks: userStream
+          .getVideoTracks()
+          .map((track) => buildTrackSnapshot(track)),
+        devicePixelRatio: window.devicePixelRatio,
+        screen: { width: window.screen?.width, height: window.screen?.height },
+        inner: { width: window.innerWidth, height: window.innerHeight },
+      });
     }
 
     if (data.recordingType === "camera") {
@@ -1250,6 +1584,14 @@ const Recorder = () => {
       debug("desktop/tab stream acquired", {
         videoTracks: stream.getVideoTracks().length,
         audioTracks: stream.getAudioTracks().length,
+      });
+      logCaptureContext("desktop/tab stream", stream);
+      debugRecordingEvent(recdbgSessionRef, "capture-desktop", {
+        constraints,
+        tracks: stream.getVideoTracks().map((track) => buildTrackSnapshot(track)),
+        devicePixelRatio: window.devicePixelRatio,
+        screen: { width: window.screen?.width, height: window.screen?.height },
+        inner: { width: window.innerWidth, height: window.innerHeight },
       });
 
       if (isTab.current) {

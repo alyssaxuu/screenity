@@ -2,11 +2,11 @@ import { MIME_TYPES } from "./recorderConfig";
 
 export function createMediaRecorder(
   stream,
-  { audioBitsPerSecond, videoBitsPerSecond }
+  { audioBitsPerSecond, videoBitsPerSecond, mimeType: mimeTypeOverride }
 ) {
-  const mimeType = MIME_TYPES.find((type) =>
-    MediaRecorder.isTypeSupported(type)
-  );
+  const mimeType =
+    mimeTypeOverride ||
+    MIME_TYPES.find((type) => MediaRecorder.isTypeSupported(type));
 
   if (!mimeType) {
     throw new Error("❌ No supported MIME types found");

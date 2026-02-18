@@ -52,10 +52,53 @@ import { newChunk, clearAllRecordings } from "../recording/chunkHandler";
 import { setMicActiveTab } from "../tabManagement/tabHelpers";
 import { handleSignOutDrive } from "../drive/handleSignOutDrive";
 import { loginWithWebsite } from "../auth/loginWithWebsite";
+import { isRecordingDebugEnabled } from "../../utils/recordingDebug";
 
 const API_BASE = process.env.SCREENITY_API_BASE_URL;
 const CLOUD_FEATURES_ENABLED =
   process.env.SCREENITY_ENABLE_CLOUD_FEATURES === "true";
+const RECDBG_MAX_EVENTS = 300;
+const RECDBG_KEY_PREFIX = "recordingDebugLog:";
+
+const appendRecordingDebugEvent = async (event) => {
+  if (!event?.sessionId) return;
+  const key = `${RECDBG_KEY_PREFIX}${event.sessionId}`;
+  try {
+    const existing = await chrome.storage.local.get([key]);
+    const list = Array.isArray(existing[key]) ? existing[key] : [];
+    list.push(event);
+    if (list.length > RECDBG_MAX_EVENTS) {
+      list.splice(0, list.length - RECDBG_MAX_EVENTS);
+    }
+    await chrome.storage.local.set({ [key]: list });
+  } catch (err) {
+    console.warn("[RECDBG] Failed to persist debug event", err);
+  }
+};
+
+const exportRecordingDebugLog = async (sessionId) => {
+  const key = `${RECDBG_KEY_PREFIX}${sessionId}`;
+  const { [key]: events } = await chrome.storage.local.get([key]);
+  const payload = JSON.stringify(
+    {
+      sessionId,
+      exportedAt: Date.now(),
+      events: Array.isArray(events) ? events : [],
+    },
+    null,
+    2,
+  );
+
+  const dataUrl =
+    "data:application/json;charset=utf-8," + encodeURIComponent(payload);
+  const filename = `screenity-recording-debug-${sessionId}.json`;
+
+  await chrome.downloads.download({
+    url: dataUrl,
+    filename,
+    saveAs: true,
+  });
+};
 
 const ensureAudioOffscreen = async () => {
   if (!chrome.offscreen) return false;
@@ -65,7 +108,7 @@ const ensureAudioOffscreen = async () => {
     const hasAudioOffscreen = contexts.some(
       (context) =>
         context.contextType === "OFFSCREEN_DOCUMENT" &&
-        context.documentUrl === audioUrl
+        context.documentUrl === audioUrl,
     );
     if (!hasAudioOffscreen) {
       await chrome.offscreen.createDocument({
@@ -118,7 +161,7 @@ export const copyToClipboard = (text) => {
         navigator.clipboard.writeText(content).catch((err) => {
           console.warn(
             "❌ Failed to copy to clipboard in content script:",
-            err
+            err,
           );
         });
       },
@@ -131,27 +174,67 @@ export const copyToClipboard = (text) => {
 export const setupHandlers = () => {
   registerMessage("desktop-capture", (message) => desktopCapture(message));
   registerMessage("backup-created", (message) =>
-    offscreenDocument(message.request, message.tabId)
+    offscreenDocument(message.request, message.tabId),
   );
   registerMessage("write-file", (message) => writeFile(message));
   registerMessage("handle-restart", (message) => handleRestart(message));
   registerMessage("handle-dismiss", (message) => handleDismiss(message));
   registerMessage("reset-active-tab", () => resetActiveTab(false));
   registerMessage("reset-active-tab-restart", (message) =>
-    resetActiveTabRestart(message)
+    resetActiveTabRestart(message),
   );
   registerMessage("video-ready", (message) => videoReady(message));
   registerMessage("start-recording", (message) => startRecording(message));
   registerMessage("restarted", (message) => restartActiveTab(message));
 
   registerMessage("new-chunk", (message, sender, sendResponse) => {
-    newChunk(message, sendResponse);
+    newChunk(message, sender, sendResponse);
+    return true;
+  });
+
+  registerMessage("recdbg", (message, sender, sendResponse) => {
+    console.log("[SW] raw recdbg message", message);
+    if (!message || message.kind !== "RECDBG") {
+      sendResponse?.({ ok: false });
+      return false;
+    }
+
+    const { sessionId, eventType, tSinceStartMs, payload } = message;
+    console.log("[RECDBG]", sessionId, eventType, tSinceStartMs, payload);
+    appendRecordingDebugEvent(message).catch((err) => {
+      console.warn("[RECDBG] append failed", err);
+    });
+    sendResponse?.({ ok: true });
+    return false;
+  });
+
+  registerMessage("recdbg-ping", (message, sender, sendResponse) => {
+    console.log("[RECDBG] ping", { sender, message });
+    sendResponse?.({ ok: true });
+    return false;
+  });
+
+  registerMessage("export-recording-debug", (message, sender, sendResponse) => {
+    if (!isRecordingDebugEnabled()) {
+      sendResponse?.({ status: "error", error: "debug-disabled" });
+      return true;
+    }
+    const sessionId = message?.sessionId;
+    if (!sessionId) {
+      sendResponse?.({ status: "error", error: "missing-session-id" });
+      return true;
+    }
+    exportRecordingDebugLog(sessionId)
+      .then(() => sendResponse?.({ status: "ok" }))
+      .catch((err) =>
+        sendResponse?.({ status: "error", error: err?.message || String(err) }),
+      );
     return true;
   });
 
   registerMessage(
     "get-streaming-data",
-    async (message, sender) => await handleGetStreamingData(message, sender)
+    async (message, sender) => await handleGetStreamingData(message, sender),
   );
   registerMessage("cancel-recording", (message) => cancelRecording(message));
   registerMessage("stop-recording-tab", (message, sender, sendResponse) => {
@@ -182,27 +265,27 @@ export const setupHandlers = () => {
     return true;
   });
   registerMessage("restart-recording-tab", (message) =>
-    handleRestartRecordingTab(message)
+    handleRestartRecordingTab(message),
   );
   registerMessage("dismiss-recording-tab", (message) =>
-    handleDismissRecordingTab(message)
+    handleDismissRecordingTab(message),
   );
   registerMessage("pause-recording-tab", () =>
-    sendMessageRecord({ type: "pause-recording-tab" })
+    sendMessageRecord({ type: "pause-recording-tab" }),
   );
   registerMessage("resume-recording-tab", () =>
-    sendMessageRecord({ type: "resume-recording-tab" })
+    sendMessageRecord({ type: "resume-recording-tab" }),
   );
   registerMessage("set-mic-active-tab", (message) => setMicActiveTab(message));
   registerMessage("recording-error", (message) =>
-    handleRecordingError(message)
+    handleRecordingError(message),
   );
   registerMessage("on-get-permissions", (message) =>
-    handleOnGetPermissions(message)
+    handleOnGetPermissions(message),
   );
   registerMessage(
     "recording-complete",
-    async (message, sender) => await handleRecordingComplete(message, sender)
+    async (message, sender) => await handleRecordingComplete(message, sender),
   );
   registerMessage("check-recording", (message) => checkRecording(message));
 
@@ -210,81 +293,81 @@ export const setupHandlers = () => {
     createTab(
       "https://chrome.google.com/webstore/detail/screenity-screen-recorder/kbbdabhdfibnancpjfhlkhafgdilcnji/reviews",
       false,
-      true
-    )
+      true,
+    ),
   );
   registerMessage("follow-twitter", () =>
-    createTab("https://alyssax.substack.com/", false, true)
+    createTab("https://alyssax.substack.com/", false, true),
   );
   registerMessage("pricing", () =>
-    createTab("https://screenity.io/pro", false, true)
+    createTab("https://screenity.io/pro", false, true),
   );
   registerMessage("open-processing-info", () =>
     createTab(
       "https://help.screenity.io/editing-and-exporting/dJRFpGq56JFKC7k8zEvsqb/why-is-there-a-5-minute-limit-for-editing/ddy4e4TpbnrFJ8VoRT37tQ",
       true,
-      true
-    )
+      true,
+    ),
   );
   registerMessage("upgrade-info", () =>
     createTab(
       "https://help.screenity.io/getting-started/77KizPC8MHVGfpKpqdux9D/what-are-the-technical-requirements-for-using-screenity/6kdB6qru6naVD8ZLFvX3m9",
       true,
-      true
-    )
+      true,
+    ),
   );
   registerMessage("trim-info", () =>
     createTab(
       "https://help.screenity.io/editing-and-exporting/dJRFpGq56JFKC7k8zEvsqb/how-to-cut-trim-or-mute-parts-of-your-video/svNbM7YHYY717MuSWXrKXH",
       true,
-      true
-    )
+      true,
+    ),
   );
   registerMessage("join-waitlist", () =>
-    createTab("https://tally.so/r/npojNV", true, true)
+    createTab("https://tally.so/r/npojNV", true, true),
   );
   registerMessage("chrome-update-info", () =>
     createTab(
       "https://help.screenity.io/getting-started/77KizPC8MHVGfpKpqdux9D/what-are-the-technical-requirements-for-using-screenity/6kdB6qru6naVD8ZLFvX3m9",
       true,
-      true
-    )
+      true,
+    ),
   );
   registerMessage("set-surface", (message) => setSurface(message));
   registerMessage("pip-ended", () => handlePip(false));
   registerMessage("pip-started", () => handlePip(true));
   registerMessage("sign-out-drive", (message) => handleSignOutDrive(message));
   registerMessage("open-help", () =>
-    createTab("https://help.screenity.io/", true, true)
+    createTab("https://help.screenity.io/", true, true),
   );
   registerMessage("memory-limit-help", () =>
     createTab(
       "https://help.screenity.io/troubleshooting/9Jy5RGjNrBB42hqUdREQ7W/what-does-%E2%80%9Cmemory-limit-reached%E2%80%9D-mean-when-recording/8WkwHbt3puuXunYqQnyPcb",
       true,
-      true
-    )
+      true,
+    ),
   );
   registerMessage("open-home", () =>
-    createTab("https://screenity.io/", false, true)
+    createTab("https://screenity.io/", false, true),
   );
   registerMessage("report-bug", () =>
     createTab(
       "https://tally.so/r/3ElpXq?version=" +
         chrome.runtime.getManifest().version,
       false,
-      true
-    )
+      true,
+    ),
   );
   registerMessage("clear-recordings", () => clearAllRecordings());
   registerMessage("force-processing", (message) => forceProcessing(message));
   registerMessage("focus-this-tab", (message, sender) =>
-    focusTab(sender.tab.id)
+    focusTab(sender.tab.id),
   );
   registerMessage("stop-recording-tab-backup", (message) =>
-    handleStopRecordingTabBackup(message)
+    handleStopRecordingTabBackup(message),
   );
   registerMessage("indexed-db-download", (message) =>
-    downloadIndexedDB(message)
+    downloadIndexedDB(message),
   );
   registerMessage("get-platform-info", async () => await getPlatformInfo());
   registerMessage("restore-recording", (message) => restoreRecording(message));
@@ -297,15 +380,13 @@ export const setupHandlers = () => {
     "check-capture-permissions",
     async (message, sender, sendResponse) => {
       const { isLoggedIn, isSubscribed } = message;
-
       const response = await checkCapturePermissions({
         isLoggedIn,
         isSubscribed,
       });
-
       sendResponse(response);
       return true;
-    }
+    },
   );
   registerMessage("is-pinned", async () => await isPinned());
 
@@ -325,17 +406,17 @@ export const setupHandlers = () => {
 
   registerMessage(
     "save-to-drive",
-    async (message) => await handleSaveToDrive(message, false)
+    async (message) => await handleSaveToDrive(message, false),
   );
   registerMessage(
     "save-to-drive-fallback",
-    async (message) => await handleSaveToDrive(message, true)
+    async (message) => await handleSaveToDrive(message, true),
   );
   registerMessage("request-download", (message) =>
-    requestDownload(message.base64, message.title)
+    requestDownload(message.base64, message.title),
   );
   registerMessage("resize-window", (message) =>
-    resizeWindow(message.width, message.height)
+    resizeWindow(message.width, message.height),
   );
   registerMessage("available-memory", async () => {
     return await checkAvailableMemory();
@@ -344,8 +425,8 @@ export const setupHandlers = () => {
     createTab(
       `chrome://settings/content/siteDetails?site=chrome-extension://${chrome.runtime.id}`,
       false,
-      true
-    )
+      true,
+    ),
   );
   registerMessage("add-alarm-listener", (payload) => addAlarmListener(payload));
   registerMessage(
@@ -361,7 +442,7 @@ export const setupHandlers = () => {
       const result = await loginWithWebsite();
       sendResponse(result);
       return true;
-    }
+    },
   );
   registerMessage(
     "create-video-project",
@@ -416,7 +497,7 @@ export const setupHandlers = () => {
       }
 
       return true;
-    }
+    },
   );
   registerMessage("handle-login", async () => {
     if (!CLOUD_FEATURES_ENABLED) {
@@ -481,7 +562,7 @@ export const setupHandlers = () => {
                 win.left >= d.bounds.left &&
                 win.left < d.bounds.left + d.bounds.width &&
                 win.top >= d.bounds.top &&
-                win.top < d.bounds.top + d.bounds.height
+                win.top < d.bounds.top + d.bounds.height,
             );
 
             if (!monitor) {
@@ -531,7 +612,7 @@ export const setupHandlers = () => {
         if (!win || chrome.runtime.lastError) {
           console.warn(
             "[get-monitor-for-window] No window found",
-            chrome.runtime.lastError
+            chrome.runtime.lastError,
           );
           sendResponse({ error: "No window found" });
           return;
@@ -542,7 +623,7 @@ export const setupHandlers = () => {
             win.left >= d.bounds.left &&
             win.left < d.bounds.left + d.bounds.width &&
             win.top >= d.bounds.top &&
-            win.top < d.bounds.top + d.bounds.height
+            win.top < d.bounds.top + d.bounds.height,
         );
 
         if (!monitor) {
@@ -562,7 +643,7 @@ export const setupHandlers = () => {
                 monitorBounds: monitor.bounds,
                 displays,
               });
-            }
+            },
           );
         }
       });
@@ -608,7 +689,7 @@ export const setupHandlers = () => {
             Authorization: `Bearer ${token}`,
           },
           credentials: "include",
-        }
+        },
       );
 
       const result = await res.json();
@@ -668,7 +749,7 @@ export const setupHandlers = () => {
 
       try {
         const { screenityToken } = await chrome.storage.local.get(
-          "screenityToken"
+          "screenityToken",
         );
 
         const res = await fetch(`${API_BASE}/storage/quota`, {
@@ -695,7 +776,7 @@ export const setupHandlers = () => {
       }
 
       return true;
-    }
+    },
   );
   registerMessage("time-warning", async (message) => {
     const tab = await getCurrentTab();
@@ -747,7 +828,7 @@ export const setupHandlers = () => {
       await sendMessageTab(tab.id, {
         type: "preparing-recording",
       }).catch((e) =>
-        console.warn("Failed to send preparing-recording to tab:", e)
+        console.warn("Failed to send preparing-recording to tab:", e),
       );
     }
   });
@@ -776,7 +857,7 @@ export const setupHandlers = () => {
               .get("screenityToken")
               .then((r) => r.screenityToken)}`,
           },
-        }
+        },
       );
 
       if (editorTab) {
@@ -841,7 +922,7 @@ export const setupHandlers = () => {
                 .get("screenityToken")
                 .then((r) => r.screenityToken)}`,
             },
-          }
+          },
         );
 
         const url = `${process.env.SCREENITY_APP_BASE}/editor/${multiProjectId}/edit?share=true`;
@@ -965,11 +1046,16 @@ export const setupHandlers = () => {
     const url = `https://tally.so/r/310MNg?${query.toString()}`;
     createTab(url, true, true);
   });
-  registerMessage("check-banner-support", async (message, sendResponse) => {
-    const { bannerSupport } = await chrome.storage.local.get(["bannerSupport"]);
-    sendResponse({ bannerSupport: Boolean(bannerSupport) });
-    return true;
-  });
+  registerMessage(
+    "check-banner-support",
+    async (message, sender, sendResponse) => {
+      const { bannerSupport } = await chrome.storage.local.get([
+        "bannerSupport",
+      ]);
+      sendResponse({ bannerSupport: Boolean(bannerSupport) });
+      return true;
+    },
+  );
   registerMessage("hide-banner", async () => {
     await chrome.storage.local.set({ bannerSupport: false });
     chrome.runtime.sendMessage({ type: "hide-banner" });
@@ -994,32 +1080,35 @@ export const setupHandlers = () => {
       return { success: false, message: "Cloud features disabled" };
     return await loginWithWebsite();
   });
-  registerMessage("sync-recording-state", async (message, sendResponse) => {
-    const {
-      recording,
-      paused,
-      recordingStartTime,
-      pausedAt,
-      totalPausedMs,
-      pendingRecording,
-    } = await chrome.storage.local.get([
-      "recording",
-      "paused",
-      "recordingStartTime",
-      "pausedAt",
-      "totalPausedMs",
-      "pendingRecording",
-    ]);
-    sendResponse({
-      recording: Boolean(recording),
-      paused: Boolean(paused),
-      recordingStartTime: recordingStartTime || null,
-      pausedAt: pausedAt || null,
-      totalPausedMs: totalPausedMs || 0,
-      pendingRecording: Boolean(pendingRecording),
-    });
-    return true;
-  });
+  registerMessage(
+    "sync-recording-state",
+    async (message, sender, sendResponse) => {
+      const {
+        recording,
+        paused,
+        recordingStartTime,
+        pausedAt,
+        totalPausedMs,
+        pendingRecording,
+      } = await chrome.storage.local.get([
+        "recording",
+        "paused",
+        "recordingStartTime",
+        "pausedAt",
+        "totalPausedMs",
+        "pendingRecording",
+      ]);
+      sendResponse({
+        recording: Boolean(recording),
+        paused: Boolean(paused),
+        recordingStartTime: recordingStartTime || null,
+        pausedAt: pausedAt || null,
+        totalPausedMs: totalPausedMs || 0,
+        pendingRecording: Boolean(pendingRecording),
+      });
+      return true;
+    },
+  );
   registerMessage(
     "register-recording-session",
     (message, sender, sendResponse) => {
@@ -1043,7 +1132,7 @@ export const setupHandlers = () => {
       registerRecordingTabListener(tabId);
       sendResponse({ ok: true, session: activeRecordingSession });
       return true;
-    }
+    },
   );
 
   registerMessage(
@@ -1052,7 +1141,7 @@ export const setupHandlers = () => {
       clearRecordingSession();
       sendResponse({ ok: true });
       return true;
-    }
+    },
   );
 
   registerMessage(
@@ -1063,6 +1152,6 @@ export const setupHandlers = () => {
       ]);
       sendResponse({ recorderSession: recorderSession || null });
       return true;
-    }
+    },
   );
 };

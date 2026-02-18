@@ -16,12 +16,25 @@ import {
   getHostnameFromUrl,
   sanitizeFilenameBase,
 } from "../../utils/filenameHelpers";
+import {
+  debugRecordingEventWithSession,
+  isRecordingDebugEnabled,
+} from "../../utils/recordingDebug";
 
 localforage.config({
   driver: localforage.INDEXEDDB,
   name: "screenity", // global DB group
   version: 1,
 });
+
+const DEBUG_RECORDER = globalThis.SCREENITY_DEBUG_RECORDER === true;
+const logPrefix = "[Sandbox]";
+
+const debug = (...args) => {
+  if (!DEBUG_RECORDER && !isRecordingDebugEnabled()) return;
+  // eslint-disable-next-line no-console
+  console.log(logPrefix, ...args);
+};
 
 const chunksStore = localforage.createInstance({
   name: "chunks", // the actual DB name
@@ -34,6 +47,42 @@ const ContentState = (props) => {
   const videoChunks = useRef([]);
   const makeVideoCheck = useRef(false);
   const chunkCount = useRef(0);
+  const recdbgSessionRef = useRef(null);
+
+  useEffect(() => {
+    if (!DEBUG_RECORDER && !isRecordingDebugEnabled()) return;
+    chrome.storage.local.get(
+      ["recordingDebugSessionId", "recordingDebugStartMs"],
+      (res) => {
+        if (!res?.recordingDebugSessionId) return;
+        recdbgSessionRef.current = {
+          sessionId: res.recordingDebugSessionId,
+          startTimeMs: res.recordingDebugStartMs || null,
+          startPerfMs: null,
+        };
+      },
+    );
+  }, []);
+
+  useEffect(() => {
+    if (!DEBUG_RECORDER && !isRecordingDebugEnabled()) return;
+    window.__screenityExportRecordingDebug = async () => {
+      const { recordingDebugSessionId } = await chrome.storage.local.get([
+        "recordingDebugSessionId",
+      ]);
+      if (!recordingDebugSessionId) {
+        // eslint-disable-next-line no-console
+        console.warn("[Sandbox] No recording debug session id found.");
+        return;
+      }
+      chrome.runtime.sendMessage({
+        type: "export-recording-debug",
+        sessionId: recordingDebugSessionId,
+      });
+    };
+    window.__screenityPingRecdbg = () =>
+      chrome.runtime.sendMessage({ type: "recdbg-ping" });
+  }, []);
 
   const defaultState = {
     time: 0,
@@ -123,6 +172,17 @@ const ContentState = (props) => {
     const inferredType = first?.type || "video/webm";
 
     const blob = new Blob(parts, { type: inferredType });
+
+    debug("Reconstructed blob from chunks", {
+      type: blob.type,
+      size: blob.size,
+      chunkCount: parts.length,
+    });
+    debugRecordingEventWithSession(recdbgSessionRef.current, "blob-rebuilt", {
+      type: blob.type,
+      size: blob.size,
+      chunkCount: parts.length,
+    });
 
     reconstructVideo(blob);
   };
@@ -289,6 +349,20 @@ const ContentState = (props) => {
     const video = document.createElement("video");
     video.preload = "metadata";
     video.onloadedmetadata = async () => {
+      debug("Output metadata (webm)", {
+        type: contentState.blob?.type,
+        size: contentState.blob?.size,
+        duration: video.duration,
+        width: video.videoWidth,
+        height: video.videoHeight,
+      });
+      debugRecordingEventWithSession(recdbgSessionRef.current, "output-metadata", {
+        type: contentState.blob?.type,
+        size: contentState.blob?.size,
+        duration: video.duration,
+        width: video.videoWidth,
+        height: video.videoHeight,
+      });
       setContentState((prevState) => ({
         ...prevState,
         duration: video.duration,
@@ -354,6 +428,24 @@ const ContentState = (props) => {
       const video = document.createElement("video");
       video.preload = "metadata";
       video.onloadedmetadata = () => {
+        debug("Output metadata (mp4)", {
+          type: blob.type,
+          size: blob.size,
+          duration: video.duration,
+          width: video.videoWidth,
+          height: video.videoHeight,
+        });
+        debugRecordingEventWithSession(
+          recdbgSessionRef.current,
+          "output-metadata",
+          {
+            type: blob.type,
+            size: blob.size,
+            duration: video.duration,
+            width: video.videoWidth,
+            height: video.videoHeight,
+          },
+        );
         setContentState((prev) => ({
           ...prev,
           duration: video.duration,

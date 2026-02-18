@@ -45,7 +45,7 @@ const openRecorderTab = async (
         recordingTab: tab.id,
         offscreen: false,
         region: false,
-        wasRegion: true,
+        wasRegion: Boolean(isRegion),
         clickEvents: [],
         ...(isRegion ? { tabRecordedID: activeTab.id } : {}),
       });

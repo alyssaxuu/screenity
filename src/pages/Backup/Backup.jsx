@@ -131,7 +131,7 @@ const Backup = () => {
         chrome.runtime.sendMessage({
           type: "recording-error",
           error: "backup-error",
-          why: JSON.stringify(err),
+          why: "User cancelled directory picker",
         });
       }
       return;

@@ -148,13 +148,21 @@ const config = {
   module: {
     rules: [
       {
-        test: /\.(css|scss)$/,
+        test: /\.css$/,
+        use: [{ loader: "style-loader" }, { loader: "css-loader" }],
+      },
+      {
+        test: /\.scss$/,
         use: [
           { loader: "style-loader" },
           { loader: "css-loader" },
           {
             loader: "sass-loader",
-            options: { sourceMap: true },
+            options: {
+              sourceMap: true,
+              implementation: require("sass"),
+              api: "modern",
+            },
           },
         ],
       },

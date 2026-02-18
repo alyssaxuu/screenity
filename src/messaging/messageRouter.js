@@ -14,24 +14,41 @@ export const messageDispatcher = (message, sender, sendResponse) => {
   const handler = handlers[message.type];
 
   if (handler) {
+    let responseSent = false;
+    const safeSendResponse = (payload) => {
+      if (responseSent) return;
+      responseSent = true;
+      sendResponse(payload);
+    };
+
     try {
-      const result = handler(message, sender, sendResponse);
+      const result = handler(message, sender, safeSendResponse);
 
       if (result instanceof Promise) {
         result
           .then((response) => {
-            sendResponse(response);
+            if (!responseSent && response !== undefined) {
+              safeSendResponse(response);
+            }
           })
           .catch((err) => {
-            sendResponse({ error: err.message });
+            if (!responseSent) {
+              safeSendResponse({ error: err.message });
+            }
           });
 
         return true;
+      } else if (result === true) {
+        return true;
       } else {
-        sendResponse(result);
+        if (result !== undefined && !responseSent) {
+          safeSendResponse(result);
+        }
       }
     } catch (err) {
-      sendResponse({ error: err.message });
+      if (!responseSent) {
+        safeSendResponse({ error: err.message });
+      }
     }
   }
 };

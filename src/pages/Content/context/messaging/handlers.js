@@ -89,25 +89,9 @@ export const setupHandlers = () => {
       drawingMode: nextDrawingMode,
       blurMode: nextDrawingMode ? false : prev.blurMode,
     }));
-
-    registerMessage("toggle-drawing-mode", () => {
-      const now = Date.now();
-      if (now - lastToggleDrawingAt < TOGGLE_DRAWING_COOLDOWN_MS) return;
-      lastToggleDrawingAt = now;
-      if (document.hidden || !document.hasFocus()) return;
-
-      const nextDrawingMode = !contentStateRef.current.drawingMode;
-
-      setContentState((prev) => ({
-        ...prev,
-        drawingMode: nextDrawingMode,
-        blurMode: nextDrawingMode ? false : prev.blurMode,
-      }));
-
-      chrome.storage.local.set({
-        drawingMode: nextDrawingMode,
-        ...(nextDrawingMode ? { blurMode: false } : {}),
-      });
+    chrome.storage.local.set({
+      drawingMode: nextDrawingMode,
+      ...(nextDrawingMode ? { blurMode: false } : {}),
     });
   });
 

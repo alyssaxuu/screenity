@@ -66,6 +66,8 @@ export default class BunnyTusUploader {
     this.MAX_QUEUE_SIZE = options.maxQueueSize || 100;
     this.onProgress = options.onProgress || null;
     this.onStall = options.onStall || null;
+    this.debug =
+      options.debug === true || globalThis.SCREENITY_DEBUG_CLOUD === true;
 
     this.totalBytes = 0;
     this.uploadUrl = null;
@@ -86,12 +88,250 @@ export default class BunnyTusUploader {
     this.heartbeatTimer = null;
     this.lastProgressAt = Date.now();
     this.stalled = false;
+    this.sceneId = null;
+    this.metaWidth = null;
+    this.metaHeight = null;
+    this.fingerprint = null;
+    this.sessionId = null;
+    this.journalKey = null;
+    this.journalLookupKey = null;
 
     this.chunkQueue = [];
     this.isProcessingQueue = false;
     this.queueProcessingPromise = null;
     this.queuedBytes = 0;
     this._hasExtractedMeta = true; // Skip in-flight thumbnail extraction to avoid timeouts/noise
+  }
+
+  debugLog(message, payload = null) {
+    if (!this.debug) return;
+    if (payload) {
+      console.info(`[BunnyTusUploader] ${message}`, payload);
+      return;
+    }
+    console.info(`[BunnyTusUploader] ${message}`);
+  }
+
+  getJournalKey(mediaId) {
+    return mediaId ? `uploadJournal-${mediaId}` : null;
+  }
+
+  getJournalLookupKey(projectId, sceneId, type) {
+    return `uploadJournalLookup-${projectId}-${sceneId || "none"}-${type}`;
+  }
+
+  buildFingerprint({ projectId, sceneId, type, width, height, fingerprint }) {
+    if (fingerprint) return fingerprint;
+    return `${projectId || "none"}:${sceneId || "none"}:${type || "none"}:${
+      width || "na"
+    }x${height || "na"}`;
+  }
+
+  async clearUploadJournal(journal = null) {
+    if (typeof chrome === "undefined" || !chrome.storage?.local) return;
+    const keysToRemove = [];
+    const mediaId = journal?.mediaId || this.mediaId || null;
+    const journalKey = journal?.key || this.getJournalKey(mediaId);
+    const lookupKey = journal?.lookupKey || this.journalLookupKey;
+
+    if (journalKey) keysToRemove.push(journalKey);
+    if (lookupKey) keysToRemove.push(lookupKey);
+    if (!keysToRemove.length) return;
+
+    try {
+      await chrome.storage.local.remove(keysToRemove);
+      this.debugLog("Cleared upload journal", {
+        keys: keysToRemove,
+      });
+    } catch (err) {
+      this.debugLog("Failed to clear upload journal", {
+        error: err?.message || err,
+        keys: keysToRemove,
+      });
+    }
+  }
+
+  async persistUploadJournal() {
+    if (typeof chrome === "undefined" || !chrome.storage?.local || !this.mediaId)
+      return;
+    const journalKey = this.getJournalKey(this.mediaId);
+    const lookupKey = this.journalLookupKey;
+    const payload = {
+      key: journalKey,
+      projectId: this.projectId || null,
+      sceneId: this.sceneId || null,
+      type: this.metadata.type || null,
+      width: this.metaWidth || null,
+      height: this.metaHeight || null,
+      fingerprint: this.fingerprint || null,
+      sessionId: this.sessionId || null,
+      uploadUrl: this.uploadUrl || null,
+      signature: this.signature || null,
+      expires: this.expires || null,
+      libraryId: this.libraryId || null,
+      offset: this.offset,
+      totalBytes: this.totalBytes,
+      updatedAt: Date.now(),
+      videoId: this.videoId,
+      mediaId: this.mediaId,
+      stalled: this.stalled,
+      status: this.status,
+    };
+
+    const toStore = {
+      [journalKey]: payload,
+    };
+    if (lookupKey) {
+      toStore[lookupKey] = {
+        mediaId: this.mediaId,
+        key: journalKey,
+        updatedAt: payload.updatedAt,
+      };
+    }
+    await chrome.storage.local.set(toStore);
+  }
+
+  isResumeJournalStale(updatedAt) {
+    if (!updatedAt) return true;
+    const MAX_AGE_MS = 24 * 60 * 60 * 1000;
+    return Date.now() - updatedAt > MAX_AGE_MS;
+  }
+
+  validateResumeJournal(
+    journal,
+    { projectId, sceneId, type, fingerprint, allowSceneMismatch = false }
+  ) {
+    if (!journal || !journal.mediaId || !journal.videoId || !journal.uploadUrl) {
+      return { valid: false, reason: "missing-required-fields" };
+    }
+    if (journal.projectId !== projectId) {
+      return { valid: false, reason: "project-mismatch" };
+    }
+    if (journal.type !== type) {
+      return { valid: false, reason: "type-mismatch" };
+    }
+    if (!allowSceneMismatch && sceneId && journal.sceneId && journal.sceneId !== sceneId) {
+      return { valid: false, reason: "scene-mismatch" };
+    }
+    if (fingerprint && journal.fingerprint && journal.fingerprint !== fingerprint) {
+      return { valid: false, reason: "fingerprint-mismatch" };
+    }
+    if (this.isResumeJournalStale(journal.updatedAt)) {
+      return { valid: false, reason: "stale-journal" };
+    }
+    return { valid: true, reason: "ok" };
+  }
+
+  async getResumeJournal({
+    projectId,
+    sceneId,
+    type,
+    fingerprint,
+    reuse = null,
+  }) {
+    if (typeof chrome === "undefined" || !chrome.storage?.local) return null;
+    const lookupKey = this.getJournalLookupKey(projectId, sceneId, type);
+    const candidates = [];
+
+    if (reuse?.mediaId) {
+      const reuseKey = this.getJournalKey(reuse.mediaId);
+      const reuseResult = await chrome.storage.local.get([reuseKey]);
+      if (reuseResult[reuseKey]) {
+        candidates.push({
+          journal: reuseResult[reuseKey],
+          key: reuseKey,
+          lookupKey,
+          allowSceneMismatch: true,
+        });
+      }
+    }
+
+    const lookupResult = await chrome.storage.local.get([lookupKey]);
+    const mappedMediaId = lookupResult?.[lookupKey]?.mediaId || null;
+    if (mappedMediaId) {
+      const mappedKey = this.getJournalKey(mappedMediaId);
+      const mappedResult = await chrome.storage.local.get([mappedKey]);
+      if (mappedResult[mappedKey]) {
+        candidates.push({
+          journal: mappedResult[mappedKey],
+          key: mappedKey,
+          lookupKey,
+          allowSceneMismatch: false,
+        });
+      }
+    }
+
+    if (!candidates.length) return null;
+
+    for (const candidate of candidates) {
+      const validation = this.validateResumeJournal(candidate.journal, {
+        projectId,
+        sceneId,
+        type,
+        fingerprint,
+        allowSceneMismatch: candidate.allowSceneMismatch,
+      });
+      if (validation.valid) {
+        this.debugLog("Found valid upload journal for resume", {
+          mediaId: candidate.journal.mediaId,
+          projectId,
+          sceneId,
+          type,
+          offset: candidate.journal.offset || 0,
+        });
+        return {
+          ...candidate.journal,
+          key: candidate.key,
+          lookupKey: candidate.lookupKey,
+        };
+      }
+
+      this.debugLog("Discarding invalid upload journal", {
+        reason: validation.reason,
+        mediaId: candidate.journal?.mediaId || null,
+        projectId,
+        sceneId,
+        type,
+      });
+      await this.clearUploadJournal({
+        key: candidate.key,
+        lookupKey: candidate.lookupKey,
+        mediaId: candidate.journal?.mediaId || null,
+      });
+    }
+
+    return null;
+  }
+
+  async getServerOffset() {
+    if (!this.uploadUrl) return null;
+    try {
+      const headRes = await fetch(this.uploadUrl, {
+        method: "HEAD",
+        headers: {
+          "Tus-Resumable": "1.0.0",
+          AuthorizationSignature: this.signature,
+          AuthorizationExpire: String(this.expires),
+          LibraryId: String(this.libraryId),
+          VideoId: this.videoId,
+        },
+      });
+
+      if (!headRes.ok) {
+        this.debugLog("HEAD offset check failed", {
+          status: headRes.status,
+        });
+        return null;
+      }
+
+      const serverOffset = parseInt(headRes.headers.get("Upload-Offset") || "0", 10);
+      return Number.isFinite(serverOffset) ? serverOffset : null;
+    } catch (err) {
+      this.debugLog("HEAD offset check threw", {
+        error: err?.message || err,
+      });
+      return null;
+    }
   }
 
   async initialize(
@@ -104,6 +344,8 @@ export default class BunnyTusUploader {
       linkedMediaId = null,
       reuse = null,
       sceneId = null,
+      fingerprint = null,
+      sessionId = null,
     }
   ) {
     if (this.status !== "idle" && this.status !== "error") {
@@ -116,11 +358,34 @@ export default class BunnyTusUploader {
       this.sceneId = sceneId;
       this.metaWidth = width;
       this.metaHeight = height;
+      this.sessionId = sessionId;
+      this.journalLookupKey = this.getJournalLookupKey(projectId, sceneId, type);
+      this.fingerprint = this.buildFingerprint({
+        projectId,
+        sceneId,
+        type,
+        width,
+        height,
+        fingerprint,
+      });
 
       this.status = "initializing";
       this.error = null;
       this.offset = 0;
       this.totalBytes = 0;
+
+      const { screenityToken } = await chrome.storage.local.get([
+        "screenityToken",
+      ]);
+      this.userToken = screenityToken || null;
+
+      const resumeJournal = await this.getResumeJournal({
+        projectId,
+        sceneId,
+        type,
+        fingerprint: this.fingerprint,
+        reuse,
+      });
 
       // Validate reuse object if provided
       if (reuse) {
@@ -131,18 +396,26 @@ export default class BunnyTusUploader {
         }
         this.videoId = reuse.videoId;
         this.mediaId = reuse.mediaId;
+      } else if (resumeJournal?.videoId && resumeJournal?.mediaId) {
+        this.videoId = resumeJournal.videoId;
+        this.mediaId = resumeJournal.mediaId;
+        this.uploadUrl = resumeJournal.uploadUrl || null;
+        this.offset = resumeJournal.offset || 0;
+        this.totalBytes = resumeJournal.totalBytes || 0;
+        this.journalKey = resumeJournal.key || this.getJournalKey(this.mediaId);
+        this.debugLog("Resuming upload from journal candidate", {
+          projectId,
+          sceneId,
+          type,
+          mediaId: this.mediaId,
+          offset: this.offset,
+        });
       } else {
         const { authenticated, user } = await new Promise((resolve) => {
           chrome.runtime.sendMessage({ type: "check-auth-status" }, resolve);
         });
 
         if (!authenticated) throw new Error("Not authenticated with Screenity");
-
-        const { screenityToken } = await chrome.storage.local.get([
-          "screenityToken",
-        ]);
-
-        this.userToken = screenityToken;
 
         if (!this.userToken) {
           throw new Error("Missing user token for saving upload metadata");
@@ -169,8 +442,36 @@ export default class BunnyTusUploader {
         this.mediaId = data.mediaId;
       }
 
+      this.journalKey = this.getJournalKey(this.mediaId);
+
       await this.refreshTusAuth();
-      await this.initTusUpload();
+
+      const hasResumeSession = Boolean(this.uploadUrl);
+      if (hasResumeSession) {
+        const serverOffset = await this.getServerOffset();
+        if (serverOffset === null) {
+          this.debugLog("Resume journal unusable, creating fresh tus session", {
+            mediaId: this.mediaId,
+          });
+          await this.clearUploadJournal(resumeJournal);
+          this.uploadUrl = null;
+          this.offset = 0;
+          this.totalBytes = 0;
+          await this.initTusUpload();
+        } else {
+          this.offset = serverOffset;
+          this.totalBytes = Math.max(this.totalBytes, serverOffset);
+          this.debugLog("Resumed upload using server offset", {
+            mediaId: this.mediaId,
+            offset: serverOffset,
+            totalBytes: this.totalBytes,
+          });
+        }
+      } else {
+        await this.initTusUpload();
+      }
+
+      await this.persistUploadJournal();
       this.startHeartbeat();
       this.status = "ready";
       return { videoId: this.videoId, mediaId: this.mediaId };
@@ -214,19 +515,26 @@ export default class BunnyTusUploader {
       ? `https://video.bunnycdn.com${location}`
       : location;
 
-    await fetch(`${API_BASE}/bunny/videos/save-upload-meta`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${this.userToken}`,
-      },
-      body: JSON.stringify({
+    if (this.userToken) {
+      await fetch(`${API_BASE}/bunny/videos/save-upload-meta`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${this.userToken}`,
+        },
+        body: JSON.stringify({
+          mediaId: this.mediaId,
+          uploadUrl: this.uploadUrl,
+          signature: this.signature,
+          expires: this.expires,
+        }),
+      });
+    } else {
+      this.debugLog("Skipping save-upload-meta because user token is missing", {
         mediaId: this.mediaId,
-        uploadUrl: this.uploadUrl,
-        signature: this.signature,
-        expires: this.expires,
-      }),
-    });
+      });
+    }
+    await this.persistUploadJournal();
   }
 
   async write(chunk) {
@@ -547,6 +855,7 @@ export default class BunnyTusUploader {
     if (!res.ok && res.status !== 204) throw new Error("Finalization failed");
     this.status = "completed";
     this.stopHeartbeat();
+    await this.clearUploadJournal();
   }
 
   getMeta() {
@@ -640,15 +949,11 @@ export default class BunnyTusUploader {
 
     // Journal offsets locally to aid recovery
     if (typeof chrome !== "undefined" && chrome.storage?.local) {
-      const key = `uploadJournal-${this.mediaId}`;
-      chrome.storage.local.set({
-        [key]: {
-          offset: this.offset,
-          updatedAt: this.lastProgressAt,
-          videoId: this.videoId,
+      this.persistUploadJournal().catch((err) => {
+        this.debugLog("Failed to persist upload journal", {
+          error: err?.message || err,
           mediaId: this.mediaId,
-          stalled: this.stalled,
-        },
+        });
       });
     }
   }

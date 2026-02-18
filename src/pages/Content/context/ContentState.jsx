@@ -367,12 +367,12 @@ const ContentState = (props) => {
           isSubscribed,
         },
         (response) => {
+          console.debug("[Permissions] UI received SW response", response);
           resolve(response.status === "ok");
         },
       );
     });
   }, []);
-
   const startStreaming = useCallback(async () => {
     // Set this early
     setContentState((prev) => ({
@@ -464,6 +464,9 @@ const ContentState = (props) => {
         chrome.i18n.getMessage("chromePermissionsModalAction"),
         chrome.i18n.getMessage("chromePermissionsModalCancel"),
         async () => {
+          console.debug(
+            "[Permissions] Modal action clicked: enable screen recording"
+          );
           await checkChromeCapturePermissionsSW();
           startStreaming(); // Retry streaming
         },

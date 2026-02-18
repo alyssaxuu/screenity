@@ -19,7 +19,9 @@ export const updateFromStorage = (check = true, id = null) => {
   chrome.storage.local.get(
     [
       "audioInput",
+      "audioinput",
       "videoInput",
+      "videoinput",
       "defaultAudioInput",
       "defaultVideoInput",
       "defaultAudioInputLabel",
@@ -95,10 +97,14 @@ export const updateFromStorage = (check = true, id = null) => {
         audioInput:
           result.audioInput !== undefined && result.audioInput !== null
             ? result.audioInput
+            : result.audioinput !== undefined && result.audioinput !== null
+            ? result.audioinput
             : prevContentState.audioInput,
         videoInput:
           result.videoInput !== undefined && result.videoInput !== null
             ? result.videoInput
+            : result.videoinput !== undefined && result.videoinput !== null
+            ? result.videoinput
             : prevContentState.videoInput,
         defaultAudioInput:
           result.defaultAudioInput !== undefined &&

@@ -1,0 +1,26 @@
+diff --git a/node_modules/@radix-ui/react-use-callback-ref/dist/index.js b/node_modules/@radix-ui/react-use-callback-ref/dist/index.js
+index 6f1c6bd..d6c0b7d 100644
+--- a/node_modules/@radix-ui/react-use-callback-ref/dist/index.js
++++ b/node_modules/@radix-ui/react-use-callback-ref/dist/index.js
+@@
+-  return React.useMemo(() => (...args) => callbackRef.current?.(...args), []);
++  return React.useMemo(() => (...args) => {
++    const fn = callbackRef.current;
++    if (typeof fn === "function") {
++      return fn(...args);
++    }
++  }, []);
+ }
+diff --git a/node_modules/@radix-ui/react-use-callback-ref/dist/index.mjs b/node_modules/@radix-ui/react-use-callback-ref/dist/index.mjs
+index b5e7d74..a3b3164 100644
+--- a/node_modules/@radix-ui/react-use-callback-ref/dist/index.mjs
++++ b/node_modules/@radix-ui/react-use-callback-ref/dist/index.mjs
+@@
+-  return React.useMemo(() => (...args) => callbackRef.current?.(...args), []);
++  return React.useMemo(() => (...args) => {
++    const fn = callbackRef.current;
++    if (typeof fn === "function") {
++      return fn(...args);
++    }
++  }, []);
+ }

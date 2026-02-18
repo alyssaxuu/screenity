@@ -1,7 +1,17 @@
 import React from "react";
 import Warning from "./warning/Warning";
 
-const RecorderUI = ({ started, initProject = false, isTab }) => {
+const RecorderUI = ({
+  started,
+  initProject = false,
+  isTab,
+  finalizeFailure = null,
+  retryingFinalize = false,
+  onRetryFinalize = null,
+  onExportDiagnostics = null,
+}) => {
+  const hasFinalizeFailure = Boolean(finalizeFailure);
+
   return (
     <div className="wrap">
       <img
@@ -15,17 +25,31 @@ const RecorderUI = ({ started, initProject = false, isTab }) => {
           alt="Recording icon"
         />
         <div className="title">
-          {initProject
+          {hasFinalizeFailure
+            ? "Upload finalization failed"
+            : initProject
             ? chrome.i18n.getMessage("recorderSetupTitle")
             : !started
             ? chrome.i18n.getMessage("recorderSelectTitle")
             : chrome.i18n.getMessage("recorderSelectProgressTitle")}
         </div>
         <div className="subtitle">
-          {initProject
+          {hasFinalizeFailure
+            ? "Screenity could not finalize the upload. You can retry finalize or export diagnostics."
+            : initProject
             ? chrome.i18n.getMessage("recorderSetupDescription")
             : chrome.i18n.getMessage("recorderSelectDescription")}
         </div>
+        {hasFinalizeFailure && (
+          <>
+            <div className="button-strong" onClick={onRetryFinalize}>
+              {retryingFinalize ? "Retrying..." : "Retry finalize"}
+            </div>
+            <div className="button-stop" onClick={onExportDiagnostics}>
+              Export diagnostics
+            </div>
+          </>
+        )}
         {/* 
         Optionally: 
         <div className="button-stop" onClick={() => chrome.runtime.sendMessage({ type: "stop-recording-tab" })}>
@@ -53,6 +77,20 @@ const RecorderUI = ({ started, initProject = false, isTab }) => {
             cursor: pointer;
             margin-top: 0px;
             border: 1px solid #E8E8E8;
+            margin-left: auto;
+            margin-right: auto;
+            z-index: 999999;
+          }
+          .button-strong {
+            padding: 10px 20px;
+            background: #29292F;
+            border-radius: 30px;
+            color: #FFF;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            margin-top: 0px;
+            margin-bottom: 8px;
             margin-left: auto;
             margin-right: auto;
             z-index: 999999;
