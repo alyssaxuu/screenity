@@ -7,6 +7,7 @@ import { setContentState, contentStateRef } from "../ContentState";
 import { updateFromStorage } from "../utils/updateFromStorage";
 
 import { checkAuthStatus } from "../utils/checkAuthStatus";
+import JSZip from "jszip";
 
 const CLOUD_FEATURES_ENABLED =
   process.env.SCREENITY_ENABLE_CLOUD_FEATURES === "true";
@@ -335,6 +336,12 @@ export const setupHandlers = () => {
     }
   });
 
+  registerMessage("show-toast", (message) => {
+    const state = getState();
+    if (typeof state.openToast !== "function") return;
+    state.openToast(message?.message || "", () => {}, message?.timeout || 5000);
+  });
+
   registerMessage("backup-error", () => {
     const state = getState();
     state.openModal(
@@ -348,6 +355,98 @@ export const setupHandlers = () => {
       () => {
         state.dismissRecording();
       },
+    );
+  });
+
+  registerMessage("fast-recorder-hard-fail", async () => {
+    const state = getState();
+    if (typeof state.openModal !== "function") return;
+
+    const downloadBundle = async () => {
+      const userAgent = navigator.userAgent;
+      let platformInfo = {};
+      try {
+        platformInfo = await chrome.runtime.sendMessage({
+          type: "get-platform-info",
+        });
+      } catch {}
+
+      const manifestInfo = chrome.runtime.getManifest().version;
+      const fastRecorderData = await chrome.storage.local.get([
+        "fastRecorderBeta",
+        "fastRecorderDecision",
+        "fastRecorderDisabledForDevice",
+        "fastRecorderDisabledReason",
+        "fastRecorderDisabledDetails",
+        "fastRecorderDisabledAt",
+        "fastRecorderProbe",
+        "fastRecorderValidation",
+        "fastRecorderValidationFailed",
+        "fastRecorderInUse",
+        "fastRecorderActiveRecordingId",
+      ]);
+
+      const data = {
+        userAgent: userAgent,
+        platformInfo: platformInfo,
+        manifestInfo: manifestInfo,
+        defaultAudioInput: state.defaultAudioInput,
+        defaultAudioOutput: state.defaultAudioOutput,
+        defaultVideoInput: state.defaultVideoInput,
+        quality: state.quality,
+        systemAudio: state.systemAudio,
+        audioInput: state.audioInput,
+        audioOutput: state.audioOutput,
+        backgroundEffectsActive: state.backgroundEffectsActive,
+        recording: state.recording,
+        recordingType: state.recordingType,
+        askForPermissions: state.askForPermissions,
+        cameraPermission: state.cameraPermission,
+        microphonePermission: state.microphonePermission,
+        askMicrophone: state.askMicrophone,
+        cursorMode: state.cursorMode,
+        zoomEnabled: state.zoomEnabled,
+        offscreenRecording: state.offscreenRecording,
+        updateChrome: state.updateChrome,
+        permissionsChecked: state.permissionsChecked,
+        permissionsLoaded: state.permissionsLoaded,
+        hideUI: state.hideUI,
+        alarm: state.alarm,
+        alarmTime: state.alarmTime,
+        surface: state.surface,
+        blurMode: state.blurMode,
+        fastRecorder: fastRecorderData,
+      };
+
+      const zip = new JSZip();
+      zip.file("troubleshooting.json", JSON.stringify(data));
+      const blob = await zip.generateAsync({ type: "blob" });
+      const url = window.URL.createObjectURL(blob);
+
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "screenity-troubleshooting.zip";
+      a.click();
+      window.URL.revokeObjectURL(url);
+
+      chrome.runtime.sendMessage({ type: "indexed-db-download" });
+    };
+
+    state.openModal(
+      "Fast recorder failed",
+      "The fast recorder output couldn't be validated on this device.\nYou can download the file anyway, or grab a debug bundle for support.",
+      "Download anyway",
+      "Cancel",
+      () => {
+        chrome.runtime.sendMessage({ type: "open-download-mp4" });
+      },
+      () => {},
+      null,
+      null,
+      null,
+      true,
+      "Download debug bundle",
+      downloadBundle
     );
   });
 

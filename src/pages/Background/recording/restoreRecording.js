@@ -1,6 +1,5 @@
 import { sendMessageTab } from "../tabManagement";
 import { chunksStore } from "./chunkHandler";
-import { supportsWebCodecs } from "../utils/featureDetection";
 
 export const checkRestore = async () => {
   const chunks = [];
@@ -15,16 +14,19 @@ export const checkRestore = async () => {
 };
 
 export const restoreRecording = async () => {
+  const { fastRecorderInUse } = await chrome.storage.local.get([
+    "fastRecorderInUse",
+  ]);
   //const hasWebCodecs = supportsWebCodecs();
-  const hasWebCodecs = false; // FLAG: Force old FFMPEG for now
+  const hasWebCodecs = Boolean(fastRecorderInUse);
 
   let editorUrl, messageType;
 
   if (hasWebCodecs) {
-    editorUrl = "editorwebcodecs.html";
+    editorUrl = "editorwebcodecs.html?mode=recover";
     messageType = "restore-recording";
   } else {
-    editorUrl = "editorviewer.html";
+    editorUrl = "editorviewer.html?mode=recover";
     messageType = "viewer-recording";
   }
 

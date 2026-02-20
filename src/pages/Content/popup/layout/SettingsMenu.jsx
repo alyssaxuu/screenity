@@ -13,6 +13,11 @@ import JSZip from "jszip";
 
 // Context
 import { contentStateContext } from "../../context/ContentState";
+import {
+  probeFastRecorderSupport,
+  shouldUseFastRecorder,
+  getFastRecorderStickyState,
+} from "../../../../media/fastRecorderGate";
 
 const CLOUD_FEATURES_ENABLED =
   process.env.SCREENITY_ENABLE_CLOUD_FEATURES === "true";
@@ -27,6 +32,15 @@ const SettingsMenu = (props) => {
   const [RAM, setRAM] = useState(0);
   const [width, setWidth] = useState(0);
   const [height, setHeight] = useState(0);
+  const [fastRecorderInfo, setFastRecorderInfo] = useState({
+    status: null,
+    probe: null,
+    decision: null,
+    disabled: false,
+    disabledReason: null,
+    disabledDetails: null,
+    disabledAt: null,
+  });
 
   useEffect(() => {
     // Check chrome version
@@ -53,55 +67,71 @@ const SettingsMenu = (props) => {
             .then((response) => {
               platformInfo = response;
               const manifestInfo = chrome.runtime.getManifest().version;
+              chrome.storage.local.get(
+                [
+                  "fastRecorderBeta",
+                  "fastRecorderDecision",
+                  "fastRecorderDisabledForDevice",
+                  "fastRecorderDisabledReason",
+                  "fastRecorderDisabledDetails",
+                  "fastRecorderDisabledAt",
+                  "fastRecorderProbe",
+                  "fastRecorderValidation",
+                  "fastRecorderValidationFailed",
+                  "fastRecorderInUse",
+                ],
+                (fastRecorderData) => {
+                  const data = {
+                    userAgent: userAgent,
+                    platformInfo: platformInfo,
+                    manifestInfo: manifestInfo,
+                    defaultAudioInput: contentState.defaultAudioInput,
+                    defaultAudioOutput: contentState.defaultAudioOutput,
+                    defaultVideoInput: contentState.defaultVideoInput,
+                    quality: contentState.quality,
+                    systemAudio: contentState.systemAudio,
+                    audioInput: contentState.audioInput,
+                    audioOutput: contentState.audioOutput,
+                    backgroundEffectsActive: contentState.backgroundEffectsActive,
+                    recording: contentState.recording,
+                    recordingType: contentState.recordingType,
+                    askForPermissions: contentState.askForPermissions,
+                    cameraPermission: contentState.cameraPermission,
+                    microphonePermission: contentState.microphonePermission,
+                    askMicrophone: contentState.askMicrophone,
+                    cursorMode: contentState.cursorMode,
+                    zoomEnabled: contentState.zoomEnabled,
+                    offscreenRecording: contentState.offscreenRecording,
+                    updateChrome: contentState.updateChrome,
+                    permissionsChecked: contentState.permissionsChecked,
+                    permissionsLoaded: contentState.permissionsLoaded,
+                    hideUI: contentState.hideUI,
+                    alarm: contentState.alarm,
+                    alarmTime: contentState.alarmTime,
+                    surface: contentState.surface,
+                    blurMode: contentState.blurMode,
+                    fastRecorder: fastRecorderData,
+                    //contentState: contentStateData,
+                  };
+                  // Create a zip file with the original recording and the data
+                  const zip = new JSZip();
+                  zip.file("troubleshooting.json", JSON.stringify(data));
+                  zip.generateAsync({ type: "blob" }).then(function (blob) {
+                    const url = window.URL.createObjectURL(blob);
 
-              const data = {
-                userAgent: userAgent,
-                platformInfo: platformInfo,
-                manifestInfo: manifestInfo,
-                defaultAudioInput: contentState.defaultAudioInput,
-                defaultAudioOutput: contentState.defaultAudioOutput,
-                defaultVideoInput: contentState.defaultVideoInput,
-                quality: contentState.quality,
-                systemAudio: contentState.systemAudio,
-                audioInput: contentState.audioInput,
-                audioOutput: contentState.audioOutput,
-                backgroundEffectsActive: contentState.backgroundEffectsActive,
-                recording: contentState.recording,
-                recordingType: contentState.recordingType,
-                askForPermissions: contentState.askForPermissions,
-                cameraPermission: contentState.cameraPermission,
-                microphonePermission: contentState.microphonePermission,
-                askMicrophone: contentState.askMicrophone,
-                cursorMode: contentState.cursorMode,
-                zoomEnabled: contentState.zoomEnabled,
-                offscreenRecording: contentState.offscreenRecording,
-                updateChrome: contentState.updateChrome,
-                permissionsChecked: contentState.permissionsChecked,
-                permissionsLoaded: contentState.permissionsLoaded,
-                hideUI: contentState.hideUI,
-                alarm: contentState.alarm,
-                alarmTime: contentState.alarmTime,
-                surface: contentState.surface,
-                blurMode: contentState.blurMode,
-                //contentState: contentStateData,
-              };
-              // Create a zip file with the original recording and the data
-              const zip = new JSZip();
-              zip.file("troubleshooting.json", JSON.stringify(data));
-              zip.generateAsync({ type: "blob" }).then(function (blob) {
-                const url = window.URL.createObjectURL(blob);
+                    // Download file
+                    const a = document.createElement("a");
+                    a.href = url;
+                    a.download = "screenity-troubleshooting.zip";
+                    a.click();
+                    window.URL.revokeObjectURL(url);
 
-                // Download file
-                const a = document.createElement("a");
-                a.href = url;
-                a.download = "screenity-troubleshooting.zip";
-                a.click();
-                window.URL.revokeObjectURL(url);
-
-                chrome.runtime.sendMessage({
-                  type: "indexed-db-download",
-                });
-              });
+                    chrome.runtime.sendMessage({
+                      type: "indexed-db-download",
+                    });
+                  });
+                }
+              );
             });
         },
         () => {}
@@ -122,6 +152,154 @@ const SettingsMenu = (props) => {
     setRAM(ram);
   }, []);
 
+  const getFastRecDebug = () => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      return params.get("fastRecDebug") === "1";
+    } catch {
+      return false;
+    }
+  };
+
+  const hasLadderFields = (probe) => {
+    if (!probe || !probe.details) return false;
+    return (
+      Array.isArray(probe.details.attemptSummary) &&
+      probe.details.attemptSummary.length > 0 &&
+      Boolean(probe.details.selectedVideoConfig)
+    );
+  };
+
+  const runFastRecorderProbe = async (source = "auto") => {
+    if (!contentState) return;
+    const userSetting =
+      contentState.useWebCodecsRecorder === true
+        ? true
+        : contentState.useWebCodecsRecorder === false
+        ? false
+        : null;
+    const sticky = await getFastRecorderStickyState();
+    const probe = await probeFastRecorderSupport();
+    const useFast = shouldUseFastRecorder(userSetting, probe, sticky);
+    const decision = {
+      useFast,
+      why:
+        userSetting === false
+          ? "user_disabled"
+          : sticky?.disabled && userSetting !== true
+          ? "sticky_disabled"
+          : probe.ok
+          ? "probe_ok"
+          : "probe_failed",
+      at: Date.now(),
+    };
+    const status = {
+      userSetting,
+      probe: { ...probe, at: probe.at || Date.now() },
+        decision,
+        disabled: Boolean(sticky?.disabled),
+        disabledReason: sticky?.reason || null,
+        disabledDetails: sticky?.details || null,
+        disabledAt: null,
+        updatedAt: Date.now(),
+      };
+    try {
+      await chrome.storage.local.set({ fastRecorderStatus: status });
+    } catch {}
+    setFastRecorderInfo({
+      status,
+      probe: status.probe,
+      decision,
+      disabled: status.disabled,
+      disabledReason: status.disabledReason,
+      disabledDetails: status.disabledDetails,
+      disabledAt: status.disabledAt,
+    });
+    if (getFastRecDebug()) {
+      console.log("[FastRecorderStatus]", { source, status });
+    }
+    return status;
+  };
+
+  const migrateFastRecorderStatus = async () => {
+    const existing = await chrome.storage.local.get(["fastRecorderStatus"]);
+    if (existing.fastRecorderStatus) {
+      const status = existing.fastRecorderStatus;
+      if (!hasLadderFields(status?.probe)) {
+        await runFastRecorderProbe("stale-status");
+        const refreshed = await chrome.storage.local.get(["fastRecorderStatus"]);
+        return refreshed.fastRecorderStatus || status;
+      }
+      return status;
+    }
+    const legacy = await chrome.storage.local.get([
+      "fastRecorderBeta",
+      "fastRecorderProbe",
+      "fastRecorderDecision",
+      "fastRecorderDisabledForDevice",
+      "fastRecorderDisabledReason",
+      "fastRecorderDisabledDetails",
+      "fastRecorderDisabledAt",
+    ]);
+    const status = {
+      userSetting:
+        legacy.fastRecorderBeta === true
+          ? true
+          : legacy.fastRecorderBeta === false
+          ? false
+          : null,
+      probe: legacy.fastRecorderProbe || null,
+      decision: legacy.fastRecorderDecision || null,
+      disabled: Boolean(legacy.fastRecorderDisabledForDevice),
+      disabledReason: legacy.fastRecorderDisabledReason || null,
+      disabledDetails: legacy.fastRecorderDisabledDetails || null,
+      disabledAt: legacy.fastRecorderDisabledAt || null,
+      updatedAt: Date.now(),
+    };
+    try {
+      await chrome.storage.local.set({ fastRecorderStatus: status });
+    } catch {}
+    if (!hasLadderFields(status.probe)) {
+      await runFastRecorderProbe("stale-legacy");
+      const refreshed = await chrome.storage.local.get(["fastRecorderStatus"]);
+      return refreshed.fastRecorderStatus || status;
+    }
+    return status;
+  };
+
+  useEffect(() => {
+    let canceled = false;
+    (async () => {
+      const status = await migrateFastRecorderStatus();
+      if (canceled) return;
+      setFastRecorderInfo((prev) => ({
+        ...prev,
+        status,
+        probe: status?.probe || null,
+        decision: status?.decision || null,
+        disabled: Boolean(status?.disabled),
+        disabledReason: status?.disabledReason || null,
+        disabledDetails: status?.disabledDetails || null,
+        disabledAt: status?.disabledAt || null,
+      }));
+      const staleHours = 12;
+      const probeAgeMs =
+        status?.probe?.at && Number.isFinite(status.probe.at)
+          ? Date.now() - status.probe.at
+          : Infinity;
+      const shouldRun =
+        !status?.probe ||
+        probeAgeMs > staleHours * 60 * 60 * 1000 ||
+        !hasLadderFields(status?.probe);
+      if (shouldRun) {
+        await runFastRecorderProbe("effect");
+      }
+    })();
+    return () => {
+      canceled = true;
+    };
+  }, [contentState?.useWebCodecsRecorder]);
+
   return (
     <DropdownMenu.Root
       open={props.open}
@@ -133,6 +311,20 @@ const SettingsMenu = (props) => {
           .then((response) => {
             setRestore(response.restore);
           });
+
+        chrome.storage.local.get(["fastRecorderStatus"], (result) => {
+          const status = result.fastRecorderStatus || null;
+          setFastRecorderInfo((prev) => ({
+            ...prev,
+            status,
+            probe: status?.probe || null,
+            decision: status?.decision || null,
+            disabled: Boolean(status?.disabled),
+            disabledReason: status?.disabledReason || null,
+            disabledDetails: status?.disabledDetails || null,
+            disabledAt: status?.disabledAt || null,
+          }));
+        });
       }}
     >
       <DropdownMenu.Trigger asChild>
@@ -544,6 +736,38 @@ const SettingsMenu = (props) => {
               <img src={CheckWhiteIcon} />
             </DropdownMenu.ItemIndicator>
           </DropdownMenu.CheckboxItem>
+          {!contentState.isSubscribed &&
+            !contentState.isLoggedIn &&
+            fastRecorderInfo?.probe?.ok === true &&
+            fastRecorderInfo?.probe?.details?.selectedVideoConfig && (
+              <DropdownMenu.CheckboxItem
+                className="DropdownMenuItem"
+                onSelect={(e) => {
+                  e.preventDefault();
+                }}
+                onCheckedChange={(checked) => {
+                  setContentState((prevContentState) => ({
+                    ...prevContentState,
+                    useWebCodecsRecorder: checked,
+                  }));
+                  chrome.storage.local.set({
+                    useWebCodecsRecorder: checked,
+                    ...(checked
+                      ? {
+                          lastWebCodecsFailureAt: null,
+                          lastWebCodecsFailureCode: null,
+                        }
+                      : {}),
+                  });
+                }}
+                checked={contentState.useWebCodecsRecorder === true}
+              >
+                {chrome.i18n.getMessage("webcodecsToggleLabel")}
+                <DropdownMenu.ItemIndicator className="ItemIndicator">
+                  <img src={CheckWhiteIcon} />
+                </DropdownMenu.ItemIndicator>
+              </DropdownMenu.CheckboxItem>
+            )}
           {!oldChrome &&
             !contentState.isSubscribed &&
             !contentState.isLoggedIn && (

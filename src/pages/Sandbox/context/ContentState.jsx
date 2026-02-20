@@ -16,6 +16,10 @@ import {
   getHostnameFromUrl,
   sanitizeFilenameBase,
 } from "../../utils/filenameHelpers";
+import {
+  debugRecordingEventWithSession,
+  isRecordingDebugEnabled,
+} from "../../utils/recordingDebug";
 
 localforage.config({
   driver: localforage.INDEXEDDB,
@@ -30,10 +34,58 @@ const chunksStore = localforage.createInstance({
 
 export const ContentStateContext = createContext();
 
+const DEBUG_RECORDER =
+  typeof window !== "undefined" ? !!window.SCREENITY_DEBUG_RECORDER : false;
+
 const ContentState = (props) => {
   const videoChunks = useRef([]);
   const makeVideoCheck = useRef(false);
   const chunkCount = useRef(0);
+  const recdbgSessionRef = useRef(null);
+  const tabIdRef = useRef(null);
+
+  useEffect(() => {
+    if (!DEBUG_RECORDER && !isRecordingDebugEnabled()) return;
+    chrome.storage.local.get(
+      ["recordingDebugSessionId", "recordingDebugStartMs"],
+      (res) => {
+        if (!res?.recordingDebugSessionId) return;
+        recdbgSessionRef.current = {
+          sessionId: res.recordingDebugSessionId,
+          startTimeMs: res.recordingDebugStartMs || null,
+          startPerfMs: null,
+        };
+      },
+    );
+  }, []);
+
+  useEffect(() => {
+    try {
+      chrome.tabs.getCurrent((tab) => {
+        tabIdRef.current = tab?.id || null;
+      });
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    if (!DEBUG_RECORDER && !isRecordingDebugEnabled()) return;
+    window.__screenityExportRecordingDebug = async () => {
+      const { recordingDebugSessionId } = await chrome.storage.local.get([
+        "recordingDebugSessionId",
+      ]);
+      if (!recordingDebugSessionId) {
+        // eslint-disable-next-line no-console
+        console.warn("[Sandbox] No recording debug session id found.");
+        return;
+      }
+      chrome.runtime.sendMessage({
+        type: "export-recording-debug",
+        sessionId: recordingDebugSessionId,
+      });
+    };
+    window.__screenityPingRecdbg = () =>
+      chrome.runtime.sendMessage({ type: "recdbg-ping" });
+  }, []);
 
   const defaultState = {
     time: 0,
@@ -98,6 +150,11 @@ const ContentState = (props) => {
 
   const [contentState, _setContentState] = useState(defaultState);
   const contentStateRef = useRef(contentState);
+  const launchModeRef = useRef("normal");
+  const launchRecordingIdRef = useRef(null);
+  const pseudoProgressTimerRef = useRef(null);
+  const pseudoProgressStartRef = useRef(null);
+  const pseudoProgressStartAtRef = useRef(null);
 
   const setContentState = useCallback((updater) => {
     _setContentState((prev) => {
@@ -106,6 +163,168 @@ const ContentState = (props) => {
       return next;
     });
   }, []);
+
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      launchModeRef.current = params.get("mode") || "normal";
+      launchRecordingIdRef.current = params.get("recordingId") || null;
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    if (launchModeRef.current !== "postStop") return;
+    if (contentState.ready) {
+      if (pseudoProgressTimerRef.current) {
+        clearInterval(pseudoProgressTimerRef.current);
+        pseudoProgressTimerRef.current = null;
+      }
+      return;
+    }
+
+    if (pseudoProgressTimerRef.current || pseudoProgressStartRef.current)
+      return;
+    pseudoProgressStartRef.current = setTimeout(() => {
+      pseudoProgressStartRef.current = null;
+      if (contentStateRef.current?.ready) return;
+      if ((contentStateRef.current?.processingProgress || 0) > 0) return;
+      pseudoProgressStartAtRef.current = Date.now();
+      pseudoProgressTimerRef.current = setInterval(() => {
+        setContentState((prev) => {
+          if (prev.ready) return prev;
+          const current = Number(prev.processingProgress || 0);
+          const elapsedMs = Math.max(
+            0,
+            Date.now() - (pseudoProgressStartAtRef.current || Date.now()),
+          );
+          const target = Math.min(90, Math.round((elapsedMs / 6000) * 90));
+          const next = Math.max(current, target);
+          if (next <= current) return prev;
+          return { ...prev, processingProgress: next };
+        });
+      }, 200);
+    }, 800);
+
+    return () => {
+      if (pseudoProgressStartRef.current) {
+        clearTimeout(pseudoProgressStartRef.current);
+        pseudoProgressStartRef.current = null;
+      }
+      pseudoProgressStartAtRef.current = null;
+      if (pseudoProgressTimerRef.current) {
+        clearInterval(pseudoProgressTimerRef.current);
+        pseudoProgressTimerRef.current = null;
+      }
+    };
+  }, [contentState.ready]);
+
+  const waitForFinalizeReady = async (recordingId) => {
+    if (!recordingId) return { ok: true };
+    const key = `freeFinalizeStatus:${recordingId}`;
+    const timeoutMs = 60_000;
+    const pollMs = 200;
+    const start = Date.now();
+    debugRecordingEventWithSession(recdbgSessionRef.current, "poststop-wait", {
+      recordingId,
+      key,
+      timeoutMs,
+      pollMs,
+    });
+
+    const getStatus = async () => {
+      const res = await chrome.storage.local.get([key]);
+      return res[key] || null;
+    };
+
+    return new Promise(async (resolve) => {
+      let done = false;
+      const cleanup = () => {
+        done = true;
+        chrome.storage.onChanged.removeListener(onChanged);
+        clearInterval(pollTimer);
+      };
+
+      const handleStatus = (status) => {
+        if (!status || done) return;
+        const rawPct =
+          typeof status.percent === "number" ? status.percent : 0;
+        const prePct = Math.min(90, Math.max(0, Math.round(rawPct * 0.9)));
+        debugRecordingEventWithSession(
+          recdbgSessionRef.current,
+          "poststop-status",
+          {
+            recordingId,
+            stage: status.stage,
+            percent: status.percent,
+            updatedAt: status.updatedAt,
+          },
+        );
+        setContentState((prev) => ({
+          ...prev,
+          isFfmpegRunning: true,
+          processingProgress: Math.max(prev.processingProgress || 0, prePct),
+        }));
+        if (status.stage === "chunks_ready" || status.stage === "ready") {
+          cleanup();
+          debugRecordingEventWithSession(
+            recdbgSessionRef.current,
+            "poststop-ready",
+            { recordingId, stage: status.stage },
+          );
+          resolve({ ok: true });
+        } else if (status.stage === "failed") {
+          cleanup();
+          debugRecordingEventWithSession(
+            recdbgSessionRef.current,
+            "poststop-failed",
+            { recordingId, error: status.error || "failed" },
+          );
+          resolve({ ok: false, error: status.error || "failed" });
+        }
+      };
+
+      const onChanged = (changes, area) => {
+        if (area !== "local") return;
+        if (!changes[key]) return;
+        handleStatus(changes[key].newValue);
+      };
+
+      chrome.storage.onChanged.addListener(onChanged);
+
+      const pollTimer = setInterval(async () => {
+        if (done) return;
+        if (Date.now() - start > timeoutMs) {
+          cleanup();
+          debugRecordingEventWithSession(
+            recdbgSessionRef.current,
+            "poststop-timeout",
+            { recordingId, timeoutMs },
+          );
+          resolve({ ok: false, error: "timeout" });
+          return;
+        }
+        const status = await getStatus();
+        handleStatus(status);
+      }, pollMs);
+
+      const initial = await getStatus();
+      handleStatus(initial);
+    });
+  };
+
+  useEffect(() => {
+    if (launchModeRef.current !== "postStop") return;
+    if (!contentState.chunkCount) return;
+    const ratio =
+      contentState.chunkCount > 0
+        ? contentState.chunkIndex / contentState.chunkCount
+        : 0;
+    const pct = Math.min(100, Math.max(20, Math.round(ratio * 80 + 20)));
+    setContentState((prev) => ({
+      ...prev,
+      processingProgress: pct,
+    }));
+  }, [contentState.chunkIndex, contentState.chunkCount]);
 
   const buildBlobFromChunks = async () => {
     const items = [];
@@ -119,12 +338,21 @@ const ContentState = (props) => {
       c.chunk instanceof Blob ? c.chunk : new Blob([c.chunk]),
     );
 
+    if (!parts.length) {
+      debug("No chunks found in IndexedDB");
+      debugRecordingEventWithSession(recdbgSessionRef.current, "blob-empty", {
+        chunkCount: 0,
+      });
+      return null;
+    }
+
     const first = parts[0];
     const inferredType = first?.type || "video/webm";
 
     const blob = new Blob(parts, { type: inferredType });
 
     reconstructVideo(blob);
+    return blob;
   };
 
   // useEffect(() => {
@@ -622,6 +850,13 @@ const ContentState = (props) => {
   const onChromeMessage = useCallback(
     (request, sender, sendResponse) => {
       const message = request;
+      if (
+        message?._targetTabId &&
+        tabIdRef.current &&
+        message._targetTabId !== tabIdRef.current
+      ) {
+        return false;
+      }
       if (message.type === "chunk-count") {
         setContentState((prevState) => ({
           ...prevState,
@@ -653,7 +888,12 @@ const ContentState = (props) => {
         }));
 
         buildBlobFromChunks()
-          .then(() => {
+          .then((blob) => {
+            if (!blob) {
+              chrome.runtime.sendMessage({ type: "send-chunks-to-sandbox" });
+              sendResponse({ status: "deferred" });
+              return;
+            }
             sendResponse({ status: "ok" });
           })
           .catch((error) => {
@@ -665,12 +905,48 @@ const ContentState = (props) => {
         setContentState((prevContentState) => ({
           ...prevContentState,
           noffmpeg: false,
-          isFfmpegRunning: false,
+          isFfmpegRunning: true,
           editLimit: 0,
         }));
+        const shouldGate =
+          launchModeRef.current === "postStop" &&
+          Boolean(launchRecordingIdRef.current);
+        if (shouldGate) {
+          waitForFinalizeReady(launchRecordingIdRef.current).then((result) => {
+            if (!result.ok) {
+              setContentState((prev) => ({
+                ...prev,
+                isFfmpegRunning: false,
+                noffmpeg: true,
+                ffmpegLoaded: true,
+                processingProgress: 0,
+              }));
+              sendResponse({ status: "error", error: result.error });
+              return;
+            }
+            buildBlobFromChunks()
+              .then((blob) => {
+                if (!blob) {
+                  chrome.runtime.sendMessage({ type: "send-chunks-to-sandbox" });
+                  sendResponse({ status: "deferred" });
+                  return;
+                }
+                sendResponse({ status: "ok" });
+              })
+              .catch((error) =>
+                sendResponse({ status: "error", error: error.message })
+              );
+          });
+          return true;
+        }
 
         buildBlobFromChunks()
-          .then(() => {
+          .then((blob) => {
+            if (!blob) {
+              chrome.runtime.sendMessage({ type: "send-chunks-to-sandbox" });
+              sendResponse({ status: "deferred" });
+              return;
+            }
             sendResponse({ status: "ok" });
           })
           .catch((error) => {
@@ -683,12 +959,48 @@ const ContentState = (props) => {
           ...prevContentState,
           fallback: true,
           noffmpeg: false,
-          isFfmpegRunning: false,
+          isFfmpegRunning: true,
           editLimit: 3600,
         }));
+        const shouldGate =
+          launchModeRef.current === "postStop" &&
+          Boolean(launchRecordingIdRef.current);
+        if (shouldGate) {
+          waitForFinalizeReady(launchRecordingIdRef.current).then((result) => {
+            if (!result.ok) {
+              setContentState((prev) => ({
+                ...prev,
+                isFfmpegRunning: false,
+                noffmpeg: true,
+                ffmpegLoaded: true,
+                processingProgress: 0,
+              }));
+              sendResponse({ status: "error", error: result.error });
+              return;
+            }
+            buildBlobFromChunks()
+              .then((blob) => {
+                if (!blob) {
+                  chrome.runtime.sendMessage({ type: "send-chunks-to-sandbox" });
+                  sendResponse({ status: "deferred" });
+                  return;
+                }
+                sendResponse({ status: "ok" });
+              })
+              .catch((error) =>
+                sendResponse({ status: "error", error: error.message })
+              );
+          });
+          return true;
+        }
 
         buildBlobFromChunks()
-          .then(() => {
+          .then((blob) => {
+            if (!blob) {
+              chrome.runtime.sendMessage({ type: "send-chunks-to-sandbox" });
+              sendResponse({ status: "deferred" });
+              return;
+            }
             sendResponse({ status: "ok" });
           })
           .catch((error) => {
@@ -701,9 +1013,33 @@ const ContentState = (props) => {
           ...prevContentState,
           fallback: true,
           noffmpeg: true, // No FFmpeg
-          isFfmpegRunning: false,
+          isFfmpegRunning: true,
           editLimit: 0, // No editing allowed
         }));
+        const shouldGate =
+          launchModeRef.current === "postStop" &&
+          Boolean(launchRecordingIdRef.current);
+        if (shouldGate) {
+          waitForFinalizeReady(launchRecordingIdRef.current).then((result) => {
+            if (!result.ok) {
+              setContentState((prev) => ({
+                ...prev,
+                isFfmpegRunning: false,
+                noffmpeg: true,
+                ffmpegLoaded: true,
+                processingProgress: 0,
+              }));
+              sendResponse({ status: "error", error: result.error });
+              return;
+            }
+            buildBlobFromChunks()
+              .then(() => sendResponse({ status: "ok" }))
+              .catch((error) =>
+                sendResponse({ status: "error", error: error.message })
+              );
+          });
+          return true;
+        }
 
         buildBlobFromChunks()
           .then(() => {

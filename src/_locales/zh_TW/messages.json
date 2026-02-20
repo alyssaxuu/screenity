@@ -1388,5 +1388,13 @@
   "welcomeToProActionModal": {
     "message": "了解",
     "description": "Pro 歡迎視窗確認按鈕"
+  },
+  "webcodecsToggleLabel": {
+    "message": "快速 MP4（beta）",
+    "description": "WebCodecs recorder toggle label"
+  },
+  "webcodecsFailedOffToast": {
+    "message": "快速 MP4 失敗 — 關閉",
+    "description": "WebCodecs failure auto-disable toast"
   }
 }

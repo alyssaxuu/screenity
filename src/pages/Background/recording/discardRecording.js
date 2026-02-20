@@ -13,6 +13,8 @@ export const discardRecording = async () => {
     sandboxTab: null,
     recording: false,
   });
+  chrome.storage.local.set({ pipForceClose: Date.now() });
+  chrome.storage.local.set({ recordingUiTabId: null });
   chrome.storage.local.remove(["recordingMeta"]);
 
   chrome.runtime.sendMessage({ type: "discard-backup" });

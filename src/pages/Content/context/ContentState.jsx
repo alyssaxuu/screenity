@@ -56,14 +56,22 @@ const ContentState = (props) => {
   const tabIdRef = useRef(null);
   const activeTabRef = useRef(null);
   const tabRecordedIdRef = useRef(null);
+  const recordingUiTabRef = useRef(null);
+  const recordingStartTimeRef = useRef(null);
+  const lastBeepStartTimeRef = useRef(null);
+  const recordingBeepTabIdRef = useRef(null);
 
   const isTargetTab = useCallback(() => {
     const tabId = tabIdRef.current;
     const tabRecordedID = tabRecordedIdRef.current;
+    const recordingUiTabId = recordingUiTabRef.current;
     const activeTab = activeTabRef.current;
 
     if (tabRecordedID != null) {
       return tabId != null && tabId === tabRecordedID;
+    }
+    if (recordingUiTabId != null) {
+      return tabId != null && tabId === recordingUiTabId;
     }
     if (activeTab != null) {
       return tabId != null && tabId === activeTab;
@@ -110,10 +118,23 @@ const ContentState = (props) => {
       }
     });
 
-    chrome.storage.local.get(["activeTab", "tabRecordedID"], (result) => {
-      activeTabRef.current = result.activeTab ?? null;
-      tabRecordedIdRef.current = result.tabRecordedID ?? null;
-    });
+    chrome.storage.local.get(
+      [
+        "activeTab",
+        "tabRecordedID",
+        "recordingUiTabId",
+        "recordingStartTime",
+        "recordingBeepTabId",
+        "recordingNow",
+      ],
+      (result) => {
+        activeTabRef.current = result.activeTab ?? null;
+        tabRecordedIdRef.current = result.tabRecordedID ?? null;
+        recordingUiTabRef.current = result.recordingUiTabId ?? null;
+        recordingStartTimeRef.current = result.recordingStartTime ?? null;
+        recordingBeepTabIdRef.current = result.recordingBeepTabId ?? null;
+      },
+    );
   }, []);
 
   useEffect(() => {
@@ -161,6 +182,12 @@ const ContentState = (props) => {
         ? { countdownActive: false, isCountdownVisible: false }
         : {}),
     }));
+    if (tabIdRef.current != null) {
+      const preferredTab =
+        tabRecordedIdRef.current ?? recordingUiTabRef.current ?? tabIdRef.current;
+      chrome.storage.local.set({ recordingBeepTabId: preferredTab });
+      recordingBeepTabIdRef.current = preferredTab;
+    }
     chrome.storage.local.set({ restarting: false });
 
     // This cannot be triggered from here because the user might not have the page focused
@@ -811,6 +838,7 @@ const ContentState = (props) => {
     swatch: 1,
     time: 0,
     timer: 0,
+    processingProgress: 0,
     recording: false,
     startRecording: startRecording,
     restartRecording: restartRecording,
@@ -917,6 +945,9 @@ const ContentState = (props) => {
     hasOpenedBefore: false,
     qualityValue: "1080p",
     fpsValue: "30",
+    fastRecorderBeta: null,
+    fastRecorderStatus: null,
+    useWebCodecsRecorder: false,
     countdownActive: false,
     countdownCancelled: false,
     multiMode: false,
@@ -1004,6 +1035,62 @@ const ContentState = (props) => {
   }, []);
 
   useEffect(() => {
+    if (!contentState.preparingRecording) return;
+    let canceled = false;
+    let pollTimer = null;
+
+    const getStatus = async () => {
+      const { fastRecorderActiveRecordingId, postStopRecordingId } =
+        await chrome.storage.local.get([
+          "fastRecorderActiveRecordingId",
+          "postStopRecordingId",
+        ]);
+      const recordingId =
+        fastRecorderActiveRecordingId || postStopRecordingId || null;
+      if (!recordingId) return null;
+      const key = `freeFinalizeStatus:${recordingId}`;
+      const res = await chrome.storage.local.get([key]);
+      return res[key] || null;
+    };
+
+    const applyStatus = (status) => {
+      if (!status || canceled) return;
+      const pct =
+        typeof status.percent === "number" ? Math.round(status.percent) : 0;
+      setContentState((prev) => ({
+        ...prev,
+        processingProgress: pct,
+      }));
+    };
+
+    const onChanged = (changes, area) => {
+      if (area !== "local") return;
+      const entry = Object.keys(changes).find((k) =>
+        k.startsWith("freeFinalizeStatus:")
+      );
+      if (!entry) return;
+      applyStatus(changes[entry].newValue);
+    };
+
+    chrome.storage.onChanged.addListener(onChanged);
+
+    (async () => {
+      const status = await getStatus();
+      applyStatus(status);
+      pollTimer = setInterval(async () => {
+        const s = await getStatus();
+        applyStatus(s);
+      }, 500);
+    })();
+
+    return () => {
+      canceled = true;
+      chrome.storage.onChanged.removeListener(onChanged);
+      if (pollTimer) clearInterval(pollTimer);
+    };
+  }, [contentState.preparingRecording]);
+
+  useEffect(() => {
     const isRecording = Boolean(contentState.recording);
     if (!hydratedRef.current) {
       prevRecordingRef.current = isRecording;
@@ -1019,6 +1106,22 @@ const ContentState = (props) => {
     }
 
     if (prevRecordingRef.current === false && isRecording === true) {
+      if (
+        recordingBeepTabIdRef.current != null &&
+        tabIdRef.current != null &&
+        recordingBeepTabIdRef.current !== tabIdRef.current
+      ) {
+        prevRecordingRef.current = isRecording;
+        return;
+      }
+      const startTime = recordingStartTimeRef.current;
+      const isNewSession =
+        startTime != null && startTime !== lastBeepStartTimeRef.current;
+      if (!isNewSession) {
+        prevRecordingRef.current = isRecording;
+        return;
+      }
+      lastBeepStartTimeRef.current = startTime;
       if (suppressStartBeepRef.current) {
         suppressStartBeepRef.current = false;
       } else {
@@ -1187,7 +1290,19 @@ const ContentState = (props) => {
     const interval = setInterval(() => {
       updateTimerFromStorage();
     }, 1000);
-    return () => clearInterval(interval);
+    const handleVisibility = () => {
+      if (!document.hidden) {
+        updateTimerFromStorage();
+      }
+    };
+    const handleFocus = () => updateTimerFromStorage();
+    document.addEventListener("visibilitychange", handleVisibility);
+    window.addEventListener("focus", handleFocus);
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener("visibilitychange", handleVisibility);
+      window.removeEventListener("focus", handleFocus);
+    };
   }, [updateTimerFromStorage]);
 
   useEffect(() => {
@@ -1200,11 +1315,26 @@ const ContentState = (props) => {
       if (changes.tabRecordedID) {
         tabRecordedIdRef.current = changes.tabRecordedID.newValue ?? null;
       }
+      if (changes.recordingUiTabId) {
+        recordingUiTabRef.current = changes.recordingUiTabId.newValue ?? null;
+      }
+      if (changes.recordingStartTime) {
+        recordingStartTimeRef.current =
+          changes.recordingStartTime.newValue ?? null;
+      }
+      if (changes.recordingBeepTabId) {
+        recordingBeepTabIdRef.current =
+          changes.recordingBeepTabId.newValue ?? null;
+      }
+      if (changes.recordingNow) {
+        updateTimerFromStorage();
+      }
       if (changes.paused) {
         setContentState((prev) => ({
           ...prev,
           paused: Boolean(changes.paused.newValue),
         }));
+        updateTimerFromStorage();
       }
       if (changes.recording) {
         const isRecording = Boolean(changes.recording.newValue);
@@ -1229,6 +1359,14 @@ const ContentState = (props) => {
               }
             : {}),
         }));
+        updateTimerFromStorage();
+      }
+      if (
+        changes.recordingStartTime ||
+        changes.totalPausedMs ||
+        changes.pausedAt
+      ) {
+        updateTimerFromStorage();
       }
       if (changes.cursorEffects) {
         const nextEffects = normalizeCursorEffects(

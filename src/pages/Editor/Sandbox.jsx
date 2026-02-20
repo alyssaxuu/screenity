@@ -251,7 +251,7 @@ const Sandbox = () => {
     <div>
       <iframe
         ref={iframeRef}
-        src="sandbox.html"
+        src={`sandbox.html${window.location.search || ""}`}
         allowFullScreen={true}
         style={{
           width: "100%",

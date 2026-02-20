@@ -30,6 +30,15 @@ const RightPanel = () => {
     contentStateRef.current = contentState;
   }, [contentState]);
 
+  const getPreparingLabel = () => {
+    const base = chrome.i18n.getMessage("preparingLabel");
+    const pct = Math.round(contentState.processingProgress || 0);
+    if (!contentState.mp4ready && pct > 0) {
+      return `${base} (${pct}%)`;
+    }
+    return base;
+  };
+
   const saveToDrive = () => {
     //if (contentState.noffmpeg) return;
     setContentState((prevContentState) => ({
@@ -423,7 +432,7 @@ const RightPanel = () => {
                       ? chrome.i18n.getMessage("notAvailableLabel")
                       : contentState.mp4ready
                       ? chrome.i18n.getMessage("editButtonDescription")
-                      : chrome.i18n.getMessage("preparingLabel")}
+                      : getPreparingLabel()}
                   </div>
                 </div>
                 <div className={styles.buttonRight}>
@@ -458,7 +467,7 @@ const RightPanel = () => {
                       ? chrome.i18n.getMessage("notAvailableLabel")
                       : contentState.mp4ready
                       ? chrome.i18n.getMessage("cropButtonDescription")
-                      : chrome.i18n.getMessage("preparingLabel")}
+                      : getPreparingLabel()}
                   </div>
                 </div>
                 <div className={styles.buttonRight}>
@@ -493,7 +502,7 @@ const RightPanel = () => {
                       ? chrome.i18n.getMessage("notAvailableLabel")
                       : contentState.mp4ready
                       ? chrome.i18n.getMessage("addAudioButtonDescription")
-                      : chrome.i18n.getMessage("preparingLabel")}
+                      : getPreparingLabel()}
                   </div>
                 </div>
                 <div className={styles.buttonRight}>
@@ -611,7 +620,7 @@ const RightPanel = () => {
                       ? chrome.i18n.getMessage("notAvailableLabel")
                       : contentState.mp4ready && !contentState.isFfmpegRunning
                       ? chrome.i18n.getMessage("downloadMP4ButtonDescription")
-                      : chrome.i18n.getMessage("preparingLabel")}
+                      : getPreparingLabel()}
                   </div>
                 </div>
                 <div className={styles.buttonRight}>
@@ -639,7 +648,7 @@ const RightPanel = () => {
                         ? chrome.i18n.getMessage(
                             "downloadWEBMButtonDescription"
                           )
-                        : chrome.i18n.getMessage("preparingLabel")}
+                        : getPreparingLabel()}
                     </div>
                   </div>
                   <div className={styles.buttonRight}>
@@ -680,7 +689,7 @@ const RightPanel = () => {
                       ? chrome.i18n.getMessage("notAvailableLabel")
                       : contentState.mp4ready
                       ? chrome.i18n.getMessage("downloadGIFButtonDescription")
-                      : chrome.i18n.getMessage("preparingLabel")}
+                      : getPreparingLabel()}
                   </div>
                 </div>
                 <div className={styles.buttonRight}>

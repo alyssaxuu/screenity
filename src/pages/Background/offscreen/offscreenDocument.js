@@ -47,6 +47,7 @@ const openRecorderTab = async (
         region: false,
         wasRegion: true,
         clickEvents: [],
+        recordingUiTabId: activeTab.id,
         ...(isRegion ? { tabRecordedID: activeTab.id } : {}),
       });
 
@@ -81,6 +82,7 @@ export const offscreenDocument = async (request, tabId = null) => {
     activeTab: activeTab.id,
     tabRecordedID: null,
     memoryError: false,
+    recordingUiTabId: activeTab.id,
   });
 
   if (activeTab.url.includes(chrome.runtime.getURL("playground.html"))) {
@@ -98,6 +100,7 @@ export const offscreenDocument = async (request, tabId = null) => {
       recordingTab: activeTab.id,
       offscreen: false,
       region: true,
+      recordingUiTabId: activeTab.id,
     });
 
     if (request.customRegion) {
@@ -138,6 +141,7 @@ export const offscreenDocument = async (request, tabId = null) => {
         offscreen: true,
         region: false,
         wasRegion: false,
+        recordingUiTabId: activeTab.id,
       });
 
       sendMessageRecord({

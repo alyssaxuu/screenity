@@ -93,7 +93,7 @@ const Backup = () => {
       localSaving(prompt);
     } else {
       alert(
-        "Failed to set up local backup. Reach out to us at support@screenity.io for more help. You can still record your screen."
+        "Failed to set up local backup. Reach out to us at support@screenity.io for more help. You can still record your screen.",
       );
       chrome.storage.local.set({ backup: false });
       chrome.runtime.sendMessage({
@@ -120,7 +120,7 @@ const Backup = () => {
         chrome.runtime.sendMessage({
           type: "recording-error",
           error: "backup-error",
-          why: JSON.stringify(err),
+          why: String(err),
         });
       }
       return;
@@ -131,7 +131,7 @@ const Backup = () => {
         chrome.runtime.sendMessage({
           type: "recording-error",
           error: "backup-error",
-          why: JSON.stringify(err),
+          why: String(err),
         });
       }
       return;
@@ -144,7 +144,7 @@ const Backup = () => {
     } else {
       directoryHandle = await directoryPicker.getDirectoryHandle(
         "Screenity Recordings",
-        { create: true }
+        { create: true },
       );
     }
 
@@ -172,7 +172,7 @@ const Backup = () => {
         if (directory) {
           try {
             const permissions = await verifyFilePermissions(
-              directory.directoryHandle
+              directory.directoryHandle,
             );
             if (!permissions) {
               directoryPicker(prompt);
@@ -189,7 +189,7 @@ const Backup = () => {
       });
     } else {
       alert(
-        "Your browser doesn't support local backups. Reach out to us at support@screenity.io for more help. You can still record your screen."
+        "Your browser doesn't support local backups. Reach out to us at support@screenity.io for more help. You can still record your screen.",
       );
       chrome.storage.local.set({ backup: false });
       chrome.runtime.sendMessage({
@@ -257,7 +257,7 @@ const Backup = () => {
       const directory = await localDirectoryStore.getItem("directoryHandle");
       if (directory && directory !== null) {
         const permissions = await verifyFilePermissions(
-          directory.directoryHandle
+          directory.directoryHandle,
         );
         if (permissions) {
           await directory.directoryHandle.removeEntry(titleRef.current);

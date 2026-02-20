@@ -50,6 +50,11 @@ export class WebCodecsRecorder {
     this.frameCount = 0;
     // Monotonic video frame index for safe timestamps
     this._videoFrameIndex = 0;
+    this._videoStartUs = null;
+    this._frameDurationUs = null;
+
+    this.audioSamplesWritten = 0;
+    this.audioSampleRate = null;
 
     this.resizeCanvas = null;
     this.resizeCtx = null;
@@ -92,6 +97,9 @@ export class WebCodecsRecorder {
     this.firstVideoFrame = undefined;
     this._stopping = false;
     this._videoFrameIndex = 0;
+    this._videoStartUs = null;
+    this._frameDurationUs = null;
+    this.audioSamplesWritten = 0;
 
     if (this.running) return this._startPromise;
 
@@ -148,14 +156,45 @@ export class WebCodecsRecorder {
         this.log("[WCR] Target:", this.targetWidth, "x", this.targetHeight);
 
         const fps = this.options.fps || 30;
+        this._frameDurationUs = Math.round(1_000_000 / fps);
         const safeBitrate = this.options.videoBitrate || 10_000_000;
 
-        const videoConfig = await this.chooseVideoEncoderConfig({
-          width: this.targetWidth,
-          height: this.targetHeight,
-          fps,
-          bitrate: safeBitrate,
-        });
+        const overrideConfig =
+          this.options.videoEncoderConfig && typeof this.options.videoEncoderConfig === "object"
+            ? this.options.videoEncoderConfig
+            : null;
+
+        let videoConfig = null;
+        if (overrideConfig) {
+          const config = {
+            ...overrideConfig,
+            width: this.targetWidth,
+            height: this.targetHeight,
+          };
+          this.log("[WCR] Using override encoder config", config);
+          try {
+            // Verify override is still supported at runtime
+            const support = await VideoEncoder.isConfigSupported(config);
+            if (support?.supported) {
+              videoConfig = {
+                config: support.config || config,
+                codec: (support.config || config).codec || overrideConfig.codec,
+                containerCodec: "avc",
+              };
+            }
+          } catch (err) {
+            this.warn("[WCR] Override config unsupported", err);
+          }
+        }
+
+        if (!videoConfig) {
+          videoConfig = await this.chooseVideoEncoderConfig({
+            width: this.targetWidth,
+            height: this.targetHeight,
+            fps,
+            bitrate: safeBitrate,
+          });
+        }
         this.selectedVideoCodec = videoConfig.codec;
 
         const audioConfig = await this.prepareAudioEncoderConfig();
@@ -368,6 +407,10 @@ export class WebCodecsRecorder {
     this.firstVideoFrame = undefined;
     this.selectedVideoCodec = null;
     this._videoFrameIndex = 0;
+    this._videoStartUs = null;
+    this._frameDurationUs = null;
+    this.audioSamplesWritten = 0;
+    this.audioSampleRate = null;
 
     this.resizeCanvas = null;
     this.resizeCtx = null;
@@ -432,6 +475,7 @@ export class WebCodecsRecorder {
         this.warn("[WCR] AAC unsupported");
         return null;
       }
+      this.audioSampleRate = support.config?.sampleRate || candidateConfig.sampleRate;
       return support.config || candidateConfig;
     } catch {
       this.warn("[WCR] AAC probe failed");
@@ -520,27 +564,53 @@ export class WebCodecsRecorder {
           this.targetHeight
         );
 
-        if (!this.startTimeUs) this.startTimeUs = performance.now() * 1000;
+        if (!this._videoStartUs) this._videoStartUs = performance.now() * 1000;
 
         const nowUs = performance.now() * 1000;
-        const tsUs = nowUs - this.startTimeUs;
+        const elapsedUs = Math.max(
+          0,
+          nowUs - this._videoStartUs - (this.totalPausedDurationUs || 0)
+        );
+        const frameDurationUs = this._frameDurationUs || Math.round(1_000_000 / 30);
+        const targetIndex = Math.max(0, Math.floor(elapsedUs / frameDurationUs));
 
-        const resized = new VideoFrame(this.resizeCanvas, {
-          timestamp: tsUs,
-        });
+        // If we're ahead of wall-clock, drop this frame.
+        if (targetIndex < this._videoFrameIndex) {
+          frame.close();
+          continue;
+        }
 
-        // Keyframe only first frame and after resume
-        const keyFrame = this.frameCount === 0 || this.justResumed;
-        this.justResumed = false;
+        const startIndex = this._videoFrameIndex;
+        const endIndex = targetIndex;
+        for (let i = startIndex; i <= endIndex; i += 1) {
+          const tsUs = i * frameDurationUs;
+          const resized = new VideoFrame(this.resizeCanvas, {
+            timestamp: tsUs,
+            duration: frameDurationUs,
+          });
 
-        this.videoEncoder.encode(resized, {
-          timestamp: tsUs,
-          keyFrame,
-        });
+          const keyFrame = i === 0 || (this.justResumed && i === startIndex);
+          if (this.justResumed && i === startIndex) {
+            this.justResumed = false;
+          }
 
-        this.frameCount++;
+          this.videoEncoder.encode(resized, {
+            timestamp: tsUs,
+            keyFrame,
+          });
+          if (this.debug && (this.frameCount < 5 || this.frameCount % 300 === 0)) {
+            this.log("[WCR] video pts", {
+              frame: this.frameCount,
+              tsUs,
+              durUs: frameDurationUs,
+              targetIndex,
+            });
+          }
+          this.frameCount++;
+          this._videoFrameIndex = i + 1;
+          resized.close();
+        }
 
-        resized.close();
         frame.close();
       }
     } catch (err) {
@@ -556,6 +626,33 @@ export class WebCodecsRecorder {
     }
     if (!this.audioReader) return;
     this.log("[WCR] audio loop start");
+
+    const encodeAudioData = (audioData) => {
+      const sampleRate =
+        audioData.sampleRate || this.audioSampleRate || 48000;
+      const frames =
+        typeof audioData.numberOfFrames === "number"
+          ? audioData.numberOfFrames
+          : 0;
+      const tsUs = Math.round(
+        (this.audioSamplesWritten * 1_000_000) / sampleRate
+      );
+      const durUs = Math.round((frames * 1_000_000) / sampleRate);
+
+      this.audioEncoder.encode(audioData, {
+        timestamp: tsUs,
+      });
+      this.audioSamplesWritten += frames;
+
+      if (this.debug && (this.audioSamplesWritten === frames || this.audioSamplesWritten % (sampleRate * 10) < frames)) {
+        this.log("[WCR] audio pts", {
+          samples: this.audioSamplesWritten,
+          tsUs,
+          durUs,
+          sampleRate,
+        });
+      }
+    };
 
     try {
       while (this.running) {
@@ -575,14 +672,18 @@ export class WebCodecsRecorder {
           continue;
         }
 
-        if (this.firstAudioTs === null) {
-          this.firstAudioTs = audioData.timestamp;
-        }
-
         try {
-          this.audioEncoder.encode(audioData, {
-            timestamp: audioData.timestamp - this.firstAudioTs,
-          });
+          if (this._prebufferedAudio.length) {
+            while (this._prebufferedAudio.length) {
+              const buffered = this._prebufferedAudio.shift();
+              try {
+                encodeAudioData(buffered);
+              } finally {
+                buffered.close?.();
+              }
+            }
+          }
+          encodeAudioData(audioData);
         } catch (err) {
           audioData.close?.();
           this.options.onError?.(err);

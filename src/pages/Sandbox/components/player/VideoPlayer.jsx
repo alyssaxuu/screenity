@@ -19,6 +19,15 @@ const VideoPlayer = (props) => {
     contentStateRef.current = contentState;
   }, [contentState]);
 
+  const getProcessingBannerText = () => {
+    const base = chrome.i18n.getMessage("processingBannerEditor");
+    const pct = Math.round(contentStateRef.current.processingProgress || 0);
+    if (pct > 0 && pct < 100) {
+      return `${base} (${pct}%)`;
+    }
+    return base;
+  };
+
   useEffect(() => {
     if (
       playerRef.current &&
@@ -140,7 +149,7 @@ const VideoPlayer = (props) => {
             "<img src='" +
             chrome.runtime.getURL("assets/editor/icons/alert-white.svg") +
             "'/> <span>" +
-            chrome.i18n.getMessage("processingBannerEditor") +
+            getProcessingBannerText() +
             "</span>";
 
           document.querySelector(".plyr--video").appendChild(bannerRef.current);
@@ -161,6 +170,16 @@ const VideoPlayer = (props) => {
       }
     };
   }, []);
+
+  useEffect(() => {
+    if (!bannerRef.current) return;
+    bannerRef.current.innerHTML =
+      "<img src='" +
+      chrome.runtime.getURL("assets/editor/icons/alert-white.svg") +
+      "'/> <span>" +
+      getProcessingBannerText() +
+      "</span>";
+  }, [contentState.processingProgress]);
 
   return (
     <div className="videoPlayer">

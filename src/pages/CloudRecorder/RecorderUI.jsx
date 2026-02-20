@@ -1,7 +1,17 @@
 import React from "react";
 import Warning from "./warning/Warning";
 
-const RecorderUI = ({ started, initProject = false, isTab }) => {
+const RecorderUI = ({
+  started,
+  initProject = false,
+  isTab,
+  finalizeFailure = null,
+  retryingFinalize = false,
+  onRetryFinalize = null,
+  onExportDiagnostics = null,
+  onExportDebugBundle = null,
+}) => {
+  const hasFinalizeFailure = Boolean(finalizeFailure);
   return (
     <div className="wrap">
       <img
@@ -26,6 +36,21 @@ const RecorderUI = ({ started, initProject = false, isTab }) => {
             ? chrome.i18n.getMessage("recorderSetupDescription")
             : chrome.i18n.getMessage("recorderSelectDescription")}
         </div>
+        {hasFinalizeFailure && (
+          <>
+            <div className="button-strong" onClick={onRetryFinalize}>
+              {retryingFinalize ? "Retrying..." : "Retry finalize"}
+            </div>
+            <div className="button-stop" onClick={onExportDiagnostics}>
+              Export diagnostics
+            </div>
+          </>
+        )}
+        {onExportDebugBundle && (
+          <div className="button-stop" onClick={onExportDebugBundle}>
+            Generate debug bundle
+          </div>
+        )}
         {/* 
         Optionally: 
         <div className="button-stop" onClick={() => chrome.runtime.sendMessage({ type: "stop-recording-tab" })}>

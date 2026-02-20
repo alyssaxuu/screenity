@@ -18,6 +18,31 @@ export const sendMessageTab = async (
       });
     });
 
+    const extOrigin = chrome.runtime.getURL("").replace(/\/$/, "");
+    const isExtUrl = tab?.url && tab.url.startsWith(extOrigin);
+    const isPendingExtUrl =
+      tab?.pendingUrl && tab.pendingUrl.startsWith(extOrigin);
+
+    if (isExtUrl || isPendingExtUrl) {
+      return new Promise((resolve, reject) => {
+        chrome.runtime.sendMessage(
+          { ...message, _targetTabId: tab.id },
+          (response) => {
+            if (chrome.runtime.lastError) {
+              const msg = chrome.runtime.lastError.message || "";
+              if (msg.includes("message port closed before a response")) {
+                responseCallback ? responseCallback(undefined) : resolve();
+                return;
+              }
+              reject(msg);
+              return;
+            }
+            responseCallback ? responseCallback(response) : resolve(response);
+          }
+        );
+      });
+    }
+
     if (
       !tab ||
       !tab.url ||

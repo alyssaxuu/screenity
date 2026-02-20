@@ -94,6 +94,273 @@ export default class BunnyTusUploader {
     this._hasExtractedMeta = true; // Skip in-flight thumbnail extraction to avoid timeouts/noise
   }
 
+  debugLog(message, payload = null) {
+    if (!this.debug) return;
+    if (payload) {
+      console.info(`[BunnyTusUploader] ${message}`, payload);
+      return;
+    }
+    console.info(`[BunnyTusUploader] ${message}`);
+  }
+
+  getJournalKey(mediaId) {
+    return mediaId ? `uploadJournal-${mediaId}` : null;
+  }
+
+  getJournalLookupKey(projectId, sceneId, type) {
+    return `uploadJournalLookup-${projectId}-${sceneId || "none"}-${type}`;
+  }
+
+  getVideoMapKey(projectId, sceneId, type) {
+    return `bunnyVideoMap-${projectId}-${sceneId || "none"}-${type || "none"}`;
+  }
+
+  async getVideoMap(projectId, sceneId, type) {
+    if (typeof chrome === "undefined" || !chrome.storage?.local) return null;
+    const key = this.getVideoMapKey(projectId, sceneId, type);
+    const result = await chrome.storage.local.get([key]);
+    const entry = result?.[key];
+    if (!entry || !entry.videoId || !entry.mediaId) return null;
+    return { ...entry, key };
+  }
+
+  async persistVideoMap({
+    projectId,
+    sceneId,
+    type,
+    videoId,
+    mediaId,
+    sessionId,
+  }) {
+    if (typeof chrome === "undefined" || !chrome.storage?.local) return;
+    if (!projectId || !videoId || !mediaId) return;
+    const key = this.getVideoMapKey(projectId, sceneId, type);
+    await chrome.storage.local.set({
+      [key]: {
+        projectId,
+        sceneId: sceneId || null,
+        type: type || null,
+        videoId,
+        mediaId,
+        sessionId: sessionId || null,
+        updatedAt: Date.now(),
+      },
+    });
+  }
+
+  buildFingerprint({ projectId, sceneId, type, width, height, fingerprint }) {
+    if (fingerprint) return fingerprint;
+    return `${projectId || "none"}:${sceneId || "none"}:${type || "none"}:${
+      width || "na"
+    }x${height || "na"}`;
+  }
+
+  async clearUploadJournal(journal = null) {
+    if (typeof chrome === "undefined" || !chrome.storage?.local) return;
+    const keysToRemove = [];
+    const mediaId = journal?.mediaId || this.mediaId || null;
+    const journalKey = journal?.key || this.getJournalKey(mediaId);
+    const lookupKey = journal?.lookupKey || this.journalLookupKey;
+
+    if (journalKey) keysToRemove.push(journalKey);
+    if (lookupKey) keysToRemove.push(lookupKey);
+    if (!keysToRemove.length) return;
+
+    try {
+      await chrome.storage.local.remove(keysToRemove);
+      this.debugLog("Cleared upload journal", {
+        keys: keysToRemove,
+      });
+    } catch (err) {
+      this.debugLog("Failed to clear upload journal", {
+        error: err?.message || err,
+        keys: keysToRemove,
+      });
+    }
+  }
+
+  async persistUploadJournal() {
+    if (typeof chrome === "undefined" || !chrome.storage?.local || !this.mediaId)
+      return;
+    const journalKey = this.getJournalKey(this.mediaId);
+    const lookupKey = this.journalLookupKey;
+    const payload = {
+      key: journalKey,
+      projectId: this.projectId || null,
+      sceneId: this.sceneId || null,
+      type: this.metadata.type || null,
+      width: this.metaWidth || null,
+      height: this.metaHeight || null,
+      fingerprint: this.fingerprint || null,
+      sessionId: this.sessionId || null,
+      uploadUrl: this.uploadUrl || null,
+      signature: this.signature || null,
+      expires: this.expires || null,
+      libraryId: this.libraryId || null,
+      offset: this.offset,
+      totalBytes: this.totalBytes,
+      updatedAt: Date.now(),
+      videoId: this.videoId,
+      mediaId: this.mediaId,
+      stalled: this.stalled,
+      status: this.status,
+    };
+
+    const toStore = {
+      [journalKey]: payload,
+    };
+    if (lookupKey) {
+      toStore[lookupKey] = {
+        mediaId: this.mediaId,
+        key: journalKey,
+        updatedAt: payload.updatedAt,
+      };
+    }
+    await chrome.storage.local.set(toStore);
+  }
+
+  isResumeJournalStale(updatedAt) {
+    if (!updatedAt) return true;
+    const MAX_AGE_MS = 24 * 60 * 60 * 1000;
+    return Date.now() - updatedAt > MAX_AGE_MS;
+  }
+
+  validateResumeJournal(
+    journal,
+    { projectId, sceneId, type, fingerprint, allowSceneMismatch = false }
+  ) {
+    if (!journal || !journal.mediaId || !journal.videoId || !journal.uploadUrl) {
+      return { valid: false, reason: "missing-required-fields" };
+    }
+    if (journal.projectId !== projectId) {
+      return { valid: false, reason: "project-mismatch" };
+    }
+    if (journal.type !== type) {
+      return { valid: false, reason: "type-mismatch" };
+    }
+    if (!allowSceneMismatch && sceneId && journal.sceneId && journal.sceneId !== sceneId) {
+      return { valid: false, reason: "scene-mismatch" };
+    }
+    if (fingerprint && journal.fingerprint && journal.fingerprint !== fingerprint) {
+      return { valid: false, reason: "fingerprint-mismatch" };
+    }
+    if (this.isResumeJournalStale(journal.updatedAt)) {
+      return { valid: false, reason: "stale-journal" };
+    }
+    return { valid: true, reason: "ok" };
+  }
+
+  async getResumeJournal({
+    projectId,
+    sceneId,
+    type,
+    fingerprint,
+    reuse = null,
+  }) {
+    if (typeof chrome === "undefined" || !chrome.storage?.local) return null;
+    const lookupKey = this.getJournalLookupKey(projectId, sceneId, type);
+    const candidates = [];
+
+    if (reuse?.mediaId) {
+      const reuseKey = this.getJournalKey(reuse.mediaId);
+      const reuseResult = await chrome.storage.local.get([reuseKey]);
+      if (reuseResult[reuseKey]) {
+        candidates.push({
+          journal: reuseResult[reuseKey],
+          key: reuseKey,
+          lookupKey,
+          allowSceneMismatch: true,
+        });
+      }
+    }
+
+    const lookupResult = await chrome.storage.local.get([lookupKey]);
+    const mappedMediaId = lookupResult?.[lookupKey]?.mediaId || null;
+    if (mappedMediaId) {
+      const mappedKey = this.getJournalKey(mappedMediaId);
+      const mappedResult = await chrome.storage.local.get([mappedKey]);
+      if (mappedResult[mappedKey]) {
+        candidates.push({
+          journal: mappedResult[mappedKey],
+          key: mappedKey,
+          lookupKey,
+          allowSceneMismatch: false,
+        });
+      }
+    }
+
+    if (!candidates.length) return null;
+
+    for (const candidate of candidates) {
+      const validation = this.validateResumeJournal(candidate.journal, {
+        projectId,
+        sceneId,
+        type,
+        fingerprint,
+        allowSceneMismatch: candidate.allowSceneMismatch,
+      });
+      if (validation.valid) {
+        this.debugLog("Found valid upload journal for resume", {
+          mediaId: candidate.journal.mediaId,
+          projectId,
+          sceneId,
+          type,
+          offset: candidate.journal.offset || 0,
+        });
+        return {
+          ...candidate.journal,
+          key: candidate.key,
+          lookupKey: candidate.lookupKey,
+        };
+      }
+
+      this.debugLog("Discarding invalid upload journal", {
+        reason: validation.reason,
+        mediaId: candidate.journal?.mediaId || null,
+        projectId,
+        sceneId,
+        type,
+      });
+      await this.clearUploadJournal({
+        key: candidate.key,
+        lookupKey: candidate.lookupKey,
+        mediaId: candidate.journal?.mediaId || null,
+      });
+    }
+
+    return null;
+  }
+
+  async getServerOffset() {
+    if (!this.uploadUrl) return null;
+    try {
+      const headRes = await fetch(this.uploadUrl, {
+        method: "HEAD",
+        headers: {
+          "Tus-Resumable": "1.0.0",
+          AuthorizationSignature: this.signature,
+          AuthorizationExpire: String(this.expires),
+          LibraryId: String(this.libraryId),
+          VideoId: this.videoId,
+        },
+      });
+
+      if (!headRes.ok) {
+        this.debugLog("HEAD offset check failed", {
+          status: headRes.status,
+        });
+        return null;
+      }
+
+      const serverOffset = parseInt(headRes.headers.get("Upload-Offset") || "0", 10);
+      return Number.isFinite(serverOffset) ? serverOffset : null;
+    } catch (err) {
+      this.debugLog("HEAD offset check threw", {
+        error: err?.message || err,
+      });
+      return null;
+    }
+  }
   async initialize(
     projectId,
     {
@@ -131,7 +398,43 @@ export default class BunnyTusUploader {
         }
         this.videoId = reuse.videoId;
         this.mediaId = reuse.mediaId;
+      } else if (resumeJournal?.videoId && resumeJournal?.mediaId) {
+        this.videoId = resumeJournal.videoId;
+        this.mediaId = resumeJournal.mediaId;
+        this.uploadUrl = resumeJournal.uploadUrl || null;
+        this.offset = resumeJournal.offset || 0;
+        this.totalBytes = resumeJournal.totalBytes || 0;
+        this.journalKey = resumeJournal.key || this.getJournalKey(this.mediaId);
+        this.debugLog("Resuming upload from journal candidate", {
+          projectId,
+          sceneId,
+          type,
+          mediaId: this.mediaId,
+          offset: this.offset,
+        });
+        await this.persistVideoMap({
+          projectId,
+          sceneId,
+          type,
+          videoId: this.videoId,
+          mediaId: this.mediaId,
+          sessionId: this.sessionId,
+        });
       } else {
+        const existingMap = await this.getVideoMap(projectId, sceneId, type);
+        if (existingMap?.videoId && existingMap?.mediaId) {
+          this.videoId = existingMap.videoId;
+          this.mediaId = existingMap.mediaId;
+          this.debugLog("Reusing Bunny video from map", {
+            projectId,
+            sceneId,
+            type,
+            mediaId: this.mediaId,
+          });
+        }
+      }
+
+      if (!this.videoId || !this.mediaId) {
         const { authenticated, user } = await new Promise((resolve) => {
           chrome.runtime.sendMessage({ type: "check-auth-status" }, resolve);
         });
@@ -160,6 +463,7 @@ export default class BunnyTusUploader {
             type,
             linkedMediaId,
             sceneId,
+            recordingSessionId: this.sessionId || null,
           }),
         });
 
@@ -167,6 +471,23 @@ export default class BunnyTusUploader {
         const data = await res.json();
         this.videoId = data.videoId;
         this.mediaId = data.mediaId;
+        await this.persistVideoMap({
+          projectId,
+          sceneId,
+          type,
+          videoId: this.videoId,
+          mediaId: this.mediaId,
+          sessionId: this.sessionId,
+        });
+      } else {
+        await this.persistVideoMap({
+          projectId,
+          sceneId,
+          type,
+          videoId: this.videoId,
+          mediaId: this.mediaId,
+          sessionId: this.sessionId,
+        });
       }
 
       await this.refreshTusAuth();
@@ -214,19 +535,32 @@ export default class BunnyTusUploader {
       ? `https://video.bunnycdn.com${location}`
       : location;
 
-    await fetch(`${API_BASE}/bunny/videos/save-upload-meta`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${this.userToken}`,
-      },
-      body: JSON.stringify({
+    if (this.userToken) {
+      await fetch(`${API_BASE}/bunny/videos/save-upload-meta`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${this.userToken}`,
+        },
+        body: JSON.stringify({
+          mediaId: this.mediaId,
+          uploadUrl: this.uploadUrl,
+          signature: this.signature,
+          expires: this.expires,
+          projectId: this.projectId,
+          sceneId: this.sceneId || null,
+          recordingSessionId: this.sessionId || null,
+          type: this.metadata?.type || null,
+        }),
+      });
+    } else {
+      this.debugLog("Skipping save-upload-meta because user token is missing", {
         mediaId: this.mediaId,
         uploadUrl: this.uploadUrl,
         signature: this.signature,
         expires: this.expires,
-      }),
-    });
+      });
+    }
   }
 
   async write(chunk) {

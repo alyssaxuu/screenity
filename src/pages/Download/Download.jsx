@@ -77,6 +77,33 @@ const Download = () => {
               window.close();
             });
         });
+    } else if (message.type === "recover-indexed-db-mp4") {
+      const chunkArray = [];
+      chunksStore
+        .iterate((value) => {
+          if (value && typeof value.index === "number" && value.chunk) {
+            chunkArray.push({ index: value.index, chunk: value.chunk });
+          }
+        })
+        .then(() => {
+          chunkArray.sort((a, b) => a.index - b.index);
+          const blob = new Blob(
+            chunkArray.map((entry) => entry.chunk),
+            { type: "video/mp4" }
+          );
+          const url = URL.createObjectURL(blob);
+          const filename = `screenity-recording-${Date.now()}.mp4`;
+          chrome.downloads
+            .download({
+              url: url,
+              filename,
+              saveAs: true,
+            })
+            .then(() => {
+              URL.revokeObjectURL(url);
+              window.close();
+            });
+        });
     }
   });
 

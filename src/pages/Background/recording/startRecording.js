@@ -5,6 +5,11 @@ export const startRecording = async () => {
     restarting: false,
   });
 
+  const { activeTab } = await chrome.storage.local.get(["activeTab"]);
+  if (activeTab != null) {
+    chrome.storage.local.set({ recordingUiTabId: activeTab });
+  }
+
   // Check if customRegion is set
   const { customRegion } = await chrome.storage.local.get(["customRegion"]);
 

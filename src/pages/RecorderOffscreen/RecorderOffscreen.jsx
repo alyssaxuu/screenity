@@ -65,7 +65,7 @@ const RecorderOffscreen = () => {
     } catch (err) {
       console.warn(
         "[RecorderOffscreen] Failed to persist recording timing state",
-        err
+        err,
       );
     }
   };
@@ -246,7 +246,7 @@ const RecorderOffscreen = () => {
 
       // Check if the browser supports any of the mimeTypes, make sure to select the first one that is supported from the list
       let mimeType = mimeTypes.find((mimeType) =>
-        MediaRecorder.isTypeSupported(mimeType)
+        MediaRecorder.isTypeSupported(mimeType),
       );
 
       // If no mimeType is supported, throw an error
@@ -268,7 +268,7 @@ const RecorderOffscreen = () => {
       chrome.runtime.sendMessage({
         type: "recording-error",
         error: "stream-error",
-        why: JSON.stringify(err),
+        why: String(err),
       });
       return;
     }
@@ -282,7 +282,7 @@ const RecorderOffscreen = () => {
       chrome.runtime.sendMessage({
         type: "recording-error",
         error: "stream-error",
-        why: JSON.stringify(err),
+        why: String(err),
       });
       return;
     }
@@ -369,7 +369,7 @@ const RecorderOffscreen = () => {
       };
       console.warn(
         "[RecorderOffscreen] liveStream video track ended",
-        diagnosticInfo
+        diagnosticInfo,
       );
       chrome.storage.local.set({
         recording: false,
@@ -395,7 +395,7 @@ const RecorderOffscreen = () => {
       };
       console.warn(
         "[RecorderOffscreen] helperVideoStream video track ended",
-        diagnosticInfo
+        diagnosticInfo,
       );
       chrome.storage.local.set({
         recording: false,
@@ -486,10 +486,7 @@ const RecorderOffscreen = () => {
     };
 
     const { defaultAudioInputLabel, audioinput } =
-      await chrome.storage.local.get([
-        "defaultAudioInputLabel",
-        "audioinput",
-      ]);
+      await chrome.storage.local.get(["defaultAudioInputLabel", "audioinput"]);
     const desiredLabel =
       defaultAudioInputLabel ||
       audioinput?.find((device) => device.deviceId === id)?.label ||
@@ -634,13 +631,13 @@ const RecorderOffscreen = () => {
         const desiredAudioLabel =
           defaultAudioInputLabel ||
           audioinput?.find(
-            (device) => device.deviceId === data.defaultAudioInput
+            (device) => device.deviceId === data.defaultAudioInput,
           )?.label ||
           "";
         const desiredVideoLabel =
           defaultVideoInputLabel ||
           videoinput?.find(
-            (device) => device.deviceId === data.defaultVideoInput
+            (device) => device.deviceId === data.defaultVideoInput,
           )?.label ||
           "";
 
@@ -774,7 +771,7 @@ const RecorderOffscreen = () => {
       ) {
         audioInputGain.current = aCtx.current.createGain();
         audioInputSource.current = aCtx.current.createMediaStreamSource(
-          helperAudioStream.current
+          helperAudioStream.current,
         );
         audioInputSource.current
           .connect(audioInputGain.current)
@@ -791,7 +788,7 @@ const RecorderOffscreen = () => {
       if (helperVideoStream.current.getAudioTracks().length > 0) {
         audioOutputGain.current = aCtx.current.createGain();
         audioOutputSource.current = aCtx.current.createMediaStreamSource(
-          helperVideoStream.current
+          helperVideoStream.current,
         );
         audioOutputSource.current
           .connect(audioOutputGain.current)
@@ -802,7 +799,7 @@ const RecorderOffscreen = () => {
 
       // Add the tracks to the stream
       liveStream.current.addTrack(
-        helperVideoStream.current.getVideoTracks()[0]
+        helperVideoStream.current.getVideoTracks()[0],
       );
       if (
         (helperAudioStream.current != null &&
@@ -810,7 +807,7 @@ const RecorderOffscreen = () => {
         helperVideoStream.current.getAudioTracks().length > 0
       ) {
         liveStream.current.addTrack(
-          destination.current.stream.getAudioTracks()[0]
+          destination.current.stream.getAudioTracks()[0],
         );
       }
 
@@ -821,7 +818,7 @@ const RecorderOffscreen = () => {
       chrome.runtime.sendMessage({
         type: "recording-error",
         error: "cancel-modal",
-        why: JSON.stringify(err),
+        why: String(err),
       });
     }
   }
@@ -893,7 +890,7 @@ const RecorderOffscreen = () => {
           } catch (err) {
             console.warn(
               "[RecorderOffscreen] Failed to update resume timing state",
-              err
+              err,
             );
           }
         })();
@@ -901,7 +898,7 @@ const RecorderOffscreen = () => {
         dismissRecording();
       }
     },
-    [recorder.current]
+    [recorder.current],
   );
 
   useEffect(() => {

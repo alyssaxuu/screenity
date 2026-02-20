@@ -1,7 +1,7 @@
 import "./styles/edit/_VideoPlayer.scss";
 import "./styles/global/_app.scss";
 
-import React, { useState, useEffect, useRef, useContext } from "react";
+import React, { useEffect, useRef, useContext } from "react";
 // Layout
 import Editor from "./layout/editor/Editor";
 import Player from "./layout/player/Player";
@@ -142,7 +142,9 @@ const Sandbox = () => {
             <div className="title">
               {chrome.i18n.getMessage("sandboxProgressTitle") +
                 " " +
-                progress.current}
+                (contentState.processingProgress > 0
+                  ? `(${Math.round(contentState.processingProgress)}%)`
+                  : progress.current)}
             </div>
             <div className="subtitle">
               {chrome.i18n.getMessage("sandboxProgressDescription")}

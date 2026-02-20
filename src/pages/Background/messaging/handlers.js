@@ -12,6 +12,8 @@ import {
   handleStopRecordingTab,
   handleStopRecordingTabBackup,
 } from "../recording/stopRecording";
+import { sendChunks } from "../recording/sendChunks";
+import { chunksStore } from "../recording/chunkHandler";
 import { handleSaveToDrive } from "../drive/handleSaveToDrive";
 import { addAlarmListener } from "../alarms/addAlarmListener";
 import { cancelRecording, handleDismiss } from "../recording/cancelRecording";
@@ -143,6 +145,52 @@ export const setupHandlers = () => {
   registerMessage("video-ready", (message) => videoReady(message));
   registerMessage("start-recording", (message) => startRecording(message));
   registerMessage("restarted", (message) => restartActiveTab(message));
+  const sendChunksToSandbox = async () => {
+    const { sandboxTab } = await chrome.storage.local.get(["sandboxTab"]);
+    if (!sandboxTab) {
+      throw new Error("no-sandbox-tab");
+    }
+
+    const pingReady = async () => {
+      return new Promise((resolve) => {
+        chrome.runtime.sendMessage(
+          { type: "ping", _targetTabId: sandboxTab },
+          (response) => {
+            resolve(response?.status === "ready");
+          }
+        );
+      });
+    };
+    const maxPingAttempts = 10;
+    let pingOk = false;
+    for (let attempt = 1; attempt <= maxPingAttempts; attempt += 1) {
+      // eslint-disable-next-line no-await-in-loop
+      pingOk = await pingReady();
+      if (pingOk) break;
+      // eslint-disable-next-line no-await-in-loop
+      await new Promise((r) => setTimeout(r, 200));
+    }
+    if (!pingOk) {
+      throw new Error("sandbox-not-ready");
+    }
+
+    const maxAttempts = 6;
+    const delayMs = 250;
+    let chunkCount = 0;
+    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+      chunkCount = 0;
+      await chunksStore.iterate(() => {
+        chunkCount += 1;
+      });
+      if (chunkCount > 0) break;
+      await new Promise((r) => setTimeout(r, delayMs));
+    }
+
+    await sendChunks();
+    return { status: "ok", chunkCount };
+  };
+
+  registerMessage("send-chunks-to-sandbox", () => sendChunksToSandbox());
 
   registerMessage("new-chunk", (message, sender, sendResponse) => {
     newChunk(message, sendResponse);
@@ -205,6 +253,16 @@ export const setupHandlers = () => {
     async (message, sender) => await handleRecordingComplete(message, sender)
   );
   registerMessage("check-recording", (message) => checkRecording(message));
+  registerMessage("open-download-mp4", async () => {
+    const tab = await createTab("download.html", true, true);
+    if (!tab?.id) return;
+    chrome.tabs.onUpdated.addListener(function listener(tabId, info) {
+      if (info.status === "complete" && tabId === tab.id) {
+        chrome.tabs.onUpdated.removeListener(listener);
+        sendMessageTab(tab.id, { type: "recover-indexed-db-mp4" });
+      }
+    });
+  });
 
   registerMessage("review-screenity", () =>
     createTab(

@@ -1378,5 +1378,13 @@
   "welcomeToProActionModal": {
     "message": "Ho capito",
     "description": "Pulsante di conferma della finestra di benvenuto per Pro"
+  },
+  "webcodecsToggleLabel": {
+    "message": "Fast MP4 (beta)",
+    "description": "WebCodecs recorder toggle label"
+  },
+  "webcodecsFailedOffToast": {
+    "message": "Fast MP4 errore — off",
+    "description": "WebCodecs failure auto-disable toast"
   }
 }

@@ -25,6 +25,11 @@ const IS_IFRAME_CONTEXT =
     !document.referrer.startsWith("chrome-extension://"));
 
 const CloudRecorder = () => {
+  const DEBUG_BUNDLE_MAX_EVENTS = 200;
+  const debugBundleSessionRef = useRef(null);
+  const debugBundleEventsRef = useRef([]);
+  const debugBundleKeyRef = useRef(null);
+
   const screenTimer = useRef({ start: null, total: 0, paused: false });
   const cameraTimer = useRef({ start: null, total: 0, paused: false });
   const [started, setStarted] = useState(false);
@@ -105,6 +110,286 @@ const CloudRecorder = () => {
   const keepAliveInterval = useRef(null);
   const keepAliveAudioCtx = useRef(null);
   const keepAliveOscillator = useRef(null);
+
+  const ensureDebugBundleSession = async () => {
+    if (debugBundleSessionRef.current) return debugBundleSessionRef.current;
+    const fallbackId = `recdbg-${Date.now()}-${Math.random()
+      .toString(36)
+      .slice(2, 8)}`;
+    const sessionId = recorderSession.current?.id || fallbackId;
+    const session = { id: sessionId, startedAt: Date.now() };
+    debugBundleSessionRef.current = session;
+    debugBundleKeyRef.current = `recorderDebugBundle:${sessionId}`;
+    try {
+      await chrome.storage.local.set({ recorderDebugBundleSessionId: sessionId });
+    } catch {
+      // ignore
+    }
+    return session;
+  };
+
+  const appendDebugBundleEvent = async (event) => {
+    if (!event) return;
+    debugBundleEventsRef.current = [
+      ...debugBundleEventsRef.current,
+      event,
+    ].slice(-DEBUG_BUNDLE_MAX_EVENTS);
+    const key = debugBundleKeyRef.current || `recorderDebugBundle:${event.sessionId}`;
+    try {
+      await chrome.storage.local.set({ [key]: debugBundleEventsRef.current });
+    } catch {
+      // ignore
+    }
+  };
+
+  const logDebugEvent = async (eventType, payload = {}) => {
+    const session = await ensureDebugBundleSession();
+    const event = {
+      sessionId: session.id,
+      eventType,
+      ts: Date.now(),
+      payload,
+    };
+    appendDebugBundleEvent(event);
+  };
+
+  const setPipelineState = async (step, extra = {}) => {
+    const state = {
+      step,
+      ts: Date.now(),
+      projectId: extra.projectId || null,
+      sceneId: extra.sceneId || null,
+      status: extra.status || null,
+      details: extra.details || null,
+    };
+    try {
+      await chrome.storage.local.set({ recorderPipelineState: state });
+    } catch {
+      // ignore
+    }
+  };
+
+  const getOrCreateSceneId = async ({ forceNew = false } = {}) => {
+    try {
+      const { sceneId, sceneIdStatus } = await chrome.storage.local.get([
+        "sceneId",
+        "sceneIdStatus",
+      ]);
+      if (!forceNew && sceneId && sceneIdStatus === "recording") {
+        return sceneId;
+      }
+    } catch {
+      // ignore
+    }
+    const next = crypto.randomUUID();
+    try {
+      await chrome.storage.local.set({
+        sceneId: next,
+        sceneIdStatus: "recording",
+      });
+    } catch {
+      // ignore
+    }
+    return next;
+  };
+
+  const markSceneComplete = async (sceneId) => {
+    if (!sceneId) return;
+    try {
+      await chrome.storage.local.set({
+        sceneIdStatus: "completed",
+        lastCompletedSceneId: sceneId,
+      });
+    } catch {
+      // ignore
+    }
+  };
+
+  const upsertPendingScene = async (sceneId, payload) => {
+    if (!sceneId) return;
+    const indexKey = "pendingSceneIndex";
+    const sceneKey = `pendingScene:${sceneId}`;
+    const { pendingSceneIndex = [] } = await chrome.storage.local.get([
+      indexKey,
+    ]);
+    const nextIndex = pendingSceneIndex.includes(sceneId)
+      ? pendingSceneIndex
+      : [...pendingSceneIndex, sceneId];
+    await chrome.storage.local.set({
+      [sceneKey]: { ...payload, sceneId, updatedAt: Date.now() },
+      [indexKey]: nextIndex,
+    });
+  };
+
+  const removePendingScene = async (sceneId) => {
+    if (!sceneId) return;
+    const indexKey = "pendingSceneIndex";
+    const sceneKey = `pendingScene:${sceneId}`;
+    const { pendingSceneIndex = [] } = await chrome.storage.local.get([
+      indexKey,
+    ]);
+    const nextIndex = pendingSceneIndex.filter((id) => id !== sceneId);
+    await chrome.storage.local.remove([sceneKey]);
+    await chrome.storage.local.set({ [indexKey]: nextIndex });
+  };
+
+  const getSceneCreateStatus = async (sceneId) => {
+    if (!sceneId) return null;
+    const key = `sceneCreateStatus:${sceneId}`;
+    const result = await chrome.storage.local.get([key]);
+    return result?.[key] || null;
+  };
+
+  const setSceneCreateStatus = async (sceneId, status, extra = {}) => {
+    if (!sceneId) return;
+    const key = `sceneCreateStatus:${sceneId}`;
+    await chrome.storage.local.set({
+      [key]: {
+        status,
+        updatedAt: Date.now(),
+        ...extra,
+      },
+    });
+  };
+
+  const linkMediaToScene = async (projectId, sceneId, mediaId) => {
+    if (!projectId || !sceneId || !mediaId) return;
+    await fetch(`${API_BASE}/media/${mediaId}/scene`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ projectId, sceneId }),
+    });
+  };
+
+  const confirmLinkedMedia = async (projectId, sceneId, mediaIds = []) => {
+    const filtered = mediaIds.filter(Boolean);
+    if (!projectId || !sceneId || filtered.length === 0) return;
+    await fetch(`${API_BASE}/media/confirm-linked`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ mediaIds: filtered, projectId, sceneId }),
+    });
+  };
+
+  const ensureMediaLinked = async ({ projectId, sceneId, mediaIds }) => {
+    const filtered = (mediaIds || []).filter(Boolean);
+    if (!projectId || !sceneId || filtered.length === 0) return;
+    await Promise.allSettled(
+      filtered.map((mediaId) => linkMediaToScene(projectId, sceneId, mediaId)),
+    );
+    await confirmLinkedMedia(projectId, sceneId, filtered);
+  };
+
+  const recoverScene = async ({
+    projectId,
+    sceneId,
+    screenMediaId,
+    cameraMediaId,
+    audioMediaId,
+  }) => {
+    if (!projectId || !sceneId) return { ok: false, error: "missing-ids" };
+    const mediaIds = [screenMediaId, cameraMediaId, audioMediaId].filter(
+      Boolean,
+    );
+    const res = await fetch(`${API_BASE}/videos/${projectId}/recover-scene`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({
+        sceneId,
+        mediaIds,
+        screenMediaId: screenMediaId || null,
+        cameraMediaId: cameraMediaId || null,
+        audioMediaId: audioMediaId || null,
+      }),
+    });
+    if (!res.ok) {
+      const errorText = await res.text();
+      return { ok: false, error: errorText || "recover-scene-failed" };
+    }
+    return { ok: true };
+  };
+
+  const exportDebugBundle = async () => {
+    try {
+      const session = await ensureDebugBundleSession();
+      const key = debugBundleKeyRef.current || `recorderDebugBundle:${session.id}`;
+      const storage = await chrome.storage.local.get([
+        key,
+        "projectId",
+        "sceneId",
+        "uploadMeta",
+        "recorderSession",
+        "lastStopRecordingEvent",
+        "lastFinalizeFailure",
+        "screenTrackLog",
+        "pendingSceneIndex",
+        "recorderPipelineState",
+      ]);
+      const events = Array.isArray(storage[key])
+        ? storage[key]
+        : debugBundleEventsRef.current;
+      const uploadMeta = uploadMetaRef.current || storage.uploadMeta || null;
+      const ids = {
+        projectId: storage.projectId || null,
+        sceneId:
+          uploadMeta?.sceneId ||
+          screenUploader.current?.getMeta()?.sceneId ||
+          cameraUploader.current?.getMeta()?.sceneId ||
+          storage.sceneId ||
+          null,
+        screenMediaId:
+          uploadMeta?.screen?.mediaId ||
+          screenUploader.current?.getMeta()?.mediaId ||
+          null,
+        cameraMediaId:
+          uploadMeta?.camera?.mediaId ||
+          cameraUploader.current?.getMeta()?.mediaId ||
+          null,
+        audioMediaId: uploadMeta?.audio?.mediaId || null,
+        screenVideoId:
+          uploadMeta?.screen?.videoId ||
+          screenUploader.current?.getMeta()?.videoId ||
+          null,
+        cameraVideoId:
+          uploadMeta?.camera?.videoId ||
+          cameraUploader.current?.getMeta()?.videoId ||
+          null,
+      };
+
+      const payload = {
+        sessionId: session.id,
+        exportedAt: Date.now(),
+        pipelineState: storage.recorderPipelineState || null,
+        recorderSession: storage.recorderSession || recorderSession.current || null,
+        ids,
+        uploadMeta,
+        lastStopRecordingEvent: storage.lastStopRecordingEvent || null,
+        lastFinalizeFailure: storage.lastFinalizeFailure || null,
+        screenTrackLog: storage.screenTrackLog || [],
+        pendingSceneIndex: storage.pendingSceneIndex || [],
+        events,
+      };
+
+      const blob = new Blob([JSON.stringify(payload, null, 2)], {
+        type: "application/json",
+      });
+      const objectUrl = URL.createObjectURL(blob);
+      try {
+        await chrome.downloads.download({
+          url: objectUrl,
+          filename: `Screenity-Debug-Bundle-${new Date().toISOString()}.json`,
+          saveAs: false,
+        });
+      } finally {
+        URL.revokeObjectURL(objectUrl);
+      }
+    } catch (err) {
+      console.warn("[CloudRecorder] Failed to export debug bundle", err);
+    }
+  };
 
   // Note: We no longer try to "keep alive" the service worker with pings.
   // Instead, we persist recording state to chrome.storage.local so the SW can
@@ -327,6 +612,11 @@ const CloudRecorder = () => {
     };
     recorderSession.current = session;
     await chrome.storage.local.set({ recorderSession: session });
+    await ensureDebugBundleSession();
+    logDebugEvent("recorder-session-started", {
+      sessionId: session.id,
+      projectId: meta.projectId || null,
+    });
     try {
       const result = await chrome.runtime.sendMessage({
         type: "register-recording-session",
@@ -362,6 +652,7 @@ const CloudRecorder = () => {
     });
     chrome.runtime.sendMessage({ type: "clear-recording-session" });
     recorderSession.current = null;
+    logDebugEvent("recorder-session-finalized", { status });
   };
 
   const startChunkWatchdog = () => {
@@ -437,6 +728,100 @@ const CloudRecorder = () => {
     screenTrackMonitor.current = null;
   };
 
+  const shouldSimulateFinalizeFailure = () => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("simulateFinalizeFailure") === "1") return true;
+      return window.SCREENITY_SIMULATE_FINALIZE_FAILURE === true;
+    } catch {
+      return false;
+    }
+  };
+
+  const buildFinalizeDiagnostics = ({
+    stage,
+    settledResults = [],
+    rejectedResults = [],
+    incompleteUploaders = [],
+    reason = "finalize-failed",
+  }) => {
+    const screenMeta = screenUploader.current?.getMeta?.() || null;
+    const cameraMeta = cameraUploader.current?.getMeta?.() || null;
+
+    return {
+      reason,
+      stage,
+      ts: Date.now(),
+      settledResults: settledResults.map((result, i) => ({
+        index: i,
+        status: result?.status || "unknown",
+        reason:
+          result?.status === "rejected"
+            ? String(result.reason?.message || result.reason || "unknown")
+            : null,
+      })),
+      rejectedResults: rejectedResults.map((result, i) => ({
+        index: i,
+        reason: String(result.reason?.message || result.reason || "unknown"),
+      })),
+      incompleteUploaders,
+      uploaderMeta: {
+        screen: screenMeta,
+        camera: cameraMeta,
+      },
+      recorderSession: recorderSession.current,
+      finalizeContext: finalizeContextRef.current,
+    };
+  };
+
+  const exportFinalizeDiagnostics = async (diagnostics) => {
+    try {
+      const payload = diagnostics ||
+        finalizeFailureRef.current || { reason: "no-diagnostics" };
+      const blob = new Blob([JSON.stringify(payload, null, 2)], {
+        type: "application/json",
+      });
+      const objectUrl = URL.createObjectURL(blob);
+      try {
+        await chrome.downloads.download({
+          url: objectUrl,
+          filename: `Screenity-Finalize-Diagnostics-${new Date().toISOString()}.json`,
+          saveAs: false,
+        });
+      } finally {
+        URL.revokeObjectURL(objectUrl);
+      }
+    } catch (err) {
+      console.warn("[CloudRecorder][Finalize] Failed to export diagnostics", {
+        error: err?.message || err,
+      });
+    }
+  };
+
+  const markFinalizeFailure = async (diagnostics) => {
+    finalizeFailureRef.current = diagnostics;
+    setFinalizeFailure(diagnostics);
+    isFinishing.current = false;
+
+    console.error("[CloudRecorder][Finalize] Finalization failed", diagnostics);
+
+    await chrome.storage.local.set({
+      lastFinalizeFailure: diagnostics,
+    });
+    await persistSessionState({
+      status: "finalize-failed",
+      finalizeFailureAt: Date.now(),
+      finalizeFailureReason: diagnostics?.reason || "finalize-failed",
+    });
+    await setPipelineState("finalize-failed", {
+      status: diagnostics?.reason || "finalize-failed",
+    });
+    try {
+      await chrome.storage.local.set({ sceneIdStatus: "failed" });
+    } catch {
+      // ignore
+    }
+  };
   const exportLocalRecovery = async (reason = "upload failed") => {
     try {
       let blob =
@@ -519,6 +904,80 @@ const CloudRecorder = () => {
       }
     } catch (err) {
       console.warn("Recovery check failed:", err);
+    }
+  }, []);
+
+  const recoverPendingScenes = useCallback(async () => {
+    try {
+      const { pendingSceneIndex = [] } = await chrome.storage.local.get([
+        "pendingSceneIndex",
+      ]);
+      if (!pendingSceneIndex.length) return;
+
+      for (const sceneId of pendingSceneIndex) {
+        const sceneKey = `pendingScene:${sceneId}`;
+        const result = await chrome.storage.local.get([sceneKey]);
+        const pending = result?.[sceneKey];
+        if (!pending || pending.status === "created") {
+          await removePendingScene(sceneId);
+          continue;
+        }
+
+        const {
+          projectId,
+          screenMediaId,
+          cameraMediaId,
+          audioMediaId,
+        } = pending;
+
+        if (!projectId) continue;
+
+        await setPipelineState("scene-recovering", {
+          projectId,
+          sceneId,
+        });
+        logDebugEvent("scene-recover-attempt", {
+          projectId,
+          sceneId,
+        });
+
+        const recoverResult = await recoverScene({
+          projectId,
+          sceneId,
+          screenMediaId,
+          cameraMediaId,
+          audioMediaId,
+        });
+
+        if (recoverResult.ok) {
+          await ensureMediaLinked({
+            projectId,
+            sceneId,
+            mediaIds: [screenMediaId, cameraMediaId, audioMediaId],
+          });
+          await setSceneCreateStatus(sceneId, "created", {
+            recovered: true,
+          });
+          await removePendingScene(sceneId);
+          await markSceneComplete(sceneId);
+          await setPipelineState("scene-recovered", {
+            projectId,
+            sceneId,
+          });
+          logDebugEvent("scene-recover-success", {
+            projectId,
+            sceneId,
+          });
+        } else {
+          logDebugEvent("scene-recover-failed", {
+            projectId,
+            sceneId,
+            error: recoverResult.error,
+          });
+        }
+      }
+    } catch (err) {
+      console.warn("Failed to recover pending scenes", err);
     }
   }, []);
 
@@ -832,7 +1291,9 @@ const CloudRecorder = () => {
       return;
     }
 
-    uploadersInitialized.current = await initializeUploaders();
+    uploadersInitialized.current = await initializeUploaders({
+      forceNewSceneId: true,
+    });
     if (!uploadersInitialized.current) {
       sendRecordingError("Failed to re-initialize uploaders on restart.");
       return;
@@ -840,15 +1301,23 @@ const CloudRecorder = () => {
     chrome.runtime.sendMessage({ type: "reset-active-tab-restart" });
   };
 
-  const initializeUploaders = async () => {
+  const initializeUploaders = async ({ forceNewSceneId = false } = {}) => {
     try {
       emptyCleanupRef.current = false;
       const { projectId } = await chrome.storage.local.get(["projectId"]);
 
-      const sceneId = crypto.randomUUID();
-      chrome.storage.local.set({
+      const sceneId = await getOrCreateSceneId({
+        forceNew: forceNewSceneId,
+      });
+      await chrome.storage.local.set({
+        sceneId,
+        sceneIdStatus: "recording",
+      });
+      await setPipelineState("uploaders-initializing", {
+        projectId,
         sceneId,
       });
+      logDebugEvent("uploaders-init-start", { projectId, sceneId });
 
       if (!projectId) {
         throw new Error("Missing projectId");
@@ -894,6 +1363,13 @@ const CloudRecorder = () => {
           height,
           sceneId,
         });
+        logDebugEvent("uploader-ready", {
+          type: "screen",
+          projectId,
+          sceneId,
+          mediaId: screenUploader.current?.getMeta()?.mediaId || null,
+          videoId: screenUploader.current?.getMeta()?.videoId || null,
+        });
       }
 
       if (cameraStream.current) {
@@ -921,12 +1397,29 @@ const CloudRecorder = () => {
           height,
           sceneId,
         });
+        logDebugEvent("uploader-ready", {
+          type: "camera",
+          projectId,
+          sceneId,
+          mediaId: cameraUploader.current?.getMeta()?.mediaId || null,
+          videoId: cameraUploader.current?.getMeta()?.videoId || null,
+        });
       }
 
+      await setPipelineState("uploaders-ready", {
+        projectId,
+        sceneId,
+      });
+      logDebugEvent("uploaders-init-complete", { projectId, sceneId });
       return true;
     } catch (err) {
       console.error("❌ Failed to initialize uploaders:", err);
       sendRecordingError("Failed to initialize uploaders: " + err.message);
+      await setPipelineState("uploaders-error", {
+        status: "error",
+        details: err?.message || String(err),
+      });
+      logDebugEvent("uploaders-init-failed", { error: err?.message || err });
       return false;
     }
   };
@@ -989,6 +1482,9 @@ const CloudRecorder = () => {
       sendRecordingError("No project ID found. Please restart recording.");
       return;
     }
+
+    await setPipelineState("recording-starting", { projectId });
+    logDebugEvent("recording-starting", { projectId });
 
     if (isTab.current && recordingTabId.current) {
       const tabAlive = await chrome.tabs
@@ -1272,6 +1768,20 @@ const CloudRecorder = () => {
       pausedStateRef.current = false;
       persistSessionState({ status: "recording" });
       setStarted(true);
+      await setPipelineState("recording", {
+        projectId,
+        sceneId:
+          screenUploader.current?.getMeta()?.sceneId ||
+          cameraUploader.current?.getMeta()?.sceneId ||
+          null,
+      });
+      logDebugEvent("recording-started", {
+        projectId,
+        sceneId:
+          screenUploader.current?.getMeta()?.sceneId ||
+          cameraUploader.current?.getMeta()?.sceneId ||
+          null,
+      });
     } catch (err) {
       sendRecordingError("Recording failed: " + err.message);
     }
@@ -1397,11 +1907,25 @@ const CloudRecorder = () => {
       const audioFile = new File([audioBlob], "audio-recording.webm", {
         type: "audio/webm",
       });
+      logDebugEvent("audio-upload-start", {
+        projectId,
+        sceneId: uploadMeta?.sceneId || null,
+      });
       const result = await uploadAudioToBunny(audioFile, projectId);
 
+      logDebugEvent("audio-upload-complete", {
+        projectId,
+        sceneId: uploadMeta?.sceneId || null,
+        mediaId: result?.mediaId || null,
+      });
       return result;
     } catch (err) {
       console.warn("❌ Audio upload/transcription failed:", err);
+      logDebugEvent("audio-upload-failed", {
+        projectId,
+        sceneId: uploadMeta?.sceneId || null,
+        error: err?.message || String(err),
+      });
     }
   };
 
@@ -1412,6 +1936,10 @@ const CloudRecorder = () => {
         uploadMeta.screen?.mediaId || uploadMeta.camera?.mediaId;
 
       if (transcriptionTarget && uploadMeta.audio?.url) {
+        const dedupeKey = `transcriptionQueued:${uploadMeta.sceneId}:${uploadMeta.audio.mediaId}`;
+        const dedupe = await chrome.storage.local.get([dedupeKey]);
+        if (dedupe?.[dedupeKey]) return;
+
         await fetch(`${API_BASE}/transcription/queue`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -1427,9 +1955,21 @@ const CloudRecorder = () => {
             model: "tiny",
           }),
         });
+        await chrome.storage.local.set({ [dedupeKey]: true });
+        logDebugEvent("transcription-queued", {
+          projectId,
+          sceneId: uploadMeta.sceneId,
+          inputMediaId: uploadMeta.audio.mediaId,
+          targetMediaId: transcriptionTarget,
+        });
       }
     } catch (err) {
       console.warn("❌ Transcription failed:", err);
+      logDebugEvent("transcription-failed", {
+        projectId,
+        sceneId: uploadMeta.sceneId,
+        error: err?.message || String(err),
+      });
     }
   };
 
@@ -1486,6 +2026,10 @@ const CloudRecorder = () => {
   useEffect(() => {
     tryRecoverPreviousSession();
   }, [tryRecoverPreviousSession]);
+
+  useEffect(() => {
+    recoverPendingScenes();
+  }, [recoverPendingScenes]);
 
   useEffect(() => {
     return () => {
@@ -1550,6 +2094,36 @@ const CloudRecorder = () => {
       );
     }
 
+    const existingStatus = await getSceneCreateStatus(uploadMeta.sceneId);
+    if (existingStatus?.status === "created") {
+      logDebugEvent("scene-create-skip", {
+        projectId,
+        sceneId: uploadMeta.sceneId,
+      });
+      await ensureMediaLinked({
+        projectId,
+        sceneId: uploadMeta.sceneId,
+        mediaIds: [
+          uploadMeta.screen?.mediaId,
+          uploadMeta.camera?.mediaId,
+          uploadMeta.audio?.mediaId,
+        ],
+      });
+      return { reused: true };
+    }
+
+    await setSceneCreateStatus(uploadMeta.sceneId, "creating", {
+      projectId,
+    });
+    await setPipelineState("scene-creating", {
+      projectId,
+      sceneId: uploadMeta.sceneId,
+    });
+    logDebugEvent("scene-create-start", {
+      projectId,
+      sceneId: uploadMeta.sceneId,
+    });
+
     const payload = {
       sceneId: uploadMeta.sceneId,
       screenMediaId: uploadMeta.screen?.mediaId || null,
@@ -1557,6 +2131,7 @@ const CloudRecorder = () => {
       screenVideoId: uploadMeta.screen?.videoId || null,
       cameraVideoId: uploadMeta.camera?.videoId || null,
       audioMediaId: uploadMeta.audio?.mediaId || null,
+      recordingSessionId: recorderSession.current?.id || null,
       durations,
       captionSource: uploadMeta.screen ? "screen" : "camera",
       transcriptionSourceMediaId: !isSilent
@@ -1594,8 +2169,70 @@ const CloudRecorder = () => {
 
     if (!res.ok) {
       const errorText = await res.text();
+      const recoverResult = await recoverScene({
+        projectId,
+        sceneId: uploadMeta.sceneId,
+        screenMediaId: uploadMeta.screen?.mediaId || null,
+        cameraMediaId: uploadMeta.camera?.mediaId || null,
+        audioMediaId: uploadMeta.audio?.mediaId || null,
+      });
+
+      if (recoverResult.ok) {
+        await setSceneCreateStatus(uploadMeta.sceneId, "created", {
+          recovered: true,
+        });
+        await ensureMediaLinked({
+          projectId,
+          sceneId: uploadMeta.sceneId,
+          mediaIds: [
+            uploadMeta.screen?.mediaId,
+            uploadMeta.camera?.mediaId,
+            uploadMeta.audio?.mediaId,
+          ],
+        });
+        await removePendingScene(uploadMeta.sceneId);
+        await markSceneComplete(uploadMeta.sceneId);
+        await setPipelineState("scene-recovered", {
+          projectId,
+          sceneId: uploadMeta.sceneId,
+        });
+        logDebugEvent("scene-recovered", {
+          projectId,
+          sceneId: uploadMeta.sceneId,
+        });
+        return { recovered: true };
+      }
+
+      logDebugEvent("scene-create-failed", {
+        projectId,
+        sceneId: uploadMeta.sceneId,
+        error: errorText,
+      });
+      await setSceneCreateStatus(uploadMeta.sceneId, "failed", {
+        error: errorText,
+      });
       throw new Error(`Failed to create scene: ${errorText}`);
     } else {
+      await setSceneCreateStatus(uploadMeta.sceneId, "created");
+      await ensureMediaLinked({
+        projectId,
+        sceneId: uploadMeta.sceneId,
+        mediaIds: [
+          uploadMeta.screen?.mediaId,
+          uploadMeta.camera?.mediaId,
+          uploadMeta.audio?.mediaId,
+        ],
+      });
+      await removePendingScene(uploadMeta.sceneId);
+      await markSceneComplete(uploadMeta.sceneId);
+      await setPipelineState("scene-created", {
+        projectId,
+        sceneId: uploadMeta.sceneId,
+      });
+      logDebugEvent("scene-create-complete", {
+        projectId,
+        sceneId: uploadMeta.sceneId,
+      });
       if (multiMode) {
         await chrome.storage.local.set({
           multiSceneCount: multiSceneCount + 1,
@@ -1672,6 +2309,7 @@ const CloudRecorder = () => {
         ts: Date.now(),
       },
     });
+    const stage = reason || (shouldFinalize ? "finalize" : "stop");
 
     if (keepAliveInterval.current) {
       clearInterval(keepAliveInterval.current);
@@ -1725,14 +2363,77 @@ const CloudRecorder = () => {
     await flushPendingChunks();
 
     let finalizeError = null;
-    try {
-      await Promise.allSettled([
-        screenUploader.current?.finalize?.(),
-        cameraUploader.current?.finalize?.(),
-      ]);
-    } catch (err) {
-      finalizeError = err;
-      console.warn("Finalize threw an error:", err);
+    const finalizeCalls = [
+      screenUploader.current?.finalize?.(),
+      cameraUploader.current?.finalize?.(),
+    ];
+
+    if (
+      shouldSimulateFinalizeFailure() &&
+      !simulateFinalizeFailureConsumedRef.current
+    ) {
+      simulateFinalizeFailureConsumedRef.current = true;
+      finalizeCalls.push(
+        Promise.reject(new Error("simulated-finalize-failure")),
+      );
+    }
+
+    const settledResults = await Promise.allSettled(finalizeCalls);
+    const rejectedResults = settledResults.filter(
+      (result) => result.status === "rejected",
+    );
+
+    const screenMeta = screenUploader.current?.getMeta?.() || null;
+    const cameraMeta = cameraUploader.current?.getMeta?.() || null;
+    const incompleteUploaders = [];
+
+    if (screenUploader.current && screenMeta?.status !== "completed") {
+      incompleteUploaders.push({
+        uploader: "screen",
+        status: screenMeta?.status || "unknown",
+        offset: screenMeta?.offset || 0,
+        error: screenMeta?.error || null,
+      });
+    }
+
+    if (cameraUploader.current && cameraMeta?.status !== "completed") {
+      incompleteUploaders.push({
+        uploader: "camera",
+        status: cameraMeta?.status || "unknown",
+        offset: cameraMeta?.offset || 0,
+        error: cameraMeta?.error || null,
+      });
+    }
+
+    if (rejectedResults.length > 0 || incompleteUploaders.length > 0) {
+      const diagnostics = buildFinalizeDiagnostics({
+        stage,
+        settledResults,
+        rejectedResults,
+        incompleteUploaders,
+        reason: "uploader-finalize-incomplete",
+      });
+      await markFinalizeFailure(diagnostics);
+      logDebugEvent("finalize-failed", {
+        stage,
+        diagnostics,
+      });
+      finalizeError = new Error("uploader-finalize-incomplete");
+    } else {
+      console.info("[CloudRecorder][Finalize] Finalization complete", {
+        stage,
+        settledResults: settledResults.map((result, i) => ({
+          index: i,
+          status: result.status,
+        })),
+        screen: screenMeta,
+        camera: cameraMeta,
+      });
+      logDebugEvent("finalize-complete", {
+        stage,
+        screen: screenMeta,
+        camera: cameraMeta,
+      });
     }
 
     const { sceneId } = await chrome.storage.local.get(["sceneId"]);
@@ -1754,6 +2455,11 @@ const CloudRecorder = () => {
     cleanupTimers();
 
     if (!shouldFinalize) {
+      try {
+        await chrome.storage.local.set({ sceneIdStatus: "cancelled" });
+      } catch {
+        // ignore
+      }
       await finalizeRecorderSession("cancelled");
       return;
     }
@@ -1834,9 +2540,23 @@ const CloudRecorder = () => {
 
     // Create final audio blob from chunks
     const audioBlob = createBlobFromChunks(audioChunks.current, "audio/webm");
+    const silent = audioBlob ? await isAudioSilent(audioBlob) : true;
 
-    const result = await handleAudioUpload(audioBlob, projectId, uploadMeta);
-    uploadMeta.audio = result;
+    await upsertPendingScene(uploadMeta.sceneId, {
+      projectId,
+      screenMediaId: uploadMeta.screen?.mediaId || null,
+      cameraMediaId: uploadMeta.camera?.mediaId || null,
+      audioMediaId: null,
+      status: "ready",
+    });
+    await setPipelineState("scene-ready", {
+      projectId,
+      sceneId: uploadMeta.sceneId,
+    });
+    logDebugEvent("scene-ready", {
+      projectId,
+      sceneId: uploadMeta.sceneId,
+    });
 
     chrome.storage.local.set({ uploadMeta });
 
@@ -1844,9 +2564,20 @@ const CloudRecorder = () => {
 
     if (!sentLast.current) {
       sentLast.current = true;
-      const silent = audioBlob ? await isAudioSilent(audioBlob) : true;
       try {
         await createSceneOrHandleMultiMode(uploadMeta, usedDurations, silent);
+
+        const result = await handleAudioUpload(audioBlob, projectId, uploadMeta);
+        uploadMeta.audio = result;
+        chrome.storage.local.set({ uploadMeta });
+
+        if (result?.mediaId) {
+          await ensureMediaLinked({
+            projectId,
+            sceneId: uploadMeta.sceneId,
+            mediaIds: [uploadMeta.audio?.mediaId],
+          });
+        }
 
         if (!silent && audioBlob) {
           await handleTranscription(uploadMeta, projectId);
@@ -1862,6 +2593,10 @@ const CloudRecorder = () => {
         } else {
           window.location.reload();
         }
+        await setPipelineState("completed", {
+          projectId,
+          sceneId: uploadMeta.sceneId,
+        });
         await finalizeRecorderSession("completed");
       } catch (err) {
         console.error("❌ Failed to create scene:", err);
@@ -1891,6 +2626,11 @@ const CloudRecorder = () => {
             error: err.message,
           },
         });
+        await setPipelineState("failed", {
+          projectId,
+          sceneId: uploadMeta.sceneId,
+          status: err.message,
+        });
 
         // Still close the window even on error to prevent stuck tabs
         // Give user time to see the error message
@@ -1904,10 +2644,16 @@ const CloudRecorder = () => {
           }
         }, 3000);
         await exportLocalRecovery("scene-error");
+        try {
+          await chrome.storage.local.set({ sceneIdStatus: "failed" });
+        } catch {
+          // ignore
+        }
         await finalizeRecorderSession("failed");
       }
     }
   };
+
 
   const startAudioStream = async (id) => {
     const useExact = id && id !== "none";
@@ -2350,6 +3096,14 @@ const CloudRecorder = () => {
         }
 
         await chrome.storage.local.set({ projectId: videoId });
+        await setPipelineState("project-ready", {
+          projectId: videoId,
+          status: multiMode ? "multi" : "single",
+        });
+        logDebugEvent("project-ready", {
+          projectId: videoId,
+          multiMode: Boolean(multiMode),
+        });
 
         uploadersInitialized.current = await initializeUploaders();
         if (!uploadersInitialized.current) {
@@ -2615,6 +3369,13 @@ const CloudRecorder = () => {
       started={started}
       isTab={isTab.current}
       initProject={initProject}
+      finalizeFailure={finalizeFailure}
+      retryingFinalize={retryingFinalize}
+      onRetryFinalize={retryFinalize}
+      onExportDiagnostics={() =>
+        exportFinalizeDiagnostics(finalizeFailureRef.current)
+      }
+      onExportDebugBundle={exportDebugBundle}
     />
   );
 };

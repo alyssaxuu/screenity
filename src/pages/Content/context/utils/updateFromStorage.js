@@ -68,6 +68,9 @@ export const updateFromStorage = (check = true, id = null) => {
       "backupSetup",
       "qualityValue",
       "fpsValue",
+      "fastRecorderBeta",
+      "fastRecorderStatus",
+      "useWebCodecsRecorder",
       "multiMode",
       "multiSceneCount",
       "sortBy",
@@ -300,6 +303,21 @@ export const updateFromStorage = (check = true, id = null) => {
           result.fpsValue !== undefined && result.fpsValue !== null
             ? result.fpsValue
             : prevContentState.fpsValue,
+        fastRecorderBeta:
+          result.fastRecorderBeta !== undefined &&
+          result.fastRecorderBeta !== null
+            ? result.fastRecorderBeta
+            : prevContentState.fastRecorderBeta,
+        fastRecorderStatus:
+          result.fastRecorderStatus !== undefined &&
+          result.fastRecorderStatus !== null
+            ? result.fastRecorderStatus
+            : prevContentState.fastRecorderStatus,
+        useWebCodecsRecorder:
+          result.useWebCodecsRecorder !== undefined &&
+          result.useWebCodecsRecorder !== null
+            ? result.useWebCodecsRecorder
+            : prevContentState.useWebCodecsRecorder,
         multiMode: result.multiMode || false,
         multiSceneCount: result.multiSceneCount || 0,
         wasLoggedIn: result.wasLoggedIn || false,

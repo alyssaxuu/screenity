@@ -25,7 +25,10 @@ import { contentStateContext } from "./context/ContentState";
 
 import { startClickTracking } from "./cursor/trackClicks";
 
-const RecordingLoader = () => {
+const RecordingLoader = ({ progress = 0 }) => {
+  const pct = Math.round(progress || 0);
+  const base = chrome.i18n.getMessage("preparingLabel") || "Preparing recording...";
+  const label = pct > 0 ? `${base} ${pct}%` : base;
   return (
     <div
       style={{
@@ -86,7 +89,7 @@ const RecordingLoader = () => {
             animation: "pulse 2s ease-in-out infinite",
           }}
         >
-          Preparing recording...
+          {label}
         </div>
         <style>
           {`
@@ -298,7 +301,9 @@ const Wrapper = () => {
               {contentState.recordingType === "region" &&
                 contentState.customRegion && <Region />}
               {shadowRef.current && <Modal shadowRef={shadowRef} />}
-              {contentState.preparingRecording && <RecordingLoader />}
+              {contentState.preparingRecording && (
+                <RecordingLoader progress={contentState.processingProgress} />
+              )}
               <Countdown />
               {contentState.recordingType != "camera" &&
                 !contentState.onboarding &&

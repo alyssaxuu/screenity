@@ -1383,5 +1383,13 @@
   "welcomeToProActionModal": {
     "message": "Зрозуміло",
     "description": "Кнопка дії у вікні привітання Pro"
+  },
+  "webcodecsToggleLabel": {
+    "message": "Fast MP4 (beta)",
+    "description": "WebCodecs recorder toggle label"
+  },
+  "webcodecsFailedOffToast": {
+    "message": "Fast MP4 помилка — вимк",
+    "description": "WebCodecs failure auto-disable toast"
   }
 }

@@ -92,6 +92,24 @@ export const setupHandlers = ({ setLoading }) => {
   });
 
   messageRouter();
+
+  // Fallback: if a runtime message is missed, close PiP when storage flag flips.
+  chrome.storage.local.get(["pipForceClose"], (res) => {
+    if (res.pipForceClose && document.pictureInPictureElement) {
+      document.exitPictureInPicture().catch(() => {});
+      setPipMode(false);
+      chrome.runtime.sendMessage({ type: "pip-ended" });
+    }
+  });
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area !== "local") return;
+    if (!changes.pipForceClose) return;
+    if (document.pictureInPictureElement) {
+      document.exitPictureInPicture().catch(() => {});
+      setPipMode(false);
+      chrome.runtime.sendMessage({ type: "pip-ended" });
+    }
+  });
 };
 
 const handleStopRecording = async (request) => {
