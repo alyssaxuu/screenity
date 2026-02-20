@@ -36,6 +36,8 @@ export const ContentStateContext = createContext();
 
 const DEBUG_RECORDER =
   typeof window !== "undefined" ? !!window.SCREENITY_DEBUG_RECORDER : false;
+// Enable post-stop debug logs for sandbox
+const DEBUG_POSTSTOP = true;
 
 const ContentState = (props) => {
   const videoChunks = useRef([]);
@@ -246,8 +248,11 @@ const ContentState = (props) => {
 
       const handleStatus = (status) => {
         if (!status || done) return;
-        const rawPct =
-          typeof status.percent === "number" ? status.percent : 0;
+        if (DEBUG_POSTSTOP)
+          console.debug("[Screenity][Sandbox] waitForFinalizeReady status", {
+            status,
+          });
+        const rawPct = typeof status.percent === "number" ? status.percent : 0;
         const prePct = Math.min(90, Math.max(0, Math.round(rawPct * 0.9)));
         debugRecordingEventWithSession(
           recdbgSessionRef.current,
@@ -330,8 +335,16 @@ const ContentState = (props) => {
     const items = [];
 
     await chunksStore.ready();
+    if (DEBUG_POSTSTOP)
+      console.debug(
+        "[Screenity][Sandbox] buildBlobFromChunks: chunksStore ready, iterating",
+      );
 
     await chunksStore.iterate((value) => (items.push(value), undefined));
+    if (DEBUG_POSTSTOP)
+      console.debug("[Screenity][Sandbox] buildBlobFromChunks: items loaded", {
+        count: items.length,
+      });
 
     items.sort((a, b) => (a.timestamp ?? 0) - (b.timestamp ?? 0));
     const parts = items.map((c) =>
@@ -340,6 +353,10 @@ const ContentState = (props) => {
 
     if (!parts.length) {
       debug("No chunks found in IndexedDB");
+      if (DEBUG_POSTSTOP)
+        console.warn(
+          "[Screenity][Sandbox] buildBlobFromChunks: no parts found in IndexedDB",
+        );
       debugRecordingEventWithSession(recdbgSessionRef.current, "blob-empty", {
         chunkCount: 0,
       });
@@ -350,7 +367,14 @@ const ContentState = (props) => {
     const inferredType = first?.type || "video/webm";
 
     const blob = new Blob(parts, { type: inferredType });
-
+    if (DEBUG_POSTSTOP)
+      console.debug(
+        "[Screenity][Sandbox] buildBlobFromChunks: reconstructed blob",
+        {
+          size: blob.size,
+          type: blob.type,
+        },
+      );
     reconstructVideo(blob);
     return blob;
   };
@@ -757,6 +781,10 @@ const ContentState = (props) => {
   }, [contentState.chunkCount]);
 
   const handleBatch = (chunks, sendResponse) => {
+    if (DEBUG_POSTSTOP)
+      console.debug("[Screenity][Sandbox] handleBatch called", {
+        chunksLen: chunks?.length,
+      });
     // Process chunks asynchronously, but do not make this function async
     (async () => {
       try {
@@ -767,6 +795,11 @@ const ContentState = (props) => {
             }
 
             const chunkData = base64ToUint8Array(chunk.chunk);
+            if (DEBUG_POSTSTOP)
+              console.debug("[Screenity][Sandbox] handleBatch pushing chunk", {
+                index: chunk.index,
+                size: chunkData?.size || null,
+              });
             videoChunks.current.push(chunkData);
 
             // Assuming setContentState doesn't need to be awaited
@@ -810,6 +843,10 @@ const ContentState = (props) => {
   const makeVideoTab = (sendResponse = null, message) => {
     if (makeVideoCheck.current) return;
     makeVideoCheck.current = true;
+    if (DEBUG_POSTSTOP)
+      console.debug("[Screenity][Sandbox] makeVideoTab invoked", {
+        override: message?.override,
+      });
     setContentState((prevState) => ({
       ...prevState,
       override: message.override,
@@ -820,6 +857,13 @@ const ContentState = (props) => {
 
     setTimeout(() => {
       const s = contentStateRef.current;
+      if (DEBUG_POSTSTOP)
+        console.debug("[Screenity][Sandbox] makeVideoTab: post-check", {
+          chunkCount: s?.chunkCount,
+          chunkIndex: s?.chunkIndex,
+          rawBlob: Boolean(s?.rawBlob),
+          ready: s?.ready,
+        });
       const complete = s?.chunkCount > 0 && s?.chunkIndex >= s?.chunkCount;
       if (complete && !s?.ready && s?.rawBlob) {
         setContentState((prev) => ({
@@ -850,6 +894,11 @@ const ContentState = (props) => {
   const onChromeMessage = useCallback(
     (request, sender, sendResponse) => {
       const message = request;
+      if (DEBUG_POSTSTOP)
+        console.debug("[Screenity][Sandbox] onChromeMessage", {
+          type: message?.type,
+          senderTab: sender?.tab?.id,
+        });
       if (
         message?._targetTabId &&
         tabIdRef.current &&
@@ -858,6 +907,10 @@ const ContentState = (props) => {
         return false;
       }
       if (message.type === "chunk-count") {
+        if (DEBUG_POSTSTOP)
+          console.debug("[Screenity][Sandbox] received chunk-count", {
+            count: message.count,
+          });
         setContentState((prevState) => ({
           ...prevState,
           chunkCount: message.count,
@@ -866,8 +919,14 @@ const ContentState = (props) => {
       } else if (message.type === "ping") {
         sendResponse({ status: "ready" });
       } else if (message.type === "new-chunk-tab") {
+        if (DEBUG_POSTSTOP)
+          console.debug("[Screenity][Sandbox] received new-chunk-tab", {
+            chunksLen: message?.chunks?.length,
+          });
         return handleBatch(message.chunks, sendResponse);
       } else if (message.type === "make-video-tab") {
+        if (DEBUG_POSTSTOP)
+          console.debug("[Screenity][Sandbox] received make-video-tab");
         makeVideoTab(sendResponse, message);
 
         return true;
@@ -927,14 +986,16 @@ const ContentState = (props) => {
             buildBlobFromChunks()
               .then((blob) => {
                 if (!blob) {
-                  chrome.runtime.sendMessage({ type: "send-chunks-to-sandbox" });
+                  chrome.runtime.sendMessage({
+                    type: "send-chunks-to-sandbox",
+                  });
                   sendResponse({ status: "deferred" });
                   return;
                 }
                 sendResponse({ status: "ok" });
               })
               .catch((error) =>
-                sendResponse({ status: "error", error: error.message })
+                sendResponse({ status: "error", error: error.message }),
               );
           });
           return true;
@@ -981,14 +1042,16 @@ const ContentState = (props) => {
             buildBlobFromChunks()
               .then((blob) => {
                 if (!blob) {
-                  chrome.runtime.sendMessage({ type: "send-chunks-to-sandbox" });
+                  chrome.runtime.sendMessage({
+                    type: "send-chunks-to-sandbox",
+                  });
                   sendResponse({ status: "deferred" });
                   return;
                 }
                 sendResponse({ status: "ok" });
               })
               .catch((error) =>
-                sendResponse({ status: "error", error: error.message })
+                sendResponse({ status: "error", error: error.message }),
               );
           });
           return true;
@@ -1035,7 +1098,7 @@ const ContentState = (props) => {
             buildBlobFromChunks()
               .then(() => sendResponse({ status: "ok" }))
               .catch((error) =>
-                sendResponse({ status: "error", error: error.message })
+                sendResponse({ status: "error", error: error.message }),
               );
           });
           return true;
@@ -1073,8 +1136,79 @@ const ContentState = (props) => {
 
     chrome.runtime.onMessage.addListener(messageListener);
 
+    // Storage fallback listener: watch for background writing a `chunks_ready_for:<tabId>` key
+    const storageListener = (changes, areaName) => {
+      if (areaName !== "local") return;
+      try {
+        const tabId = tabIdRef.current;
+        if (!tabId) return;
+        const key = `chunks_ready_for:${tabId}`;
+        if (changes[key]) {
+          if (DEBUG_POSTSTOP)
+            console.debug("[Screenity][Sandbox] storage fallback triggered", {
+              key,
+            });
+          // Ensure IndexedDB is available in this frame before attempting
+          // to read chunks. Some sandboxed/iframe contexts (ffmpeg iframe)
+          // may not expose IndexedDB; guard to avoid localforage throwing.
+          if (!window.indexedDB) {
+            if (DEBUG_POSTSTOP)
+              console.warn(
+                "[Screenity][Sandbox] storage fallback: no indexedDB in this context, skipping",
+              );
+            return;
+          }
+
+          // Asynchronously attempt to build the blob from IndexedDB
+          buildBlobFromChunks()
+            .then((blob) => {
+              if (!blob) {
+                if (DEBUG_POSTSTOP)
+                  console.warn(
+                    "[Screenity][Sandbox] storage fallback: no blob built",
+                  );
+                return;
+              }
+              if (DEBUG_POSTSTOP)
+                console.debug(
+                  "[Screenity][Sandbox] storage fallback: blob built",
+                  {
+                    size: blob.size,
+                  },
+                );
+            })
+            .catch((err) => {
+              if (DEBUG_POSTSTOP)
+                console.warn(
+                  "[Screenity][Sandbox] storage fallback build error",
+                  err,
+                );
+            });
+        }
+      } catch (err) {
+        if (DEBUG_POSTSTOP)
+          console.warn("[Screenity][Sandbox] storageListener error", err);
+      }
+    };
+
+    // Only attach the storage fallback listener in the top-level window
+    // (editor/page) — avoid running this inside sandboxed iframes used for
+    // FFmpeg which may not expose IndexedDB.
+    let storageListenerAttached = false;
+    if (window.top === window.self) {
+      chrome.storage.onChanged.addListener(storageListener);
+      storageListenerAttached = true;
+    } else if (DEBUG_POSTSTOP) {
+      console.debug(
+        "[Screenity][Sandbox] running inside an iframe; skipping storage fallback listener",
+      );
+    }
+
     return () => {
       chrome.runtime.onMessage.removeListener(messageListener);
+      if (storageListenerAttached) {
+        chrome.storage.onChanged.removeListener(storageListener);
+      }
     };
   }, []);
 

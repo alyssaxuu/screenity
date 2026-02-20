@@ -46,11 +46,7 @@ const RecorderUI = ({
             </div>
           </>
         )}
-        {onExportDebugBundle && (
-          <div className="button-stop" onClick={onExportDebugBundle}>
-            Generate debug bundle
-          </div>
-        )}
+        {/* Debug bundle generation button removed */}
         {/* 
         Optionally: 
         <div className="button-stop" onClick={() => chrome.runtime.sendMessage({ type: "stop-recording-tab" })}>
@@ -89,7 +85,7 @@ const RecorderUI = ({
             width: 100%;
             height:100%;
             background: url('${chrome.runtime.getURL(
-              "assets/helper/pattern-svg.svg"
+              "assets/helper/pattern-svg.svg",
             )}') repeat;
             background-size: 62px 23.5px;
             animation: moveBackground 138s linear infinite;

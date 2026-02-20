@@ -1,4 +1,5 @@
 @use "./variables.scss" as *;
+@use "sass:color";
 
 body {
   background: $color-light-grey;
@@ -59,7 +60,7 @@ body {
       color: $color-text-contrast;
     }
     &:hover {
-      background-color: darken($color-primary, 10%);
+      background-color: color.adjust($color-primary, $lightness: -10%);
       cursor: pointer;
     }
   }

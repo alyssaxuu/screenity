@@ -986,6 +986,24 @@ const Recorder = () => {
         let activeMimeType = null;
 
         try {
+          // Ensure recorder.current is initialized (createMediaRecorder may
+          // be used elsewhere; create a MediaRecorder here if missing).
+          if (!recorder.current) {
+            try {
+              recorder.current = createMediaRecorder(liveStream.current, {
+                audioBitsPerSecond,
+                videoBitsPerSecond: videoBitsPerSecond,
+              });
+              debug("Created MediaRecorder instance for fallback");
+            } catch (initErr) {
+              debugError("Failed to create MediaRecorder", initErr);
+              sendRecordingError(
+                "Failed to start recording: " + String(initErr),
+              );
+              return;
+            }
+          }
+
           recorder.current.start(1000);
           debug("MediaRecorder.start(1000) called");
         } catch (err) {

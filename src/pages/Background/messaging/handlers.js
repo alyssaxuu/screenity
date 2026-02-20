@@ -58,6 +58,8 @@ import { loginWithWebsite } from "../auth/loginWithWebsite";
 const API_BASE = process.env.SCREENITY_API_BASE_URL;
 const CLOUD_FEATURES_ENABLED =
   process.env.SCREENITY_ENABLE_CLOUD_FEATURES === "true";
+// Debug toggle for post-stop/chunk flow
+const DEBUG_POSTSTOP = true;
 
 const ensureAudioOffscreen = async () => {
   if (!chrome.offscreen) return false;
@@ -67,7 +69,7 @@ const ensureAudioOffscreen = async () => {
     const hasAudioOffscreen = contexts.some(
       (context) =>
         context.contextType === "OFFSCREEN_DOCUMENT" &&
-        context.documentUrl === audioUrl
+        context.documentUrl === audioUrl,
     );
     if (!hasAudioOffscreen) {
       await chrome.offscreen.createDocument({
@@ -80,6 +82,260 @@ const ensureAudioOffscreen = async () => {
   } catch (error) {
     console.warn("Failed to ensure audio offscreen document", error);
     return false;
+  }
+};
+
+const logStopRecordingTabEvent = (message, sender) => {
+  try {
+    const reason = message?.reason || "unknown";
+    const senderTabId = message?.tabId || sender?.tab?.id || null;
+    const senderUrl = sender?.url || null;
+    const stack = new Error().stack;
+    console.warn("[Screenity][BG] stop-recording-tab received", {
+      reason,
+      senderTabId,
+      senderUrl,
+    });
+    chrome.storage.local.set({
+      lastStopRecordingEvent: {
+        reason,
+        senderTabId,
+        senderUrl,
+        stack,
+        ts: Date.now(),
+      },
+    });
+  } catch (err) {
+    console.warn("[Screenity][BG] stop-recording-tab logging failed", err);
+  }
+};
+
+const setTabAutoDiscardableSafe = async (message, sender) => {
+  try {
+    const tabId = sender?.tab?.id;
+    const discardable = message?.discardable;
+
+    if (!tabId || typeof discardable !== "boolean") return;
+
+    await chrome.tabs.update(tabId, { autoDiscardable: discardable });
+  } catch (err) {
+    console.warn("Failed to set tab autoDiscardable:", err);
+  }
+};
+
+const handleCreateVideoProject = async (message) => {
+  try {
+    const res = await fetch(`${API_BASE}/videos/create`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${await chrome.storage.local
+          .get("screenityToken")
+          .then((r) => r.screenityToken)}`,
+      },
+      body: JSON.stringify({
+        title: message.title || "Untitled Recording",
+        data: message.data || {},
+        instantMode: message.instantMode || false,
+        recording: true,
+        isPublic: message.instantMode ? true : false,
+      }),
+    });
+
+    const result = await res.json();
+
+    if (!res.ok || !result?.videoId) {
+      return {
+        success: false,
+        error: result?.error || "Server error",
+      };
+    }
+
+    return { success: true, videoId: result.videoId };
+  } catch (err) {
+    console.error("❌ Failed to create video:", err.message);
+    return { success: false, error: err.message };
+  }
+};
+
+const handleFetchVideos = async (message) => {
+  try {
+    const page = message.page || 0;
+    const pageSize = message.pageSize || 12;
+    const sort = message.sort || "newest";
+    const filter = message.filter || "all";
+
+    const token = await chrome.storage.local
+      .get("screenityToken")
+      .then((r) => r.screenityToken);
+
+    const res = await fetch(
+      `${API_BASE}/videos?page=${page}&pageSize=${pageSize}&sort=${sort}&filter=${filter}`,
+      {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        credentials: "include",
+      },
+    );
+
+    const result = await res.json();
+
+    if (!res.ok || !result?.videos) {
+      return {
+        success: false,
+        error: result?.error || "Failed to fetch videos",
+      };
+    }
+
+    return { success: true, videos: result.videos };
+  } catch (err) {
+    console.error("❌ Failed to fetch videos:", err.message);
+    return { success: false, error: err.message };
+  }
+};
+
+const handleReopenPopupMulti = async () => {
+  try {
+    const tab = await getCurrentTab();
+    if (!tab?.id) {
+      console.warn("No active tab found for popup reopen");
+      return;
+    }
+
+    await sendMessageTab(tab.id, {
+      type: "reopen-popup-multi",
+    });
+  } catch (err) {
+    console.warn("Failed to send popup reopen message:", err);
+  }
+};
+
+const handleCheckStorageQuota = async () => {
+  try {
+    const { screenityToken } = await chrome.storage.local.get("screenityToken");
+
+    const res = await fetch(`${API_BASE}/storage/quota`, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${screenityToken}`,
+      },
+      credentials: "include",
+    });
+
+    const result = await res.json();
+
+    if (!res.ok) {
+      return {
+        success: false,
+        error: result?.error || "Fetch failed",
+      };
+    }
+
+    return { success: true, ...result };
+  } catch (err) {
+    console.error("❌ Error checking storage quota:", err);
+    return { success: false, error: err.message };
+  }
+};
+
+const handleFinishMultiRecording = async () => {
+  try {
+    const { recordingToScene } = await chrome.storage.local.get([
+      "recordingToScene",
+    ]);
+
+    if (!recordingToScene) {
+      const { multiProjectId } = await chrome.storage.local.get([
+        "multiProjectId",
+      ]);
+
+      if (!multiProjectId) {
+        console.warn("No project ID found for finishing multi recording.");
+        return;
+      }
+
+      const res = await fetch(
+        `${API_BASE}/videos/${multiProjectId}/auto-publish`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${await chrome.storage.local
+              .get("screenityToken")
+              .then((r) => r.screenityToken)}`,
+          },
+        },
+      );
+
+      const url = `${process.env.SCREENITY_APP_BASE}/editor/${multiProjectId}/edit?share=true`;
+      const publicUrl = `${process.env.SCREENITY_APP_BASE}/view/${multiProjectId}/`;
+
+      if (!res.ok) {
+        console.warn("Failed to auto-publish multi recording", res.status);
+        return;
+      }
+
+      // Open the editor directly
+      createTab(url, true, true).then(() => {
+        if (publicUrl) {
+          copyToClipboard(publicUrl);
+          chrome.runtime.sendMessage({
+            type: "show-toast",
+            message: "Public video link copied to clipboard!",
+          });
+        }
+      });
+    } else {
+      // Multi recording on existing project
+      const { editorTab } = await chrome.storage.local.get(["editorTab"]);
+      // check if editor tab is valid, if so focus to it, otherwise use active tab
+      if (editorTab) {
+        focusTab(editorTab);
+        sendMessageTab(editorTab, {
+          type: "update-project-ready",
+          share: false,
+          newProject: false,
+        });
+      } else {
+        const activeTab = (await getCurrentTab())?.id || null;
+        if (activeTab) {
+          focusTab(activeTab);
+          sendMessageTab(activeTab, {
+            type: "update-project-ready",
+            share: false,
+            newProject: false,
+          });
+        }
+      }
+
+      chrome.storage.local.set({
+        recordingProjectTitle: "",
+        projectId: null,
+        activeSceneId: null,
+        recordingToScene: false,
+        multiMode: false,
+        multiProjectId: null,
+        editorTab: null,
+      });
+
+      const tab = await getCurrentTab();
+      if (tab?.id) {
+        sendMessageTab(tab.id, {
+          type: "clear-recordings",
+        });
+      }
+    }
+
+    // Reset multi-mode state
+    await chrome.storage.local.set({
+      multiMode: false,
+      multiSceneCount: 0,
+      multiProjectId: null,
+    });
+  } catch (err) {
+    console.warn("Failed to finish multi recording", err);
   }
 };
 
@@ -120,7 +376,7 @@ export const copyToClipboard = (text) => {
         navigator.clipboard.writeText(content).catch((err) => {
           console.warn(
             "❌ Failed to copy to clipboard in content script:",
-            err
+            err,
           );
         });
       },
@@ -133,45 +389,64 @@ export const copyToClipboard = (text) => {
 export const setupHandlers = () => {
   registerMessage("desktop-capture", (message) => desktopCapture(message));
   registerMessage("backup-created", (message) =>
-    offscreenDocument(message.request, message.tabId)
+    offscreenDocument(message.request, message.tabId),
   );
   registerMessage("write-file", (message) => writeFile(message));
   registerMessage("handle-restart", (message) => handleRestart(message));
   registerMessage("handle-dismiss", (message) => handleDismiss(message));
   registerMessage("reset-active-tab", () => resetActiveTab(false));
   registerMessage("reset-active-tab-restart", (message) =>
-    resetActiveTabRestart(message)
+    resetActiveTabRestart(message),
   );
   registerMessage("video-ready", (message) => videoReady(message));
   registerMessage("start-recording", (message) => startRecording(message));
   registerMessage("restarted", (message) => restartActiveTab(message));
-  const sendChunksToSandbox = async () => {
+  const sendChunksToSandbox = async (sender) => {
+    if (DEBUG_POSTSTOP)
+      console.debug("[Screenity][BG] sendChunksToSandbox invoked", {
+        senderTab: sender?.tab?.id,
+      });
+
     const { sandboxTab } = await chrome.storage.local.get(["sandboxTab"]);
-    if (!sandboxTab) {
+    // Prefer stored sandboxTab but fall back to the caller tab if available
+    const targetTab = sandboxTab || sender?.tab?.id || null;
+    if (!targetTab) {
+      if (DEBUG_POSTSTOP)
+        console.warn("[Screenity][BG] no targetTab for sendChunksToSandbox");
       throw new Error("no-sandbox-tab");
     }
 
     const pingReady = async () => {
       return new Promise((resolve) => {
         chrome.runtime.sendMessage(
-          { type: "ping", _targetTabId: sandboxTab },
+          { type: "ping", _targetTabId: targetTab },
           (response) => {
             resolve(response?.status === "ready");
-          }
+          },
         );
       });
     };
+
     const maxPingAttempts = 10;
     let pingOk = false;
     for (let attempt = 1; attempt <= maxPingAttempts; attempt += 1) {
       // eslint-disable-next-line no-await-in-loop
       pingOk = await pingReady();
+      if (DEBUG_POSTSTOP)
+        console.debug("[Screenity][BG] ping attempt", { attempt, pingOk });
       if (pingOk) break;
       // eslint-disable-next-line no-await-in-loop
       await new Promise((r) => setTimeout(r, 200));
     }
+
     if (!pingOk) {
-      throw new Error("sandbox-not-ready");
+      if (DEBUG_POSTSTOP)
+        console.warn(
+          "[Screenity][BG] sandbox not ready after pings, proceeding anyway",
+          { targetTab },
+        );
+      // Proceed even if ping failed — runtime message ports can be unreliable
+      // during page load; we'll attempt to send chunks regardless.
     }
 
     const maxAttempts = 6;
@@ -182,15 +457,28 @@ export const setupHandlers = () => {
       await chunksStore.iterate(() => {
         chunkCount += 1;
       });
+      if (DEBUG_POSTSTOP)
+        console.debug("[Screenity][BG] checking chunks in IndexedDB", {
+          attempt,
+          chunkCount,
+        });
       if (chunkCount > 0) break;
       await new Promise((r) => setTimeout(r, delayMs));
     }
 
-    await sendChunks();
+    if (DEBUG_POSTSTOP)
+      console.debug("[Screenity][BG] calling sendChunks() to deliver", {
+        targetTab,
+        chunkCount,
+      });
+    await sendChunks(false, { tabId: targetTab, frameId: sender?.frameId });
+    if (DEBUG_POSTSTOP) console.debug("[Screenity][BG] sendChunks() completed");
     return { status: "ok", chunkCount };
   };
 
-  registerMessage("send-chunks-to-sandbox", () => sendChunksToSandbox());
+  registerMessage("send-chunks-to-sandbox", (message, sender) =>
+    sendChunksToSandbox(sender),
+  );
 
   registerMessage("new-chunk", (message, sender, sendResponse) => {
     newChunk(message, sendResponse);
@@ -199,61 +487,62 @@ export const setupHandlers = () => {
 
   registerMessage(
     "get-streaming-data",
-    async (message, sender) => await handleGetStreamingData(message, sender)
+    async (message, sender) => await handleGetStreamingData(message, sender),
   );
   registerMessage("cancel-recording", (message) => cancelRecording(message));
   registerMessage("stop-recording-tab", (message, sender, sendResponse) => {
-    try {
-      const reason = message?.reason || "unknown";
-      const senderTabId = message?.tabId || sender?.tab?.id || null;
-      const senderUrl = sender?.url || null;
-      const stack = new Error().stack;
-      console.warn("[Screenity][BG] stop-recording-tab received", {
-        reason,
-        senderTabId,
-        senderUrl,
-      });
-      chrome.storage.local.set({
-        lastStopRecordingEvent: {
-          reason,
-          senderTabId,
-          senderUrl,
-          stack,
-          ts: Date.now(),
-        },
-      });
-    } catch (err) {
-      console.warn("[Screenity][BG] stop-recording-tab logging failed", err);
-    }
+    logStopRecordingTabEvent(message, sender);
     handleStopRecordingTab(message);
     sendResponse({ ok: true });
     return true;
   });
   registerMessage("restart-recording-tab", (message) =>
-    handleRestartRecordingTab(message)
+    handleRestartRecordingTab(message),
   );
   registerMessage("dismiss-recording-tab", (message) =>
-    handleDismissRecordingTab(message)
+    handleDismissRecordingTab(message),
   );
   registerMessage("pause-recording-tab", () =>
-    sendMessageRecord({ type: "pause-recording-tab" })
+    sendMessageRecord({ type: "pause-recording-tab" }),
   );
   registerMessage("resume-recording-tab", () =>
-    sendMessageRecord({ type: "resume-recording-tab" })
+    sendMessageRecord({ type: "resume-recording-tab" }),
   );
   registerMessage("set-mic-active-tab", (message) => setMicActiveTab(message));
   registerMessage("recording-error", (message) =>
-    handleRecordingError(message)
+    handleRecordingError(message),
   );
   registerMessage("on-get-permissions", (message) =>
-    handleOnGetPermissions(message)
+    handleOnGetPermissions(message),
   );
   registerMessage(
     "recording-complete",
-    async (message, sender) => await handleRecordingComplete(message, sender)
+    async (message, sender) => await handleRecordingComplete(message, sender),
   );
   registerMessage("check-recording", (message) => checkRecording(message));
   registerMessage("open-download-mp4", async () => {
+    // If cloud features are enabled and the user is signed in, block the
+    // local "fast MP4" recovery flow to avoid diverging from the pro/server
+    // workflow. Show a toast instead.
+    if (CLOUD_FEATURES_ENABLED) {
+      try {
+        const { authenticated } = await loginWithWebsite();
+        if (authenticated) {
+          const tab = await getCurrentTab();
+          if (tab?.id) {
+            await sendMessageTab(tab.id, {
+              type: "show-toast",
+              message:
+                "Fast MP4 download is unavailable while signed in. Use the editor or download WEBM instead.",
+            }).catch(() => {});
+          }
+          return;
+        }
+      } catch (err) {
+        console.warn("Failed to check auth for open-download-mp4", err);
+      }
+    }
+
     const tab = await createTab("download.html", true, true);
     if (!tab?.id) return;
     chrome.tabs.onUpdated.addListener(function listener(tabId, info) {
@@ -268,81 +557,81 @@ export const setupHandlers = () => {
     createTab(
       "https://chrome.google.com/webstore/detail/screenity-screen-recorder/kbbdabhdfibnancpjfhlkhafgdilcnji/reviews",
       false,
-      true
-    )
+      true,
+    ),
   );
   registerMessage("follow-twitter", () =>
-    createTab("https://alyssax.substack.com/", false, true)
+    createTab("https://alyssax.substack.com/", false, true),
   );
   registerMessage("pricing", () =>
-    createTab("https://screenity.io/pro", false, true)
+    createTab("https://screenity.io/pro", false, true),
   );
   registerMessage("open-processing-info", () =>
     createTab(
       "https://help.screenity.io/editing-and-exporting/dJRFpGq56JFKC7k8zEvsqb/why-is-there-a-5-minute-limit-for-editing/ddy4e4TpbnrFJ8VoRT37tQ",
       true,
-      true
-    )
+      true,
+    ),
   );
   registerMessage("upgrade-info", () =>
     createTab(
       "https://help.screenity.io/getting-started/77KizPC8MHVGfpKpqdux9D/what-are-the-technical-requirements-for-using-screenity/6kdB6qru6naVD8ZLFvX3m9",
       true,
-      true
-    )
+      true,
+    ),
   );
   registerMessage("trim-info", () =>
     createTab(
       "https://help.screenity.io/editing-and-exporting/dJRFpGq56JFKC7k8zEvsqb/how-to-cut-trim-or-mute-parts-of-your-video/svNbM7YHYY717MuSWXrKXH",
       true,
-      true
-    )
+      true,
+    ),
   );
   registerMessage("join-waitlist", () =>
-    createTab("https://tally.so/r/npojNV", true, true)
+    createTab("https://tally.so/r/npojNV", true, true),
   );
   registerMessage("chrome-update-info", () =>
     createTab(
       "https://help.screenity.io/getting-started/77KizPC8MHVGfpKpqdux9D/what-are-the-technical-requirements-for-using-screenity/6kdB6qru6naVD8ZLFvX3m9",
       true,
-      true
-    )
+      true,
+    ),
   );
   registerMessage("set-surface", (message) => setSurface(message));
   registerMessage("pip-ended", () => handlePip(false));
   registerMessage("pip-started", () => handlePip(true));
   registerMessage("sign-out-drive", (message) => handleSignOutDrive(message));
   registerMessage("open-help", () =>
-    createTab("https://help.screenity.io/", true, true)
+    createTab("https://help.screenity.io/", true, true),
   );
   registerMessage("memory-limit-help", () =>
     createTab(
       "https://help.screenity.io/troubleshooting/9Jy5RGjNrBB42hqUdREQ7W/what-does-%E2%80%9Cmemory-limit-reached%E2%80%9D-mean-when-recording/8WkwHbt3puuXunYqQnyPcb",
       true,
-      true
-    )
+      true,
+    ),
   );
   registerMessage("open-home", () =>
-    createTab("https://screenity.io/", false, true)
+    createTab("https://screenity.io/", false, true),
   );
   registerMessage("report-bug", () =>
     createTab(
       "https://tally.so/r/3ElpXq?version=" +
         chrome.runtime.getManifest().version,
       false,
-      true
-    )
+      true,
+    ),
   );
   registerMessage("clear-recordings", () => clearAllRecordings());
   registerMessage("force-processing", (message) => forceProcessing(message));
   registerMessage("focus-this-tab", (message, sender) =>
-    focusTab(sender.tab.id)
+    focusTab(sender.tab.id),
   );
   registerMessage("stop-recording-tab-backup", (message) =>
-    handleStopRecordingTabBackup(message)
+    handleStopRecordingTabBackup(message),
   );
   registerMessage("indexed-db-download", (message) =>
-    downloadIndexedDB(message)
+    downloadIndexedDB(message),
   );
   registerMessage("get-platform-info", async () => await getPlatformInfo());
   registerMessage("restore-recording", (message) => restoreRecording(message));
@@ -363,37 +652,28 @@ export const setupHandlers = () => {
 
       sendResponse(response);
       return true;
-    }
+    },
   );
   registerMessage("is-pinned", async () => await isPinned());
 
   // Prevent Chrome from discarding the CloudRecorder tab during recording
-  registerMessage("set-tab-auto-discardable", async (message, sender) => {
-    try {
-      const tabId = sender?.tab?.id;
-      const discardable = message?.discardable;
-
-      if (!tabId || typeof discardable !== "boolean") return;
-
-      await chrome.tabs.update(tabId, { autoDiscardable: discardable });
-    } catch (err) {
-      console.warn("Failed to set tab autoDiscardable:", err);
-    }
-  });
+  registerMessage("set-tab-auto-discardable", (message, sender) =>
+    setTabAutoDiscardableSafe(message, sender),
+  );
 
   registerMessage(
     "save-to-drive",
-    async (message) => await handleSaveToDrive(message, false)
+    async (message) => await handleSaveToDrive(message, false),
   );
   registerMessage(
     "save-to-drive-fallback",
-    async (message) => await handleSaveToDrive(message, true)
+    async (message) => await handleSaveToDrive(message, true),
   );
   registerMessage("request-download", (message) =>
-    requestDownload(message.base64, message.title)
+    requestDownload(message.base64, message.title),
   );
   registerMessage("resize-window", (message) =>
-    resizeWindow(message.width, message.height)
+    resizeWindow(message.width, message.height),
   );
   registerMessage("available-memory", async () => {
     return await checkAvailableMemory();
@@ -402,8 +682,8 @@ export const setupHandlers = () => {
     createTab(
       `chrome://settings/content/siteDetails?site=chrome-extension://${chrome.runtime.id}`,
       false,
-      true
-    )
+      true,
+    ),
   );
   registerMessage("add-alarm-listener", (payload) => addAlarmListener(payload));
   registerMessage(
@@ -419,7 +699,7 @@ export const setupHandlers = () => {
       const result = await loginWithWebsite();
       sendResponse(result);
       return true;
-    }
+    },
   );
   registerMessage(
     "create-video-project",
@@ -440,41 +720,11 @@ export const setupHandlers = () => {
         return true;
       }
 
-      try {
-        const res = await fetch(`${API_BASE}/videos/create`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${await chrome.storage.local
-              .get("screenityToken")
-              .then((r) => r.screenityToken)}`,
-          },
-          body: JSON.stringify({
-            title: message.title || "Untitled Recording",
-            data: message.data || {},
-            instantMode: message.instantMode || false,
-            recording: true,
-            isPublic: message.instantMode ? true : false,
-          }),
-        });
-
-        const result = await res.json();
-
-        if (!res.ok || !result?.videoId) {
-          sendResponse({
-            success: false,
-            error: result?.error || "Server error",
-          });
-        } else {
-          sendResponse({ success: true, videoId: result.videoId });
-        }
-      } catch (err) {
-        console.error("❌ Failed to create video project:", err.message);
-        sendResponse({ success: false, error: err.message });
-      }
+      const response = await handleCreateVideoProject(message);
+      sendResponse(response);
 
       return true;
-    }
+    },
   );
   registerMessage("handle-login", async () => {
     if (!CLOUD_FEATURES_ENABLED) {
@@ -539,7 +789,7 @@ export const setupHandlers = () => {
                 win.left >= d.bounds.left &&
                 win.left < d.bounds.left + d.bounds.width &&
                 win.top >= d.bounds.top &&
-                win.top < d.bounds.top + d.bounds.height
+                win.top < d.bounds.top + d.bounds.height,
             );
 
             if (!monitor) {
@@ -589,7 +839,7 @@ export const setupHandlers = () => {
         if (!win || chrome.runtime.lastError) {
           console.warn(
             "[get-monitor-for-window] No window found",
-            chrome.runtime.lastError
+            chrome.runtime.lastError,
           );
           sendResponse({ error: "No window found" });
           return;
@@ -600,7 +850,7 @@ export const setupHandlers = () => {
             win.left >= d.bounds.left &&
             win.left < d.bounds.left + d.bounds.width &&
             win.top >= d.bounds.top &&
-            win.top < d.bounds.top + d.bounds.height
+            win.top < d.bounds.top + d.bounds.height,
         );
 
         if (!monitor) {
@@ -620,7 +870,7 @@ export const setupHandlers = () => {
                 monitorBounds: monitor.bounds,
                 displays,
               });
-            }
+            },
           );
         }
       });
@@ -648,41 +898,8 @@ export const setupHandlers = () => {
       return true;
     }
 
-    try {
-      const page = message.page || 0;
-      const pageSize = message.pageSize || 12;
-      const sort = message.sort || "newest";
-      const filter = message.filter || "all";
-
-      const token = await chrome.storage.local
-        .get("screenityToken")
-        .then((r) => r.screenityToken);
-
-      const res = await fetch(
-        `${API_BASE}/videos?page=${page}&pageSize=${pageSize}&sort=${sort}&filter=${filter}`,
-        {
-          method: "GET",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-          credentials: "include",
-        }
-      );
-
-      const result = await res.json();
-
-      if (!res.ok || !result?.videos) {
-        sendResponse({
-          success: false,
-          error: result?.error || "Failed to fetch videos",
-        });
-      } else {
-        sendResponse({ success: true, videos: result.videos });
-      }
-    } catch (err) {
-      console.error("❌ Failed to fetch videos:", err.message);
-      sendResponse({ success: false, error: err.message });
-    }
+    const response = await handleFetchVideos(message);
+    sendResponse(response);
 
     return true;
   });
@@ -691,19 +908,7 @@ export const setupHandlers = () => {
       console.warn("Cloud features disabled");
       return;
     }
-    try {
-      const tab = await getCurrentTab();
-      if (!tab?.id) {
-        console.warn("No active tab found for popup reopen");
-        return;
-      }
-
-      await sendMessageTab(tab.id, {
-        type: "reopen-popup-multi",
-      });
-    } catch (err) {
-      console.warn("Failed to send popup reopen message:", err);
-    }
+    await handleReopenPopupMulti();
   });
   registerMessage(
     "check-storage-quota",
@@ -724,36 +929,11 @@ export const setupHandlers = () => {
         return true;
       }
 
-      try {
-        const { screenityToken } = await chrome.storage.local.get(
-          "screenityToken"
-        );
-
-        const res = await fetch(`${API_BASE}/storage/quota`, {
-          method: "GET",
-          headers: {
-            Authorization: `Bearer ${screenityToken}`,
-          },
-          credentials: "include",
-        });
-
-        const result = await res.json();
-
-        if (!res.ok) {
-          sendResponse({
-            success: false,
-            error: result?.error || "Fetch failed",
-          });
-        } else {
-          sendResponse({ success: true, ...result });
-        }
-      } catch (err) {
-        console.error("❌ Error checking storage quota:", err);
-        sendResponse({ success: false, error: err.message });
-      }
+      const response = await handleCheckStorageQuota();
+      sendResponse(response);
 
       return true;
-    }
+    },
   );
   registerMessage("time-warning", async (message) => {
     const tab = await getCurrentTab();
@@ -805,7 +985,7 @@ export const setupHandlers = () => {
       await sendMessageTab(tab.id, {
         type: "preparing-recording",
       }).catch((e) =>
-        console.warn("Failed to send preparing-recording to tab:", e)
+        console.warn("Failed to send preparing-recording to tab:", e),
       );
     }
   });
@@ -834,7 +1014,7 @@ export const setupHandlers = () => {
               .get("screenityToken")
               .then((r) => r.screenityToken)}`,
           },
-        }
+        },
       );
 
       if (editorTab) {
@@ -874,97 +1054,7 @@ export const setupHandlers = () => {
       console.warn("Cloud features disabled");
       return;
     }
-    try {
-      const { recordingToScene } = await chrome.storage.local.get([
-        "recordingToScene",
-      ]);
-
-      if (!recordingToScene) {
-        const { multiProjectId } = await chrome.storage.local.get([
-          "multiProjectId",
-        ]);
-
-        if (!multiProjectId) {
-          console.warn("No project ID found for finishing multi recording.");
-          return;
-        }
-
-        const res = await fetch(
-          `${API_BASE}/videos/${multiProjectId}/auto-publish`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${await chrome.storage.local
-                .get("screenityToken")
-                .then((r) => r.screenityToken)}`,
-            },
-          }
-        );
-
-        const url = `${process.env.SCREENITY_APP_BASE}/editor/${multiProjectId}/edit?share=true`;
-        const publicUrl = `${process.env.SCREENITY_APP_BASE}/view/${multiProjectId}/`;
-
-        // Open the editor directly
-        createTab(url, true, true).then(() => {
-          if (publicUrl) {
-            copyToClipboard(publicUrl);
-            chrome.runtime.sendMessage({
-              type: "show-toast",
-              message: "Public video link copied to clipboard!",
-            });
-          }
-        });
-      } else {
-        // Multi recording on existing project
-        const { editorTab } = await chrome.storage.local.get(["editorTab"]);
-        // check if editor tab is valid, if so focus to it, otherwise use active tab
-        if (editorTab) {
-          focusTab(editorTab);
-          sendMessageTab(editorTab, {
-            type: "update-project-ready",
-            share: false,
-            newProject: false,
-          });
-        } else {
-          const activeTab = (await getCurrentTab())?.id || null;
-          if (activeTab) {
-            focusTab(activeTab);
-            sendMessageTab(activeTab, {
-              type: "update-project-ready",
-              share: false,
-              newProject: false,
-            });
-          }
-        }
-
-        chrome.storage.local.set({
-          recordingProjectTitle: "",
-          projectId: null,
-          activeSceneId: null,
-          recordingToScene: false,
-          multiMode: false,
-          multiProjectId: null,
-          editorTab: null,
-        });
-
-        const tab = await getCurrentTab();
-        if (tab?.id) {
-          sendMessageTab(tab.id, {
-            type: "clear-recordings",
-          });
-        }
-      }
-
-      // Reset multi-mode state
-      await chrome.storage.local.set({
-        multiMode: false,
-        multiSceneCount: 0,
-        multiProjectId: null,
-      });
-    } catch (err) {
-      console.error("Failed to finalize multi recording:", err);
-    }
+    await handleFinishMultiRecording();
   });
   registerMessage("handle-reactivate", async () => {
     if (!CLOUD_FEATURES_ENABLED) {
@@ -1101,7 +1191,7 @@ export const setupHandlers = () => {
       registerRecordingTabListener(tabId);
       sendResponse({ ok: true, session: activeRecordingSession });
       return true;
-    }
+    },
   );
 
   registerMessage(
@@ -1110,7 +1200,7 @@ export const setupHandlers = () => {
       clearRecordingSession();
       sendResponse({ ok: true });
       return true;
-    }
+    },
   );
 
   registerMessage(
@@ -1121,6 +1211,6 @@ export const setupHandlers = () => {
       ]);
       sendResponse({ recorderSession: recorderSession || null });
       return true;
-    }
+    },
   );
 };

@@ -71,7 +71,7 @@ const Background = () => {
         renderEffectBackground(
           effectRef.current,
           bottomCanvasRef,
-          bottomCanvasContextRef
+          bottomCanvasContextRef,
         );
 
         resizeCanvases(
@@ -81,7 +81,7 @@ const Background = () => {
           effectRef.current,
           canvasRef,
           bottomCanvasRef,
-          bottomCanvasContextRef
+          bottomCanvasContextRef,
         );
       }
     };
@@ -118,7 +118,7 @@ const Background = () => {
                 renderEffectBackground(
                   effectRef.current,
                   bottomCanvasRef,
-                  bottomCanvasContextRef
+                  bottomCanvasContextRef,
                 );
               }
 
@@ -128,7 +128,7 @@ const Background = () => {
                 { r: 255, g: 255, b: 255, a: 255 }, // White for the person
                 { r: 0, g: 0, b: 0, a: 0 }, // Transparent for background
                 false,
-                0.6
+                0.6,
               );
 
               // Start with a clear canvas
@@ -137,7 +137,7 @@ const Background = () => {
               // Create an RGBA image data with transparency
               const imageData = ctx.createImageData(
                 canvas.width,
-                canvas.height
+                canvas.height,
               );
 
               // Copy RGB from current frame and use mask for alpha
@@ -173,7 +173,9 @@ const Background = () => {
     const handleMessage = (request) => {
       if (request.type === "set-background-effect") {
         // The actual handling is now in message handlers, this just forces a re-render
-        console.log("Background component received effect change message");
+        if (globalThis.SCREENITY_VERBOSE_LOGS) {
+          console.log("Background component received effect change message");
+        }
       }
     };
 

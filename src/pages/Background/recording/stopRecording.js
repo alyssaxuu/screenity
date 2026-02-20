@@ -2,23 +2,19 @@ import { focusTab, sendMessageTab } from "../tabManagement/";
 import { discardOffscreenDocuments } from "../offscreen/discardOffscreenDocuments";
 import { sendMessageRecord } from "./sendMessageRecord";
 import { sendChunks } from "./sendChunks";
+import { waitForContentScript } from "../utils/waitForContentScript";
 
 export const stopRecording = async () => {
   chrome.action.setIcon({ path: "assets/icon-34.png" });
   chrome.storage.local.set({ restarting: false });
-  const {
-    recordingStartTime,
-    isSubscribed,
-    paused,
-    pausedAt,
-    totalPausedMs,
-  } = await chrome.storage.local.get([
-    "recordingStartTime",
-    "isSubscribed",
-    "paused",
-    "pausedAt",
-    "totalPausedMs",
-  ]);
+  const { recordingStartTime, isSubscribed, paused, pausedAt, totalPausedMs } =
+    await chrome.storage.local.get([
+      "recordingStartTime",
+      "isSubscribed",
+      "paused",
+      "pausedAt",
+      "totalPausedMs",
+    ]);
 
   const startTime = Number(recordingStartTime);
   const now = Date.now();
@@ -61,9 +57,7 @@ export const stopRecording = async () => {
   const validationMatches =
     validation?.details?.recordingId &&
     validation.details.recordingId === fastRecorderActiveRecordingId;
-  const hardFailForCurrent = Boolean(
-    validationMatches && validation?.hardFail
-  );
+  const hardFailForCurrent = Boolean(validationMatches && validation?.hardFail);
   //const hasWebCodecs = supportsWebCodecs();
   const hasWebCodecs = Boolean(fastRecorderInUse) && !hardFailForCurrent;
 
@@ -73,14 +67,13 @@ export const stopRecording = async () => {
     sandboxTab,
     postStopRecordingId,
     recordingTab,
-  } =
-    await chrome.storage.local.get([
-      "postStopEditorOpened",
-      "postStopEditorOpening",
-      "sandboxTab",
-      "postStopRecordingId",
-      "recordingTab",
-    ]);
+  } = await chrome.storage.local.get([
+    "postStopEditorOpened",
+    "postStopEditorOpening",
+    "sandboxTab",
+    "postStopRecordingId",
+    "recordingTab",
+  ]);
 
   if (isSubscribed) {
     chrome.alarms.clear("recording-alarm");
@@ -100,22 +93,22 @@ export const stopRecording = async () => {
         chrome.tabs.onUpdated.addListener(function _(
           tabId,
           changeInfo,
-          updatedTab
+          updatedTab,
         ) {
           if (tabId === tab.id && changeInfo.status === "complete") {
             chrome.tabs.onUpdated.removeListener(_);
             chrome.storage.local.set({ sandboxTab: tab.id });
-            sendMessageTab(tab.id, { type: "fallback-recording" }).catch(
-              (err) => {
-                console.error(
-                  "❌ Failed to send message:",
-                  err?.message || err
-                );
+            (async () => {
+              try {
+                await waitForContentScript(tab.id);
+                await sendMessageTab(tab.id, { type: "fallback-recording" });
+              } catch (err) {
+                console.error("❌ Failed to wait/send to content script:", err);
               }
-            );
+            })();
           }
         });
-      }
+      },
     );
 
     chrome.runtime.sendMessage({ type: "turn-off-pip" });
@@ -131,22 +124,22 @@ export const stopRecording = async () => {
         chrome.tabs.onUpdated.addListener(function _(
           tabId,
           changeInfo,
-          updatedTab
+          updatedTab,
         ) {
           if (tabId === tab.id && changeInfo.status === "complete") {
             chrome.tabs.onUpdated.removeListener(_);
             chrome.storage.local.set({ sandboxTab: tab.id });
-            sendMessageTab(tab.id, { type: "viewer-recording" }).catch(
-              (err) => {
-                console.error(
-                  "❌ Failed to send message:",
-                  err?.message || err
-                );
+            (async () => {
+              try {
+                await waitForContentScript(tab.id);
+                await sendMessageTab(tab.id, { type: "viewer-recording" });
+              } catch (err) {
+                console.error("❌ Failed to wait/send to content script:", err);
               }
-            );
+            })();
           }
         });
-      }
+      },
     );
 
     chrome.runtime.sendMessage({ type: "turn-off-pip" });
@@ -155,29 +148,26 @@ export const stopRecording = async () => {
     const query = postStopRecordingId
       ? `?mode=postStop&recordingId=${encodeURIComponent(postStopRecordingId)}`
       : "?mode=postStop";
-    chrome.tabs.create(
-      { url: `editor.html${query}`, active: true },
-      (tab) => {
-        chrome.tabs.onUpdated.addListener(function _(
-          tabId,
-          changeInfo,
-          updatedTab
-        ) {
-          if (tabId === tab.id && changeInfo.status === "complete") {
-            chrome.tabs.onUpdated.removeListener(_);
-            chrome.storage.local.set({ sandboxTab: tab.id });
-            sendMessageTab(tab.id, { type: "fallback-recording" }).catch(
-              (err) => {
-                console.error(
-                  "❌ Failed to send message:",
-                  err?.message || err
-                );
-              }
-            );
-          }
-        });
-      }
-    );
+    chrome.tabs.create({ url: `editor.html${query}`, active: true }, (tab) => {
+      chrome.tabs.onUpdated.addListener(function _(
+        tabId,
+        changeInfo,
+        updatedTab,
+      ) {
+        if (tabId === tab.id && changeInfo.status === "complete") {
+          chrome.tabs.onUpdated.removeListener(_);
+          chrome.storage.local.set({ sandboxTab: tab.id });
+          (async () => {
+            try {
+              await waitForContentScript(tab.id);
+              await sendMessageTab(tab.id, { type: "fallback-recording" });
+            } catch (err) {
+              console.error("❌ Failed to wait/send to content script:", err);
+            }
+          })();
+        }
+      });
+    });
 
     chrome.runtime.sendMessage({ type: "turn-off-pip" });
   }
@@ -248,7 +238,7 @@ export const handleStopRecordingTab = async (request) => {
       chrome.tabs.create(
         {
           url: `${editorUrl}?mode=postStop&recordingId=${encodeURIComponent(
-            recordingId
+            recordingId,
           )}`,
           active: true,
         },
@@ -257,7 +247,7 @@ export const handleStopRecordingTab = async (request) => {
           chrome.tabs.onUpdated.addListener(function _(
             tabId,
             changeInfo,
-            updatedTab
+            updatedTab,
           ) {
             if (tabId === tab.id && changeInfo.status === "complete") {
               chrome.tabs.onUpdated.removeListener(_);
@@ -270,13 +260,13 @@ export const handleStopRecordingTab = async (request) => {
                 (err) => {
                   console.error(
                     "❌ Failed to send message:",
-                    err?.message || err
+                    err?.message || err,
                   );
-                }
+                },
               );
             }
           });
-        }
+        },
       );
     } else {
       const editorUrl =
@@ -287,7 +277,7 @@ export const handleStopRecordingTab = async (request) => {
         chrome.tabs.onUpdated.addListener(function _(
           tabId,
           changeInfo,
-          updatedTab
+          updatedTab,
         ) {
           if (tabId === tab.id && changeInfo.status === "complete") {
             chrome.tabs.onUpdated.removeListener(_);
@@ -302,9 +292,9 @@ export const handleStopRecordingTab = async (request) => {
                 (err) => {
                   console.error(
                     "❌ Failed to send message:",
-                    err?.message || err
+                    err?.message || err,
                   );
-                }
+                },
               );
             } else {
               sendChunks();

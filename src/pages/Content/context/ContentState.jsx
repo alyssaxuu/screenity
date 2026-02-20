@@ -184,7 +184,9 @@ const ContentState = (props) => {
     }));
     if (tabIdRef.current != null) {
       const preferredTab =
-        tabRecordedIdRef.current ?? recordingUiTabRef.current ?? tabIdRef.current;
+        tabRecordedIdRef.current ??
+        recordingUiTabRef.current ??
+        tabIdRef.current;
       chrome.storage.local.set({ recordingBeepTabId: preferredTab });
       recordingBeepTabIdRef.current = preferredTab;
     }
@@ -1066,7 +1068,7 @@ const ContentState = (props) => {
     const onChanged = (changes, area) => {
       if (area !== "local") return;
       const entry = Object.keys(changes).find((k) =>
-        k.startsWith("freeFinalizeStatus:")
+        k.startsWith("freeFinalizeStatus:"),
       );
       if (!entry) return;
       applyStatus(changes[entry].newValue);
@@ -1591,6 +1593,8 @@ const ContentState = (props) => {
   useEffect(() => {
     updateFromStorage();
   }, []);
+
+  // (No storage fallback listener here; use direct messaging flow)
 
   return (
     // this is the provider providing state

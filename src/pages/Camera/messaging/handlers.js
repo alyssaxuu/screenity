@@ -58,17 +58,17 @@ export const setupHandlers = ({ setLoading }) => {
           {
             onStart: () => setLoading("videoElement", true),
             onFinish: () => setLoading("videoElement", false),
-          }
+          },
         );
       }, 500);
     }
   });
 
   registerMessage("background-effects-active", () =>
-    setBackgroundEffects(true)
+    setBackgroundEffects(true),
   );
   registerMessage("background-effects-inactive", () =>
-    setBackgroundEffects(false)
+    setBackgroundEffects(false),
   );
   registerMessage("camera-only-update", handleCameraOnlyUpdate);
   registerMessage("screen-update", handleScreenUpdate);

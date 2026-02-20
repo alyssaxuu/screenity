@@ -1,6 +1,9 @@
 import React, { useEffect, useState, useRef, useCallback } from "react";
 import RecorderUI from "./RecorderUI";
-import { sendRecordingError as sendRecordingErrorBase, sendStopRecording } from "./messaging";
+import {
+  sendRecordingError as sendRecordingErrorBase,
+  sendStopRecording,
+} from "./messaging";
 import { getBitrates, getResolutionForQuality } from "./recorderConfig";
 import BunnyTusUploader from "./bunnyTusUploader";
 import localforage from "localforage";
@@ -25,15 +28,27 @@ const IS_IFRAME_CONTEXT =
     !document.referrer.startsWith("chrome-extension://"));
 
 const CloudRecorder = () => {
-  const DEBUG_BUNDLE_MAX_EVENTS = 200;
-  const debugBundleSessionRef = useRef(null);
-  const debugBundleEventsRef = useRef([]);
-  const debugBundleKeyRef = useRef(null);
+  // Debug bundle removed; keep a no-op logger to preserve calls
 
   const screenTimer = useRef({ start: null, total: 0, paused: false });
   const cameraTimer = useRef({ start: null, total: 0, paused: false });
   const [started, setStarted] = useState(false);
   const [initProject, setInitProject] = useState(false);
+  const [finalizeFailure, setFinalizeFailure] = useState(null);
+  const finalizeFailureRef = useRef(null);
+  const [retryingFinalize, setRetryingFinalize] = useState(false);
+
+  const retryFinalize = async () => {
+    setRetryingFinalize(true);
+    try {
+      // Attempt to re-run finalize flow by calling stopRecording with shouldFinalize=true
+      await stopRecording(true, "retry-finalize");
+    } catch (err) {
+      console.warn("Retry finalize failed:", err);
+    } finally {
+      setRetryingFinalize(false);
+    }
+  };
 
   const isTab = useRef(false);
   const tabID = useRef(null);
@@ -111,46 +126,8 @@ const CloudRecorder = () => {
   const keepAliveAudioCtx = useRef(null);
   const keepAliveOscillator = useRef(null);
 
-  const ensureDebugBundleSession = async () => {
-    if (debugBundleSessionRef.current) return debugBundleSessionRef.current;
-    const fallbackId = `recdbg-${Date.now()}-${Math.random()
-      .toString(36)
-      .slice(2, 8)}`;
-    const sessionId = recorderSession.current?.id || fallbackId;
-    const session = { id: sessionId, startedAt: Date.now() };
-    debugBundleSessionRef.current = session;
-    debugBundleKeyRef.current = `recorderDebugBundle:${sessionId}`;
-    try {
-      await chrome.storage.local.set({ recorderDebugBundleSessionId: sessionId });
-    } catch {
-      // ignore
-    }
-    return session;
-  };
-
-  const appendDebugBundleEvent = async (event) => {
-    if (!event) return;
-    debugBundleEventsRef.current = [
-      ...debugBundleEventsRef.current,
-      event,
-    ].slice(-DEBUG_BUNDLE_MAX_EVENTS);
-    const key = debugBundleKeyRef.current || `recorderDebugBundle:${event.sessionId}`;
-    try {
-      await chrome.storage.local.set({ [key]: debugBundleEventsRef.current });
-    } catch {
-      // ignore
-    }
-  };
-
-  const logDebugEvent = async (eventType, payload = {}) => {
-    const session = await ensureDebugBundleSession();
-    const event = {
-      sessionId: session.id,
-      eventType,
-      ts: Date.now(),
-      payload,
-    };
-    appendDebugBundleEvent(event);
+  const logDebugEvent = async () => {
+    // debug bundle feature removed; noop
   };
 
   const setPipelineState = async (step, extra = {}) => {
@@ -312,84 +289,7 @@ const CloudRecorder = () => {
     return { ok: true };
   };
 
-  const exportDebugBundle = async () => {
-    try {
-      const session = await ensureDebugBundleSession();
-      const key = debugBundleKeyRef.current || `recorderDebugBundle:${session.id}`;
-      const storage = await chrome.storage.local.get([
-        key,
-        "projectId",
-        "sceneId",
-        "uploadMeta",
-        "recorderSession",
-        "lastStopRecordingEvent",
-        "lastFinalizeFailure",
-        "screenTrackLog",
-        "pendingSceneIndex",
-        "recorderPipelineState",
-      ]);
-      const events = Array.isArray(storage[key])
-        ? storage[key]
-        : debugBundleEventsRef.current;
-      const uploadMeta = uploadMetaRef.current || storage.uploadMeta || null;
-      const ids = {
-        projectId: storage.projectId || null,
-        sceneId:
-          uploadMeta?.sceneId ||
-          screenUploader.current?.getMeta()?.sceneId ||
-          cameraUploader.current?.getMeta()?.sceneId ||
-          storage.sceneId ||
-          null,
-        screenMediaId:
-          uploadMeta?.screen?.mediaId ||
-          screenUploader.current?.getMeta()?.mediaId ||
-          null,
-        cameraMediaId:
-          uploadMeta?.camera?.mediaId ||
-          cameraUploader.current?.getMeta()?.mediaId ||
-          null,
-        audioMediaId: uploadMeta?.audio?.mediaId || null,
-        screenVideoId:
-          uploadMeta?.screen?.videoId ||
-          screenUploader.current?.getMeta()?.videoId ||
-          null,
-        cameraVideoId:
-          uploadMeta?.camera?.videoId ||
-          cameraUploader.current?.getMeta()?.videoId ||
-          null,
-      };
-
-      const payload = {
-        sessionId: session.id,
-        exportedAt: Date.now(),
-        pipelineState: storage.recorderPipelineState || null,
-        recorderSession: storage.recorderSession || recorderSession.current || null,
-        ids,
-        uploadMeta,
-        lastStopRecordingEvent: storage.lastStopRecordingEvent || null,
-        lastFinalizeFailure: storage.lastFinalizeFailure || null,
-        screenTrackLog: storage.screenTrackLog || [],
-        pendingSceneIndex: storage.pendingSceneIndex || [],
-        events,
-      };
-
-      const blob = new Blob([JSON.stringify(payload, null, 2)], {
-        type: "application/json",
-      });
-      const objectUrl = URL.createObjectURL(blob);
-      try {
-        await chrome.downloads.download({
-          url: objectUrl,
-          filename: `Screenity-Debug-Bundle-${new Date().toISOString()}.json`,
-          saveAs: false,
-        });
-      } finally {
-        URL.revokeObjectURL(objectUrl);
-      }
-    } catch (err) {
-      console.warn("[CloudRecorder] Failed to export debug bundle", err);
-    }
-  };
+  // exportDebugBundle removed
 
   // Note: We no longer try to "keep alive" the service worker with pings.
   // Instead, we persist recording state to chrome.storage.local so the SW can
@@ -428,7 +328,9 @@ const CloudRecorder = () => {
         discardable: false,
       });
 
-      console.log("[CloudRecorder] Tab keep-alive started");
+      if (globalThis.SCREENITY_VERBOSE_LOGS) {
+        console.log("[CloudRecorder] Tab keep-alive started");
+      }
     } catch (err) {
       console.warn("[CloudRecorder] Failed to start tab keep-alive:", err);
     }
@@ -455,7 +357,9 @@ const CloudRecorder = () => {
         discardable: true,
       });
 
-      console.log("[CloudRecorder] Tab keep-alive stopped");
+      if (globalThis.SCREENITY_VERBOSE_LOGS) {
+        console.log("[CloudRecorder] Tab keep-alive stopped");
+      }
     } catch (err) {
       console.warn("[CloudRecorder] Failed to stop tab keep-alive:", err);
     }
@@ -554,7 +458,7 @@ const CloudRecorder = () => {
         // Stop the recording when track dies
         if (!isFinishing.current && !sentLast.current) {
           console.warn(
-            "⚠️ Screen track monitor detected ended track - stopping recording"
+            "⚠️ Screen track monitor detected ended track - stopping recording",
           );
           stopRecording(true, "screen-track-monitor-ended");
         }
@@ -572,7 +476,7 @@ const CloudRecorder = () => {
     } catch (err) {
       fatalErrorRef.current = true;
       sendRecordingError(
-        "Local storage is blocked (IndexedDB unavailable). Recording cannot start."
+        "Local storage is blocked (IndexedDB unavailable). Recording cannot start.",
       );
       return false;
     }
@@ -612,7 +516,6 @@ const CloudRecorder = () => {
     };
     recorderSession.current = session;
     await chrome.storage.local.set({ recorderSession: session });
-    await ensureDebugBundleSession();
     logDebugEvent("recorder-session-started", {
       sessionId: session.id,
       projectId: meta.projectId || null,
@@ -628,14 +531,14 @@ const CloudRecorder = () => {
         chrome.storage.local.remove("recorderSession");
         sendRecordingError(
           result?.error ||
-            "Another Screenity recorder is already running. Please close it and try again."
+            "Another Screenity recorder is already running. Please close it and try again.",
         );
         return false;
       }
     } catch (err) {
       console.warn(
         "Failed to register recording session with background:",
-        err
+        err,
       );
     }
     return true;
@@ -835,7 +738,7 @@ const CloudRecorder = () => {
         recovered.sort((a, b) => a.index - b.index);
         blob = createBlobFromChunks(
           recovered.map((c) => c.chunk),
-          "video/webm"
+          "video/webm",
         );
       }
       if (!blob) return;
@@ -863,7 +766,7 @@ const CloudRecorder = () => {
     recoveryAttempted.current = true;
     try {
       const { recorderSession: storedSession } = await chrome.storage.local.get(
-        ["recorderSession"]
+        ["recorderSession"],
       );
 
       const chunkCount = await chunksStore.length().catch(() => 0);
@@ -879,7 +782,7 @@ const CloudRecorder = () => {
         recovered.sort((a, b) => a.index - b.index);
         const blob = createBlobFromChunks(
           recovered.map((c) => c.chunk),
-          "video/webm"
+          "video/webm",
         );
         if (blob) {
           const objectUrl = URL.createObjectURL(blob);
@@ -923,12 +826,8 @@ const CloudRecorder = () => {
           continue;
         }
 
-        const {
-          projectId,
-          screenMediaId,
-          cameraMediaId,
-          audioMediaId,
-        } = pending;
+        const { projectId, screenMediaId, cameraMediaId, audioMediaId } =
+          pending;
 
         if (!projectId) continue;
 
@@ -1124,16 +1023,15 @@ const CloudRecorder = () => {
         "projectId",
         "recordingToScene",
       ]);
-      const uploadMeta =
-        uploadMetaRef.current || {
-          screen: screenUploader.current?.getMeta?.() || null,
-          camera: cameraUploader.current?.getMeta?.() || null,
-          audio: null,
-          sceneId:
-            screenUploader.current?.getMeta?.()?.sceneId ||
-            cameraUploader.current?.getMeta?.()?.sceneId ||
-            null,
-        };
+      const uploadMeta = uploadMetaRef.current || {
+        screen: screenUploader.current?.getMeta?.() || null,
+        camera: cameraUploader.current?.getMeta?.() || null,
+        audio: null,
+        sceneId:
+          screenUploader.current?.getMeta?.()?.sceneId ||
+          cameraUploader.current?.getMeta?.()?.sceneId ||
+          null,
+      };
 
       if (projectId && uploadMeta) {
         await deleteProject(projectId, uploadMeta, !recordingToScene);
@@ -1459,14 +1357,14 @@ const CloudRecorder = () => {
       .catch(() => true);
     if (pinned === false) {
       sendRecordingError(
-        "Screenity must stay pinned to record. Pin the extension and try again."
+        "Screenity must stay pinned to record. Pin the extension and try again.",
       );
       return;
     }
 
     if (!uploadersInitialized.current) {
       sendRecordingError(
-        "Uploaders not initialized. Please restart recording."
+        "Uploaders not initialized. Please restart recording.",
       );
       return;
     }
@@ -1493,7 +1391,7 @@ const CloudRecorder = () => {
         .catch(() => false);
       if (!tabAlive) {
         sendRecordingError(
-          "The tab you selected for recording was closed. Please start again."
+          "The tab you selected for recording was closed. Please start again.",
         );
         return;
       }
@@ -1514,7 +1412,7 @@ const CloudRecorder = () => {
     } catch (err) {
       fatalErrorRef.current = true;
       sendRecordingError(
-        "Unable to initialize local buffer (IndexedDB issue)."
+        "Unable to initialize local buffer (IndexedDB issue).",
       );
       return;
     }
@@ -1534,7 +1432,7 @@ const CloudRecorder = () => {
       if (screenStream.current) {
         const stream = attachMicToStream(
           screenStream.current,
-          micStream.current
+          micStream.current,
         );
 
         const screenOptions = {
@@ -1555,7 +1453,7 @@ const CloudRecorder = () => {
               consecutiveScreenFailures.current++;
               if (consecutiveScreenFailures.current > 3) {
                 sendRecordingError(
-                  "Recording failed - no video data being captured. Please try again."
+                  "Recording failed - no video data being captured. Please try again.",
                 );
                 sendStopRecording("empty-screen-chunk");
               }
@@ -1586,7 +1484,7 @@ const CloudRecorder = () => {
               .catch((err) => {
                 fatalErrorRef.current = true;
                 sendRecordingError(
-                  "Could not buffer recording data locally (IndexedDB blocked)."
+                  "Could not buffer recording data locally (IndexedDB blocked).",
                 );
                 sendStopRecording();
                 throw err;
@@ -1610,7 +1508,7 @@ const CloudRecorder = () => {
                 if (consecutiveScreenFailures.current > 3) {
                   stallNotified.current = true;
                   sendRecordingError(
-                    "Screen upload failed repeatedly. Continuing locally; upload will retry on finalize."
+                    "Screen upload failed repeatedly. Continuing locally; upload will retry on finalize.",
                   );
                   screenUploader.current?.pause?.();
                 }
@@ -1625,7 +1523,7 @@ const CloudRecorder = () => {
             }
 
             index.current++;
-          }
+          },
         );
 
         // Start recording with 2-second time slices
@@ -1647,7 +1545,7 @@ const CloudRecorder = () => {
           (blob) => {
             // Store chunks for final blob creation
             audioChunks.current.push(blob);
-          }
+          },
         );
 
         audioRecorder.current.start(2000);
@@ -1661,7 +1559,7 @@ const CloudRecorder = () => {
           if (micStream.current) {
             streamToRecord = attachMicToStream(
               cameraStream.current,
-              micStream.current
+              micStream.current,
             );
           } else {
             console.warn("⚠️ Camera-only recording: microphone not available");
@@ -1699,18 +1597,18 @@ const CloudRecorder = () => {
               } catch (uploadErr) {
                 console.error(
                   "Failed to upload camera chunk to Bunny:",
-                  uploadErr
+                  uploadErr,
                 );
                 consecutiveCameraFailures.current++;
                 if (consecutiveCameraFailures.current > 3) {
                   console.error(
-                    "Camera upload failing repeatedly; pausing camera uploader"
+                    "Camera upload failing repeatedly; pausing camera uploader",
                   );
                   cameraUploader.current?.pause?.();
                 }
               }
             }
-          }
+          },
         );
 
         cameraRecorder.current.start(2000);
@@ -1846,7 +1744,7 @@ const CloudRecorder = () => {
               recorderRef.current.stop();
             }),
             new Promise((_, reject) =>
-              setTimeout(() => reject(new Error("Stop timeout")), 5000)
+              setTimeout(() => reject(new Error("Stop timeout")), 5000),
             ),
           ]);
         } catch (err) {
@@ -1991,7 +1889,7 @@ const CloudRecorder = () => {
         // Use sendBeacon or sync storage write for reliability
         navigator.sendBeacon?.(
           `${API_BASE}/log/recorder-unload`,
-          JSON.stringify({ reason: "pagehide", ts: Date.now() })
+          JSON.stringify({ reason: "pagehide", ts: Date.now() }),
         );
         stopRecording(true, "pagehide-unload");
       }
@@ -2047,7 +1945,7 @@ const CloudRecorder = () => {
   const createSceneOrHandleMultiMode = async (
     uploadMeta,
     durations,
-    isSilent
+    isSilent,
   ) => {
     const {
       projectId,
@@ -2090,7 +1988,7 @@ const CloudRecorder = () => {
 
     if (!uploadMeta.screen?.mediaId && !uploadMeta.camera?.mediaId) {
       throw new Error(
-        "No valid media uploaded - both screen and camera mediaId are missing"
+        "No valid media uploaded - both screen and camera mediaId are missing",
       );
     }
 
@@ -2468,7 +2366,7 @@ const CloudRecorder = () => {
       await exportLocalRecovery("finalize-error");
       await finalizeRecorderSession("failed");
       sendRecordingError(
-        "Upload failed to finalize. A recovery copy was downloaded."
+        "Upload failed to finalize. A recovery copy was downloaded.",
       );
       return;
     }
@@ -2509,7 +2407,7 @@ const CloudRecorder = () => {
       const minExpectedSize = effectiveScreenDuration * 50000; // ~50KB/sec minimum
       if (screenOffset < minExpectedSize) {
         console.warn(
-          `⚠️ Screen upload size (${screenOffset} bytes) seems small for ${effectiveScreenDuration}s recording. Expected at least ${minExpectedSize} bytes.`
+          `⚠️ Screen upload size (${screenOffset} bytes) seems small for ${effectiveScreenDuration}s recording. Expected at least ${minExpectedSize} bytes.`,
         );
       }
     }
@@ -2525,14 +2423,14 @@ const CloudRecorder = () => {
       if (hasAnyScreenData || hasAnyCameraData) {
         console.warn(
           "Uploads have data but were not marked completed. Proceeding with scene creation.",
-          { screenStatus, cameraStatus, screenOffset, cameraOffset }
+          { screenStatus, cameraStatus, screenOffset, cameraOffset },
         );
       } else {
         await cleanupIfEmptyUploads("no-upload");
         await exportLocalRecovery("no-upload");
         await finalizeRecorderSession("failed");
         sendRecordingError(
-          `No media was successfully uploaded. Screen: ${screenStatus} (${screenOffset} bytes, error: ${screenError}), Camera: ${cameraStatus} (${cameraOffset} bytes, error: ${cameraError})`
+          `No media was successfully uploaded. Screen: ${screenStatus} (${screenOffset} bytes, error: ${screenError}), Camera: ${cameraStatus} (${cameraOffset} bytes, error: ${cameraError})`,
         );
         return;
       }
@@ -2567,7 +2465,11 @@ const CloudRecorder = () => {
       try {
         await createSceneOrHandleMultiMode(uploadMeta, usedDurations, silent);
 
-        const result = await handleAudioUpload(audioBlob, projectId, uploadMeta);
+        const result = await handleAudioUpload(
+          audioBlob,
+          projectId,
+          uploadMeta,
+        );
         uploadMeta.audio = result;
         chrome.storage.local.set({ uploadMeta });
 
@@ -2654,7 +2556,6 @@ const CloudRecorder = () => {
     }
   };
 
-
   const startAudioStream = async (id) => {
     const useExact = id && id !== "none";
     const audioStreamOptions = {
@@ -2694,14 +2595,14 @@ const CloudRecorder = () => {
     } catch (err) {
       console.warn(
         "⚠️ Failed to access audio with deviceId, trying fallback:",
-        err
+        err,
       );
       try {
         return await navigator.mediaDevices.getUserMedia({ audio: true });
       } catch (err2) {
         console.warn(
           "⚠️ Microphone blocked/unavailable; continuing without mic:",
-          err2
+          err2,
         );
 
         // Optional: small non-fatal UI signal
@@ -2721,10 +2622,7 @@ const CloudRecorder = () => {
       return navigator.mediaDevices.getUserMedia(constraints);
     }
     const { defaultVideoInputLabel, videoinput } =
-      await chrome.storage.local.get([
-        "defaultVideoInputLabel",
-        "videoinput",
-      ]);
+      await chrome.storage.local.get(["defaultVideoInputLabel", "videoinput"]);
     const desiredLabel =
       defaultVideoInputLabel ||
       videoinput?.find((device) => device.deviceId === deviceId)?.label ||
@@ -2783,7 +2681,7 @@ const CloudRecorder = () => {
       if (data.recordingType === "camera") {
         try {
           cameraStream.current = await navigator.mediaDevices.getUserMedia(
-            constraints
+            constraints,
           );
         } catch (err) {
           console.warn("⚠️ Failed to access camera stream:", err);
@@ -2801,7 +2699,7 @@ const CloudRecorder = () => {
             audio: data.systemAudio,
           };
           const stream = await navigator.mediaDevices.getDisplayMedia(
-            constraints
+            constraints,
           );
           screenStream.current = stream;
           regionRef.current = true;
@@ -2838,12 +2736,12 @@ const CloudRecorder = () => {
           try {
             cameraStream.current = await getVideoStreamWithFallback(
               cameraConstraints,
-              defaultVideoInput
+              defaultVideoInput,
             );
           } catch (err) {
             console.warn(
               "⚠️ Camera permission denied — continuing without camera:",
-              err
+              err,
             );
             cameraStream.current = null;
 
@@ -2853,7 +2751,7 @@ const CloudRecorder = () => {
             // only fatal if the user is doing camera-only recording
             if (data.recordingType === "camera") {
               sendRecordingError(
-                "Camera permission is blocked. Please allow camera access to record."
+                "Camera permission is blocked. Please allow camera access to record.",
               );
               return;
             }
@@ -2866,7 +2764,7 @@ const CloudRecorder = () => {
             await track.cropTo(target.current);
           } else {
             sendRecordingError(
-              "No crop target set for region capture. Please select a region."
+              "No crop target set for region capture. Please select a region.",
             );
             return;
           }
@@ -2911,7 +2809,7 @@ const CloudRecorder = () => {
 
         try {
           screenStream.current = await navigator.mediaDevices.getUserMedia(
-            desktopConstraints
+            desktopConstraints,
           );
           const track = screenStream.current.getVideoTracks()[0];
           const {
@@ -2936,7 +2834,7 @@ const CloudRecorder = () => {
               if (!response || chrome.runtime.lastError || response.error) {
                 console.error(
                   "Failed to get monitor info:",
-                  response?.error || chrome.runtime.lastError || "No response"
+                  response?.error || chrome.runtime.lastError || "No response",
                 );
                 return;
               }
@@ -2950,7 +2848,7 @@ const CloudRecorder = () => {
                 monitorBounds,
                 recordedStreamDimensions: { width, height },
               });
-            }
+            },
           );
 
           chrome.runtime.sendMessage({
@@ -2990,12 +2888,12 @@ const CloudRecorder = () => {
           try {
             cameraStream.current = await getVideoStreamWithFallback(
               cameraConstraints,
-              defaultVideoInput
+              defaultVideoInput,
             );
           } catch (err) {
             console.warn(
               "⚠️ Camera permission denied — continuing without camera:",
-              err
+              err,
             );
             cameraStream.current = null;
 
@@ -3005,7 +2903,7 @@ const CloudRecorder = () => {
             // only fatal if the user is doing camera-only recording
             if (data.recordingType === "camera") {
               sendRecordingError(
-                "Camera permission is blocked. Please allow camera access to record."
+                "Camera permission is blocked. Please allow camera access to record.",
               );
               return;
             }
@@ -3026,7 +2924,7 @@ const CloudRecorder = () => {
       if (micStream.current?.getAudioTracks().length) {
         audioInputGain.current = aCtx.current.createGain();
         const micSource = aCtx.current.createMediaStreamSource(
-          micStream.current
+          micStream.current,
         );
         micSource.connect(audioInputGain.current).connect(destination.current);
         micStream.current = destination.current.stream;
@@ -3040,7 +2938,7 @@ const CloudRecorder = () => {
       if (screenStream.current?.getAudioTracks().length) {
         audioOutputGain.current = aCtx.current.createGain();
         const screenSource = aCtx.current.createMediaStreamSource(
-          screenStream.current
+          screenStream.current,
         );
         screenSource
           .connect(audioOutputGain.current)
@@ -3078,7 +2976,7 @@ const CloudRecorder = () => {
           const options = { day: "2-digit", month: "short", year: "numeric" };
           const title = `Untitled video - ${now.toLocaleString(
             "en-GB",
-            options
+            options,
           )}`;
 
           videoId = await createVideoProject({
@@ -3141,7 +3039,7 @@ const CloudRecorder = () => {
             } else {
               startStream(data, streamId, permissions, permissions2);
             }
-          }
+          },
         );
       } else {
         startStream(data, tabID.current, permissions, permissions2);
@@ -3169,7 +3067,7 @@ const CloudRecorder = () => {
     const sendReady = () => {
       window.parent.postMessage(
         { type: "screenity-region-capture-loaded" },
-        "*"
+        "*",
       );
     };
 
@@ -3375,7 +3273,6 @@ const CloudRecorder = () => {
       onExportDiagnostics={() =>
         exportFinalizeDiagnostics(finalizeFailureRef.current)
       }
-      onExportDebugBundle={exportDebugBundle}
     />
   );
 };

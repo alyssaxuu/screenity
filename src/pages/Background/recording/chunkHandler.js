@@ -12,6 +12,7 @@ export const chunksStore = localforage.createInstance({ name: "chunks" });
 export const localDirectoryStore = localforage.createInstance({
   name: "localDirectory",
 });
+const DEBUG_POSTSTOP = true;
 
 export const clearAllRecordings = async () => {
   try {
@@ -21,7 +22,7 @@ export const clearAllRecordings = async () => {
   }
 };
 
-export const handleChunks = async (chunks, override = false) => {
+export const handleChunks = async (chunks, override = false, target = null) => {
   const { sendingChunks, sandboxTab, bannerSupport } =
     await chrome.storage.local.get([
       "sendingChunks",
@@ -29,13 +30,25 @@ export const handleChunks = async (chunks, override = false) => {
       "bannerSupport",
     ]);
 
+  if (DEBUG_POSTSTOP)
+    console.debug("[Screenity][BG] handleChunks called", {
+      chunksLength: chunks?.length,
+      sandboxTab,
+      override,
+    });
+
   if (sendingChunks) return;
 
   await chrome.storage.local.set({ sendingChunks: true });
 
   try {
-    if (chunks.length === 0) {
-      sendMessageTab(sandboxTab, { type: "make-video-tab", override });
+    if (!Array.isArray(chunks) || chunks.length === 0) {
+      if (DEBUG_POSTSTOP)
+        console.debug(
+          "[Screenity][BG] no chunks to send, instructing sandbox to make-video-tab",
+        );
+      if (sandboxTab)
+        sendMessageTab(sandboxTab, { type: "make-video-tab", override });
       return;
     }
 
@@ -49,29 +62,85 @@ export const handleChunks = async (chunks, override = false) => {
     const maxRetries = 3;
     const retryDelay = 1000;
 
-    sendMessageTab(sandboxTab, {
-      type: "chunk-count",
-      count: chunks.length,
-      override,
-    });
+    const targetTab = target?.tabId || sandboxTab;
+    const targetFrame = target?.frameId ?? null;
+
+    if (DEBUG_POSTSTOP)
+      console.debug("[Screenity][BG] sending chunk-count", {
+        count: chunks.length,
+        targetTab,
+        targetFrame,
+        override,
+      });
+
+    const sendToTarget = (msg) =>
+      new Promise((resolve, reject) => {
+        try {
+          if (targetTab == null) return reject(new Error("no-target-tab"));
+          if (typeof targetFrame === "number") {
+            chrome.tabs.sendMessage(
+              targetTab,
+              msg,
+              { frameId: targetFrame },
+              (resp) => {
+                if (chrome.runtime.lastError)
+                  return reject(chrome.runtime.lastError.message);
+                resolve(resp);
+              },
+            );
+          } else {
+            sendMessageTab(targetTab, msg, null).then(resolve).catch(reject);
+          }
+        } catch (err) {
+          reject(err);
+        }
+      });
+
+    try {
+      await sendToTarget({
+        type: "chunk-count",
+        count: chunks.length,
+        override,
+      });
+    } catch (err) {
+      if (DEBUG_POSTSTOP)
+        console.warn("[Screenity][BG] chunk-count message failed", err);
+    }
 
     if (bannerSupport) {
-      sendMessageTab(sandboxTab, { type: "banner-support" });
+      try {
+        await sendToTarget({ type: "banner-support" });
+      } catch (err) {
+        if (DEBUG_POSTSTOP)
+          console.warn("[Screenity][BG] banner-support message failed", err);
+      }
     }
 
     const delay = (ms) => new Promise((res) => setTimeout(res, ms));
 
     const sendBatch = async (batch) => {
-      for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      let attempt = 0;
+      while (attempt < maxRetries) {
+        attempt += 1;
         try {
-          const response = await sendMessageTab(sandboxTab, {
-            type: "new-chunk-tab",
-            chunks: batch,
-          });
-          if (response) return true;
-        } catch (err) {}
-        await delay(retryDelay);
+          if (DEBUG_POSTSTOP)
+            console.debug("[Screenity][BG] sending new-chunk-tab batch", {
+              batchLen: batch.length,
+              attempt,
+            });
+          await sendToTarget({ type: "new-chunk-tab", chunks: batch });
+          return true;
+        } catch (err) {
+          if (DEBUG_POSTSTOP)
+            console.warn("[Screenity][BG] sendBatch attempt failed, retrying", {
+              attempt,
+              err,
+            });
+          if (attempt < maxRetries) await delay(retryDelay);
+        }
       }
+      if (DEBUG_POSTSTOP)
+        console.warn("[Screenity][BG] sendBatch failed after retries");
       return false;
     };
 
@@ -89,19 +158,38 @@ export const handleChunks = async (chunks, override = false) => {
           } catch {
             return null;
           }
-        })
+        }),
       );
 
       const filtered = batch.filter(Boolean);
       if (filtered.length > 0) {
+        if (DEBUG_POSTSTOP)
+          console.debug("[Screenity][BG] sending filtered batch", {
+            filteredLen: filtered.length,
+            currentIndex,
+          });
         const ok = await sendBatch(filtered);
-        if (!ok) return;
+        if (!ok) {
+          if (DEBUG_POSTSTOP)
+            console.warn("[Screenity][BG] failed to send batch, aborting");
+          return;
+        }
       }
 
       currentIndex += batchSize;
     }
 
-    sendMessageTab(sandboxTab, { type: "make-video-tab", override });
+    if (DEBUG_POSTSTOP)
+      console.debug(
+        "[Screenity][BG] all batches sent, instructing sandbox to make video tab",
+        { sandboxTab: targetTab },
+      );
+    try {
+      await sendToTarget({ type: "make-video-tab", override });
+    } catch (err) {
+      if (DEBUG_POSTSTOP)
+        console.warn("[Screenity][BG] make-video-tab message failed", err);
+    }
   } finally {
     await chrome.storage.local.set({ sendingChunks: false });
   }

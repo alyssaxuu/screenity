@@ -9,7 +9,7 @@
     "watch": "cross-env NODE_ENV=development webpack --watch",
     "hot-reload": "cross-env NODE_ENV=development webpack serve --hot",
     "prettier": "prettier --write '**/*.{js,jsx,ts,tsx,json,css,scss,md}'",
-    "postinstall": "patch-package",
+    "postinstall": "patch-package && node scripts/patch-radix.js",
     "package": "npm run build && cd build && zip -r ../extension.zip . && cd ..",
     "clean": "rm -rf build && mkdir build",
     "lint": "eslint src/**/*.js --fix"
@@ -59,6 +59,7 @@
     "react-shadow": "^20.0.0",
     "react-svg": "^16.1.18",
     "ssestream": "^1.1.0",
+    "tar": "7.5.9",
     "wavesurfer.js": "^7.4.2",
     "webm-duration-fix": "^1.0.4"
   },
@@ -78,8 +79,8 @@
     "html-loader": "^3.1.0",
     "html-webpack-plugin": "^5.5.0",
     "prettier": "^2.7.1",
-    "sass": "^1.53.0",
-    "sass-loader": "^13.2.0",
+    "sass": "^1.97.3",
+    "sass-loader": "^16.0.7",
     "source-map-loader": "^3.0.1",
     "style-loader": "^3.3.1",
     "terser-webpack-plugin": "^5.3.6",
@@ -87,5 +88,9 @@
     "typescript": "^4.9.3",
     "webpack-cli": "^5.1.4",
     "webpack-dev-server": "^4.11.1"
+  },
+  "overrides": {
+    "tar": "7.5.9",
+    "minimatch": "10.2.2"
   }
 }

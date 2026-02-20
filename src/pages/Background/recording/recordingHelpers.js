@@ -79,7 +79,9 @@ export const handleRecordingComplete = async () => {
 };
 
 export const handleRecordingError = async (request) => {
-  console.log("handleRecordingError called with request:", request);
+  if (globalThis.SCREENITY_VERBOSE_LOGS) {
+    console.log("handleRecordingError called with request:", request);
+  }
   const { activeTab } = await chrome.storage.local.get(["activeTab"]);
 
   // For stream-ended, we just notify the user but DON'T stop the recording
@@ -138,7 +140,7 @@ export const writeFile = async (request) => {
       null,
       () => {
         sendMessageRecord({ type: "stop-recording-tab" });
-      }
+      },
     );
   } else {
     sendMessageRecord({ type: "stop-recording-tab" });

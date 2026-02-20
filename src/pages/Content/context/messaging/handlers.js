@@ -434,7 +434,7 @@ export const setupHandlers = () => {
 
     state.openModal(
       "Fast recorder failed",
-      "The fast recorder output couldn't be validated on this device.\nYou can download the file anyway, or grab a debug bundle for support.",
+      "The fast recorder output couldn't be validated on this device.\nYou can download the file anyway.",
       "Download anyway",
       "Cancel",
       () => {
@@ -445,8 +445,8 @@ export const setupHandlers = () => {
       null,
       null,
       true,
-      "Download debug bundle",
-      downloadBundle
+      false,
+      () => {},
     );
   });
 

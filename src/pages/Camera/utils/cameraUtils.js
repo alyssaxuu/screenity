@@ -11,7 +11,7 @@ export const getCameraStream = async (
   videoRef,
   offScreenCanvasRef,
   offScreenCanvasContextRef,
-  { onStart = () => {}, onFinish = () => {} } = {}
+  { onStart = () => {}, onFinish = () => {} } = {},
 ) => {
   const { setWidth, setHeight, recordingTypeRef } = getContextRefs();
 
@@ -29,14 +29,14 @@ export const getCameraStream = async (
 
   if (!offScreenCanvasRef) {
     console.warn(
-      "⚠️ offScreenCanvasRef is undefined. Creating a new reference."
+      "⚠️ offScreenCanvasRef is undefined. Creating a new reference.",
     );
     offScreenCanvasRef = { current: null };
   }
 
   if (!offScreenCanvasContextRef) {
     console.warn(
-      "⚠️ offScreenCanvasContextRef is undefined. Creating a new reference."
+      "⚠️ offScreenCanvasContextRef is undefined. Creating a new reference.",
     );
     offScreenCanvasContextRef = { current: null };
   }

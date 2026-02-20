@@ -93,7 +93,7 @@ const Sandbox = () => {
     if (contentState.chunkCount > 0) {
       progress.current = `(${Math.min(
         100,
-        Math.round((contentState.chunkIndex / contentState.chunkCount) * 100)
+        Math.round((contentState.chunkIndex / contentState.chunkCount) * 100),
       )}%)`;
     }
   }, [contentState.chunkIndex, contentState.chunkCount]);
@@ -108,6 +108,34 @@ const Sandbox = () => {
         }));
       }
     });
+  }, []);
+
+  // If editor was opened manually and we don't yet have a blob/ready state,
+  // proactively ask the background to send chunks to this sandbox tab.
+  useEffect(() => {
+    let requested = false;
+    if (requested) return; // guard
+    requested = true;
+
+    const tryRequest = () => {
+      try {
+        if (!contentState.blob && !contentState.ready) {
+          console.debug(
+            "[Screenity][Sandbox] requesting chunks from background (send-chunks-to-sandbox)",
+          );
+          // Ask background to send chunks to this tab (background will
+          // determine the target tab or use this sender)
+          chrome.runtime.sendMessage(
+            { type: "send-chunks-to-sandbox" },
+            () => {},
+          );
+        }
+      } catch (err) {}
+    };
+
+    // Delay slightly to allow initial message listeners to be registered
+    const t = setTimeout(tryRequest, 400);
+    return () => clearTimeout(t);
   }, []);
 
   // Regenerate frame when entering crop mode to reflect current blob
@@ -163,7 +191,7 @@ const Sandbox = () => {
                     },
                     () => {
                       chrome.runtime.sendMessage({ type: "report-bug" });
-                    }
+                    },
                   );
                 }}
               >

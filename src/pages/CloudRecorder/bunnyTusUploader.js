@@ -48,7 +48,7 @@ export async function getThumbnailFromBlob(blob, seekTo = 0.1) {
           else reject(new Error("Failed to create thumbnail blob"));
         },
         "image/jpeg",
-        0.8
+        0.8,
       );
     };
   });
@@ -180,7 +180,11 @@ export default class BunnyTusUploader {
   }
 
   async persistUploadJournal() {
-    if (typeof chrome === "undefined" || !chrome.storage?.local || !this.mediaId)
+    if (
+      typeof chrome === "undefined" ||
+      !chrome.storage?.local ||
+      !this.mediaId
+    )
       return;
     const journalKey = this.getJournalKey(this.mediaId);
     const lookupKey = this.journalLookupKey;
@@ -227,9 +231,14 @@ export default class BunnyTusUploader {
 
   validateResumeJournal(
     journal,
-    { projectId, sceneId, type, fingerprint, allowSceneMismatch = false }
+    { projectId, sceneId, type, fingerprint, allowSceneMismatch = false },
   ) {
-    if (!journal || !journal.mediaId || !journal.videoId || !journal.uploadUrl) {
+    if (
+      !journal ||
+      !journal.mediaId ||
+      !journal.videoId ||
+      !journal.uploadUrl
+    ) {
       return { valid: false, reason: "missing-required-fields" };
     }
     if (journal.projectId !== projectId) {
@@ -238,10 +247,19 @@ export default class BunnyTusUploader {
     if (journal.type !== type) {
       return { valid: false, reason: "type-mismatch" };
     }
-    if (!allowSceneMismatch && sceneId && journal.sceneId && journal.sceneId !== sceneId) {
+    if (
+      !allowSceneMismatch &&
+      sceneId &&
+      journal.sceneId &&
+      journal.sceneId !== sceneId
+    ) {
       return { valid: false, reason: "scene-mismatch" };
     }
-    if (fingerprint && journal.fingerprint && journal.fingerprint !== fingerprint) {
+    if (
+      fingerprint &&
+      journal.fingerprint &&
+      journal.fingerprint !== fingerprint
+    ) {
       return { valid: false, reason: "fingerprint-mismatch" };
     }
     if (this.isResumeJournalStale(journal.updatedAt)) {
@@ -352,7 +370,10 @@ export default class BunnyTusUploader {
         return null;
       }
 
-      const serverOffset = parseInt(headRes.headers.get("Upload-Offset") || "0", 10);
+      const serverOffset = parseInt(
+        headRes.headers.get("Upload-Offset") || "0",
+        10,
+      );
       return Number.isFinite(serverOffset) ? serverOffset : null;
     } catch (err) {
       this.debugLog("HEAD offset check threw", {
@@ -371,7 +392,7 @@ export default class BunnyTusUploader {
       linkedMediaId = null,
       reuse = null,
       sceneId = null,
-    }
+    },
   ) {
     if (this.status !== "idle" && this.status !== "error") {
       throw new Error("Uploader has already been initialized");
@@ -389,11 +410,30 @@ export default class BunnyTusUploader {
       this.offset = 0;
       this.totalBytes = 0;
 
+      // Build fingerprint for resume journal matching
+      const fingerprint = this.buildFingerprint({
+        projectId,
+        sceneId,
+        type,
+        width,
+        height,
+      });
+      this.fingerprint = fingerprint;
+
+      // Attempt to locate a resume journal candidate from storage
+      const resumeJournal = await this.getResumeJournal({
+        projectId,
+        sceneId,
+        type,
+        fingerprint,
+        reuse,
+      });
+
       // Validate reuse object if provided
       if (reuse) {
         if (!reuse.videoId || !reuse.mediaId) {
           throw new Error(
-            "Invalid reuse object: must have both videoId and mediaId"
+            "Invalid reuse object: must have both videoId and mediaId",
           );
         }
         this.videoId = reuse.videoId;
@@ -504,7 +544,7 @@ export default class BunnyTusUploader {
 
   async refreshTusAuth() {
     const res = await fetch(
-      `${API_BASE}/bunny/videos/tus-auth?videoId=${this.videoId}`
+      `${API_BASE}/bunny/videos/tus-auth?videoId=${this.videoId}`,
     );
     if (!res.ok) throw new Error("Failed to refresh TUS auth");
     const { signature, expires, libraryId } = await res.json();
@@ -524,7 +564,7 @@ export default class BunnyTusUploader {
         LibraryId: String(this.libraryId),
         VideoId: this.videoId,
         "Upload-Metadata": `filetype ${btoa("video/webm")},title ${btoa(
-          this.metadata.title
+          this.metadata.title,
         )}`,
       },
     });
@@ -620,7 +660,7 @@ export default class BunnyTusUploader {
         const controller = new AbortController();
         const timeout = setTimeout(
           () => controller.abort("upload-timeout"),
-          this.UPLOAD_TIMEOUT_MS
+          this.UPLOAD_TIMEOUT_MS,
         );
 
         const res = await fetch(this.uploadUrl, {
@@ -677,7 +717,7 @@ export default class BunnyTusUploader {
             errorText.toLowerCase().includes("offset")
           ) {
             console.warn(
-              `⚠️ Offset conflict detected (status ${res.status}), fetching current offset from server`
+              `⚠️ Offset conflict detected (status ${res.status}), fetching current offset from server`,
             );
 
             // Query server for current offset using HEAD request
@@ -695,7 +735,7 @@ export default class BunnyTusUploader {
 
               if (headRes.ok) {
                 const serverOffset = parseInt(
-                  headRes.headers.get("Upload-Offset") || "0"
+                  headRes.headers.get("Upload-Offset") || "0",
                 );
 
                 this.offset = serverOffset;
@@ -717,7 +757,7 @@ export default class BunnyTusUploader {
         if (attempt === this.MAX_RETRIES) {
           console.error(
             `❌ Failed to upload chunk after ${this.MAX_RETRIES} retries:`,
-            err
+            err,
           );
           throw err;
         }
@@ -725,11 +765,11 @@ export default class BunnyTusUploader {
           `⚠️ Upload attempt ${attempt + 1}/${
             this.MAX_RETRIES + 1
           } failed, retrying...`,
-          err.message
+          err.message,
         );
         const jitter = Math.random() * 300;
         await new Promise((r) =>
-          setTimeout(r, this.RETRY_DELAY * Math.pow(2, attempt) + jitter)
+          setTimeout(r, this.RETRY_DELAY * Math.pow(2, attempt) + jitter),
         );
       }
     }
@@ -828,7 +868,7 @@ export default class BunnyTusUploader {
       if (headRes.ok) {
         serverOffset = parseInt(
           headRes.headers.get("Upload-Offset") || "0",
-          10
+          10,
         );
         this.offset = serverOffset;
       }
@@ -851,7 +891,7 @@ export default class BunnyTusUploader {
       this.status = "error";
       this.error = `incomplete-upload server=${serverOffset} expected=${this.totalBytes}`;
       throw new Error(
-        `Finalize blocked: upload incomplete (server ${serverOffset} / expected ${this.totalBytes}).`
+        `Finalize blocked: upload incomplete (server ${serverOffset} / expected ${this.totalBytes}).`,
       );
     }
 
@@ -859,7 +899,7 @@ export default class BunnyTusUploader {
       this.status = "error";
       this.error = `invalid-length server=${serverOffset} expected=${this.totalBytes}`;
       throw new Error(
-        `Finalize blocked: serverOffset (${serverOffset}) exceeds expected totalBytes (${this.totalBytes}).`
+        `Finalize blocked: serverOffset (${serverOffset}) exceeds expected totalBytes (${this.totalBytes}).`,
       );
     }
 
