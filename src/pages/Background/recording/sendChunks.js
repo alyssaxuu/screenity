@@ -4,7 +4,7 @@ import { handleChunks } from "./chunkHandler";
 export const sendChunks = async (override = false, target = null) => {
   try {
     // Wait briefly for chunks to be flushed to IndexedDB
-    const maxAttempts = 15;
+    const maxAttempts = 50;
     const delayMs = 200;
     let chunkCount = 0;
     for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
@@ -18,6 +18,23 @@ export const sendChunks = async (override = false, target = null) => {
       });
       if (chunkCount > 0) break;
       await new Promise((r) => setTimeout(r, delayMs));
+    }
+
+    if (chunkCount === 0) {
+      console.warn(
+        "[Screenity][BG] sendChunks: no chunks available after waiting",
+      );
+      try {
+        await chrome.storage.local.set({
+          lastChunkSendFailure: {
+            ts: Date.now(),
+            why: "no-chunks-after-wait",
+            override,
+            targetTabId: target?.tabId ?? null,
+          },
+        });
+      } catch {}
+      return { status: "empty", chunkCount: 0 };
     }
 
     const chunks = [];

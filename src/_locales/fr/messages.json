@@ -95,7 +95,6 @@
     "message": "Afficher plus d'options",
     "description": "Étiquette Afficher plus d'options"
   },
-
   "systemAudioLabel": {
     "message": "Inclure l'audio système",
     "description": "Étiquette de l'audio système/onglet"
@@ -525,7 +524,7 @@
     "description": "Étiquette de recadrage"
   },
   "preparingLabel": {
-    "message": "Préparation de la vidéo, veuillez patienter...",
+    "message": "Préparation...",
     "description": "Étiquette de préparation"
   },
   "cropButtonTitle": {
@@ -900,12 +899,10 @@
     "message": "En savoir plus sur le traitement des vidéos longues.",
     "description": "Lien 'En savoir plus' de la fenêtre modale de limite de plus de 5 minutes avec un point"
   },
-
   "recoveryModeTitle": {
     "message": "Mode de récupération",
     "description": "Titre du mode de récupération"
   },
-
   "downloadForTroubleshootingOption": {
     "message": "Télécharger des données pour résoudre les problèmes",
     "description": "Option de téléchargement pour résoudre les problèmes"
@@ -1012,7 +1009,6 @@
     "message": "Assurez-vous d'activer l'option 'Partager l'audio du système' si vous souhaitez enregistrer l'audio de l'ordinateur. Si vous ne voyez pas cette option, essayez de mettre à jour Chrome ou basculez vers l'enregistrement de l'onglet.",
     "description": "Description de l'avertissement audio pour d'autres systèmes"
   },
-
   "maxResolutionLabel": {
     "message": "Résolution maximale",
     "description": "Étiquette de résolution maximale dans le menu des paramètres"
@@ -1021,7 +1017,6 @@
     "message": "FPS maximum",
     "description": "Étiquette de FPS maximum dans le menu des paramètres"
   },
-
   "notEnoughRAM": {
     "message": "Pas assez de RAM",
     "description": "Étiquette 'Pas assez de RAM' dans le menu des paramètres"
@@ -1401,5 +1396,57 @@
   "webcodecsFailedOffToast": {
     "message": "Fast MP4 échec — off",
     "description": "WebCodecs failure auto-disable toast"
+  },
+  "proOnboardingWelcomeTitle": {
+    "message": "Bienvenue dans l'extension Screenity Pro",
+    "description": "Pro onboarding welcome step title"
+  },
+  "proOnboardingWelcomeDescription": {
+    "message": "Quelques conseils rapides avant d'enregistrer.<br/>Les zooms automatiques ne fonctionnent que pour les clics dans les <strong>onglets Chrome</strong>. Vous pourrez toujours en ajouter manuellement ensuite.",
+    "description": "Pro onboarding welcome step description"
+  },
+  "proOnboardingToolbarTitle": {
+    "message": "Barre d'enregistrement et effets",
+    "description": "Pro onboarding toolbar step title"
+  },
+  "proOnboardingToolbarDescription": {
+    "message": "Utilisez cette barre pour dessiner, appliquer des effets de curseur, flouter et contrôler l'enregistrement.<br/><br/><strong>Cette barre est visible dans la vidéo</strong> si vous ne la masquez pas.",
+    "description": "Pro onboarding toolbar step description"
+  },
+  "proOnboardingCameraTitle": {
+    "message": "La caméra est capturée séparément",
+    "description": "Pro onboarding camera step title"
+  },
+  "proOnboardingCameraDescription": {
+    "message": "Votre caméra peut <strong>se masquer ou passer en PiP</strong> pendant l'enregistrement, c'est normal.<br/><br/>Elle est capturée séparément pour pouvoir être repositionnée ensuite.",
+    "description": "Pro onboarding camera step description"
+  },
+  "proOnboardingInstantTitle": {
+    "message": "Mode instantané",
+    "description": "Pro onboarding instant mode step title"
+  },
+  "proOnboardingInstantDescription": {
+    "message": "Parfait pour partager rapidement avec des <strong>téléchargements illimités</strong>.<br/><br/>Les mises en page et options d'édition avancées ne sont pas disponibles dans ce mode.",
+    "description": "Pro onboarding instant mode step description"
+  },
+  "proOnboardingDone": {
+    "message": "Compris",
+    "description": "Pro onboarding done button text"
+  },
+  "proOnboardingNext": {
+    "message": "Suivant",
+    "description": "Pro onboarding next button text"
+  },
+  "proOnboardingBack": {
+    "message": "Retour",
+    "description": "Pro onboarding back button text"
+  },
+  "proOnboardingToolbarLearnMore": {
+    "message": "En savoir plus",
+    "description": "Pro onboarding toolbar learn more link label"
+  },
+  "resetOnboardingOption": {
+    "message": "Réinitialiser l'onboarding",
+    "description": "Reset pro onboarding option label in popup settings menu"
   }
 }

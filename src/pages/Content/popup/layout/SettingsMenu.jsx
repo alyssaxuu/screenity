@@ -18,6 +18,8 @@ import {
   shouldUseFastRecorder,
   getFastRecorderStickyState,
 } from "../../../../media/fastRecorderGate";
+import { resetOnboardingSeen } from "../onboarding/storage";
+import { runProPopupOnboardingIfNeeded } from "../onboarding/proOnboarding";
 
 const CLOUD_FEATURES_ENABLED =
   process.env.SCREENITY_ENABLE_CLOUD_FEATURES === "true";
@@ -849,6 +851,40 @@ const SettingsMenu = (props) => {
             </DropdownMenu.Item>
           )}
           {CLOUD_FEATURES_ENABLED && (
+            <>
+              {contentState.isLoggedIn && contentState.isSubscribed && (
+                <DropdownMenu.Item
+                  className="DropdownMenuItem"
+                  onSelect={async (e) => {
+                    e.preventDefault();
+                    await resetOnboardingSeen(["proPopupCore", "proCameraInfo"]);
+                    props.setOpen(false);
+                    runProPopupOnboardingIfNeeded({
+                      rootContext: props.shadowRef?.current?.shadowRoot || document,
+                      isPro: Boolean(
+                        contentState.isLoggedIn && contentState.isSubscribed
+                      ),
+                      isLoggedIn: Boolean(contentState.isLoggedIn),
+                      popupOpen: Boolean(
+                        contentState.showPopup && contentState.showExtension
+                      ),
+                      cameraEnabled: Boolean(contentState.cameraActive),
+                      pendingRecording: Boolean(contentState.pendingRecording),
+                      preparingRecording: Boolean(contentState.preparingRecording),
+                      recording: Boolean(contentState.recording),
+                      countdownActive: Boolean(contentState.countdownActive),
+                      isCountdownVisible: Boolean(contentState.isCountdownVisible),
+                      forceStart: true,
+                    });
+                  }}
+                >
+                  {chrome.i18n.getMessage("resetOnboardingOption") ||
+                    "Reset onboarding"}
+                </DropdownMenu.Item>
+              )}
+            </>
+          )}
+          {CLOUD_FEATURES_ENABLED && (
             <DropdownMenu.Item
               className="DropdownMenuItem"
               onSelect={(e) => {
@@ -859,9 +895,11 @@ const SettingsMenu = (props) => {
                   setContentState((prev) => ({
                     ...prev,
                     isLoggedIn: false,
+                    wasLoggedIn: true,
                     isSubscribed: false,
                     screenityUser: null,
                     proSubscription: null,
+                    bigTab: "record",
                   }));
                   contentState.openToast(
                     chrome.i18n.getMessage("loggedOutToastTitle"),

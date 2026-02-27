@@ -524,7 +524,7 @@
     "description": "குறைத்து பொத்தான்"
   },
   "preparingLabel": {
-    "message": "வீடியோ தயாரிக்கப்படுகின்றது, தயவு செய்து காத்திருக்கவும்...",
+    "message": "தயாராகிறது...",
     "description": "தயாரிக்கின்றது லேபிள்"
   },
   "cropButtonTitle": {
@@ -899,12 +899,10 @@
     "message": "நீண்ட வீடியோக்களை செயல்படுத்துவது பற்றிய மேலும் அறிந்து கொள்ளுங்கள்.",
     "description": "5 நிமிட வாரந்தோற்ற உள்ளடக்கம் மோடல் மேலும் அறிந்து கொள்ளுங்கள் இணைப்பு மூலம்"
   },
-
   "recoveryModeTitle": {
     "message": "மீட்டமைப்பு முறை",
     "description": "மீட்டமைப்பு முறை தலைப்பு"
   },
-
   "downloadForTroubleshootingOption": {
     "message": "பிரச்சனைகளை தீர்க்க தரவை பதிவிறக்கவும்",
     "description": "பிரச்சனைகளை தீர்க்க விருப்ப பதிவிறக்க விருப்பம்"
@@ -1011,7 +1009,6 @@
     "message": "கணினியிலிருந்து ஒலியை பதிவுசெய்ய விரும்பினதால், 'கணினி ஒலியை பகிர்க' விருப்பத்தை செயல்படுத்துக. இந்த விருப்பத்தை காணாதிருக்கின்றார் என்பதை பார்க்கின்றதால், Chrome ஐ புதுப்பிக்கவும் அல்லது வரிசை பதிவு விருப்பம் மாற்றுவதை முயற்சிக்கவும்.",
     "description": "பிற கணினி வடிவம் க்கு ஒலியின் எச்சரிக்கை தலைப்பு"
   },
-
   "maxResolutionLabel": {
     "message": "அதிசய கருவி",
     "description": "அமைப்புகள் பட்டியலில் அதிசய கருவி குறியீட்டு"
@@ -1020,7 +1017,6 @@
     "message": "அதிசய கோட்டிகள் கோட்டிகள்",
     "description": "அமைப்புகள் பட்டியலில் அதிசய கோட்டிகள் குறியீட்டு"
   },
-
   "notEnoughRAM": {
     "message": "புதிய ரேம் போதுமில்லை",
     "description": "அமைப்புக்கு அந்த ரேம் போதுமில்லை பதில்"
@@ -1400,5 +1396,57 @@
   "webcodecsFailedOffToast": {
     "message": "Fast MP4 தோல்வி — ஆஃப்",
     "description": "WebCodecs failure auto-disable toast"
+  },
+  "proOnboardingWelcomeTitle": {
+    "message": "Screenity Pro நீட்டிப்புக்கு வரவேற்கிறோம்",
+    "description": "Pro onboarding welcome step title"
+  },
+  "proOnboardingWelcomeDescription": {
+    "message": "பதிவு செய்ய முன் சில வேகமான குறிப்புகள்.<br/>தானியங்கி zoom என்பது <strong>Chrome தாவல்கள்</strong> உள்ள கிளிக்குகளுக்கு மட்டும் வேலை செய்யும். பிறகு நீங்கள் zoom-ஐ கைமுறையாகச் சேர்க்கலாம்.",
+    "description": "Pro onboarding welcome step description"
+  },
+  "proOnboardingToolbarTitle": {
+    "message": "பதிவு கருவிப்பட்டை மற்றும் விளைவுகள்",
+    "description": "Pro onboarding toolbar step title"
+  },
+  "proOnboardingToolbarDescription": {
+    "message": "இந்த கருவிப்பட்டையில் வரைதல், கர்சர் விளைவுகள், blur மற்றும் பதிவு கட்டுப்பாடுகளைப் பயன்படுத்தலாம்.<br/><br/><strong>இந்த கருவிப்பட்டை வீடியோவில் சேரும்</strong> மறைக்கவில்லை என்றால்.",
+    "description": "Pro onboarding toolbar step description"
+  },
+  "proOnboardingCameraTitle": {
+    "message": "கேமரா தனியாக பதிவு செய்யப்படுகிறது",
+    "description": "Pro onboarding camera step title"
+  },
+  "proOnboardingCameraDescription": {
+    "message": "பதிவு செய்யும்போது கேமரா <strong>மறையவோ அல்லது PiP-க்கு மாறவோ</strong>லாம்; இது சாதாரணம்.<br/><br/>பிறகு நீங்கள் இடத்தை மாற்றுவதற்கு அது தனியாகப் பதிவு செய்யப்படுகிறது.",
+    "description": "Pro onboarding camera step description"
+  },
+  "proOnboardingInstantTitle": {
+    "message": "உடனடி முறை",
+    "description": "Pro onboarding instant mode step title"
+  },
+  "proOnboardingInstantDescription": {
+    "message": "வேகமாக பகிர்வதற்கு மற்றும் <strong>வரம்பில்லா பதிவிறக்கங்களுக்கு</strong> சிறந்தது.<br/><br/>இந்த முறையில் மேம்பட்ட layout/editor விருப்பங்கள் கிடைக்காது.",
+    "description": "Pro onboarding instant mode step description"
+  },
+  "proOnboardingDone": {
+    "message": "சரி",
+    "description": "Pro onboarding done button text"
+  },
+  "proOnboardingNext": {
+    "message": "அடுத்து",
+    "description": "Pro onboarding next button text"
+  },
+  "proOnboardingBack": {
+    "message": "பின்",
+    "description": "Pro onboarding back button text"
+  },
+  "proOnboardingToolbarLearnMore": {
+    "message": "மேலும் அறிக",
+    "description": "Pro onboarding toolbar learn more link label"
+  },
+  "resetOnboardingOption": {
+    "message": "Onboarding-ஐ மீட்டமை",
+    "description": "Reset pro onboarding option label in popup settings menu"
   }
 }

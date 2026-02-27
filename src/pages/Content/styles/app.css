@@ -73,7 +73,7 @@ iframe {
   right: -10px;
   box-sizing: border-box;
   border-radius: 30px;
-  border: 1px solid #E8E8E8;
+  border: 1px solid #e8e8e8;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -93,7 +93,7 @@ iframe {
   pointer-events: auto;
 }
 .toolbar-controls .popup-control svg {
-  color: #9797A4;
+  color: #9797a4;
   margin-bottom: -2px;
 }
 
@@ -104,7 +104,7 @@ iframe {
   box-sizing: border-box;
   width: 100%;
   height: 100%;
-  border: 10px solid #3080F8;
+  border: 10px solid #3080f8;
   pointer-events: none;
   transform: scale(1.2);
   opacity: 0;
@@ -276,7 +276,7 @@ iframe {
 .ToolbarRecordingTime {
   margin-right: 4px;
   width: 42px;
-  color: #29292F;
+  color: #29292f;
   font-size: 13px;
   user-select: none;
   -webkit-user-select: none;
@@ -339,7 +339,7 @@ iframe {
 .ToolbarModeItemSingle svg,
 .ToolbarLink svg,
 .ToolbarButton svg {
-  color: #9797A4;
+  color: #9797a4;
 }
 .ToolbarToggleItem:disabled,
 .ToolbarModeItem:disabled,
@@ -430,7 +430,7 @@ iframe {
   background: rgba(56, 126, 247, 0.1);
 }
 .ToolbarModeItem[data-state=on] svg {
-  color: #3080F8;
+  color: #3080f8;
 }
 .ToolbarModeItem[data-state=on]::before {
   transform: translateY(0px) scale(1) !important;
@@ -460,7 +460,7 @@ iframe {
   margin-left: 0;
 }
 .ToolbarToggleItem[data-state=on] {
-  background: radial-gradient(117.41% 117.78% at 35.44% 0%, #2BAEF8 23.13%, #3582F6 46.35%, #486DEF 74.48%, #7B9AEA 100%);
+  background: radial-gradient(117.41% 117.78% at 35.44% 0%, #2baef8 23.13%, #3582f6 46.35%, #486def 74.48%, #7b9aea 100%);
   color: #fff;
 }
 .ToolbarToggleItem[data-state=on] svg {
@@ -470,7 +470,7 @@ iframe {
 .ToolbarSeparator {
   width: 1px;
   height: 19px;
-  background-color: #E8E8E8;
+  background-color: #e8e8e8;
   margin: 0 8px;
 }
 
@@ -519,12 +519,182 @@ iframe {
 
 .OnboardingText {
   font-size: 32px;
-  color: #9797A4;
+  color: #9797a4;
   font-family: "Gloria-Hallelujah", sans-serif !important;
 }
 
 .ArrowShape {
   margin-left: -15px;
+}
+
+.driver-popover.ScreenityOnboardingPopover,
+.ScreenityOnboardingPopover,
+.onboarding-popover {
+  border-radius: 30px !important;
+  background: #fff !important;
+  color: #29292f !important;
+  font-family: "Satoshi-Regular", sans-serif !important;
+  box-shadow: 0 4px 20px rgba(38, 38, 52, 0.08) !important;
+  padding: 20px !important;
+  max-width: 340px !important;
+  font-size: 14px !important;
+  z-index: 99999999999 !important;
+}
+.driver-popover.ScreenityOnboardingPopover .driver-popover-title,
+.ScreenityOnboardingPopover .driver-popover-title,
+.onboarding-popover .driver-popover-title {
+  font-size: 1rem !important;
+  font-family: "Satoshi-Bold", sans-serif !important;
+  margin-bottom: 12px !important;
+  color: #29292f !important;
+}
+.driver-popover.ScreenityOnboardingPopover .driver-popover-description,
+.ScreenityOnboardingPopover .driver-popover-description,
+.onboarding-popover .driver-popover-description {
+  font-size: 14px !important;
+  font-family: "Satoshi-Medium", sans-serif !important;
+  color: #6e7684 !important;
+  line-height: 1.5 !important;
+  margin-bottom: 18px !important;
+}
+.driver-popover.ScreenityOnboardingPopover .driver-popover-description a,
+.ScreenityOnboardingPopover .driver-popover-description a,
+.onboarding-popover .driver-popover-description a {
+  color: #3080f8 !important;
+  font-family: "Satoshi-Bold", sans-serif !important;
+  text-decoration: none !important;
+  cursor: pointer !important;
+}
+.driver-popover.ScreenityOnboardingPopover .driver-popover-close-btn,
+.ScreenityOnboardingPopover .driver-popover-close-btn,
+.onboarding-popover .driver-popover-close-btn {
+  display: none !important;
+  top: 14px;
+  right: 12px;
+  color: #6e7684 !important;
+  font-size: 1.5rem !important;
+}
+.driver-popover.ScreenityOnboardingPopover .driver-popover-arrow,
+.ScreenityOnboardingPopover .driver-popover-arrow,
+.onboarding-popover .driver-popover-arrow {
+  width: 0px;
+  height: 0px;
+  background: none !important;
+  box-shadow: none !important;
+  box-sizing: border-box;
+}
+.driver-popover.ScreenityOnboardingPopover .driver-popover-arrow-side-top,
+.ScreenityOnboardingPopover .driver-popover-arrow-side-top,
+.onboarding-popover .driver-popover-arrow-side-top {
+  border-left: 8px solid transparent !important;
+  border-right: 8px solid transparent !important;
+  border-top: 8px solid #fff !important;
+}
+.driver-popover.ScreenityOnboardingPopover .driver-popover-arrow-side-bottom,
+.ScreenityOnboardingPopover .driver-popover-arrow-side-bottom,
+.onboarding-popover .driver-popover-arrow-side-bottom {
+  border-left: 8px solid transparent !important;
+  border-right: 8px solid transparent !important;
+  border-bottom: 8px solid #fff !important;
+}
+.driver-popover.ScreenityOnboardingPopover .driver-popover-arrow-side-left,
+.ScreenityOnboardingPopover .driver-popover-arrow-side-left,
+.onboarding-popover .driver-popover-arrow-side-left {
+  border-top: 8px solid transparent !important;
+  border-bottom: 8px solid transparent !important;
+  border-left: 8px solid #fff !important;
+}
+.driver-popover.ScreenityOnboardingPopover .driver-popover-arrow-side-right,
+.ScreenityOnboardingPopover .driver-popover-arrow-side-right,
+.onboarding-popover .driver-popover-arrow-side-right {
+  border-top: 8px solid transparent !important;
+  border-bottom: 8px solid transparent !important;
+  border-right: 8px solid #fff !important;
+}
+.driver-popover.ScreenityOnboardingPopover .driver-popover-arrow-align-start,
+.ScreenityOnboardingPopover .driver-popover-arrow-align-start,
+.onboarding-popover .driver-popover-arrow-align-start {
+  top: 35px !important;
+}
+.driver-popover.ScreenityOnboardingPopover .driver-popover-arrow-align-end,
+.ScreenityOnboardingPopover .driver-popover-arrow-align-end,
+.onboarding-popover .driver-popover-arrow-align-end {
+  bottom: 35px !important;
+}
+.driver-popover.ScreenityOnboardingPopover .driver-popover-arrow-align-left,
+.ScreenityOnboardingPopover .driver-popover-arrow-align-left,
+.onboarding-popover .driver-popover-arrow-align-left {
+  left: 35px !important;
+}
+.driver-popover.ScreenityOnboardingPopover .driver-popover-arrow-align-right,
+.ScreenityOnboardingPopover .driver-popover-arrow-align-right,
+.onboarding-popover .driver-popover-arrow-align-right {
+  right: 35px !important;
+}
+.driver-popover.ScreenityOnboardingPopover .driver-popover-progress-text,
+.ScreenityOnboardingPopover .driver-popover-progress-text,
+.onboarding-popover .driver-popover-progress-text {
+  font-size: 0.8rem !important;
+  font-family: "Satoshi-Medium", sans-serif !important;
+  color: #6e7684 !important;
+  opacity: 0.7 !important;
+  margin-top: 2px !important;
+}
+.driver-popover.ScreenityOnboardingPopover .driver-popover-footer,
+.ScreenityOnboardingPopover .driver-popover-footer,
+.onboarding-popover .driver-popover-footer {
+  display: flex !important;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+}
+.driver-popover.ScreenityOnboardingPopover .driver-popover-footer .driver-popover-navigation-btns,
+.ScreenityOnboardingPopover .driver-popover-footer .driver-popover-navigation-btns,
+.onboarding-popover .driver-popover-footer .driver-popover-navigation-btns {
+  gap: 6px !important;
+}
+.driver-popover.ScreenityOnboardingPopover .driver-popover-footer .driver-popover-navigation-btns .driver-popover-next-btn,
+.driver-popover.ScreenityOnboardingPopover .driver-popover-footer .driver-popover-navigation-btns .driver-popover-prev-btn,
+.driver-popover.ScreenityOnboardingPopover .driver-popover-footer .driver-popover-navigation-btns .driver-popover-close-btn,
+.ScreenityOnboardingPopover .driver-popover-footer .driver-popover-navigation-btns .driver-popover-next-btn,
+.ScreenityOnboardingPopover .driver-popover-footer .driver-popover-navigation-btns .driver-popover-prev-btn,
+.ScreenityOnboardingPopover .driver-popover-footer .driver-popover-navigation-btns .driver-popover-close-btn,
+.onboarding-popover .driver-popover-footer .driver-popover-navigation-btns .driver-popover-next-btn,
+.onboarding-popover .driver-popover-footer .driver-popover-navigation-btns .driver-popover-prev-btn,
+.onboarding-popover .driver-popover-footer .driver-popover-navigation-btns .driver-popover-close-btn {
+  background-color: #3080f8 !important;
+  color: white !important;
+  border: none !important;
+  padding: 10px 14px !important;
+  border-radius: 30px !important;
+  font-family: "Satoshi-Medium", sans-serif !important;
+  font-weight: 500 !important;
+  cursor: pointer !important;
+  font-size: 0.875rem !important;
+  text-shadow: none !important;
+}
+.driver-popover.ScreenityOnboardingPopover .driver-popover-footer .driver-popover-navigation-btns .driver-popover-next-btn:hover,
+.ScreenityOnboardingPopover .driver-popover-footer .driver-popover-navigation-btns .driver-popover-next-btn:hover,
+.onboarding-popover .driver-popover-footer .driver-popover-navigation-btns .driver-popover-next-btn:hover {
+  background: rgb(23.3341121495, 112.8668224299, 247.1658878505) !important;
+}
+.driver-popover.ScreenityOnboardingPopover .driver-popover-footer .driver-popover-navigation-btns .driver-popover-prev-btn,
+.ScreenityOnboardingPopover .driver-popover-footer .driver-popover-navigation-btns .driver-popover-prev-btn,
+.onboarding-popover .driver-popover-footer .driver-popover-navigation-btns .driver-popover-prev-btn {
+  background-color: transparent !important;
+  color: #29292f !important;
+  border: 1px solid #e8e8e8 !important;
+}
+.driver-popover.ScreenityOnboardingPopover .driver-popover-footer .driver-popover-navigation-btns .driver-popover-prev-btn:hover,
+.ScreenityOnboardingPopover .driver-popover-footer .driver-popover-navigation-btns .driver-popover-prev-btn:hover,
+.onboarding-popover .driver-popover-footer .driver-popover-navigation-btns .driver-popover-prev-btn:hover {
+  background: #f6f7fb !important;
+}
+.driver-popover.ScreenityOnboardingPopover .driver-popover-footer .driver-popover-navigation-btns .driver-popover-close-btn,
+.ScreenityOnboardingPopover .driver-popover-footer .driver-popover-navigation-btns .driver-popover-close-btn,
+.onboarding-popover .driver-popover-footer .driver-popover-navigation-btns .driver-popover-close-btn {
+  background-color: transparent !important;
+  color: #6e7684 !important;
 }
 
 body {
@@ -658,7 +828,7 @@ body {
 
 .TooltipContent {
   border-radius: 30px;
-  background-color: #29292F;
+  background-color: #29292f;
   padding: 10px 15px;
   font-size: 12px;
   margin-bottom: 10px;
@@ -666,7 +836,7 @@ body {
   line-height: 1;
   font-family: "Satoshi-Medium", sans-serif;
   z-index: 99999999 !important;
-  color: #FFF;
+  color: #fff;
   box-shadow: hsla(206, 22%, 7%, 0.35) 0px 10px 38px -10px, hsla(206, 22%, 7%, 0.2) 0px 10px 20px -15px;
   -webkit-user-select: none;
      -moz-user-select: none;
@@ -822,7 +992,7 @@ body {
   transform-style: preserve-3d;
 }
 .eyedropper svg {
-  color: #9797A4;
+  color: #9797a4;
 }
 .eyedropper:focus-visible {
   outline: none;
@@ -834,7 +1004,7 @@ body {
 }
 
 .eye-active {
-  background-color: #3080F8 !important;
+  background-color: #3080f8 !important;
 }
 .eye-active svg {
   color: #FFF !important;
@@ -1246,7 +1416,7 @@ body {
   display: block;
 }
 .stroke-width-item div[data-state=on] {
-  background: #3080F8 !important;
+  background: #3080f8 !important;
 }
 .stroke-width-item div[data-state=on] svg {
   color: #FFF !important;
@@ -1285,8 +1455,8 @@ body {
 }
 
 .ToastRoot {
-  background-color: #29292F;
-  color: #FFF;
+  background-color: #29292f;
+  color: #fff;
   border-radius: 30px;
   box-shadow: hsla(206, 22%, 7%, 0.35) 0px 10px 38px -10px, hsla(206, 22%, 7%, 0.2) 0px 10px 20px -15px;
   padding: 10px 14px;
@@ -1347,7 +1517,7 @@ body {
   }
 }
 .ToastTitle {
-  color: #FFF;
+  color: #fff;
   font-family: "Satoshi-Medium", sans-serif;
 }
 
@@ -1357,7 +1527,7 @@ body {
 }
 
 .ToastAction {
-  color: #FFF;
+  color: #fff;
   font-family: "Satoshi-Medium", sans-serif;
   text-align: right;
   background-color: #51515F;
@@ -1398,7 +1568,7 @@ body {
   right: -10px;
   box-sizing: border-box;
   border-radius: 30px;
-  border: 1px solid #E8E8E8;
+  border: 1px solid #e8e8e8;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1413,7 +1583,7 @@ body {
   transition: opacity 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 .popup-controls .popup-control svg {
-  color: #9797A4;
+  color: #9797a4;
   margin-bottom: -2px;
 }
 .popup-controls .popup-grab {
@@ -1465,7 +1635,7 @@ body {
   width: 100%;
   height: 100%;
   transition: 2s;
-  background: #FFF;
+  background: #fff;
   background-clip: content-box;
   -webkit-mask-image: radial-gradient(circle at center top, transparent 31px, #000 31px);
   mask-image: radial-gradient(circle at center top, transparent 31px, #000 31px);
@@ -1536,7 +1706,7 @@ body {
 .popup-content-divider {
   width: 100%;
   height: 1px;
-  background: #E8E8E8;
+  background: #e8e8e8;
   margin-top: 12px;
   margin-bottom: 12px;
 }
@@ -1555,7 +1725,7 @@ body {
   margin-bottom: 8px;
 }
 .popup-warning .popup-warning-right {
-  color: #3080F8;
+  color: #3080f8;
   font-family: "Satoshi-Medium", sans-serif;
   width: 90px;
 }
@@ -1571,7 +1741,7 @@ body {
 }
 .popup-warning-left svg,
 .popup-warning-right svg {
-  color: #3080F8;
+  color: #3080f8;
 }
 
 .popup-warning-right {
@@ -1583,18 +1753,18 @@ body {
 }
 .popup-warning-middle .popup-warning-title {
   font-family: "Satoshi-Bold", sans-serif;
-  color: #29292F;
+  color: #29292f;
 }
 .popup-warning-middle .popup-warning-description {
   font-family: "Satoshi-Medium", sans-serif;
-  color: #6E7684;
+  color: #6e7684;
   margin-top: 4px;
 }
 
 .permission-button {
   background: rgba(48, 128, 248, 0.1);
   border-radius: 30px;
-  color: #3080F8;
+  color: #3080f8;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1615,7 +1785,7 @@ body {
   cursor: pointer;
 }
 .permission-button svg {
-  color: #3080F8;
+  color: #3080f8;
 }
 
 .HelpSection {
@@ -1629,7 +1799,7 @@ body {
   padding: 4px 12px;
   text-align: center;
   font-family: "Satoshi-Medium", sans-serif;
-  color: #6E7684;
+  color: #6e7684;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1664,7 +1834,7 @@ body {
 }
 
 .CollapsibleLabel {
-  color: #6E7684;
+  color: #6e7684;
   font-weight: "Satoshi-Bold", sans-serif;
   text-align: center;
   display: inline-block;
@@ -1754,24 +1924,24 @@ body {
 
 .ModalSoonTitle {
   font-weight: 700;
-  color: #29292F;
+  color: #29292f;
   margin-bottom: 8px;
   text-align: center;
 }
 
 .ModalSoonDescription {
   text-align: center;
-  color: #6E7684;
+  color: #6e7684;
   text-align: center;
   margin-bottom: 8px;
 }
 
 .ModalSoonButton {
   margin-top: 8px;
-  color: #FFF;
+  color: #fff;
   text-align: center;
   border-radius: 30px;
-  background: radial-gradient(117.41% 117.78% at 35.44% 0%, #2BAEF8 23.13%, #3582F6 46.35%, #486DEF 74.48%, #7B9AEA 100%);
+  background: radial-gradient(117.41% 117.78% at 35.44% 0%, #2baef8 23.13%, #3582f6 46.35%, #486def 74.48%, #7b9aea 100%);
   padding: 8px 16px;
 }
 .ModalSoonButton:hover {
@@ -1833,7 +2003,7 @@ body {
 .announcement-title {
   font-family: "Satoshi-Bold", sans-serif;
   font-size: 16px;
-  color: #29292F;
+  color: #29292f;
   letter-spacing: -0.8px;
   margin-bottom: 12px;
   text-align: center;
@@ -1842,7 +2012,7 @@ body {
 .announcement-description {
   font-family: "Satoshi-Medium", sans-serif;
   font-size: 14px;
-  color: #6E7684;
+  color: #6e7684;
   text-align: center;
   margin-bottom: 24px;
   line-height: 1.6;
@@ -1850,7 +2020,7 @@ body {
 }
 .announcement-description a {
   text-decoration: none !important;
-  color: #3080F8 !important;
+  color: #3080f8 !important;
   cursor: pointer !important;
 }
 
@@ -1862,8 +2032,8 @@ body {
   width: 100%;
   height: 44px;
   border-radius: 30px;
-  background: radial-gradient(117.41% 117.78% at 35.44% 0%, #2BAEF8 23.13%, #3582F6 46.35%, #486DEF 74.48%, #7B9AEA 100%);
-  color: #FFF;
+  background: radial-gradient(117.41% 117.78% at 35.44% 0%, #2baef8 23.13%, #3582f6 46.35%, #486def 74.48%, #7b9aea 100%);
+  color: #fff;
   font-family: "Satoshi-Medium", sans-serif;
   font-size: 14px;
   cursor: pointer;
@@ -1894,7 +2064,7 @@ body {
 .welcome-title {
   font-family: "Satoshi-Bold", sans-serif;
   font-size: 18px;
-  color: #29292F;
+  color: #29292f;
   letter-spacing: -0.8px;
   margin-bottom: 12px;
   text-align: center;
@@ -1903,7 +2073,7 @@ body {
 .welcome-description {
   font-family: "Satoshi-Medium", sans-serif;
   font-size: 16px;
-  color: #6E7684;
+  color: #6e7684;
   text-align: center;
   margin-bottom: 20px;
   line-height: 1.6;
@@ -1911,7 +2081,7 @@ body {
 }
 .welcome-description a {
   text-decoration: none !important;
-  color: #3080F8 !important;
+  color: #3080f8 !important;
   cursor: pointer !important;
 }
 
@@ -1924,8 +2094,8 @@ body {
   height: 44px;
   border-radius: 30px;
   background: white;
-  border: 1px solid #E8E8E8;
-  color: #29292F;
+  border: 1px solid #e8e8e8;
+  color: #29292f;
   font-family: "Satoshi-Medium", sans-serif;
   font-size: 14px;
   cursor: pointer;
@@ -1934,7 +2104,7 @@ body {
 }
 
 .welcome-content {
-  background: #F6F7FB;
+  background: #f6f7fb;
   border-bottom-left-radius: 30px;
   border-bottom-right-radius: 30px;
   max-height: calc(95vh - 300px);
@@ -1952,7 +2122,7 @@ body {
 .welcome-content-title {
   font-family: "Satoshi-Bold", sans-serif;
   font-size: 14px;
-  color: #29292F;
+  color: #29292f;
   margin-bottom: 8px;
   margin-top: 8px;
   text-align: center;
@@ -1984,7 +2154,7 @@ body {
 
 .welcome-feature-icon-text {
   font-size: 14px;
-  color: #6E7684;
+  color: #6e7684;
   font-family: "Satoshi-Medium", sans-serif;
 }
 
@@ -2000,7 +2170,7 @@ body {
 .welcome-support {
   font-family: "Satoshi-Medium", sans-serif;
   font-size: 12px;
-  color: #6E7684 !important;
+  color: #6e7684 !important;
   text-align: center;
   margin-top: 20px;
   display: flex;
@@ -2024,7 +2194,7 @@ body {
   border-radius: 15px;
   z-index: 99999;
   font-family: "Satoshi-Medium", sans-serif;
-  color: #29292F;
+  color: #29292f;
   box-shadow: 0px 10px 38px -10px rgba(22, 23, 24, 0.35), 0px 10px 20px -15px rgba(22, 23, 24, 0.2);
   animation-duration: 400ms;
   animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
@@ -2057,7 +2227,7 @@ body {
   right: 12px;
   width: 18px;
   height: 18px;
-  background: #3080F8;
+  background: #3080f8;
   border-radius: 50%;
   display: inline-flex;
   align-items: center;
@@ -2090,7 +2260,7 @@ body {
 .DropdownMenuCheckboxItem:hover,
 .DropdownMenuRadioItem:hover,
 .DropdownMenuSubTrigger:hover {
-  background-color: #F6F7FB !important;
+  background-color: #f6f7fb !important;
   cursor: pointer;
 }
 
@@ -2103,9 +2273,9 @@ body {
 .DropdownMenuCheckboxItem[data-disabled],
 .DropdownMenuRadioItem[data-disabled],
 .DropdownMenuSubTrigger[data-disabled] {
-  color: #6E7684 !important;
+  color: #6e7684 !important;
   cursor: not-allowed;
-  background-color: #F6F7FB !important;
+  background-color: #f6f7fb !important;
 }
 
 .DropdownMenuItem[data-highlighted],
@@ -2226,8 +2396,8 @@ button {
   line-height: 1;
   height: 44px;
   gap: 5px;
-  background-color: #FFF;
-  color: #29292F;
+  background-color: #fff;
+  color: #29292f;
   width: 100%;
   box-sizing: border-box;
   margin-top: 4px;
@@ -2308,7 +2478,7 @@ button {
   height: 44px;
   padding-left: 16px;
   padding-right: 16px;
-  color: #29292F;
+  color: #29292f;
   position: relative;
   -webkit-user-select: none;
      -moz-user-select: none;
@@ -2316,23 +2486,23 @@ button {
 }
 
 .SelectItem[data-disabled] {
-  color: #6E7684;
+  color: #6e7684;
   pointer-events: none;
 }
 
 .SelectItem[data-highlighted] {
-  background: #F6F7FB;
+  background: #f6f7fb;
   outline: none !important;
 }
 
 .SelectItem:hover {
-  background: #F6F7FB;
+  background: #f6f7fb;
   cursor: pointer;
 }
 
 .SelectSeparator {
   height: 1px;
-  background-color: #E8E8E8;
+  background-color: #e8e8e8;
   width: calc(100% - 24px);
   margin: auto;
   border-radius: 30px;
@@ -2345,7 +2515,7 @@ button {
   right: 12px;
   width: 24px;
   height: 24px;
-  background: #3080F8;
+  background: #3080f8;
   border-radius: 50%;
   display: inline-flex;
   align-items: center;
@@ -2363,8 +2533,8 @@ button {
 }
 
 .SelectOff {
-  background: #FAF0F4;
-  color: #D2234D;
+  background: #faf0f4;
+  color: #d2234d;
   padding-left: 12px;
   padding-right: 12px;
   padding-top: 8px;
@@ -2381,7 +2551,7 @@ button {
   padding: 8px;
 }
 .SelectIconButton:hover {
-  background-color: #F6F7FB;
+  background-color: #f6f7fb;
 }
 
 /* Radix tabs navigation */
@@ -2424,7 +2594,7 @@ input {
 .TabsTrigger {
   padding-left: 14px;
   padding-right: 14px;
-  color: #6E7684;
+  color: #6e7684;
   -webkit-user-select: none;
      -moz-user-select: none;
           user-select: none;
@@ -2432,7 +2602,7 @@ input {
 }
 
 .TabsTrigger[data-state=active] {
-  color: #29292F;
+  color: #29292f;
 }
 
 .TabsTrigger:focus-visible {
@@ -2443,7 +2613,7 @@ input {
 .TabsTriggerSpacer {
   height: 50px;
   width: 1px;
-  background: #E8E8E8;
+  background: #e8e8e8;
   flex-shrink: 0;
   margin-left: 8px;
   margin-right: 8px;
@@ -2491,7 +2661,7 @@ input {
   margin-top: auto;
   margin-bottom: auto;
   border-radius: 30px;
-  background: #FFF;
+  background: #fff;
   box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.1);
   transition: all 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
 }
@@ -2518,7 +2688,7 @@ input {
 
 .TabsList.tl {
   border-radius: 30px;
-  background: #F6F7FB;
+  background: #f6f7fb;
   padding: 6px;
   font-family: "Satoshi-Bold", sans-serif;
   position: relative;
@@ -2574,7 +2744,7 @@ input {
 }
 .recording-ui .TabsList {
   width: 100%;
-  border-bottom: 1px solid #E8E8E8;
+  border-bottom: 1px solid #e8e8e8;
   margin: auto;
   justify-content: center;
 }
@@ -2588,7 +2758,7 @@ input {
   padding-right: 16px;
 }
 .recording-ui .TabsTrigger:hover {
-  background: #F6F7FB;
+  background: #f6f7fb;
   border-top-right-radius: 15px;
   border-top-left-radius: 15px;
 }
@@ -2606,10 +2776,10 @@ input {
   margin: auto;
   height: 2px;
   border-radius: 30px;
-  background: #3080F8;
+  background: #3080f8;
 }
 .recording-ui .TabsTrigger[data-state=active] > .TabsTriggerLabel {
-  color: #29292F !important;
+  color: #29292f !important;
 }
 .recording-ui .TabsTriggerLabel {
   text-align: center;
@@ -2626,7 +2796,7 @@ input {
   border-radius: 30px;
 }
 .recording-ui .TabsContent {
-  background: #F6F7FB;
+  background: #f6f7fb;
   padding: 16px;
   border-bottom-left-radius: 30px;
   border-bottom-right-radius: 30px;
@@ -2649,7 +2819,7 @@ input {
 }
 .video-ui .TabsList {
   width: 100%;
-  border-bottom: 1px solid #E8E8E8;
+  border-bottom: 1px solid #e8e8e8;
   margin: auto;
   justify-content: space-between;
   padding-left: 12px;
@@ -2675,7 +2845,7 @@ input {
   padding-right: 20px;
 }
 .video-ui .TabsTrigger:hover {
-  background: #F6F7FB;
+  background: #f6f7fb;
   border-top-right-radius: 15px;
   border-top-left-radius: 15px;
 }
@@ -2693,16 +2863,16 @@ input {
   margin: auto;
   height: 2px;
   border-radius: 30px;
-  background: #3080F8;
+  background: #3080f8;
 }
 .video-ui .TabsTrigger[data-state=active] > .TabsTriggerLabel {
-  color: #29292F !important;
+  color: #29292f !important;
 }
 .video-ui .TabsTriggerLabel {
   text-align: center;
 }
 .video-ui .TabsContent {
-  background: #F6F7FB;
+  background: #f6f7fb;
   border-bottom-left-radius: 30px;
   border-bottom-right-radius: 30px;
 }
@@ -2720,14 +2890,14 @@ input {
 }
 .video-ui .TabsSort:hover {
   cursor: pointer;
-  background: #F6F7FB;
+  background: #f6f7fb;
 }
 .video-ui .TabsSortLabel {
   display: flex;
   flex-direction: row;
   justify-content: right;
   align-items: center;
-  color: #6E7684;
+  color: #6e7684;
   white-space: nowrap;
 }
 .video-ui .TabsSortLabel img {
@@ -2827,7 +2997,7 @@ button {
 .SwitchRoot {
   width: 34px;
   height: 22px;
-  background-color: #E8E8E8;
+  background-color: #e8e8e8;
   border-radius: 9999px;
   position: relative;
   -webkit-tap-highlight-color: rgba(0, 0, 0, 0);
@@ -2843,7 +3013,7 @@ button {
 }
 
 .SwitchRoot[data-state=checked] {
-  background-color: #3080F8;
+  background-color: #3080f8;
 }
 
 .SwitchRoot:hover {
@@ -2867,7 +3037,7 @@ button {
 }
 
 .Label {
-  color: #6E7684;
+  color: #6e7684;
   display: inline-block !important;
   /* Ellipsis */
   text-overflow: clip;
@@ -2878,9 +3048,9 @@ button {
 }
 
 .ExperimentalLabel {
-  color: #FFF;
+  color: #fff;
   font-size: 12px;
-  background-color: #3080F8;
+  background-color: #3080f8;
   border-radius: 15px;
   padding: 2px 8px;
   display: inline-block !important;
@@ -2936,24 +3106,24 @@ button {
 
 .labelDropdownContent {
   position: absolute;
-  background-color: #FFF;
+  background-color: #fff;
   min-width: 160px;
   box-shadow: 0px 8px 16px 0px rgba(0, 0, 0, 0.2);
   z-index: 9999999999;
   border-radius: 15px;
   padding: 8px 0px;
   margin-top: 4px;
-  border: 1px solid #E8E8E8;
+  border: 1px solid #e8e8e8;
   display: none;
 }
 .labelDropdownContent .labelDropdownContentItem {
-  color: #29292F;
+  color: #29292f;
   padding: 12px 16px;
   text-decoration: none;
   display: block;
 }
 .labelDropdownContent .labelDropdownContentItem:hover {
-  background-color: #F6F7FB;
+  background-color: #f6f7fb;
   cursor: pointer;
 }
 
@@ -2994,14 +3164,14 @@ button {
   padding-right: 4px;
 }
 .video-item-root .video-item-info-title {
-  color: #29292F;
+  color: #29292f;
   white-space: nowrap;
   text-overflow: ellipsis;
   overflow: hidden;
 }
 .video-item-root .video-item-info-date {
   margin-top: 4px;
-  color: #6E7684;
+  color: #6e7684;
   font-size: 12px;
   white-space: nowrap;
   text-overflow: ellipsis;
@@ -3029,7 +3199,7 @@ button {
   opacity: 0;
 }
 .video-item-right .copy-link {
-  background: #FFF;
+  background: #fff;
   height: 32px;
   width: 32px;
   border-radius: 10px;
@@ -3046,7 +3216,7 @@ button {
 .video-item-right .more-actions {
   height: 32px;
   width: 32px;
-  background: #FFF;
+  background: #fff;
   text-align: center;
   border-radius: 10px;
   display: flex;
@@ -3075,7 +3245,7 @@ button {
   box-sizing: border-box;
 }
 .main-button .main-button-label {
-  color: #FFF;
+  color: #fff;
   text-align: center;
   vertical-align: middle;
   align-items: center;
@@ -3084,7 +3254,7 @@ button {
   position: absolute;
   font-size: 12px;
   right: 16px;
-  color: #FFF;
+  color: #fff;
   opacity: 0.7;
 }
 .main-button:hover {
@@ -3193,7 +3363,7 @@ button {
   }
 }
 .dashboard-button {
-  background: #29292F;
+  background: #29292f;
   box-shadow: 0px 0px 0px 0px rgba(41, 41, 47, 0.25);
   transition: all 0.25s ease-in-out;
 }
@@ -3209,7 +3379,7 @@ button {
   border-radius: 15px;
   padding: 4px 8px;
   position: absolute;
-  color: #FFF;
+  color: #fff;
   opacity: 0.7;
   font-family: "Satoshi-Medium", sans-serif;
   font-size: 12px;
@@ -3261,7 +3431,7 @@ button {
   width: 46px;
   height: 46px;
   position: absolute;
-  border: 2px solid #3080F8;
+  border: 2px solid #3080f8;
   box-sizing: border-box;
 }
 .background-effect img {
@@ -3282,7 +3452,7 @@ button {
   width: 46px;
   height: 46px;
   position: absolute;
-  border: 2px solid #3080F8;
+  border: 2px solid #3080f8;
   opacity: 0.5;
   box-sizing: border-box;
 }
@@ -3303,7 +3473,7 @@ button {
   position: relative;
 }
 .region-input input {
-  color: #29292F !important;
+  color: #29292f !important;
   border-radius: 30px;
   height: 40px;
   box-sizing: border-box;
@@ -3312,14 +3482,14 @@ button {
   padding-left: 18px;
   padding-right: 40px;
   font-family: "Satoshi-Medium", sans-serif;
-  background-color: #FFF;
+  background-color: #fff;
 }
 .region-input input:focus-visible {
   outline: none;
   box-shadow: 0px 0px 0px 2px rgba(48, 128, 248, 0.5);
 }
 .region-input span {
-  color: #6E7684;
+  color: #6e7684;
   font-family: "Satoshi-Medium", sans-serif;
   position: absolute;
   right: 18px;
@@ -3350,7 +3520,7 @@ button {
   padding-left: 18px;
   padding-right: 40px;
   font-family: "Satoshi-Medium", sans-serif;
-  background-color: #FFF;
+  background-color: #fff;
   -webkit-appearance: textfield;
   -moz-appearance: textfield;
   appearance: textfield;
@@ -3360,7 +3530,7 @@ button {
   box-shadow: 0px 0px 0px 2px rgba(48, 128, 248, 0.5);
 }
 .time-set-input span {
-  color: #6E7684;
+  color: #6e7684;
   font-family: "Satoshi-Medium", sans-serif;
   position: absolute;
   right: 18px;
@@ -3372,13 +3542,13 @@ button {
 
 .TooltipContent {
   border-radius: 30px;
-  background-color: #29292F;
+  background-color: #29292f;
   padding: 10px 15px;
   font-size: 12px;
   line-height: 1;
   font-family: "Satoshi-Medium", sans-serif;
   z-index: 99999999 !important;
-  color: #FFF;
+  color: #fff;
   box-shadow: hsla(206, 22%, 7%, 0.35) 0px 10px 38px -10px, hsla(206, 22%, 7%, 0.2) 0px 10px 20px -15px;
   -webkit-user-select: none;
      -moz-user-select: none;
@@ -3567,7 +3737,7 @@ button {
   background-color: rgba(124, 139, 165, 0);
 }
 .CameraToggleItem svg, .CameraToolbarButton svg {
-  color: #9797A4;
+  color: #9797a4;
 }
 .CameraToggleItem:hover, .CameraToolbarButton:hover {
   background-color: rgba(124, 139, 165, 0.2) !important;
@@ -3678,7 +3848,7 @@ button {
   font-weight: 300 !important;
   font-family: "Satoshi-Light", sans-serif !important;
   font-size: 48px !important;
-  color: #FFF;
+  color: #fff;
   text-align: center;
   display: block;
   transition: all 0.6s ease-in-out;
@@ -3777,7 +3947,7 @@ button {
   display: block;
   padding: 10px 20px;
   font-family: "Satoshi-Medium", sans-serif;
-  color: #FFF;
+  color: #fff;
   z-index: 99999999999;
   width: -moz-fit-content;
   width: fit-content;
@@ -3819,7 +3989,7 @@ button {
 
 .AlertDialogTitle {
   margin: 0;
-  color: #29292F;
+  color: #29292f;
   font-size: 14px;
   font-family: "Satoshi-Bold", sans-serif;
   font-weight: 700;
@@ -3827,12 +3997,12 @@ button {
 
 .AlertDialogDescription {
   margin-bottom: 20px;
-  color: #6E7684;
+  color: #6e7684;
   font-size: 14px;
   line-height: 1.5;
 }
 .AlertDialogDescription a {
-  color: #3080F8 !important;
+  color: #3080f8 !important;
   font-weight: 600 !important;
   text-decoration: none !important;
   display: inline-block;
@@ -3853,7 +4023,7 @@ button {
 
 .Button.blue {
   background-color: rgba(48, 128, 248, 0.1);
-  color: #3080F8;
+  color: #3080f8;
 }
 .Button.blue:hover {
   background-color: rgba(48, 128, 248, 0.15);
@@ -3879,7 +4049,7 @@ button {
 
 .Button.grey {
   background: rgba(110, 118, 132, 0.1);
-  color: #6E7684;
+  color: #6e7684;
 }
 
 .Button.grey:hover {
@@ -3919,7 +4089,7 @@ button {
   line-height: 1;
   font-weight: 500;
   height: 35px;
-  color: #6E7684;
+  color: #6e7684;
   font-family: "Satoshi-Medium", sans-serif;
 }
 .SideButtonModal:hover {
@@ -4035,8 +4205,8 @@ button {
 }
 
 .warning-root {
-  background-color: #29292F;
-  color: #FFF;
+  background-color: #29292f;
+  color: #fff;
   border-radius: 30px;
   box-shadow: hsla(206, 22%, 7%, 0.35) 0px 10px 38px -10px, hsla(206, 22%, 7%, 0.2) 0px 10px 20px -15px;
   padding: 14px 20px;
@@ -4108,18 +4278,18 @@ button {
   }
 }
 .warning-title {
-  color: #FFF;
+  color: #fff;
   font-family: "Satoshi-Medium", sans-serif;
 }
 
 .warning-description {
-  color: #FFF;
+  color: #fff;
   opacity: 0.8;
   font-family: "Satoshi-Medium", sans-serif;
 }
 
 .ToastAction {
-  color: #FFF;
+  color: #fff;
   font-family: "Satoshi-Medium", sans-serif;
   text-align: right;
   background-color: #51515f;
@@ -4181,7 +4351,7 @@ html {
   border-radius: 15px;
   z-index: 99999;
   font-family: "Satoshi-Medium", sans-serif;
-  color: #29292F;
+  color: #29292f;
   box-shadow: 0px 10px 38px -10px rgba(22, 23, 24, 0.35), 0px 10px 20px -15px rgba(22, 23, 24, 0.2);
   animation-duration: 400ms;
   animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
@@ -4209,7 +4379,7 @@ html {
   right: 12px;
   width: 18px;
   height: 18px;
-  background: #3080F8;
+  background: #3080f8;
   border-radius: 50%;
   display: inline-flex;
   align-items: center;
@@ -4234,12 +4404,193 @@ html {
 }
 
 .ScreenityDropdownMenuItem:hover {
-  background-color: #F6F7FB !important;
+  background-color: #f6f7fb !important;
   cursor: pointer;
 }
 
 .ScreenityDropdownMenuItem[data-disabled] {
-  color: #6E7684 !important;
+  color: #6e7684 !important;
   cursor: not-allowed;
-  background-color: #F6F7FB !important;
+  background-color: #f6f7fb !important;
+}
+
+.driver-popover.ScreenityOnboardingPopover,
+.ScreenityOnboardingPopover,
+.onboarding-popover {
+  border-radius: 30px !important;
+  background: #fff !important;
+  color: #29292f !important;
+  font-family: "Satoshi-Regular", sans-serif !important;
+  box-shadow: 0 4px 20px rgba(38, 38, 52, 0.08) !important;
+  padding: 20px !important;
+  max-width: 340px !important;
+  font-size: 14px !important;
+  z-index: 99999999999 !important;
+}
+.driver-popover.ScreenityOnboardingPopover .driver-popover-title,
+.ScreenityOnboardingPopover .driver-popover-title,
+.onboarding-popover .driver-popover-title {
+  font-size: 1rem !important;
+  font-family: "Satoshi-Medium", sans-serif !important;
+  margin-bottom: 12px !important;
+  color: #29292f !important;
+}
+.driver-popover.ScreenityOnboardingPopover .driver-popover-description,
+.ScreenityOnboardingPopover .driver-popover-description,
+.onboarding-popover .driver-popover-description {
+  font-size: 14px !important;
+  font-family: "Satoshi-Medium", sans-serif !important;
+  color: #6e7684 !important;
+  line-height: 1.5 !important;
+  margin-bottom: 18px !important;
+}
+.driver-popover.ScreenityOnboardingPopover .driver-popover-description a,
+.ScreenityOnboardingPopover .driver-popover-description a,
+.onboarding-popover .driver-popover-description a {
+  color: #3b82f6 !important;
+  font-family: "Satoshi-Bold", sans-serif !important;
+  text-decoration: none !important;
+}
+.driver-popover.ScreenityOnboardingPopover .driver-popover-close-btn,
+.ScreenityOnboardingPopover .driver-popover-close-btn,
+.onboarding-popover .driver-popover-close-btn {
+  top: 14px;
+  right: 12px;
+  color: #6e7684 !important;
+  font-size: 1.5rem !important;
+}
+.driver-popover.ScreenityOnboardingPopover .driver-popover-arrow,
+.ScreenityOnboardingPopover .driver-popover-arrow,
+.onboarding-popover .driver-popover-arrow {
+  width: 0px;
+  height: 0px;
+  background: none !important;
+  box-shadow: none !important;
+  box-sizing: border-box;
+}
+.driver-popover.ScreenityOnboardingPopover .driver-popover-arrow-side-top,
+.ScreenityOnboardingPopover .driver-popover-arrow-side-top,
+.onboarding-popover .driver-popover-arrow-side-top {
+  border-left: 8px solid transparent !important;
+  border-right: 8px solid transparent !important;
+  border-top: 8px solid #fff !important;
+}
+.driver-popover.ScreenityOnboardingPopover .driver-popover-arrow-side-bottom,
+.ScreenityOnboardingPopover .driver-popover-arrow-side-bottom,
+.onboarding-popover .driver-popover-arrow-side-bottom {
+  border-left: 8px solid transparent !important;
+  border-right: 8px solid transparent !important;
+  border-bottom: 8px solid #fff !important;
+}
+.driver-popover.ScreenityOnboardingPopover .driver-popover-arrow-side-left,
+.ScreenityOnboardingPopover .driver-popover-arrow-side-left,
+.onboarding-popover .driver-popover-arrow-side-left {
+  border-top: 8px solid transparent !important;
+  border-bottom: 8px solid transparent !important;
+  border-left: 8px solid #fff !important;
+}
+.driver-popover.ScreenityOnboardingPopover .driver-popover-arrow-side-right,
+.ScreenityOnboardingPopover .driver-popover-arrow-side-right,
+.onboarding-popover .driver-popover-arrow-side-right {
+  border-top: 8px solid transparent !important;
+  border-bottom: 8px solid transparent !important;
+  border-right: 8px solid #fff !important;
+}
+.driver-popover.ScreenityOnboardingPopover .driver-popover-arrow-align-start,
+.ScreenityOnboardingPopover .driver-popover-arrow-align-start,
+.onboarding-popover .driver-popover-arrow-align-start {
+  top: 35px !important;
+}
+.driver-popover.ScreenityOnboardingPopover .driver-popover-arrow-align-end,
+.ScreenityOnboardingPopover .driver-popover-arrow-align-end,
+.onboarding-popover .driver-popover-arrow-align-end {
+  bottom: 35px !important;
+}
+.driver-popover.ScreenityOnboardingPopover .driver-popover-arrow-align-left,
+.ScreenityOnboardingPopover .driver-popover-arrow-align-left,
+.onboarding-popover .driver-popover-arrow-align-left {
+  left: 35px !important;
+}
+.driver-popover.ScreenityOnboardingPopover .driver-popover-arrow-align-right,
+.ScreenityOnboardingPopover .driver-popover-arrow-align-right,
+.onboarding-popover .driver-popover-arrow-align-right {
+  right: 35px !important;
+}
+.driver-popover.ScreenityOnboardingPopover .driver-popover-progress-text,
+.ScreenityOnboardingPopover .driver-popover-progress-text,
+.onboarding-popover .driver-popover-progress-text {
+  font-size: 0.8rem !important;
+  font-family: "Satoshi-Medium", sans-serif !important;
+  color: #6e7684 !important;
+  opacity: 0.7 !important;
+  margin-top: 2px !important;
+}
+.driver-popover.ScreenityOnboardingPopover .driver-popover-footer,
+.ScreenityOnboardingPopover .driver-popover-footer,
+.onboarding-popover .driver-popover-footer {
+  display: flex !important;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+}
+.driver-popover.ScreenityOnboardingPopover .driver-popover-footer .driver-popover-navigation-btns,
+.ScreenityOnboardingPopover .driver-popover-footer .driver-popover-navigation-btns,
+.onboarding-popover .driver-popover-footer .driver-popover-navigation-btns {
+  gap: 6px !important;
+}
+.driver-popover.ScreenityOnboardingPopover .driver-popover-footer .driver-popover-navigation-btns .driver-popover-next-btn,
+.driver-popover.ScreenityOnboardingPopover .driver-popover-footer .driver-popover-navigation-btns .driver-popover-prev-btn,
+.driver-popover.ScreenityOnboardingPopover .driver-popover-footer .driver-popover-navigation-btns .driver-popover-close-btn,
+.ScreenityOnboardingPopover .driver-popover-footer .driver-popover-navigation-btns .driver-popover-next-btn,
+.ScreenityOnboardingPopover .driver-popover-footer .driver-popover-navigation-btns .driver-popover-prev-btn,
+.ScreenityOnboardingPopover .driver-popover-footer .driver-popover-navigation-btns .driver-popover-close-btn,
+.onboarding-popover .driver-popover-footer .driver-popover-navigation-btns .driver-popover-next-btn,
+.onboarding-popover .driver-popover-footer .driver-popover-navigation-btns .driver-popover-prev-btn,
+.onboarding-popover .driver-popover-footer .driver-popover-navigation-btns .driver-popover-close-btn {
+  background-color: #3080f8 !important;
+  color: white !important;
+  border: none !important;
+  padding: 10px 14px !important;
+  border-radius: 30px !important;
+  font-family: "Satoshi-Medium", sans-serif !important;
+  font-weight: 500 !important;
+  cursor: pointer !important;
+  font-size: 0.875rem !important;
+  text-shadow: none !important;
+}
+.driver-popover.ScreenityOnboardingPopover .driver-popover-footer .driver-popover-navigation-btns .driver-popover-next-btn:hover,
+.ScreenityOnboardingPopover .driver-popover-footer .driver-popover-navigation-btns .driver-popover-next-btn:hover,
+.onboarding-popover .driver-popover-footer .driver-popover-navigation-btns .driver-popover-next-btn:hover {
+  background: rgb(23.3341121495, 112.8668224299, 247.1658878505) !important;
+}
+.driver-popover.ScreenityOnboardingPopover .driver-popover-footer .driver-popover-navigation-btns .driver-popover-prev-btn,
+.ScreenityOnboardingPopover .driver-popover-footer .driver-popover-navigation-btns .driver-popover-prev-btn,
+.onboarding-popover .driver-popover-footer .driver-popover-navigation-btns .driver-popover-prev-btn {
+  background-color: transparent !important;
+  color: #29292f !important;
+  border: 1px solid #e8e8e8 !important;
+}
+.driver-popover.ScreenityOnboardingPopover .driver-popover-footer .driver-popover-navigation-btns .driver-popover-prev-btn:hover,
+.ScreenityOnboardingPopover .driver-popover-footer .driver-popover-navigation-btns .driver-popover-prev-btn:hover,
+.onboarding-popover .driver-popover-footer .driver-popover-navigation-btns .driver-popover-prev-btn:hover {
+  background: #f6f7fb !important;
+}
+.driver-popover.ScreenityOnboardingPopover .driver-popover-footer .driver-popover-navigation-btns .driver-popover-close-btn,
+.ScreenityOnboardingPopover .driver-popover-footer .driver-popover-navigation-btns .driver-popover-close-btn,
+.onboarding-popover .driver-popover-footer .driver-popover-navigation-btns .driver-popover-close-btn {
+  background-color: transparent !important;
+  color: #6e7684 !important;
+}
+
+.driver-overlay {
+  z-index: 2147483645 !important;
+}
+
+.driver-stage {
+  z-index: 2147483646 !important;
+}
+
+.driver-popover,
+.driver-popover.ScreenityOnboardingPopover {
+  z-index: 2147483647 !important;
 }/*# sourceMappingURL=app.css.map */

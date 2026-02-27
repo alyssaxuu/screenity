@@ -1,27 +1,27 @@
 import { focusTab } from "./focusTab";
 import { sendMessageTab } from "./sendMessageTab";
-import {
-  startAfterCountdown,
-  startRecording,
-} from "../recording/startRecording";
+import { startRecording } from "../recording/startRecording";
 import { getCurrentTab } from "./getCurrentTab";
 
-export const restartActiveTab = async () => {
+export const restartActiveTab = async (message = {}) => {
   try {
-    const activeTab = await getCurrentTab();
-    if (activeTab && activeTab.id) {
-      sendMessageTab(activeTab.id, { type: "ready-to-record" });
+    const { recordingUiTabId, activeTab: storedActiveTab } =
+      await chrome.storage.local.get(["recordingUiTabId", "activeTab"]);
+    const preferredTabId =
+      message?.sourceTabId || recordingUiTabId || storedActiveTab || null;
+    const currentTab = await getCurrentTab();
+    const targetTabId = preferredTabId || currentTab?.id || null;
+    if (targetTabId) {
+      sendMessageTab(targetTabId, { type: "ready-to-record" });
 
       const { countdown } = await chrome.storage.local.get(["countdown"]);
-      const delay = countdown ? 3120 : 300;
+      const delay = countdown ? null : 300;
 
-      setTimeout(() => {
-        if (countdown) {
-          startAfterCountdown();
-        } else {
+      if (delay != null) {
+        setTimeout(() => {
           startRecording();
-        }
-      }, delay);
+        }, delay);
+      }
     } else {
       console.error("No active tab found.");
     }
@@ -30,12 +30,12 @@ export const restartActiveTab = async () => {
   }
 };
 
-export const resetActiveTab = async (forceRestart = false) => {
+export const resetActiveTab = async (forceRestart = false, message = {}) => {
   const { activeTab } = await chrome.storage.local.get(["activeTab"]);
   const { surface } = await chrome.storage.local.get(["surface"]);
 
   if (forceRestart) {
-    return restartActiveTab();
+    return restartActiveTab(message);
   }
 
   const [currentTab] = await chrome.tabs.query({
@@ -73,15 +73,13 @@ export const resetActiveTab = async (forceRestart = false) => {
         sendMessageTab(targetTabId, { type: "ready-to-record" });
 
         const { countdown } = await chrome.storage.local.get(["countdown"]);
-        const delay = countdown ? 3120 : 300;
+        const delay = countdown ? null : 300;
 
-        setTimeout(() => {
-          if (countdown) {
-            startAfterCountdown();
-          } else {
+        if (delay != null) {
+          setTimeout(() => {
             startRecording();
-          }
-        }, delay);
+          }, delay);
+        }
       } else {
         console.error("No valid tab to send message to.");
       }
@@ -108,6 +106,6 @@ export const resetActiveTab = async (forceRestart = false) => {
   }
 };
 
-export const resetActiveTabRestart = async () => {
-  await resetActiveTab(true);
+export const resetActiveTabRestart = async (message = {}) => {
+  await resetActiveTab(true, message);
 };

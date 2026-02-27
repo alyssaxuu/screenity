@@ -95,7 +95,6 @@
     "message": "Показати більше опцій",
     "description": "Show more options label"
   },
-
   "systemAudioLabel": {
     "message": "Включити системний звук",
     "description": "Мітка системного аудіо/вкладка"
@@ -525,7 +524,7 @@
     "description": "Trim label"
   },
   "preparingLabel": {
-    "message": "Підготовка відео, зачекайте, будь ласка...",
+    "message": "Підготовка...",
     "description": "Preparing label"
   },
   "cropButtonTitle": {
@@ -1010,7 +1009,6 @@
     "message": "Якщо ви хочете записувати звук комп'ютера, переконайтеся, що опція 'Ділитися аудіо системи' активована. Якщо ви не бачите цю опцію, спробуйте оновити Chrome або перейти до опції запису вкладок.",
     "description": "Опис попередження про аудіо для інших систем"
   },
-
   "maxResolutionLabel": {
     "message": "Максимальний роздільна здатність",
     "description": "Максимальний підпис роздільної здатності в меню налаштувань"
@@ -1019,7 +1017,6 @@
     "message": "Максимальний кадровий кут",
     "description": "Максимальний підпис кадрового кута в меню налаштувань"
   },
-
   "notEnoughRAM": {
     "message": "Недостатньо ОПЕРАТИВНОЇ ПАМ'ЯТІ",
     "description": "Надпис Недостатньо ОПЕРАТИВНОЇ ПАМ'ЯТІ в меню налаштувань"
@@ -1391,5 +1388,57 @@
   "webcodecsFailedOffToast": {
     "message": "Fast MP4 помилка — вимк",
     "description": "WebCodecs failure auto-disable toast"
+  },
+  "proOnboardingWelcomeTitle": {
+    "message": "Ласкаво просимо до розширення Screenity Pro",
+    "description": "Pro onboarding welcome step title"
+  },
+  "proOnboardingWelcomeDescription": {
+    "message": "Кілька швидких порад перед записом.<br/>Автозум працює лише для кліків у <strong>вкладках Chrome</strong>. Пізніше ви завжди можете додати зуми вручну.",
+    "description": "Pro onboarding welcome step description"
+  },
+  "proOnboardingToolbarTitle": {
+    "message": "Панель запису та ефекти",
+    "description": "Pro onboarding toolbar step title"
+  },
+  "proOnboardingToolbarDescription": {
+    "message": "Використовуйте цю панель для малювання, ефектів курсора, розмиття та керування записом.<br/><br/><strong>Ця панель буде у відео</strong>, якщо її не приховати.",
+    "description": "Pro onboarding toolbar step description"
+  },
+  "proOnboardingCameraTitle": {
+    "message": "Камера записується окремо",
+    "description": "Pro onboarding camera step title"
+  },
+  "proOnboardingCameraDescription": {
+    "message": "Під час запису камера може <strong>зникати або переходити в PiP</strong> - це нормально.<br/><br/>Вона записується окремо, щоб ви могли змінити її позицію пізніше.",
+    "description": "Pro onboarding camera step description"
+  },
+  "proOnboardingInstantTitle": {
+    "message": "Миттєвий режим",
+    "description": "Pro onboarding instant mode step title"
+  },
+  "proOnboardingInstantDescription": {
+    "message": "Найкраще для швидкого поширення з <strong>необмеженими завантаженнями</strong>.<br/><br/>У цьому режимі недоступні розширені макети й опції редактора.",
+    "description": "Pro onboarding instant mode step description"
+  },
+  "proOnboardingDone": {
+    "message": "Зрозуміло",
+    "description": "Pro onboarding done button text"
+  },
+  "proOnboardingNext": {
+    "message": "Далі",
+    "description": "Pro onboarding next button text"
+  },
+  "proOnboardingBack": {
+    "message": "Назад",
+    "description": "Pro onboarding back button text"
+  },
+  "proOnboardingToolbarLearnMore": {
+    "message": "Дізнатися більше",
+    "description": "Pro onboarding toolbar learn more link label"
+  },
+  "resetOnboardingOption": {
+    "message": "Скинути онбординг",
+    "description": "Reset pro onboarding option label in popup settings menu"
   }
 }

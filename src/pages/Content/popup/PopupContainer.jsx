@@ -16,8 +16,6 @@ import {
   ProfilePic,
 } from "../images/popup/images";
 
-import Welcome from "./layout/Welcome";
-
 import { Rnd } from "react-rnd";
 
 import {
@@ -31,10 +29,14 @@ import RecordingTab from "./layout/RecordingTab";
 import VideosTab from "./layout/VideosTab";
 
 // Layouts
-import Announcement from "./layout/Announcement";
 import SettingsMenu from "./layout/SettingsMenu";
 import InactiveSubscription from "./layout/InactiveSubscription";
 import LoggedOut from "./layout/LoggedOut";
+import Welcome from "./layout/Welcome";
+import {
+  runProPopupOnboardingIfNeeded,
+  runProCameraOnboardingIfNeeded,
+} from "./onboarding/proOnboarding";
 
 // Context
 import { contentStateContext } from "../context/ContentState";
@@ -57,38 +59,30 @@ const PopupContainer = (props) => {
   const pillRef = useRef(null);
   const [URL, setURL] = useState("https://help.screenity.io/");
   const isCloudBuild = process.env.SCREENITY_ENABLE_CLOUD_FEATURES === "true";
+  const wasCameraActiveRef = useRef(null);
 
   useEffect(() => {
-    // Check chrome storage
-    chrome.storage.local.get(
-      ["onboarding", "showProSplash"],
-      function (result) {
-        if (result.onboarding) {
-          setOnboarding(true);
-          setContentState((prevContentState) => ({
-            ...prevContentState,
-            onboarding: true,
-          }));
-        }
-        if (result.showProSplash) {
-          setShowProSplash(true);
-          setContentState((prevContentState) => ({
-            ...prevContentState,
-            showProSplash: true,
-          }));
-        }
-      }
-    );
-  }, []);
+    chrome.storage.local.get(["onboarding", "showProSplash"], (result) => {
+      const nextOnboarding = Boolean(result.onboarding);
+      const nextShowProSplash = Boolean(result.showProSplash);
+      setOnboarding(nextOnboarding);
+      setShowProSplash(nextShowProSplash);
+      setContentState((prevContentState) => ({
+        ...prevContentState,
+        onboarding: nextOnboarding,
+        showProSplash: nextShowProSplash,
+      }));
+    });
+  }, [setContentState]);
 
   useEffect(() => {
     if (contentState.isLoggedIn) {
       setOnboarding(false);
       setShowProSplash(false);
-    } else {
-      setOnboarding(contentState.onboarding);
-      setShowProSplash(contentState.showProSplash);
+      return;
     }
+    setOnboarding(Boolean(contentState.onboarding));
+    setShowProSplash(Boolean(contentState.showProSplash));
   }, [
     contentState.isLoggedIn,
     contentState.onboarding,
@@ -164,6 +158,18 @@ const PopupContainer = (props) => {
     contentState.wasLoggedIn,
     tab,
   ]);
+
+  const showWelcomeSplash = Boolean(
+    isCloudBuild &&
+      !contentState.isLoggedIn &&
+      !contentState.wasLoggedIn &&
+      (
+        onboarding ||
+        showProSplash ||
+        contentState.onboarding ||
+        contentState.showProSplash
+      ),
+  );
 
   useLayoutEffect(() => {
     if (!recordTabRef.current || !videoTabRef.current || !pillRef.current)
@@ -359,8 +365,75 @@ const PopupContainer = (props) => {
     contentState.isLoggedIn,
     contentState.bigTab,
     contentState.wasLoggedIn,
-    contentState.onboarding,
     pillRef.current,
+  ]);
+
+  useEffect(() => {
+    const isPro = Boolean(contentState.isLoggedIn && contentState.isSubscribed);
+    if (!isCloudBuild || !isPro) return;
+    runProPopupOnboardingIfNeeded({
+      rootContext: props.shadowRef?.current?.shadowRoot || document,
+      isPro,
+      isLoggedIn: Boolean(contentState.isLoggedIn),
+      popupOpen: Boolean(contentState.showPopup && contentState.showExtension),
+      cameraEnabled: Boolean(contentState.cameraActive),
+      pendingRecording: Boolean(contentState.pendingRecording),
+      preparingRecording: Boolean(contentState.preparingRecording),
+      recording: Boolean(contentState.recording),
+      countdownActive: Boolean(contentState.countdownActive),
+      isCountdownVisible: Boolean(contentState.isCountdownVisible),
+    });
+  }, [
+    isCloudBuild,
+    contentState.isLoggedIn,
+    contentState.isSubscribed,
+    contentState.showPopup,
+    contentState.showExtension,
+    contentState.recordingToScene,
+    contentState.cameraActive,
+    contentState.pendingRecording,
+    contentState.preparingRecording,
+    contentState.recording,
+    contentState.countdownActive,
+    contentState.isCountdownVisible,
+    props.shadowRef,
+  ]);
+
+  useEffect(() => {
+    const isPro = Boolean(contentState.isLoggedIn && contentState.isSubscribed);
+    const cameraEnabled = Boolean(contentState.cameraActive);
+    if (wasCameraActiveRef.current === null) {
+      wasCameraActiveRef.current = cameraEnabled;
+      return;
+    }
+    const becameEnabled = cameraEnabled && !wasCameraActiveRef.current;
+    wasCameraActiveRef.current = cameraEnabled;
+    if (!becameEnabled || !isCloudBuild || !isPro) return;
+    runProCameraOnboardingIfNeeded({
+      rootContext: props.shadowRef?.current?.shadowRoot || document,
+      isPro,
+      isLoggedIn: Boolean(contentState.isLoggedIn),
+      popupOpen: Boolean(contentState.showPopup && contentState.showExtension),
+      cameraEnabled,
+      pendingRecording: Boolean(contentState.pendingRecording),
+      preparingRecording: Boolean(contentState.preparingRecording),
+      recording: Boolean(contentState.recording),
+      countdownActive: Boolean(contentState.countdownActive),
+      isCountdownVisible: Boolean(contentState.isCountdownVisible),
+    });
+  }, [
+    isCloudBuild,
+    contentState.cameraActive,
+    contentState.isLoggedIn,
+    contentState.isSubscribed,
+    contentState.showPopup,
+    contentState.showExtension,
+    contentState.pendingRecording,
+    contentState.preparingRecording,
+    contentState.recording,
+    contentState.countdownActive,
+    contentState.isCountdownVisible,
+    props.shadowRef,
   ]);
 
   return (
@@ -391,7 +464,11 @@ const PopupContainer = (props) => {
         onDragStop={handleDrop}
         ref={DragRef}
       >
-        <div className="popup-container" ref={PopupRef}>
+        <div
+          className="popup-container"
+          id="pro-onboarding-popup-container"
+          ref={PopupRef}
+        >
           <div
             className={open ? "popup-drag-head" : "popup-drag-head drag-area"}
           ></div>
@@ -461,7 +538,34 @@ const PopupContainer = (props) => {
           </div>
           <div className="popup-nav"></div>
           <div className="popup-content">
-            {isCloudBuild &&
+            {showWelcomeSplash ? (
+              <Welcome
+                setOnboarding={() => {
+                  setOnboarding(false);
+                  setShowProSplash(false);
+                  chrome.storage.local.set({
+                    onboarding: false,
+                    showProSplash: false,
+                    firstTimePro: false,
+                  });
+                  setContentState((prev) => ({
+                    ...prev,
+                    onboarding: false,
+                    showProSplash: false,
+                  }));
+                }}
+                isBack={showProSplash}
+                clearBack={() => {
+                  setShowProSplash(false);
+                  setContentState((prev) => ({
+                    ...prev,
+                    showProSplash: false,
+                  }));
+                  chrome.storage.local.set({ showProSplash: false });
+                }}
+                setContentState={setContentState}
+              />
+            ) : isCloudBuild &&
             contentState.isSubscribed === false &&
             contentState.isLoggedIn === true ? (
               <InactiveSubscription
@@ -491,20 +595,6 @@ const PopupContainer = (props) => {
                   );
                 }}
               />
-            ) : isCloudBuild && (onboarding || showProSplash) ? (
-              <Welcome
-                setOnboarding={setOnboarding}
-                setContentState={setContentState}
-                isBack={showProSplash}
-                clearBack={() => {
-                  setContentState((prev) => ({
-                    ...prev,
-                    showProSplash: false,
-                  }));
-                  chrome.storage.local.set({ showProSplash: false });
-                  setShowProSplash(false);
-                }}
-              />
             ) : isCloudBuild &&
               !contentState.isLoggedIn &&
               contentState.wasLoggedIn ? (
@@ -522,8 +612,6 @@ const PopupContainer = (props) => {
                     bigTab: "record", // Ensure UI state sync
                   }));
                   setTab("record"); // Switch immediately
-
-                  chrome.runtime.sendMessage({ type: "handle-logout" });
 
                   requestAnimationFrame(() => {
                     if (recordTabRef.current && pillRef.current) {

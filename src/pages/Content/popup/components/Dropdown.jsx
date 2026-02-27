@@ -17,6 +17,8 @@ const Dropdown = (props) => {
   const [contentState, setContentState] = useContext(contentStateContext);
   const [label, setLabel] = useState(chrome.i18n.getMessage("None"));
   const [open, setOpen] = useState(false);
+  const cameraAnchorId =
+    props.type === "camera" ? "pro-onboarding-camera-toggle" : undefined;
 
   const updateItems = () => {
     if (props.type === "camera") {
@@ -221,7 +223,11 @@ const Dropdown = (props) => {
         }
       }}
     >
-      <Select.Trigger className="SelectTrigger" aria-label="Food">
+      <Select.Trigger
+        className="SelectTrigger"
+        aria-label="Food"
+        id={cameraAnchorId}
+      >
         <Select.Icon
           className="SelectIconType"
           onClick={(e) => {

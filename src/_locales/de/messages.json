@@ -524,7 +524,7 @@
     "description": "Beschriftung 'Zuschneiden'"
   },
   "preparingLabel": {
-    "message": "Video wird vorbereitet, bitte warten...",
+    "message": "Vorbereitung...",
     "description": "Beschriftung 'Vorbereitung'"
   },
   "cropButtonTitle": {
@@ -899,12 +899,10 @@
     "message": "Mehr über die Verarbeitung langer Videos erfahren.",
     "description": "Link 'Erfahren Sie mehr' im Modal für die 5-Minuten-Limitierung mit einem Punkt"
   },
-
   "recoveryModeTitle": {
     "message": "Wiederherstellungsmodus",
     "description": "Titel des Wiederherstellungsmodus"
   },
-
   "downloadForTroubleshootingOption": {
     "message": "Daten zum Beheben von Problemen herunterladen",
     "description": "Option zum Herunterladen zur Fehlerbehebung"
@@ -1011,7 +1009,6 @@
     "message": "Stellen Sie sicher, dass Sie die Option 'System-Audio teilen' aktivieren, wenn Sie Computer-Audio aufzeichnen möchten. Wenn Sie diese Option nicht sehen, versuchen Sie, Chrome zu aktualisieren oder zur Tab-Aufzeichnung zu wechseln.",
     "description": "Beschreibung der Audio-Warnung für andere Systeme"
   },
-
   "maxResolutionLabel": {
     "message": "Maximale Auflösung",
     "description": "Beschriftung für maximale Auflösung im Einstellungsmenü"
@@ -1020,7 +1017,6 @@
     "message": "Maximale FPS",
     "description": "Beschriftung für maximale FPS im Einstellungsmenü"
   },
-
   "notEnoughRAM": {
     "message": "Nicht genügend RAM",
     "description": "Beschriftung 'Nicht genügend RAM' im Einstellungsmenü"
@@ -1400,5 +1396,57 @@
   "webcodecsFailedOffToast": {
     "message": "Fast MP4 Fehler — aus",
     "description": "WebCodecs failure auto-disable toast"
+  },
+  "proOnboardingWelcomeTitle": {
+    "message": "Willkommen bei der Screenity Pro-Erweiterung",
+    "description": "Pro onboarding welcome step title"
+  },
+  "proOnboardingWelcomeDescription": {
+    "message": "Ein paar kurze Tipps vor der Aufnahme.<br/>Auto-Zooms funktionieren nur bei Klicks in <strong>Chrome-Tabs</strong>. Zusätzliche Zooms kannst du später manuell hinzufügen.",
+    "description": "Pro onboarding welcome step description"
+  },
+  "proOnboardingToolbarTitle": {
+    "message": "Aufnahmeleiste & Effekte",
+    "description": "Pro onboarding toolbar step title"
+  },
+  "proOnboardingToolbarDescription": {
+    "message": "Nutze diese Leiste zum Zeichnen, für Cursor-Effekte, Unschärfe und Aufnahme-Steuerung.<br/><br/><strong>Diese Leiste wird mit aufgezeichnet</strong>, wenn du sie nicht ausblendest.",
+    "description": "Pro onboarding toolbar step description"
+  },
+  "proOnboardingCameraTitle": {
+    "message": "Kamera wird separat aufgenommen",
+    "description": "Pro onboarding camera step title"
+  },
+  "proOnboardingCameraDescription": {
+    "message": "Deine Kamera kann während der Aufnahme <strong>ausgeblendet werden oder in PiP wechseln</strong> - das ist normal.<br/><br/>Sie wird separat erfasst, damit du sie später frei platzieren kannst.",
+    "description": "Pro onboarding camera step description"
+  },
+  "proOnboardingInstantTitle": {
+    "message": "Sofortmodus",
+    "description": "Pro onboarding instant mode step title"
+  },
+  "proOnboardingInstantDescription": {
+    "message": "Ideal zum schnellen Teilen mit <strong>unbegrenzten Downloads</strong>.<br/><br/>Erweiterte Layout- und Editor-Funktionen sind in diesem Modus nicht verfügbar.",
+    "description": "Pro onboarding instant mode step description"
+  },
+  "proOnboardingDone": {
+    "message": "Verstanden",
+    "description": "Pro onboarding done button text"
+  },
+  "proOnboardingNext": {
+    "message": "Weiter",
+    "description": "Pro onboarding next button text"
+  },
+  "proOnboardingBack": {
+    "message": "Zurück",
+    "description": "Pro onboarding back button text"
+  },
+  "proOnboardingToolbarLearnMore": {
+    "message": "Mehr erfahren",
+    "description": "Pro onboarding toolbar learn more link label"
+  },
+  "resetOnboardingOption": {
+    "message": "Onboarding zurücksetzen",
+    "description": "Reset pro onboarding option label in popup settings menu"
   }
 }

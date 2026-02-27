@@ -82,7 +82,25 @@ export const handleRecordingError = async (request) => {
   if (globalThis.SCREENITY_VERBOSE_LOGS) {
     console.log("handleRecordingError called with request:", request);
   }
-  const { activeTab } = await chrome.storage.local.get(["activeTab"]);
+  try {
+    await chrome.storage.local.set({
+      lastRecordingError: {
+        ts: Date.now(),
+        error: request?.error || null,
+        why: request?.why || null,
+      },
+    });
+  } catch {}
+  const { activeTab, recordingUiTabId, tabRecordedID } =
+    await chrome.storage.local.get([
+      "activeTab",
+      "recordingUiTabId",
+      "tabRecordedID",
+    ]);
+
+  await chrome.storage.local.set({
+    pendingRecording: false,
+  });
 
   // For stream-ended, we just notify the user but DON'T stop the recording
   // The user can decide whether to continue or stop
@@ -94,8 +112,26 @@ export const handleRecordingError = async (request) => {
     return; // Don't continue with the normal error handling
   }
 
+  await chrome.storage.local.set({
+    recording: false,
+    recordingUiTabId: null,
+    tabRecordedID: null,
+  });
+
+  chrome.runtime
+    .sendMessage({
+      type: "clear-recording-session-safe",
+      reason: "recording-error-terminal",
+    })
+    .catch(() => {});
+
   sendMessageRecord({ type: "recording-error" }).then(() => {
-    sendMessageTab(activeTab, { type: "stop-pending" });
+    const candidateTabs = [activeTab, recordingUiTabId, tabRecordedID].filter(
+      (id, idx, arr) => Number.isInteger(id) && arr.indexOf(id) === idx,
+    );
+    candidateTabs.forEach((id) => {
+      sendMessageTab(id, { type: "stop-pending" }).catch(() => {});
+    });
     focusTab(activeTab);
     if (request.error === "stream-error") {
       sendMessageTab(activeTab, { type: "stream-error" });
@@ -124,6 +160,12 @@ export const videoReady = async () => {
   if (backupTab) {
     sendMessageTab(backupTab, { type: "close-writable" });
   }
+  chrome.runtime
+    .sendMessage({
+      type: "clear-recording-session-safe",
+      reason: "video-ready-terminal",
+    })
+    .catch(() => {});
   stopRecording();
 };
 

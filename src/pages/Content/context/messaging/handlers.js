@@ -50,7 +50,6 @@ export const setupHandlers = () => {
       preparingRecording: false,
       pendingRecording: true,
     }));
-
     const state = getState();
 
     if (state.countdown) {
@@ -584,6 +583,7 @@ export const setupHandlers = () => {
       screenityUser: result.user,
       isSubscribed: result.subscribed,
       proSubscription: result.proSubscription,
+      ...(result.authenticated ? { wasLoggedIn: false } : {}),
       showExtension: true,
       showPopup: !recording,
     }));
@@ -601,6 +601,7 @@ export const setupHandlers = () => {
       chrome.storage.local.set({
         offscreenRecording: false,
         zoomEnabled: false,
+        wasLoggedIn: false,
       });
     }
   });

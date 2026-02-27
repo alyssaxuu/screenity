@@ -95,7 +95,6 @@
     "message": "Mostrar mais opções",
     "description": "Etiqueta de mostrar mais opções"
   },
-
   "systemAudioLabel": {
     "message": "Incluir áudio do sistema",
     "description": "Etiqueta de áudio do sistema/guia"
@@ -525,7 +524,7 @@
     "description": "Rótulo de recorte"
   },
   "preparingLabel": {
-    "message": "Preparando o vídeo, por favor aguarda...",
+    "message": "A preparar...",
     "description": "Rótulo de preparação"
   },
   "cropButtonTitle": {
@@ -720,7 +719,6 @@
     "message": "Relaxa. Clica em qualquer lugar para parar a contagem decrescente.",
     "description": "Mensagem de contagem regressiva"
   },
-
   "sandboxEditorTooSmallInfo": {
     "message": "A edição de vídeos com durações curtas pode ser imprecisa devido aos pequenos intervalos entre imagens.",
     "description": "Informação sobre o editor ser demasiado pequeno"
@@ -1011,7 +1009,6 @@
     "message": "Certifique-se de ativar a opção 'Partilhar áudio do sistema' se desejar gravar áudio do computador. Se não visualizar esta opção, tente atualizar o Chrome ou alternar para a gravação de guias.",
     "description": "Descrição do Aviso de Áudio para Outros Sistemas"
   },
-
   "maxResolutionLabel": {
     "message": "Resolução máxima",
     "description": "Etiqueta de resolução máxima no menu de configurações"
@@ -1020,7 +1017,6 @@
     "message": "Máximo de FPS",
     "description": "Etiqueta de máximo de FPS no menu de configurações"
   },
-
   "notEnoughRAM": {
     "message": "Memória RAM insuficiente",
     "description": "Etiqueta de memória RAM insuficiente no menu de configurações"
@@ -1400,5 +1396,57 @@
   "webcodecsFailedOffToast": {
     "message": "Fast MP4 falhou — off",
     "description": "WebCodecs failure auto-disable toast"
+  },
+  "proOnboardingWelcomeTitle": {
+    "message": "Bem-vindo à extensão Screenity Pro",
+    "description": "Pro onboarding welcome step title"
+  },
+  "proOnboardingWelcomeDescription": {
+    "message": "Algumas dicas rápidas antes de gravar.<br/>Os zooms automáticos só funcionam com cliques em <strong>separadores do Chrome</strong>. Pode sempre adicionar mais zooms manualmente depois.",
+    "description": "Pro onboarding welcome step description"
+  },
+  "proOnboardingToolbarTitle": {
+    "message": "Barra de gravação e efeitos",
+    "description": "Pro onboarding toolbar step title"
+  },
+  "proOnboardingToolbarDescription": {
+    "message": "Use esta barra para desenhar, aplicar efeitos do cursor, desfocar e controlar a gravação.<br/><br/><strong>Esta barra aparece no vídeo</strong> se não a ocultar.",
+    "description": "Pro onboarding toolbar step description"
+  },
+  "proOnboardingCameraTitle": {
+    "message": "A câmara é captada em separado",
+    "description": "Pro onboarding camera step title"
+  },
+  "proOnboardingCameraDescription": {
+    "message": "Durante a gravação, a câmara pode <strong>esconder-se ou passar para PiP</strong>, é normal.<br/><br/>É captada em separado para a poder posicionar depois.",
+    "description": "Pro onboarding camera step description"
+  },
+  "proOnboardingInstantTitle": {
+    "message": "Modo instantâneo",
+    "description": "Pro onboarding instant mode step title"
+  },
+  "proOnboardingInstantDescription": {
+    "message": "Ideal para partilha rápida com <strong>transferências ilimitadas</strong>.<br/><br/>As opções avançadas de layout e edição não estão disponíveis neste modo.",
+    "description": "Pro onboarding instant mode step description"
+  },
+  "proOnboardingDone": {
+    "message": "Percebi",
+    "description": "Pro onboarding done button text"
+  },
+  "proOnboardingNext": {
+    "message": "Seguinte",
+    "description": "Pro onboarding next button text"
+  },
+  "proOnboardingBack": {
+    "message": "Voltar",
+    "description": "Pro onboarding back button text"
+  },
+  "proOnboardingToolbarLearnMore": {
+    "message": "Saber mais",
+    "description": "Pro onboarding toolbar learn more link label"
+  },
+  "resetOnboardingOption": {
+    "message": "Repor onboarding",
+    "description": "Reset pro onboarding option label in popup settings menu"
   }
 }

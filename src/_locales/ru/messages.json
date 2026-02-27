@@ -95,7 +95,6 @@
     "message": "Показать больше опций",
     "description": "Метка для показа больше опций"
   },
-
   "systemAudioLabel": {
     "message": "Включить системный звук",
     "description": "Метка системного звука/вкладка"
@@ -525,7 +524,7 @@
     "description": "Метка обрезки"
   },
   "preparingLabel": {
-    "message": "Подготовка видео, пожалуйста, подождите...",
+    "message": "Подготовка...",
     "description": "Метка подготовки"
   },
   "cropButtonTitle": {
@@ -900,12 +899,10 @@
     "message": "Узнать больше о обработке длинных видео.",
     "description": "Ссылка «Узнать больше» в модальном окне ограничения более 5 минут с точкой"
   },
-
   "recoveryModeTitle": {
     "message": "Режим восстановления",
     "description": "Заголовок режима восстановления"
   },
-
   "downloadForTroubleshootingOption": {
     "message": "Скачать данные для устранения проблем",
     "description": "Опция скачивания для устранения проблем"
@@ -1020,7 +1017,6 @@
     "message": "Максимальное количество кадров в секунду",
     "description": "Метка максимального количества кадров в секунду в меню настроек"
   },
-
   "notEnoughRAM": {
     "message": "Недостаточно оперативной памяти",
     "description": "Метка 'Недостаточно оперативной памяти' в меню настроек"
@@ -1400,5 +1396,57 @@
   "webcodecsFailedOffToast": {
     "message": "Fast MP4 ошибка — выкл",
     "description": "WebCodecs failure auto-disable toast"
+  },
+  "proOnboardingWelcomeTitle": {
+    "message": "Добро пожаловать в расширение Screenity Pro",
+    "description": "Pro onboarding welcome step title"
+  },
+  "proOnboardingWelcomeDescription": {
+    "message": "Пара быстрых советов перед записью.<br/>Автозум работает только по кликам внутри <strong>вкладок Chrome</strong>. Дополнительные зумы всегда можно добавить вручную позже.",
+    "description": "Pro onboarding welcome step description"
+  },
+  "proOnboardingToolbarTitle": {
+    "message": "Панель записи и эффекты",
+    "description": "Pro onboarding toolbar step title"
+  },
+  "proOnboardingToolbarDescription": {
+    "message": "Используйте эту панель для рисования, эффектов курсора, размытия и управления записью.<br/><br/><strong>Эта панель попадет в видео</strong>, если её не скрыть.",
+    "description": "Pro onboarding toolbar step description"
+  },
+  "proOnboardingCameraTitle": {
+    "message": "Камера записывается отдельно",
+    "description": "Pro onboarding camera step title"
+  },
+  "proOnboardingCameraDescription": {
+    "message": "Во время записи камера может <strong>скрываться или переходить в PiP</strong> - это нормально.<br/><br/>Она записывается отдельно, чтобы вы могли настроить её положение позже.",
+    "description": "Pro onboarding camera step description"
+  },
+  "proOnboardingInstantTitle": {
+    "message": "Мгновенный режим",
+    "description": "Pro onboarding instant mode step title"
+  },
+  "proOnboardingInstantDescription": {
+    "message": "Лучший вариант для быстрого обмена с <strong>безлимитными загрузками</strong>.<br/><br/>В этом режиме недоступны расширенные макеты и функции редактора.",
+    "description": "Pro onboarding instant mode step description"
+  },
+  "proOnboardingDone": {
+    "message": "Понятно",
+    "description": "Pro onboarding done button text"
+  },
+  "proOnboardingNext": {
+    "message": "Далее",
+    "description": "Pro onboarding next button text"
+  },
+  "proOnboardingBack": {
+    "message": "Назад",
+    "description": "Pro onboarding back button text"
+  },
+  "proOnboardingToolbarLearnMore": {
+    "message": "Подробнее",
+    "description": "Pro onboarding toolbar learn more link label"
+  },
+  "resetOnboardingOption": {
+    "message": "Сбросить онбординг",
+    "description": "Reset pro onboarding option label in popup settings menu"
   }
 }

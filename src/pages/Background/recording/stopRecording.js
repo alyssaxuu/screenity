@@ -4,6 +4,27 @@ import { sendMessageRecord } from "./sendMessageRecord";
 import { sendChunks } from "./sendChunks";
 import { waitForContentScript } from "../utils/waitForContentScript";
 
+const acquirePostStopEditorLock = async (recordingId = null) => {
+  const { postStopEditorOpening } = await chrome.storage.local.get([
+    "postStopEditorOpening",
+  ]);
+  if (postStopEditorOpening) return false;
+  await chrome.storage.local.set({
+    postStopEditorOpening: true,
+    postStopEditorOpened: true,
+    postStopRecordingId: recordingId,
+  });
+  return true;
+};
+
+const releasePostStopEditorLock = async (overrides = {}) => {
+  await chrome.storage.local.set({
+    postStopEditorOpening: false,
+    postStopEditorOpened: false,
+    ...overrides,
+  });
+};
+
 export const stopRecording = async () => {
   chrome.action.setIcon({ path: "assets/icon-34.png" });
   chrome.storage.local.set({ restarting: false });
@@ -227,13 +248,17 @@ export const handleStopRecordingTab = async (request) => {
         ? Math.max(0, now - startTime - basePaused - extraPaused)
         : 0;
     const maxDuration = 7 * 60 * 1000;
+    const lockAcquired = await acquirePostStopEditorLock(recordingId);
+    if (!lockAcquired) {
+      console.warn(
+        "[Screenity][BG] Duplicate stop-recording-tab suppressed (editor opening)",
+      );
+      sendMessageRecord({ type: "stop-recording-tab" });
+      return;
+    }
+
     if (fastRecorderInUse) {
       const editorUrl = "editorwebcodecs.html";
-      await chrome.storage.local.set({
-        postStopEditorOpening: true,
-        postStopEditorOpened: true,
-        postStopRecordingId: recordingId,
-      });
       // Open editor immediately in postStop mode (WebCodecs only)
       chrome.tabs.create(
         {
@@ -243,7 +268,14 @@ export const handleStopRecordingTab = async (request) => {
           active: true,
         },
         (tab) => {
-          if (!tab?.id) return;
+          if (chrome.runtime.lastError || !tab?.id) {
+            console.error(
+              "❌ Failed to open post-stop editor:",
+              chrome.runtime.lastError?.message || "tab-create-failed",
+            );
+            releasePostStopEditorLock({ postStopRecordingId: null });
+            return;
+          }
           chrome.tabs.onUpdated.addListener(function _(
             tabId,
             changeInfo,
@@ -251,11 +283,8 @@ export const handleStopRecordingTab = async (request) => {
           ) {
             if (tabId === tab.id && changeInfo.status === "complete") {
               chrome.tabs.onUpdated.removeListener(_);
-              chrome.storage.local.set({
-                sandboxTab: tab.id,
-                postStopEditorOpening: false,
-                postStopEditorOpened: false,
-              });
+              chrome.storage.local.set({ sandboxTab: tab.id });
+              releasePostStopEditorLock();
               sendMessageTab(tab.id, { type: "fallback-recording" }).catch(
                 (err) => {
                   console.error(
@@ -273,7 +302,14 @@ export const handleStopRecordingTab = async (request) => {
         duration > maxDuration ? "editorviewer.html" : "editor.html";
       // MediaRecorder/FFmpeg path: open editor normally (no postStop gating)
       chrome.tabs.create({ url: editorUrl, active: true }, (tab) => {
-        if (!tab?.id) return;
+        if (chrome.runtime.lastError || !tab?.id) {
+          console.error(
+            "❌ Failed to open post-stop editor:",
+            chrome.runtime.lastError?.message || "tab-create-failed",
+          );
+          releasePostStopEditorLock({ postStopRecordingId: null });
+          return;
+        }
         chrome.tabs.onUpdated.addListener(function _(
           tabId,
           changeInfo,
@@ -283,10 +319,9 @@ export const handleStopRecordingTab = async (request) => {
             chrome.tabs.onUpdated.removeListener(_);
             chrome.storage.local.set({
               sandboxTab: tab.id,
-              postStopEditorOpening: false,
-              postStopEditorOpened: false,
               postStopRecordingId: null,
             });
+            releasePostStopEditorLock({ postStopRecordingId: null });
             if (editorUrl === "editorviewer.html") {
               sendMessageTab(tab.id, { type: "viewer-recording" }).catch(
                 (err) => {
@@ -297,7 +332,33 @@ export const handleStopRecordingTab = async (request) => {
                 },
               );
             } else {
-              sendChunks();
+              (async () => {
+                let sent = false;
+                for (let i = 0; i < 6; i += 1) {
+                  // eslint-disable-next-line no-await-in-loop
+                  const result = await sendChunks();
+                  if (result?.status === "ok") {
+                    sent = true;
+                    break;
+                  }
+                  // eslint-disable-next-line no-await-in-loop
+                  await new Promise((resolve) => setTimeout(resolve, 1000));
+                }
+                if (!sent) {
+                  console.warn(
+                    "[Screenity][BG] editor opened but chunks are still unavailable",
+                  );
+                  try {
+                    await chrome.storage.local.set({
+                      lastChunkSendFailure: {
+                        ts: Date.now(),
+                        why: "editor-opened-no-chunks",
+                        targetTabId: tab.id,
+                      },
+                    });
+                  } catch {}
+                }
+              })();
             }
           }
         });

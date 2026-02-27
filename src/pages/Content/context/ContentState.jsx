@@ -58,6 +58,7 @@ const ContentState = (props) => {
   const tabRecordedIdRef = useRef(null);
   const recordingUiTabRef = useRef(null);
   const recordingStartTimeRef = useRef(null);
+  const timerReadSeqRef = useRef(0);
   const lastBeepStartTimeRef = useRef(null);
   const recordingBeepTabIdRef = useRef(null);
 
@@ -80,7 +81,7 @@ const ContentState = (props) => {
   }, []);
 
   // Check if the user is logged in
-  const verifyUser = async () => {
+  const verifyUser = useCallback(async () => {
     if (!CLOUD_FEATURES_ENABLED) return;
     const result = await checkAuthStatus();
 
@@ -91,6 +92,7 @@ const ContentState = (props) => {
       isSubscribed: result.subscribed,
       hasSubscribedBefore: result.hasSubscribedBefore,
       proSubscription: result.proSubscription,
+      ...(result.authenticated ? { wasLoggedIn: false } : {}),
     }));
 
     if (result.authenticated) {
@@ -104,12 +106,13 @@ const ContentState = (props) => {
       chrome.storage.local.set({
         offscreenRecording: false,
         zoomEnabled: false,
+        wasLoggedIn: false,
       });
     }
-  };
+  }, [CLOUD_FEATURES_ENABLED]);
   useEffect(() => {
     verifyUser();
-  }, []);
+  }, [verifyUser]);
 
   useEffect(() => {
     chrome.runtime.sendMessage({ type: "get-tab-id" }, (response) => {
@@ -197,22 +200,14 @@ const ContentState = (props) => {
   }, []);
 
   const restartRecording = useCallback(() => {
+    // Restart transitions recording true -> false briefly; suppress the normal
+    // "stop" beep because this is not a final stop/save action.
+    suppressStopBeepRef.current = true;
+    const sourceTabId = tabIdRef.current ?? activeTabRef.current ?? null;
     chrome.storage.local.set({ restarting: true });
     setTimeout(() => {
       chrome.runtime.sendMessage({ type: "discard-backup-restart" });
-      chrome.runtime.sendMessage({ type: "restart-recording-tab" });
-      // Check if custom region is set
-      if (
-        contentStateRef.current.recordingType === "region" &&
-        contentStateRef.current.cropTarget
-      ) {
-        contentStateRef.current.regionCaptureRef.contentWindow.postMessage(
-          {
-            type: "restart-recording",
-          },
-          "*",
-        );
-      }
+      chrome.runtime.sendMessage({ type: "handle-restart", sourceTabId });
       if (contentStateRef.current.alarm) {
         setTimer(contentStateRef.current.alarmTime);
       } else {
@@ -644,20 +639,22 @@ const ContentState = (props) => {
   }, [contentState, contentStateRef]);
 
   const tryRestartRecording = useCallback(() => {
-    contentState.pauseRecording();
-    contentState.openModal(
+    if (!contentStateRef.current.paused) {
+      contentStateRef.current.pauseRecording();
+    }
+    contentStateRef.current.openModal(
       chrome.i18n.getMessage("restartModalTitle"),
       chrome.i18n.getMessage("restartModalDescription"),
       chrome.i18n.getMessage("restartModalRestart"),
       chrome.i18n.getMessage("restartModalResume"),
       () => {
-        contentState.restartRecording();
+        contentStateRef.current.restartRecording();
       },
       () => {
-        contentState.resumeRecording();
+        contentStateRef.current.resumeRecording();
       },
     );
-  });
+  }, []);
 
   const tryDismissRecording = useCallback(() => {
     if (contentStateRef.current.askDismiss) {
@@ -1117,13 +1114,14 @@ const ContentState = (props) => {
         return;
       }
       const startTime = recordingStartTimeRef.current;
-      const isNewSession =
-        startTime != null && startTime !== lastBeepStartTimeRef.current;
+      const hasStartTime = Number.isFinite(startTime) && startTime > 0;
+      const sessionMarker = hasStartTime ? startTime : Date.now();
+      const isNewSession = sessionMarker !== lastBeepStartTimeRef.current;
       if (!isNewSession) {
         prevRecordingRef.current = isRecording;
         return;
       }
-      lastBeepStartTimeRef.current = startTime;
+      lastBeepStartTimeRef.current = sessionMarker;
       if (suppressStartBeepRef.current) {
         suppressStartBeepRef.current = false;
       } else {
@@ -1139,30 +1137,6 @@ const ContentState = (props) => {
 
     prevRecordingRef.current = isRecording;
   }, [contentState.recording, isTargetTab]);
-
-  useEffect(() => {
-    if (!CLOUD_FEATURES_ENABLED) return;
-    if (!contentState.isLoggedIn || !contentState.isSubscribed) return;
-
-    chrome.storage.local.get(["firstTimePro"], (res) => {
-      if (
-        res.firstTimePro &&
-        typeof contentStateRef.current?.openModal === "function"
-      ) {
-        setTimeout(() => {
-          contentStateRef.current.openModal(
-            chrome.i18n.getMessage("welcomeToProTitleModal"),
-            chrome.i18n.getMessage("welcomeToProDescriptionModal"),
-            chrome.i18n.getMessage("welcomeToProActionModal"),
-            null,
-            () => {
-              chrome.storage.local.set({ firstTimePro: false });
-            },
-          );
-        }, 300);
-      }
-    });
-  }, [contentState?.isLoggedIn, contentState?.isSubscribed]);
 
   // Check Chrome version
   useEffect(() => {
@@ -1241,6 +1215,7 @@ const ContentState = (props) => {
   }, [contentState.openModal]);
 
   const updateTimerFromStorage = useCallback(async () => {
+    const seq = ++timerReadSeqRef.current;
     const { recording, recordingStartTime, paused, pausedAt, totalPausedMs } =
       await chrome.storage.local.get([
         "recording",
@@ -1249,6 +1224,7 @@ const ContentState = (props) => {
         "pausedAt",
         "totalPausedMs",
       ]);
+    if (seq !== timerReadSeqRef.current) return;
 
     if (!recording || !recordingStartTime) {
       setTimer(0);
@@ -1265,26 +1241,12 @@ const ContentState = (props) => {
 
     if (contentStateRef.current?.alarm) {
       const alarmTime = contentStateRef.current?.alarmTime || 0;
-      setTimer(Math.max(0, alarmTime - elapsedSeconds));
+      const nextRemaining = Math.max(0, alarmTime - elapsedSeconds);
+      setTimer((prev) => (prev === nextRemaining ? prev : nextRemaining));
       return;
     }
 
-    setTimer((prev) => {
-      if (!Number.isFinite(prev)) {
-        return elapsedSeconds;
-      }
-      if (elapsedSeconds <= prev) {
-        return elapsedSeconds;
-      }
-      const delta = elapsedSeconds - prev;
-      if (delta <= 1) {
-        return elapsedSeconds;
-      }
-      if (delta <= 3) {
-        return prev + 1;
-      }
-      return elapsedSeconds;
-    });
+    setTimer((prev) => (prev === elapsedSeconds ? prev : elapsedSeconds));
   }, []);
 
   useEffect(() => {
@@ -1310,6 +1272,7 @@ const ContentState = (props) => {
   useEffect(() => {
     const onChanged = (changes, area) => {
       if (area !== "local") return;
+      let shouldUpdateTimer = false;
 
       if (changes.activeTab) {
         activeTabRef.current = changes.activeTab.newValue ?? null;
@@ -1328,15 +1291,25 @@ const ContentState = (props) => {
         recordingBeepTabIdRef.current =
           changes.recordingBeepTabId.newValue ?? null;
       }
+      if (
+        changes.screenityToken ||
+        changes.screenityUser ||
+        changes.isSubscribed ||
+        changes.proSubscription ||
+        changes.lastAuthCheck ||
+        changes.isLoggedIn
+      ) {
+        verifyUser();
+      }
       if (changes.recordingNow) {
-        updateTimerFromStorage();
+        shouldUpdateTimer = true;
       }
       if (changes.paused) {
         setContentState((prev) => ({
           ...prev,
           paused: Boolean(changes.paused.newValue),
         }));
-        updateTimerFromStorage();
+        shouldUpdateTimer = true;
       }
       if (changes.recording) {
         const isRecording = Boolean(changes.recording.newValue);
@@ -1361,14 +1334,7 @@ const ContentState = (props) => {
               }
             : {}),
         }));
-        updateTimerFromStorage();
-      }
-      if (
-        changes.recordingStartTime ||
-        changes.totalPausedMs ||
-        changes.pausedAt
-      ) {
-        updateTimerFromStorage();
+        shouldUpdateTimer = true;
       }
       if (changes.cursorEffects) {
         const nextEffects = normalizeCursorEffects(
@@ -1397,19 +1363,23 @@ const ContentState = (props) => {
         }));
       }
       if (
+        changes.recordingNow ||
         changes.paused ||
         changes.recording ||
         changes.recordingStartTime ||
         changes.pausedAt ||
         changes.totalPausedMs
       ) {
+        shouldUpdateTimer = true;
+      }
+      if (shouldUpdateTimer) {
         updateTimerFromStorage();
       }
     };
 
     chrome.storage.onChanged.addListener(onChanged);
     return () => chrome.storage.onChanged.removeListener(onChanged);
-  }, [isTargetTab, updateTimerFromStorage]);
+  }, [isTargetTab, updateTimerFromStorage, verifyUser]);
 
   useEffect(() => {
     if (!contentState.customRegion) {

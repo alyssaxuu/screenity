@@ -5,8 +5,13 @@ export const startRecording = async () => {
     restarting: false,
   });
 
-  const { activeTab } = await chrome.storage.local.get(["activeTab"]);
-  if (activeTab != null) {
+  const { activeTab, recordingUiTabId } = await chrome.storage.local.get([
+    "activeTab",
+    "recordingUiTabId",
+  ]);
+  if (recordingUiTabId != null) {
+    chrome.storage.local.set({ recordingUiTabId });
+  } else if (activeTab != null) {
     chrome.storage.local.set({ recordingUiTabId: activeTab });
   }
 
@@ -51,9 +56,47 @@ export const startRecording = async () => {
   }
 
   if (customRegion) {
-    sendMessageRecord({ type: "start-recording-tab", region: true });
+    sendMessageRecord({ type: "start-recording-tab", region: true })
+      .then(() => {
+        chrome.storage.local.set({
+          lastStartRecordingDispatch: {
+            ts: Date.now(),
+            ok: true,
+            region: true,
+          },
+        });
+      })
+      .catch((err) => {
+        chrome.storage.local.set({
+          lastStartRecordingDispatch: {
+            ts: Date.now(),
+            ok: false,
+            region: true,
+            error: String(err),
+          },
+        });
+      });
   } else {
-    sendMessageRecord({ type: "start-recording-tab" });
+    sendMessageRecord({ type: "start-recording-tab" })
+      .then(() => {
+        chrome.storage.local.set({
+          lastStartRecordingDispatch: {
+            ts: Date.now(),
+            ok: true,
+            region: false,
+          },
+        });
+      })
+      .catch((err) => {
+        chrome.storage.local.set({
+          lastStartRecordingDispatch: {
+            ts: Date.now(),
+            ok: false,
+            region: false,
+            error: String(err),
+          },
+        });
+      });
   }
   chrome.action.setIcon({ path: "assets/recording-logo.png" });
   // Set up alarm if set in storage
@@ -65,19 +108,32 @@ export const startRecording = async () => {
   }
 };
 
-export const startAfterCountdown = async () => {
-  try {
-    // Retrieve the tab and offscreen status from local storage
-    const { recordingTab, offscreen } = await chrome.storage.local.get([
-      "recordingTab",
-      "offscreen",
-    ]);
-
-    // If there is an active recording tab or offscreen document, begin recording
-    if (recordingTab !== null || offscreen) {
-      startRecording();
+export const startAfterCountdown = () => {
+  chrome.storage.local.get(["recordingTab", "offscreen"], (result) => {
+    if (chrome.runtime.lastError) {
+      console.error(
+        "Failed to start after countdown:",
+        chrome.runtime.lastError
+      );
+      return;
     }
-  } catch (error) {
-    console.error("Failed to start after countdown:", error);
-  }
+
+    const { recordingTab, offscreen } = result || {};
+    chrome.storage.local.set({
+      lastStartAfterCountdown: {
+        ts: Date.now(),
+        recordingTab: recordingTab ?? null,
+        offscreen: Boolean(offscreen),
+      },
+    });
+
+    // Some flows can start before recordingTab is persisted. Start anyway and
+    // let sendMessageRecord route via recorderSession/offscreen fallback.
+    if (recordingTab === null && !offscreen) {
+      console.warn(
+        "[Screenity] startAfterCountdown: no recordingTab/offscreen available, starting with fallback routing"
+      );
+    }
+    startRecording();
+  });
 };

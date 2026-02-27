@@ -20,7 +20,7 @@ const TooltipWrap = (props) => {
   }, [contentState.hideUI]);
 
   return (
-    <div className={classname} style={props.style}>
+    <div id={props.id} className={classname} style={props.style}>
       {props.content == "" ? (
         <div>{props.children}</div>
       ) : (

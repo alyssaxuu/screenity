@@ -1,4 +1,4 @@
-import { sendMessageTab, focusTab } from "../tabManagement";
+import { sendMessageTab } from "../tabManagement";
 import { sendMessageRecord } from "../recording/sendMessageRecord";
 
 /**
@@ -9,35 +9,56 @@ export const onTabRemovedListener = () => {
   chrome.tabs.onRemoved.addListener(async (tabId) => {
     try {
       const {
-        region,
-        customRegion,
         recording,
+        pendingRecording,
         restarting,
         recordingTab,
         tabRecordedID,
+        recordingUiTabId,
+        activeTab,
         recorderSession,
       } = await chrome.storage.local.get([
-        "region",
-        "customRegion",
         "recording",
+        "pendingRecording",
         "restarting",
         "recordingTab",
         "tabRecordedID",
+        "recordingUiTabId",
+        "activeTab",
         "recorderSession",
       ]);
 
-      const isRegionMode = region || customRegion;
       const recordedTabId = tabRecordedID || recordingTab;
 
       // Check both recording flag AND recorderSession
       const isActivelyRecording =
         recording ||
         (recorderSession && recorderSession.status === "recording");
+      const recorderOwnerTabId =
+        recorderSession?.recorderTabId || recorderSession?.tabId || null;
 
-      if (!isActivelyRecording || restarting) return;
+      if (tabId === recorderOwnerTabId) {
+        chrome.runtime
+          .sendMessage({
+            type: "clear-recording-session-safe",
+            reason: "recorder-owner-tab-removed",
+          })
+          .catch(() => {});
+
+        if (recorderSession && recorderSession.status === "recording") {
+          await chrome.storage.local.set({
+            recorderSession: {
+              ...recorderSession,
+              status: "crashed",
+              crashedAt: Date.now(),
+            },
+            recording: false,
+          });
+        }
+      }
 
       // If the removed tab is the one being recorded (for tab capture)
-      if (tabId === recordedTabId) {
+      if (!restarting && isActivelyRecording && tabId === recordedTabId) {
         // Clear reference to the removed tab
         chrome.storage.local.set({ recordingTab: null, tabRecordedID: null });
 
@@ -62,7 +83,12 @@ export const onTabRemovedListener = () => {
       }
 
       // If the CloudRecorder tab itself was closed, that's a critical failure
-      if (tabId === recordingTab && recordingTab !== recordedTabId) {
+      if (
+        !restarting &&
+        isActivelyRecording &&
+        tabId === recordingTab &&
+        recordingTab !== recordedTabId
+      ) {
         console.error("CloudRecorder tab was closed during recording!");
         chrome.storage.local.set({
           recording: false,
@@ -71,6 +97,27 @@ export const onTabRemovedListener = () => {
             : null,
         });
         chrome.action.setIcon({ path: "assets/icon-34.png" });
+      }
+
+      // If recorder tab is closed before recording starts, clear pending UI state.
+      const pendingOnly =
+        pendingRecording && !isActivelyRecording && !restarting;
+      if (tabId === recordingTab && pendingOnly) {
+        await chrome.storage.local.set({
+          pendingRecording: false,
+          recording: false,
+          recordingTab: null,
+          tabRecordedID: null,
+          recordingUiTabId: null,
+        });
+        chrome.action.setIcon({ path: "assets/icon-34.png" });
+
+        const candidateTabs = [activeTab, recordingUiTabId, tabRecordedID].filter(
+          (id, idx, arr) => Number.isInteger(id) && arr.indexOf(id) === idx,
+        );
+        candidateTabs.forEach((id) => {
+          sendMessageTab(id, { type: "stop-pending" }).catch(() => {});
+        });
       }
     } catch (error) {
       console.error("Error handling tab removal:", error.message);

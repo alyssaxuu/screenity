@@ -259,6 +259,12 @@ const Wrapper = () => {
                   left: 0,
                 }}
                 onClick={() => {
+                  const onboardingActive =
+                    document.documentElement.classList.contains(
+                      "screenity-driver-active"
+                    ) || Boolean(document.querySelector(".driver-overlay"));
+                  if (onboardingActive) return;
+
                   if (
                     window.location.href.indexOf(
                       chrome.runtime.getURL("setup.html")

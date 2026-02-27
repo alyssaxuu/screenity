@@ -181,6 +181,8 @@ const getCodecLabel = (mimeType) => {
 
 const Recorder = () => {
   const isRestarting = useRef(false);
+  const pendingStartAfterRestart = useRef(false);
+  const recordingGeneration = useRef(0);
   const isFinishing = useRef(false);
   const sentLast = useRef(false);
   const lastTimecode = useRef(0);
@@ -229,6 +231,7 @@ const Recorder = () => {
 
   const isRecording = useRef(false);
   const pausedStateRef = useRef(false);
+  const stopSignalSent = useRef(false);
 
   // Keep-alive mechanism to prevent Chrome from freezing this background tab
   const keepAliveAudioCtx = useRef(null);
@@ -398,6 +401,25 @@ const Recorder = () => {
     }
   };
 
+  // Emit stop to background at most once per recording session.
+  const requestStop = (reason = "generic") => {
+    if (stopSignalSent.current) {
+      debugWarn("requestStop() ignored; already sent", { reason });
+      return false;
+    }
+    if (isFinishing.current || !isRecording.current) {
+      debug("requestStop() ignored; recorder not active", {
+        reason,
+        isFinishing: isFinishing.current,
+        isRecording: isRecording.current,
+      });
+      return false;
+    }
+    stopSignalSent.current = true;
+    sendStopRecording(reason);
+    return true;
+  };
+
   async function saveChunk(e, i) {
     const ts = e.timecode ?? 0;
 
@@ -410,7 +432,7 @@ const Recorder = () => {
         tabRecordedID: null,
         memoryError: true,
       });
-      chrome.runtime.sendMessage({ type: "stop-recording-tab" });
+      requestStop("low-storage");
       return false;
     }
 
@@ -436,7 +458,7 @@ const Recorder = () => {
         tabRecordedID: null,
         memoryError: true,
       });
-      chrome.runtime.sendMessage({ type: "stop-recording-tab" });
+      requestStop("chunk-save-failed");
       return false;
     }
 
@@ -481,7 +503,7 @@ const Recorder = () => {
             tabRecordedID: null,
             memoryError: true,
           });
-          chrome.runtime.sendMessage({ type: "stop-recording-tab" });
+          requestStop("low-storage");
           pending.current.length = 0;
           pendingBytes.current = 0;
           break;
@@ -528,6 +550,8 @@ const Recorder = () => {
     }
 
     debug("startRecording()");
+    recordingGeneration.current += 1;
+    const runGeneration = recordingGeneration.current;
 
     // Start silent audio to prevent Chrome from freezing this background tab
     startTabKeepAlive();
@@ -559,6 +583,7 @@ const Recorder = () => {
     pendingBytes.current = 0;
     sentLast.current = false;
     isFinishing.current = false;
+    stopSignalSent.current = false;
 
     const { qualityValue } = await chrome.storage.local.get(["qualityValue"]);
     const { isPro, maxQuality, maxFps } = await getFreeCaptureCaps();
@@ -696,6 +721,9 @@ const Recorder = () => {
     persistSessionState("recording");
 
     const handleChunk = async (data, timestampMs) => {
+      if (runGeneration !== recordingGeneration.current) {
+        return;
+      }
       if (useWebCodecs.current) {
         const blob =
           data instanceof Blob ? data : new Blob([data], { type: "video/mp4" });
@@ -1036,6 +1064,9 @@ const Recorder = () => {
         };
 
         recorder.current.ondataavailable = async (e) => {
+          if (runGeneration !== recordingGeneration.current) {
+            return;
+          }
           if (!e || !e.data || !e.data.size) {
             debugWarn("MediaRecorder.ondataavailable with empty data", e);
             if (
@@ -1047,7 +1078,7 @@ const Recorder = () => {
                 restarting: false,
                 tabRecordedID: null,
               });
-              sendStopRecording();
+              requestStop("mediarecorder-empty-inactive");
             }
             return;
           }
@@ -1083,6 +1114,7 @@ const Recorder = () => {
       const track = helperAudioStream.current.getAudioTracks()[0];
       if (track) {
         track.onended = () => {
+          if (isFinishing.current || !isRecording.current) return;
           // Log detailed diagnostics for debugging
           const diagnosticInfo = {
             reason: "audio-track-ended",
@@ -1102,59 +1134,68 @@ const Recorder = () => {
             recording: false,
             lastTrackEndEvent: diagnosticInfo,
           });
-          sendStopRecording("audio-track-ended");
+          requestStop("audio-track-ended");
         };
       }
     }
 
-    liveStream.current.getVideoTracks()[0].onended = () => {
-      const track = liveStream.current?.getVideoTracks()[0];
-      // Log detailed diagnostics for debugging
-      const diagnosticInfo = {
-        reason: "liveStream-video-track-ended",
-        savedChunks: savedCount.current,
-        lastTimecode: lastTimecode.current,
-        recordingDuration: recordingStartTime.current
-          ? Date.now() - recordingStartTime.current
-          : null,
-        trackLabel: track?.label || null,
-        trackReadyState: track?.readyState || null,
+    const liveVideoTrack = liveStream.current?.getVideoTracks?.()[0] || null;
+    if (liveVideoTrack) {
+      liveVideoTrack.onended = () => {
+        if (isFinishing.current || !isRecording.current) return;
+        const track = liveStream.current?.getVideoTracks?.()[0] || null;
+        // Log detailed diagnostics for debugging
+        const diagnosticInfo = {
+          reason: "liveStream-video-track-ended",
+          savedChunks: savedCount.current,
+          lastTimecode: lastTimecode.current,
+          recordingDuration: recordingStartTime.current
+            ? Date.now() - recordingStartTime.current
+            : null,
+          trackLabel: track?.label || null,
+          trackReadyState: track?.readyState || null,
+        };
+        console.warn("[Recorder] liveStream video track ended", diagnosticInfo);
+        chrome.storage.local.set({
+          recording: false,
+          restarting: false,
+          tabRecordedID: null,
+          lastTrackEndEvent: diagnosticInfo,
+        });
+        requestStop("live-video-track-ended");
       };
-      console.warn("[Recorder] liveStream video track ended", diagnosticInfo);
-      chrome.storage.local.set({
-        recording: false,
-        restarting: false,
-        tabRecordedID: null,
-        lastTrackEndEvent: diagnosticInfo,
-      });
-      sendStopRecording("video-track-ended");
-    };
+    }
 
-    helperVideoStream.current.getVideoTracks()[0].onended = () => {
-      const track = helperVideoStream.current?.getVideoTracks()[0];
-      // Log detailed diagnostics for debugging
-      const diagnosticInfo = {
-        reason: "helperVideoStream-video-track-ended",
-        savedChunks: savedCount.current,
-        lastTimecode: lastTimecode.current,
-        recordingDuration: recordingStartTime.current
-          ? Date.now() - recordingStartTime.current
-          : null,
-        trackLabel: track?.label || null,
-        trackReadyState: track?.readyState || null,
+    const helperVideoTrack =
+      helperVideoStream.current?.getVideoTracks?.()[0] || null;
+    if (helperVideoTrack) {
+      helperVideoTrack.onended = () => {
+        if (isFinishing.current || !isRecording.current) return;
+        const track = helperVideoStream.current?.getVideoTracks?.()[0] || null;
+        // Log detailed diagnostics for debugging
+        const diagnosticInfo = {
+          reason: "helperVideoStream-video-track-ended",
+          savedChunks: savedCount.current,
+          lastTimecode: lastTimecode.current,
+          recordingDuration: recordingStartTime.current
+            ? Date.now() - recordingStartTime.current
+            : null,
+          trackLabel: track?.label || null,
+          trackReadyState: track?.readyState || null,
+        };
+        console.warn(
+          "[Recorder] helperVideoStream video track ended",
+          diagnosticInfo,
+        );
+        chrome.storage.local.set({
+          recording: false,
+          restarting: false,
+          tabRecordedID: null,
+          lastTrackEndEvent: diagnosticInfo,
+        });
+        requestStop("helper-video-track-ended");
       };
-      console.warn(
-        "[Recorder] helperVideoStream video track ended",
-        diagnosticInfo,
-      );
-      chrome.storage.local.set({
-        recording: false,
-        restarting: false,
-        tabRecordedID: null,
-        lastTrackEndEvent: diagnosticInfo,
-      });
-      sendStopRecording("video-track-ended");
-    };
+    }
   }
 
   async function warmUpStream(liveStream) {
@@ -1356,15 +1397,17 @@ const Recorder = () => {
   const restartRecording = async () => {
     if (isRestarting.current) {
       debugWarn("restartRecording() called while already restarting");
-      return;
+      return false;
     }
 
     debug("restartRecording()");
+    recordingGeneration.current += 1;
 
     isRestarting.current = true;
     isRecording.current = false;
     sentLast.current = false;
     isFinishing.current = false;
+    stopSignalSent.current = false;
     pausedStateRef.current = false;
 
     try {
@@ -1378,13 +1421,38 @@ const Recorder = () => {
         await recorder.current.cleanup();
       } else if (recorder.current instanceof MediaRecorder) {
         debug("Stopping MediaRecorder for restart");
-        recorder.current.ondataavailable = null;
-        recorder.current.onstop = null;
-        recorder.current.onerror = null;
-        if (recorder.current.state !== "inactive") recorder.current.stop();
+        const mediaRecorder = recorder.current;
+        mediaRecorder.ondataavailable = null;
+        mediaRecorder.onstop = null;
+        mediaRecorder.onerror = null;
+        try {
+          mediaRecorder.requestData();
+        } catch {}
+        if (mediaRecorder.state !== "inactive") {
+          await new Promise((resolve) => {
+            let done = false;
+            const finish = () => {
+              if (done) return;
+              done = true;
+              clearTimeout(timeoutId);
+              resolve();
+            };
+            const timeoutId = setTimeout(finish, 1600);
+            try {
+              mediaRecorder.addEventListener("stop", finish, { once: true });
+            } catch {}
+            try {
+              mediaRecorder.stop();
+            } catch {
+              finish();
+            }
+          });
+        }
       }
     } catch (err) {
       debugError("Error while restarting recorder", err);
+      isRestarting.current = false;
+      return false;
     }
 
     recorder.current = null;
@@ -1397,11 +1465,24 @@ const Recorder = () => {
     lastSize.current = 0;
     lastTimecode.current = 0;
     await chunksStore.clear();
+    await setRecordingTimingState({
+      recording: false,
+      paused: false,
+      recordingStartTime: null,
+      pausedAt: null,
+      totalPausedMs: 0,
+    });
 
     useWebCodecs.current = false;
 
     isRestarting.current = false;
     debug("restartRecording() done, ready to start again");
+    if (pendingStartAfterRestart.current) {
+      pendingStartAfterRestart.current = false;
+      debug("Processing queued start after restart");
+      startRecording();
+    }
+    return true;
   };
 
   async function startAudioStream(id) {
@@ -1665,6 +1746,16 @@ const Recorder = () => {
     }
 
     if (data.recordingType === "camera") {
+      if (!userStream || typeof userStream.getVideoTracks !== "function") {
+        debugWarn("Camera stream unavailable");
+        sendRecordingError("Camera stream unavailable");
+        return;
+      }
+      if (!userStream.getVideoTracks().length) {
+        debugWarn("Camera stream has no video track");
+        sendRecordingError("Camera stream has no video track");
+        return;
+      }
       helperVideoStream.current = userStream;
     } else {
       const constraints = {
@@ -1761,7 +1852,12 @@ const Recorder = () => {
       }
     }
 
-    liveStream.current.addTrack(helperVideoStream.current.getVideoTracks()[0]);
+    const helperVideoTrack = helperVideoStream.current.getVideoTracks()[0];
+    if (!helperVideoTrack) {
+      sendRecordingError("Display stream missing video track");
+      return;
+    }
+    liveStream.current.addTrack(helperVideoTrack);
 
     const mainVideoTrack = liveStream.current?.getVideoTracks()[0];
     if (mainVideoTrack) {
@@ -1769,7 +1865,9 @@ const Recorder = () => {
         debugWarn("mainVideoTrack muted");
       };
       mainVideoTrack.oninactive = () => {
+        if (isFinishing.current || !isRecording.current) return;
         debugWarn("mainVideoTrack inactive → stopping recording");
+        requestStop("main-video-track-inactive");
         stopRecording();
       };
     }
@@ -1778,9 +1876,10 @@ const Recorder = () => {
         helperAudioStream.current.getAudioTracks().length > 0) ||
       helperVideoStream.current.getAudioTracks().length > 0
     ) {
-      liveStream.current.addTrack(
-        destination.current.stream.getAudioTracks()[0],
-      );
+      const mixedAudioTrack = destination.current.stream.getAudioTracks()[0];
+      if (mixedAudioTrack) {
+        liveStream.current.addTrack(mixedAudioTrack);
+      }
     }
 
     debug("liveStream ready", {
@@ -1841,8 +1940,13 @@ const Recorder = () => {
           },
         );
       } else {
-        debug("Streaming with pre-resolved tabID", tabID.current);
-        startStream(data, tabID.current, null, permissions, permissions2);
+        const tabStreamId = await waitForTabStreamId();
+        debug("Streaming with pre-resolved tabID", tabStreamId);
+        if (!tabStreamId) {
+          sendRecordingError("Unable to resolve tab stream id", true);
+          return;
+        }
+        startStream(data, tabStreamId, null, permissions, permissions2);
       }
     } catch (err) {
       debugError("startStreaming() error", err);
@@ -1864,6 +1968,15 @@ const Recorder = () => {
     });
     debug("Resolved tabCapture streamId", streamId);
     tabID.current = streamId;
+  };
+
+  const waitForTabStreamId = async () => {
+    if (tabID.current) return tabID.current;
+    for (let i = 0; i < 30; i += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      if (tabID.current) return tabID.current;
+    }
+    return null;
   };
 
   // Cleanup on component unmount
@@ -1918,11 +2031,35 @@ const Recorder = () => {
       } else if (request.type === "streaming-data") {
         startStreaming(JSON.parse(request.data));
       } else if (request.type === "start-recording-tab") {
+        if (isRestarting.current) {
+          // Restart teardown can overlap with background's start dispatch.
+          // Queue one start so we begin immediately after cleanup completes.
+          pendingStartAfterRestart.current = true;
+          debug("Queued start-recording-tab while restarting");
+          return;
+        }
         startRecording();
       } else if (request.type === "restart-recording-tab") {
-        if (!isRestarting.current) {
-          restartRecording();
+        if (isRestarting.current) {
+          sendResponse?.({ ok: false, error: "restart-in-progress" });
+          return true;
         }
+        pendingStartAfterRestart.current = false;
+        Promise.resolve(restartRecording())
+          .then((restarted) => {
+            if (!restarted) {
+              sendResponse?.({ ok: false, error: "restart-teardown-failed" });
+              return;
+            }
+            sendResponse?.({ ok: true, restarted: true });
+          })
+          .catch((error) => {
+            sendResponse?.({
+              ok: false,
+              error: error?.message || String(error),
+            });
+          });
+        return true;
       } else if (request.type === "stop-recording-tab") {
         stopRecording();
       } else if (request.type === "set-mic-active-tab") {

@@ -524,7 +524,7 @@
     "description": "Trim label"
   },
   "preparingLabel": {
-    "message": "正在准备视频，请稍候...",
+    "message": "正在准备...",
     "description": "Preparing label"
   },
   "cropButtonTitle": {
@@ -895,12 +895,10 @@
     "message": "了解有关处理长视频的更多信息。",
     "description": "超过5分钟限制的模态框了解更多链接（带有句号）"
   },
-
   "recoveryModeTitle": {
     "message": "恢复模式",
     "description": "恢复模式标题"
   },
-
   "downloadForTroubleshootingOption": {
     "message": "下载故障排除数据",
     "description": "故障排除选项"
@@ -1015,7 +1013,6 @@
     "message": "最高帧率",
     "description": "设置菜单中的最高帧率标签"
   },
-
   "notEnoughRAM": {
     "message": "内存不足",
     "description": "设置菜单中的内存不足标签"
@@ -1036,7 +1033,6 @@
     "message": "审查权限",
     "description": "审查权限按钮"
   },
-
   "recordButtonMultiLabel": {
     "message": "添加另一段录制",
     "description": "Record button label (multi mode)"
@@ -1396,5 +1392,57 @@
   "webcodecsFailedOffToast": {
     "message": "极速 MP4 失败 — 关闭",
     "description": "WebCodecs failure auto-disable toast"
+  },
+  "proOnboardingWelcomeTitle": {
+    "message": "欢迎使用 Screenity Pro 扩展",
+    "description": "Pro onboarding welcome step title"
+  },
+  "proOnboardingWelcomeDescription": {
+    "message": "开始录制前，先看几个快速提示。<br/>自动缩放仅对 <strong>Chrome 标签页</strong> 内的点击生效。你之后仍可手动添加缩放。",
+    "description": "Pro onboarding welcome step description"
+  },
+  "proOnboardingToolbarTitle": {
+    "message": "录制工具栏与效果",
+    "description": "Pro onboarding toolbar step title"
+  },
+  "proOnboardingToolbarDescription": {
+    "message": "可用此工具栏进行绘制、光标效果、模糊和录制控制。<br/><br/><strong>若不隐藏，该工具栏会出现在视频中</strong>。",
+    "description": "Pro onboarding toolbar step description"
+  },
+  "proOnboardingCameraTitle": {
+    "message": "摄像头会单独采集",
+    "description": "Pro onboarding camera step title"
+  },
+  "proOnboardingCameraDescription": {
+    "message": "录制时摄像头可能会<strong>隐藏或切换到 PiP</strong>，这是正常现象。<br/><br/>它会被单独采集，方便你之后调整位置。",
+    "description": "Pro onboarding camera step description"
+  },
+  "proOnboardingInstantTitle": {
+    "message": "即时模式",
+    "description": "Pro onboarding instant mode step title"
+  },
+  "proOnboardingInstantDescription": {
+    "message": "适合快速分享，支持<strong>不限次数下载</strong>。<br/><br/>该模式下无法使用高级布局和编辑选项。",
+    "description": "Pro onboarding instant mode step description"
+  },
+  "proOnboardingDone": {
+    "message": "知道了",
+    "description": "Pro onboarding done button text"
+  },
+  "proOnboardingNext": {
+    "message": "下一步",
+    "description": "Pro onboarding next button text"
+  },
+  "proOnboardingBack": {
+    "message": "返回",
+    "description": "Pro onboarding back button text"
+  },
+  "proOnboardingToolbarLearnMore": {
+    "message": "了解更多",
+    "description": "Pro onboarding toolbar learn more link label"
+  },
+  "resetOnboardingOption": {
+    "message": "重置引导",
+    "description": "Reset pro onboarding option label in popup settings menu"
   }
 }

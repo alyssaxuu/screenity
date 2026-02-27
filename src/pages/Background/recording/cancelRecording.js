@@ -30,10 +30,26 @@ export const cancelRecording = async () => {
     chrome.action.setIcon({ path: "assets/icon-34.png" });
 
     // Get the active tab from storage
-    const { activeTab } = await chrome.storage.local.get(["activeTab"]);
+    const { activeTab, recordingUiTabId, tabRecordedID } =
+      await chrome.storage.local.get([
+        "activeTab",
+        "recordingUiTabId",
+        "tabRecordedID",
+      ]);
+
+    await chrome.storage.local.set({
+      pendingRecording: false,
+      recordingUiTabId: null,
+      tabRecordedID: null,
+    });
 
     // Send stop message, focus the tab, and clean up
-    sendMessageTab(activeTab, { type: "stop-pending" });
+    const candidateTabs = [activeTab, recordingUiTabId, tabRecordedID].filter(
+      (id, idx, arr) => Number.isInteger(id) && arr.indexOf(id) === idx,
+    );
+    candidateTabs.forEach((id) => {
+      sendMessageTab(id, { type: "stop-pending" }).catch(() => {});
+    });
     focusTab(activeTab);
     discardOffscreenDocuments();
     chrome.runtime.sendMessage({ type: "turn-off-pip" });

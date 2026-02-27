@@ -4,6 +4,8 @@ import React, { useState, useEffect, useContext, useRef } from "react";
 import { contentStateContext } from "../context/ContentState";
 
 const COUNTDOWN_TIME = 3;
+const DEBUG_START_FLOW =
+  typeof window !== "undefined" ? !!window.SCREENITY_DEBUG_RECORDER : false;
 
 const Countdown = () => {
   const [contentState, setContentState] = useContext(contentStateContext);
@@ -12,20 +14,21 @@ const Countdown = () => {
   const [isRotating, setIsRotating] = useState(false);
 
   const END_HOLD_MS = 1000;
-  const START_AFTER_BEEP_MS = 120;
+  const POST_HIDE_START_DELAY_MS = 150;
   const HIDE_AFTER_END_MS = 0;
 
   const intervalRef = useRef(null);
   const activeRef = useRef(false);
   const cancelledRef = useRef(false);
   const wasVisibleRef = useRef(false);
-  const startRef = useRef(null);
   const finishRef = useRef(null);
   const resetRef = useRef(null);
   const completedRef = useRef(false);
   const hideTimeoutRef = useRef(null);
   const finishTimeoutRef = useRef(null);
   const startTimeoutRef = useRef(null);
+  const startAtRef = useRef(0);
+  const runIdRef = useRef(0);
 
   const cleanupTimers = () => {
     if (intervalRef.current) {
@@ -46,16 +49,35 @@ const Countdown = () => {
     }
   };
 
+  const logStartFlow = (event, data = {}) => {
+    if (!DEBUG_START_FLOW) return;
+    const payload = { ts: Date.now(), event, ...data };
+    console.info("[Screenity][StartFlow]", payload);
+    try {
+      const update = {
+        startFlowDebug: {
+          ...(data || {}),
+          event,
+          ts: payload.ts,
+        },
+      };
+      if (event === "countdown_start") {
+        update.countdownVisibleAt = payload.ts;
+      } else if (event === "countdown_end") {
+        update.countdownHiddenAt = payload.ts;
+      }
+      chrome.storage.local.set(update);
+    } catch {}
+  };
+
   useEffect(() => {
     activeRef.current = contentState.countdownActive;
     cancelledRef.current = contentState.countdownCancelled;
-    startRef.current = contentState.startRecordingAfterCountdown;
     finishRef.current = contentState.onCountdownFinished;
     resetRef.current = contentState.resetCountdown;
   }, [
     contentState.countdownActive,
     contentState.countdownCancelled,
-    contentState.startRecordingAfterCountdown,
     contentState.onCountdownFinished,
     contentState.resetCountdown,
   ]);
@@ -67,6 +89,8 @@ const Countdown = () => {
       setCount(COUNTDOWN_TIME);
       setIsTransforming(false);
       setIsRotating(false);
+      completedRef.current = false;
+      logStartFlow("countdown_cancel", { visible: false });
       contentState.cancelCountdown();
     }
   };
@@ -75,13 +99,36 @@ const Countdown = () => {
   useEffect(() => {
     if (!contentState.countdownActive) {
       cleanupTimers();
+      completedRef.current = false;
       return;
     }
 
     cleanupTimers();
-    intervalRef.current = setInterval(() => {
-      setCount((prev) => (prev > 1 ? prev - 1 : 1));
-    }, 1000);
+    // Reset immediately at run start so a stale previous `1` cannot
+    // short-circuit the next countdown cycle.
+    setCount(COUNTDOWN_TIME);
+    completedRef.current = false;
+    runIdRef.current += 1;
+    const runId = runIdRef.current;
+    startAtRef.current = performance.now();
+    logStartFlow("countdown_start", { visible: true });
+
+    const tick = () => {
+      if (runIdRef.current !== runId) return;
+      if (!activeRef.current || cancelledRef.current) return;
+      const elapsedMs = performance.now() - startAtRef.current;
+      const remainingMs = Math.max(0, COUNTDOWN_TIME * 1000 - elapsedMs);
+      const nextCount = Math.max(1, Math.ceil(remainingMs / 1000));
+      setCount(nextCount);
+
+      if (remainingMs <= 0) {
+        return;
+      }
+
+      intervalRef.current = setTimeout(tick, 100);
+    };
+
+    intervalRef.current = setTimeout(tick, 100);
 
     return cleanupTimers;
   }, [contentState.countdownActive]);
@@ -91,6 +138,12 @@ const Countdown = () => {
       return;
     }
     if (count !== 1) {
+      return;
+    }
+    const elapsedMs = performance.now() - startAtRef.current;
+    // Ignore stale count=1 carried from a previous run; valid final-second
+    // entry happens after ~2s for a 3..2..1 countdown.
+    if (elapsedMs < (COUNTDOWN_TIME - 1) * 1000) {
       return;
     }
     if (completedRef.current) {
@@ -109,17 +162,52 @@ const Countdown = () => {
           finishTimeoutRef.current = null;
           return;
         }
-        finishRef.current?.();
-        startTimeoutRef.current = setTimeout(() => {
-          startRef.current?.();
-          startTimeoutRef.current = null;
-        }, START_AFTER_BEEP_MS);
+        setContentState((prev) => ({
+          ...prev,
+          isCountdownVisible: false,
+          countdownActive: false,
+        }));
+        const endedAt = Date.now();
+        const dispatchStartAfterHide = () => {
+          if (cancelledRef.current) return;
+          const startDispatchedAt = Date.now();
+          logStartFlow("countdown_end", {
+            visible: false,
+            endedAt,
+            startDispatchedAt,
+          });
+          chrome.storage.local.set({
+            countdownFinishedAt: endedAt,
+            lastCountdownStartGate: {
+              endedAt,
+              countdownHiddenAt: endedAt,
+              startDispatchedAt,
+              overlayVisible: false,
+              ts: startDispatchedAt,
+            },
+          });
+          finishRef.current?.();
+          // Countdown-enabled flow should start from background only.
+          // Waiting briefly after hide avoids capturing the countdown frame.
+          startTimeoutRef.current = setTimeout(() => {
+            if (cancelledRef.current) {
+              startTimeoutRef.current = null;
+              return;
+            }
+            chrome.runtime
+              .sendMessage({
+                type: "countdown-finished",
+                endedAt,
+              })
+              .catch(() => {});
+            startTimeoutRef.current = null;
+          }, POST_HIDE_START_DELAY_MS);
+        };
+        // Wait for at least one paint after hidden state commit.
+        requestAnimationFrame(() => {
+          requestAnimationFrame(dispatchStartAfterHide);
+        });
         hideTimeoutRef.current = setTimeout(() => {
-          setContentState((prev) => ({
-            ...prev,
-            isCountdownVisible: false,
-            countdownActive: false,
-          }));
           hideTimeoutRef.current = null;
         }, HIDE_AFTER_END_MS);
         finishTimeoutRef.current = null;

@@ -44,11 +44,7 @@ export const handleChunks = async (chunks, override = false, target = null) => {
   try {
     if (!Array.isArray(chunks) || chunks.length === 0) {
       if (DEBUG_POSTSTOP)
-        console.debug(
-          "[Screenity][BG] no chunks to send, instructing sandbox to make-video-tab",
-        );
-      if (sandboxTab)
-        sendMessageTab(sandboxTab, { type: "make-video-tab", override });
+        console.debug("[Screenity][BG] no chunks to send; deferring delivery");
       return;
     }
 

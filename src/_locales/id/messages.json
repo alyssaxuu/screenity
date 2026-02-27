@@ -95,7 +95,6 @@
     "message": "Tampilkan opsi lebih lanjut",
     "description": "Label tampilkan opsi lebih lanjut"
   },
-
   "systemAudioLabel": {
     "message": "Sertakan audio sistem",
     "description": "Label audio sistem/tab"
@@ -525,7 +524,7 @@
     "description": "Label Potong"
   },
   "preparingLabel": {
-    "message": "Persiapan video, harap tunggu...",
+    "message": "Menyiapkan...",
     "description": "Label Persiapan"
   },
   "cropButtonTitle": {
@@ -900,12 +899,10 @@
     "message": "Pelajari lebih lanjut tentang pengolahan video panjang.",
     "description": "Tautan 'Pelajari lebih lanjut' dalam modal batas lebih dari 5 menit dengan titik"
   },
-
   "recoveryModeTitle": {
     "message": "Mode Pemulihan",
     "description": "Judul Mode Pemulihan"
   },
-
   "downloadForTroubleshootingOption": {
     "message": "Unduh data untuk perbaikan masalah",
     "description": "Pilihan unduhan untuk perbaikan masalah"
@@ -1012,7 +1009,6 @@
     "message": "Pastikan Anda mengaktifkan opsi 'Bagikan audio sistem' jika Anda ingin merekam audio dari komputer. Jika Anda tidak melihat opsi ini, coba perbarui Chrome atau beralih ke opsi merekam tab.",
     "description": "Deskripsi Peringatan Audio untuk Sistem Lainnya"
   },
-
   "maxResolutionLabel": {
     "message": "Resolusi Maksimum",
     "description": "Label resolusi maksimum dalam menu pengaturan"
@@ -1021,7 +1017,6 @@
     "message": "FPS Maksimum",
     "description": "Label FPS maksimum dalam menu pengaturan"
   },
-
   "notEnoughRAM": {
     "message": "Tidak cukup RAM",
     "description": "Label 'Tidak cukup RAM' dalam menu pengaturan"
@@ -1401,5 +1396,57 @@
   "webcodecsFailedOffToast": {
     "message": "Fast MP4 gagal — mati",
     "description": "WebCodecs failure auto-disable toast"
+  },
+  "proOnboardingWelcomeTitle": {
+    "message": "Selamat datang di ekstensi Screenity Pro",
+    "description": "Pro onboarding welcome step title"
+  },
+  "proOnboardingWelcomeDescription": {
+    "message": "Beberapa tips cepat sebelum mulai merekam.<br/>Auto-zoom hanya bekerja untuk klik di dalam <strong>tab Chrome</strong>. Kamu tetap bisa menambahkan zoom secara manual nanti.",
+    "description": "Pro onboarding welcome step description"
+  },
+  "proOnboardingToolbarTitle": {
+    "message": "Toolbar rekaman & efek",
+    "description": "Pro onboarding toolbar step title"
+  },
+  "proOnboardingToolbarDescription": {
+    "message": "Gunakan toolbar ini untuk menggambar, efek kursor, blur, dan kontrol rekaman.<br/><br/><strong>Toolbar ini ikut terekam di video</strong> jika tidak disembunyikan.",
+    "description": "Pro onboarding toolbar step description"
+  },
+  "proOnboardingCameraTitle": {
+    "message": "Kamera direkam secara terpisah",
+    "description": "Pro onboarding camera step title"
+  },
+  "proOnboardingCameraDescription": {
+    "message": "Saat merekam, kamera bisa <strong>sembunyi atau pindah ke PiP</strong>, itu normal.<br/><br/>Kamera direkam terpisah supaya bisa kamu atur posisinya nanti.",
+    "description": "Pro onboarding camera step description"
+  },
+  "proOnboardingInstantTitle": {
+    "message": "Mode instan",
+    "description": "Pro onboarding instant mode step title"
+  },
+  "proOnboardingInstantDescription": {
+    "message": "Cocok untuk berbagi cepat dengan <strong>unduhan tanpa batas</strong>.<br/><br/>Opsi tata letak dan editor lanjutan tidak tersedia di mode ini.",
+    "description": "Pro onboarding instant mode step description"
+  },
+  "proOnboardingDone": {
+    "message": "Mengerti",
+    "description": "Pro onboarding done button text"
+  },
+  "proOnboardingNext": {
+    "message": "Lanjut",
+    "description": "Pro onboarding next button text"
+  },
+  "proOnboardingBack": {
+    "message": "Kembali",
+    "description": "Pro onboarding back button text"
+  },
+  "proOnboardingToolbarLearnMore": {
+    "message": "Pelajari lebih lanjut",
+    "description": "Pro onboarding toolbar learn more link label"
+  },
+  "resetOnboardingOption": {
+    "message": "Reset onboarding",
+    "description": "Reset pro onboarding option label in popup settings menu"
   }
 }

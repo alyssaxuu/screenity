@@ -34,16 +34,13 @@ export const sendMessageRecord = (message, responseCallback = null) => {
         // No recordingTab set - check if there's an active recorderSession
         // This can happen if the service worker restarted and lost in-memory state
         chrome.storage.local.get(["recorderSession"], (sessionResult) => {
-          if (
-            sessionResult.recorderSession &&
-            sessionResult.recorderSession.tabId
-          ) {
+          const recorderTabId =
+            sessionResult.recorderSession?.recorderTabId ||
+            sessionResult.recorderSession?.tabId ||
+            null;
+          if (sessionResult.recorderSession && recorderTabId) {
             // Try the tab from the persisted session
-            sendMessageTab(
-              sessionResult.recorderSession.tabId,
-              message,
-              responseCallback
-            )
+            sendMessageTab(recorderTabId, message, responseCallback)
               .then(resolve)
               .catch(reject);
           } else {

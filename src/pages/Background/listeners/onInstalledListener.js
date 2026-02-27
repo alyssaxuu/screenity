@@ -35,7 +35,7 @@ export const onInstalledListener = () => {
       });
     } else if (details.reason === "update") {
       if (details.previousVersion === "2.8.6") {
-        chrome.storage.local.clear();
+        // Do not clear local storage on update; preserve onboarding/versioned keys.
         chrome.storage.local.set({ updatingFromOld: true });
       } else {
         chrome.storage.local.set({ updatingFromOld: false });

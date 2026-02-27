@@ -415,8 +415,10 @@ const ToolbarWrap = () => {
         onDrag={handleDrag}
         onDragStop={handleDrop}
         ref={DragRef}
+        id="pro-onboarding-recording-toolbar"
       >
         <Toolbar.Root
+          id="pro-onboarding-recording-toolbar-root"
           className={
             "ToolbarRoot" +
             " " +
@@ -487,7 +489,10 @@ const ToolbarWrap = () => {
               </div>
             </div>
           )}
-          <div className={"ToolbarRecordingControls"}>
+          <div
+            className={"ToolbarRecordingControls"}
+            id="pro-onboarding-recording-toolbar-controls"
+          >
             <ToolTrigger
               type="button"
               content={chrome.i18n.getMessage("finishRecordingTooltip")}

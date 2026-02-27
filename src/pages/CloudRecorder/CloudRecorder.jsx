@@ -17,6 +17,8 @@ localforage.config({
 });
 
 const API_BASE = process.env.SCREENITY_API_BASE_URL;
+const DEBUG_START_FLOW =
+  typeof window !== "undefined" ? !!window.SCREENITY_DEBUG_RECORDER : false;
 
 const chunksStore = localforage.createInstance({ name: "chunks" });
 
@@ -36,6 +38,8 @@ const CloudRecorder = () => {
   const [initProject, setInitProject] = useState(false);
   const [finalizeFailure, setFinalizeFailure] = useState(null);
   const finalizeFailureRef = useRef(null);
+  const finalizeContextRef = useRef(null);
+  const simulateFinalizeFailureConsumedRef = useRef(false);
   const [retryingFinalize, setRetryingFinalize] = useState(false);
 
   const retryFinalize = async () => {
@@ -74,6 +78,9 @@ const CloudRecorder = () => {
   const audioOutputGain = useRef(null);
 
   const uploadersInitialized = useRef(false);
+  const pendingStartRef = useRef(false);
+  const pendingStartAttempts = useRef(0);
+  const pendingStartTimer = useRef(null);
 
   const isRestarting = useRef(false);
   const isFinishing = useRef(false);
@@ -98,6 +105,7 @@ const CloudRecorder = () => {
   const consecutiveScreenFailures = useRef(0);
   const consecutiveCameraFailures = useRef(0);
   const firstChunkTime = useRef(null);
+  const firstChunkLoggedRef = useRef(false);
 
   const recorderSession = useRef(null);
   const sessionHeartbeat = useRef(null);
@@ -128,6 +136,107 @@ const CloudRecorder = () => {
 
   const logDebugEvent = async () => {
     // debug bundle feature removed; noop
+  };
+
+  const setCloudRestartPhase = async (phase, details = {}) => {
+    try {
+      await chrome.storage.local.set({
+        lastCloudRegionRestartPhase: {
+          phase,
+          ts: Date.now(),
+          isIframe: Boolean(IS_IFRAME_CONTEXT),
+          ...details,
+        },
+      });
+    } catch {}
+  };
+
+  const clearPendingStart = () => {
+    pendingStartRef.current = false;
+    pendingStartAttempts.current = 0;
+    if (pendingStartTimer.current) {
+      clearTimeout(pendingStartTimer.current);
+      pendingStartTimer.current = null;
+    }
+  };
+
+  const canBeginRecording = () => {
+    const hasStreams =
+      Boolean(screenStream.current) || Boolean(cameraStream.current);
+    return Boolean(uploadersInitialized.current) && hasStreams;
+  };
+
+  const maybeStartRecording = (reason = "unknown") => {
+    if (!pendingStartRef.current || isFinishing.current) return;
+    if (canBeginRecording()) {
+      clearPendingStart();
+      startRecording();
+      return;
+    }
+
+    const attempt = pendingStartAttempts.current + 1;
+    pendingStartAttempts.current = attempt;
+    if (attempt > 75) {
+      // ~15s max with 200ms delay
+      clearPendingStart();
+      sendRecordingError(
+        "Recording is taking too long to start. Please try again.",
+      );
+      return;
+    }
+
+    if (pendingStartTimer.current) {
+      clearTimeout(pendingStartTimer.current);
+    }
+    pendingStartTimer.current = setTimeout(() => {
+      pendingStartTimer.current = null;
+      maybeStartRecording(reason);
+    }, 200);
+  };
+
+  const logStartFlow = (event, data = {}) => {
+    if (!DEBUG_START_FLOW) return;
+    const payload = { ts: Date.now(), event, ...data };
+    console.info("[Screenity][StartFlow]", payload);
+    try {
+      const update = {
+        startFlowDebug: {
+          ...(data || {}),
+          event,
+          ts: payload.ts,
+        },
+      };
+      if (event === "recording_start") {
+        update.recordingStartAt = payload.ts;
+      } else if (event === "first_chunk") {
+        update.firstChunkAt = payload.ts;
+      } else if (event === "recording_stop") {
+        update.recordingStopAt = payload.ts;
+      } else if (event === "recording_error") {
+        update.recordingErrorAt = payload.ts;
+      }
+      chrome.storage.local.set(update);
+    } catch {}
+  };
+
+  const assertCountdownBeforeFirstChunk = async (firstChunkAt) => {
+    if (!DEBUG_START_FLOW) return;
+    try {
+      const { countdownFinishedAt } = await chrome.storage.local.get([
+        "countdownFinishedAt",
+      ]);
+      if (
+        typeof countdownFinishedAt === "number" &&
+        firstChunkAt < countdownFinishedAt
+      ) {
+        console.error("[Screenity][StartFlow] Chunk before countdown end", {
+          firstChunkAt,
+          countdownFinishedAt,
+        });
+      }
+    } catch (err) {
+      console.warn("[Screenity][StartFlow] Countdown assert failed", err);
+    }
   };
 
   const setPipelineState = async (step, extra = {}) => {
@@ -329,7 +438,9 @@ const CloudRecorder = () => {
       });
 
       if (globalThis.SCREENITY_VERBOSE_LOGS) {
-        console.log("[CloudRecorder] Tab keep-alive started");
+        if (DEBUG_START_FLOW) {
+          console.log("[CloudRecorder] Tab keep-alive started");
+        }
       }
     } catch (err) {
       console.warn("[CloudRecorder] Failed to start tab keep-alive:", err);
@@ -358,7 +469,9 @@ const CloudRecorder = () => {
       });
 
       if (globalThis.SCREENITY_VERBOSE_LOGS) {
-        console.log("[CloudRecorder] Tab keep-alive stopped");
+        if (DEBUG_START_FLOW) {
+          console.log("[CloudRecorder] Tab keep-alive stopped");
+        }
       }
     } catch (err) {
       console.warn("[CloudRecorder] Failed to stop tab keep-alive:", err);
@@ -504,9 +617,17 @@ const CloudRecorder = () => {
   };
 
   const startRecorderSession = async (meta = {}) => {
+    let recorderOwnerTabId = null;
+    try {
+      const tabRes = await chrome.runtime.sendMessage({ type: "get-tab-id" });
+      recorderOwnerTabId = tabRes?.tabId || null;
+    } catch {}
+
     const session = {
       id: crypto.randomUUID(),
       startedAt: Date.now(),
+      recorderTabId: recorderOwnerTabId,
+      capturedTabId: recordingTabId.current || null,
       tabId: recordingTabId.current || null,
       tabCaptureId: tabID.current || null,
       isTab: isTab.current,
@@ -546,16 +667,36 @@ const CloudRecorder = () => {
 
   const finalizeRecorderSession = async (status = "completed") => {
     if (!recorderSession.current) return;
-    await chrome.storage.local.set({
-      recorderSession: {
-        ...recorderSession.current,
-        status,
-        finishedAt: Date.now(),
-      },
+    logDebugEvent("recorder-session-finalize-start", {
+      status,
+      sessionId: recorderSession.current.id,
     });
-    chrome.runtime.sendMessage({ type: "clear-recording-session" });
-    recorderSession.current = null;
-    logDebugEvent("recorder-session-finalized", { status });
+    try {
+      await chrome.storage.local.set({
+        recorderSession: {
+          ...recorderSession.current,
+          status,
+          finishedAt: Date.now(),
+        },
+      });
+      await chrome.runtime.sendMessage({
+        type: "clear-recording-session",
+        reason: `cloud-finalize-${status}`,
+      });
+      logDebugEvent("recorder-session-finalize-complete", { status });
+    } catch (err) {
+      console.warn("Failed to finalize recorder session cleanly:", err);
+      chrome.runtime
+        .sendMessage({
+          type: "clear-recording-session-safe",
+          reason: `cloud-finalize-fallback-${status}`,
+        })
+        .catch(() => {});
+      throw err;
+    } finally {
+      recorderSession.current = null;
+      logDebugEvent("recorder-session-finalized", { status });
+    }
   };
 
   const startChunkWatchdog = () => {
@@ -1047,6 +1188,7 @@ const CloudRecorder = () => {
   };
 
   const dismissRecording = async (restarting = false) => {
+    clearPendingStart();
     setInitProject(false);
     await cleanupIfEmptyUploads(restarting ? "restart" : "dismiss");
 
@@ -1078,7 +1220,9 @@ const CloudRecorder = () => {
         try {
           const uploadMeta = uploadMetaRef.current;
           const { projectId } = await chrome.storage.local.get(["projectId"]);
-          await deleteProject(projectId, uploadMeta, false);
+          if (projectId && uploadMeta) {
+            await deleteProject(projectId, uploadMeta, false);
+          }
         } catch (err) {
           console.warn("❌ Failed to delete media:", err);
         }
@@ -1175,9 +1319,16 @@ const CloudRecorder = () => {
   };
 
   const restartRecording = async () => {
+    await setCloudRestartPhase("restart-requested", {
+      hasTarget: Boolean(target.current),
+      hadRegionMode: Boolean(regionRef.current),
+    });
     isRestarting.current = true;
     await dismissRecording(true);
-    await stopAllRecorders();
+    await setCloudRestartPhase("restart-dismissed");
+    // Restart keeps existing capture streams; only recorder instances should stop.
+    await stopAllRecorders({ stopStreams: false });
+    await setCloudRestartPhase("restart-recorders-stopped");
     screenChunks.current = [];
     cameraChunks.current = [];
     audioChunks.current = [];
@@ -1186,17 +1337,28 @@ const CloudRecorder = () => {
 
     if (IS_IFRAME_CONTEXT && !target.current) {
       sendRecordingError("No crop target for restart.");
-      return;
+      return false;
     }
 
     uploadersInitialized.current = await initializeUploaders({
       forceNewSceneId: true,
     });
     if (!uploadersInitialized.current) {
+      await setCloudRestartPhase("restart-failed", {
+        reason: "uploaders-init-failed",
+      });
       sendRecordingError("Failed to re-initialize uploaders on restart.");
-      return;
+      return false;
     }
-    chrome.runtime.sendMessage({ type: "reset-active-tab-restart" });
+    if (IS_IFRAME_CONTEXT && target.current) {
+      regionRef.current = true;
+    }
+    await setCloudRestartPhase("restart-uploaders-initialized", {
+      hasTarget: Boolean(target.current),
+      regionMode: Boolean(regionRef.current),
+    });
+    await setCloudRestartPhase("restart-ready");
+    return true;
   };
 
   const initializeUploaders = async ({ forceNewSceneId = false } = {}) => {
@@ -1371,6 +1533,7 @@ const CloudRecorder = () => {
 
     if (!screenStream.current && !cameraStream.current) {
       sendRecordingError("No streams to record");
+      logStartFlow("recording_error", { reason: "no-streams" });
       return;
     }
 
@@ -1404,6 +1567,7 @@ const CloudRecorder = () => {
 
     if (!screenUploader.current && !cameraUploader.current) {
       sendRecordingError("Uploaders not ready. Please restart recording.");
+      logStartFlow("recording_error", { reason: "uploaders-not-ready" });
       return;
     }
 
@@ -1419,6 +1583,7 @@ const CloudRecorder = () => {
     lastTimecode.current = 0;
     hasChunks.current = false;
     index.current = 0;
+    firstChunkLoggedRef.current = false;
 
     // Clear blob storage arrays
     screenChunks.current = [];
@@ -1427,7 +1592,30 @@ const CloudRecorder = () => {
 
     navigator.storage.persist();
 
+    const screenTrack =
+      screenStream.current?.getVideoTracks?.()[0] ?? null;
+    const cameraTrack =
+      cameraStream.current?.getVideoTracks?.()[0] ?? null;
+
+    if (screenStream.current && !screenTrack) {
+      sendRecordingError("No screen video track available.");
+      logStartFlow("recording_error", { reason: "no-screen-track" });
+      return;
+    }
+
+    if (recordingType.current === "camera" && !cameraTrack) {
+      sendRecordingError("No camera video track available.");
+      logStartFlow("recording_error", { reason: "no-camera-track" });
+      return;
+    }
+
     try {
+      logStartFlow("recording_start", {
+        recordingType: recordingType.current,
+        hasScreen: Boolean(screenStream.current),
+        hasCamera: Boolean(cameraStream.current),
+        hasMic: Boolean(micStream.current),
+      });
       // Screen recorder setup
       if (screenStream.current) {
         const stream = attachMicToStream(
@@ -1469,6 +1657,11 @@ const CloudRecorder = () => {
               hasChunks.current = true;
               lastTimecode.current = timestamp;
               firstChunkTime.current = timestamp;
+              if (!firstChunkLoggedRef.current) {
+                firstChunkLoggedRef.current = true;
+                logStartFlow("first_chunk", { type: "screen" });
+                assertCountdownBeforeFirstChunk(timestamp);
+              }
             } else if (timestamp < lastTimecode.current) {
               return; // Skip duplicate
             } else {
@@ -1529,11 +1722,13 @@ const CloudRecorder = () => {
         // Start recording with 2-second time slices
         screenRecorder.current.start(2000);
 
-        bindScreenTrack(screenStream.current.getVideoTracks()[0]);
+        if (screenTrack) {
+          bindScreenTrack(screenTrack);
+        }
       }
 
       // Audio recorder setup (for transcription)
-      if (rawMicStream.current) {
+      if (rawMicStream.current?.getAudioTracks?.().length) {
         const audioOptions = {
           mimeType: "audio/webm", // Using webm instead of wav for better browser support
           audioBitsPerSecond: 128000,
@@ -1545,6 +1740,11 @@ const CloudRecorder = () => {
           (blob) => {
             // Store chunks for final blob creation
             audioChunks.current.push(blob);
+            if (!firstChunkLoggedRef.current) {
+              firstChunkLoggedRef.current = true;
+              logStartFlow("first_chunk", { type: "audio" });
+              assertCountdownBeforeFirstChunk(Date.now());
+            }
           },
         );
 
@@ -1588,6 +1788,11 @@ const CloudRecorder = () => {
 
             // Store for final blob creation
             cameraChunks.current.push(blob);
+            if (!firstChunkLoggedRef.current) {
+              firstChunkLoggedRef.current = true;
+              logStartFlow("first_chunk", { type: "camera" });
+              assertCountdownBeforeFirstChunk(Date.now());
+            }
 
             if (uploadersInitialized.current && cameraUploader.current) {
               try {
@@ -1734,7 +1939,7 @@ const CloudRecorder = () => {
     return result;
   }
 
-  const stopAllRecorders = async () => {
+  const stopAllRecorders = async ({ stopStreams = true } = {}) => {
     const stopRecorder = async (recorderRef) => {
       if (recorderRef.current && recorderRef.current.state !== "inactive") {
         try {
@@ -1760,9 +1965,11 @@ const CloudRecorder = () => {
       stopRecorder(audioRecorder),
     ]);
 
-    [screenStream, cameraStream, micStream, rawMicStream].forEach((ref) => {
-      ref.current?.getTracks().forEach((track) => track.stop());
-    });
+    if (stopStreams) {
+      [screenStream, cameraStream, micStream, rawMicStream].forEach((ref) => {
+        ref.current?.getTracks().forEach((track) => track.stop());
+      });
+    }
   };
 
   const createBlobFromChunks = (chunks, mimeType) => {
@@ -2187,17 +2394,21 @@ const CloudRecorder = () => {
 
   const stopRecording = async (shouldFinalize = true, reason = "unknown") => {
     if (isFinishing.current || sentLast.current) return;
+    clearPendingStart();
 
-    console.debug("[Screenity] stopRecording invoked", {
-      reason,
-      shouldFinalize,
-      screenState: screenRecorder.current?.state,
-      cameraState: cameraRecorder.current?.state,
-      audioState: audioRecorder.current?.state,
-      screenOffset: screenUploader.current?.offset || 0,
-      cameraOffset: cameraUploader.current?.offset || 0,
-      chunkCount: screenChunks.current.length + cameraChunks.current.length,
-    });
+    if (DEBUG_START_FLOW) {
+      console.debug("[Screenity] stopRecording invoked", {
+        reason,
+        shouldFinalize,
+        screenState: screenRecorder.current?.state,
+        cameraState: cameraRecorder.current?.state,
+        audioState: audioRecorder.current?.state,
+        screenOffset: screenUploader.current?.offset || 0,
+        cameraOffset: cameraUploader.current?.offset || 0,
+        chunkCount: screenChunks.current.length + cameraChunks.current.length,
+      });
+    }
+    logStartFlow("recording_stop", { reason, shouldFinalize });
     chrome.storage.local.set({
       lastStopRecordingEvent: {
         reason,
@@ -2318,15 +2529,17 @@ const CloudRecorder = () => {
       });
       finalizeError = new Error("uploader-finalize-incomplete");
     } else {
-      console.info("[CloudRecorder][Finalize] Finalization complete", {
-        stage,
-        settledResults: settledResults.map((result, i) => ({
-          index: i,
-          status: result.status,
-        })),
-        screen: screenMeta,
-        camera: cameraMeta,
-      });
+      if (DEBUG_START_FLOW) {
+        console.info("[CloudRecorder][Finalize] Finalization complete", {
+          stage,
+          settledResults: settledResults.map((result, i) => ({
+            index: i,
+            status: result.status,
+          })),
+          screen: screenMeta,
+          camera: cameraMeta,
+        });
+      }
       logDebugEvent("finalize-complete", {
         stage,
         screen: screenMeta,
@@ -2487,6 +2700,11 @@ const CloudRecorder = () => {
 
         chrome.runtime.sendMessage({ type: "video-ready", uploadMeta });
         await chunksStore.clear().catch(() => {});
+        await setPipelineState("completed", {
+          projectId,
+          sceneId: uploadMeta.sceneId,
+        });
+        await finalizeRecorderSession("completed");
 
         if (!IS_IFRAME_CONTEXT) {
           try {
@@ -2495,11 +2713,6 @@ const CloudRecorder = () => {
         } else {
           window.location.reload();
         }
-        await setPipelineState("completed", {
-          projectId,
-          sceneId: uploadMeta.sceneId,
-        });
-        await finalizeRecorderSession("completed");
       } catch (err) {
         console.error("❌ Failed to create scene:", err);
 
@@ -2649,6 +2862,17 @@ const CloudRecorder = () => {
     });
   };
 
+  const isUserCaptureCancel = (err) => {
+    const name = err?.name || "";
+    const message = (err?.message || "").toLowerCase();
+    return (
+      name === "NotAllowedError" ||
+      name === "AbortError" ||
+      message.includes("cancel") ||
+      message.includes("permission denied")
+    );
+  };
+
   const startStream = async (data, id, permissions, permissions2) => {
     // Defaulting quality for now
     //const { qualityValue } = await chrome.storage.local.get(["qualityValue"]);
@@ -2703,6 +2927,12 @@ const CloudRecorder = () => {
           );
           screenStream.current = stream;
           regionRef.current = true;
+          if (!screenStream.current?.getVideoTracks?.().length) {
+            sendRecordingError(
+              "Failed to access region stream: no video track.",
+            );
+            return;
+          }
 
           if (isTab.current) {
             const ctx = new AudioContext();
@@ -2712,6 +2942,10 @@ const CloudRecorder = () => {
 
           bindScreenTrack(screenStream.current.getVideoTracks()[0]);
         } catch (err) {
+          if (isUserCaptureCancel(err)) {
+            sendRecordingError("User cancelled stream selection", true);
+            return;
+          }
           sendRecordingError("Failed to access region stream: " + err.message);
           return;
         }
@@ -2811,6 +3045,12 @@ const CloudRecorder = () => {
           screenStream.current = await navigator.mediaDevices.getUserMedia(
             desktopConstraints,
           );
+          if (!screenStream.current?.getVideoTracks?.().length) {
+            sendRecordingError(
+              "Failed to access screen stream: no video track.",
+            );
+            return;
+          }
           const track = screenStream.current.getVideoTracks()[0];
           const {
             width,
@@ -2864,6 +3104,10 @@ const CloudRecorder = () => {
 
           bindScreenTrack(screenStream.current.getVideoTracks()[0]);
         } catch (err) {
+          if (isUserCaptureCancel(err)) {
+            sendRecordingError("User cancelled stream selection", true);
+            return;
+          }
           sendRecordingError("Failed to access screen stream: " + err.message);
           return;
         }
@@ -3011,6 +3255,9 @@ const CloudRecorder = () => {
         setStarted(true);
         setInitProject(false);
         chrome.runtime.sendMessage({ type: "reset-active-tab" });
+        if (pendingStartRef.current) {
+          maybeStartRecording("uploaders-ready");
+        }
       } catch (err) {
         sendRecordingError("Failed to initialize uploaders: " + err.message);
       }
@@ -3026,6 +3273,20 @@ const CloudRecorder = () => {
       const permissions2 = await navigator.permissions.query({
         name: "microphone",
       });
+
+      if (isTab.current && data.recordingType !== "region") {
+        let attempts = 0;
+        while (!tabID.current && attempts < 20) {
+          // wait for tab stream id to resolve
+          // eslint-disable-next-line no-await-in-loop
+          await new Promise((resolve) => setTimeout(resolve, 50));
+          attempts += 1;
+        }
+        if (!tabID.current) {
+          sendRecordingError("Failed to prepare tab capture.");
+          return;
+        }
+      }
 
       if (data.recordingType === "camera") {
         startStream(data, null, permissions, permissions2);
@@ -3084,12 +3345,11 @@ const CloudRecorder = () => {
         regionWidth.current = event.data.width;
         regionHeight.current = event.data.height;
       } else if (event.data.type === "restart-recording") {
-        restartRecording();
+        // Legacy path: restart is now orchestrated via runtime message.
+        void setCloudRestartPhase("restart-postmessage-ignored");
       }
     };
-    window.addEventListener("message", (event) => {
-      onMessage(event);
-    });
+    window.addEventListener("message", onMessage);
 
     return () => {
       window.removeEventListener("message", onMessage);
@@ -3144,16 +3404,48 @@ const CloudRecorder = () => {
     } else if (request.type === "start-recording-tab") {
       if (!isInit.current) return;
 
+      chrome.storage.local.set({
+        lastStartRecordingTabMessage: {
+          ts: Date.now(),
+          region: Boolean(request.region),
+          isIframe: IS_IFRAME_CONTEXT,
+        },
+      });
+
       if (IS_IFRAME_CONTEXT) {
-        if (request.region) setTimeout(() => startRecording(), 10);
+        if (request.region || target.current) {
+          if (target.current) {
+            regionRef.current = true;
+          }
+          pendingStartRef.current = true;
+          pendingStartAttempts.current = 0;
+          maybeStartRecording("start-message");
+        }
       } else if (!regionRef.current) {
-        setTimeout(() => startRecording(), 10);
+        pendingStartRef.current = true;
+        pendingStartAttempts.current = 0;
+        maybeStartRecording("start-message");
       }
     } else if (request.type === "restart-recording-tab") {
       if (!isInit.current) return;
-      if (!IS_IFRAME_CONTEXT) {
-        restartRecording();
-      }
+      Promise.resolve(restartRecording())
+        .then((restarted) => {
+          if (!restarted) {
+            sendResponse?.({
+              ok: false,
+              error: "restart-teardown-failed",
+            });
+            return;
+          }
+          sendResponse?.({ ok: true, restarted: true });
+        })
+        .catch((error) => {
+          sendResponse?.({
+            ok: false,
+            error: error?.message || String(error),
+          });
+        });
+      return true;
     } else if (request.type === "stop-recording-tab") {
       if (!isInit.current) return;
       stopRecording(true, request.reason || "message-stop");

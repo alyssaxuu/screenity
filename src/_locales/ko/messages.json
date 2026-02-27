@@ -524,7 +524,7 @@
     "description": "Trim label"
   },
   "preparingLabel": {
-    "message": "비디오 준비 중, 기다려주세요...",
+    "message": "준비 중...",
     "description": "Preparing label"
   },
   "cropButtonTitle": {
@@ -899,12 +899,10 @@
     "message": "긴 비디오 처리에 대해 자세히 알아보기",
     "description": "5분 이상 제한 모달에서 자세히 알아보기 링크와 점이 포함된 설명"
   },
-
   "recoveryModeTitle": {
     "message": "복구 모드",
     "description": "복구 모드 제목"
   },
-
   "downloadForTroubleshootingOption": {
     "message": "문제 해결을 위한 데이터 다운로드",
     "description": "문제 해결을 위한 다운로드 옵션"
@@ -1011,7 +1009,6 @@
     "message": "컴퓨터 오디오를 녹음하려면 '시스템 오디오 공유' 옵션을 활성화하세요. 이 옵션을 보지 못하는 경우 Chrome을 업데이트하거나 탭 녹음 옵션으로 전환해 보세요.",
     "description": "기타 시스템용 오디오 경고 설명"
   },
-
   "maxResolutionLabel": {
     "message": "최대 해상도",
     "description": "설정 메뉴에서 최대 해상도 레이블"
@@ -1020,7 +1017,6 @@
     "message": "최대 FPS",
     "description": "설정 메뉴에서 최대 FPS 레이블"
   },
-
   "notEnoughRAM": {
     "message": "RAM 부족",
     "description": "설정 메뉴에서 'RAM 부족' 라벨"
@@ -1041,7 +1037,6 @@
     "message": "권한 검토",
     "description": "권한 검토 버튼"
   },
-
   "recordButtonMultiLabel": {
     "message": "녹화 추가",
     "description": "Record button label (multi mode)"
@@ -1401,5 +1396,57 @@
   "webcodecsFailedOffToast": {
     "message": "Fast MP4 실패 — 꺼짐",
     "description": "WebCodecs failure auto-disable toast"
+  },
+  "proOnboardingWelcomeTitle": {
+    "message": "Screenity Pro 확장 프로그램에 오신 것을 환영합니다",
+    "description": "Pro onboarding welcome step title"
+  },
+  "proOnboardingWelcomeDescription": {
+    "message": "녹화를 시작하기 전에 빠른 팁을 확인하세요.<br/>자동 줌은 <strong>Chrome 탭</strong> 안에서의 클릭에만 동작합니다. 이후에 수동으로 줌을 추가할 수 있습니다.",
+    "description": "Pro onboarding welcome step description"
+  },
+  "proOnboardingToolbarTitle": {
+    "message": "녹화 툴바 및 효과",
+    "description": "Pro onboarding toolbar step title"
+  },
+  "proOnboardingToolbarDescription": {
+    "message": "이 툴바에서 그리기, 커서 효과, 블러, 녹화 제어를 할 수 있습니다.<br/><br/><strong>툴바를 숨기지 않으면 영상에 함께 녹화됩니다</strong>.",
+    "description": "Pro onboarding toolbar step description"
+  },
+  "proOnboardingCameraTitle": {
+    "message": "카메라는 별도로 캡처됩니다",
+    "description": "Pro onboarding camera step title"
+  },
+  "proOnboardingCameraDescription": {
+    "message": "녹화 중 카메라가 <strong>숨겨지거나 PiP로 이동</strong>할 수 있으며 정상 동작입니다.<br/><br/>카메라는 별도로 캡처되므로 나중에 원하는 위치로 배치할 수 있습니다.",
+    "description": "Pro onboarding camera step description"
+  },
+  "proOnboardingInstantTitle": {
+    "message": "인스턴트 모드",
+    "description": "Pro onboarding instant mode step title"
+  },
+  "proOnboardingInstantDescription": {
+    "message": "빠른 공유와 <strong>무제한 다운로드</strong>에 가장 적합합니다.<br/><br/>이 모드에서는 고급 레이아웃/편집 옵션을 사용할 수 없습니다.",
+    "description": "Pro onboarding instant mode step description"
+  },
+  "proOnboardingDone": {
+    "message": "확인",
+    "description": "Pro onboarding done button text"
+  },
+  "proOnboardingNext": {
+    "message": "다음",
+    "description": "Pro onboarding next button text"
+  },
+  "proOnboardingBack": {
+    "message": "뒤로",
+    "description": "Pro onboarding back button text"
+  },
+  "proOnboardingToolbarLearnMore": {
+    "message": "자세히 보기",
+    "description": "Pro onboarding toolbar learn more link label"
+  },
+  "resetOnboardingOption": {
+    "message": "온보딩 다시 시작",
+    "description": "Reset pro onboarding option label in popup settings menu"
   }
 }

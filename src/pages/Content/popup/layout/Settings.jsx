@@ -52,6 +52,7 @@ const Settings = () => {
           label={chrome.i18n.getMessage("hideToolbarLabel")}
           name="hideUI"
           value="hideUI"
+          anchorId="pro-onboarding-toolbar-toggle"
         />
         <Switch
           label={chrome.i18n.getMessage("countdownLabel")}

@@ -380,8 +380,6 @@ export const updateFromStorage = (check = true, id = null) => {
           timer: 0,
         }));
       }
-
-      chrome.storage.local.set({ restarting: false });
     }
   );
 };

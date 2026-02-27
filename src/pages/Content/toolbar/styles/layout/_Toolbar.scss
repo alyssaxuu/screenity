@@ -1,4 +1,5 @@
 @use "../../../styles/_variables" as *;
+@use "sass:color";
 
 /* reset */
 a,
@@ -481,6 +482,12 @@ iframe {
   transform: rotate(12deg);
   pointer-events: none !important;
 }
+
+// Hide legacy "click here to draw" hint while Driver.js onboarding is active.
+body.driver-active .OnboardingArrow {
+  display: none !important;
+}
+
 .OnboardingText {
   font-size: 32px;
   color: $color-icon;
@@ -488,4 +495,146 @@ iframe {
 }
 .ArrowShape {
   margin-left: -15px;
+}
+
+// Onboarding (driver.js)
+.driver-popover.ScreenityOnboardingPopover,
+.ScreenityOnboardingPopover,
+.onboarding-popover {
+  border-radius: $container-border-radius !important;
+  background: $color-background !important;
+  color: $color-text-primary !important;
+  font-family: $font-regular !important;
+  box-shadow: $container-soft-shadow !important;
+  padding: 20px !important;
+  max-width: 340px !important;
+  font-size: $font-size-normal !important;
+  z-index: $z-index-max !important;
+
+  .driver-popover-title {
+    font-size: 1rem !important;
+    font-family: $font-bold !important;
+    margin-bottom: 12px !important;
+    color: $color-text-primary !important;
+  }
+
+  .driver-popover-description {
+    font-size: $font-size-normal !important;
+    font-family: $font-medium !important;
+    color: $color-text-secondary !important;
+    line-height: 1.5 !important;
+    margin-bottom: 18px !important;
+
+    a {
+      color: $color-primary !important;
+      font-family: $font-bold !important;
+      text-decoration: none !important;
+      cursor: pointer !important;
+    }
+  }
+
+  .driver-popover-close-btn {
+    display: none !important;
+    top: 14px;
+    right: 12px;
+    color: $color-text-secondary !important;
+    font-size: 1.5rem !important;
+  }
+
+  .driver-popover-arrow {
+    width: 0px;
+    height: 0px;
+    // border: 4px solid #fff;
+    background: none !important;
+    box-shadow: none !important;
+    box-sizing: border-box;
+  }
+
+  .driver-popover-arrow-side-top {
+    border-left: 8px solid transparent !important;
+    border-right: 8px solid transparent !important;
+    border-top: 8px solid $color-background !important;
+  }
+
+  .driver-popover-arrow-side-bottom {
+    border-left: 8px solid transparent !important;
+    border-right: 8px solid transparent !important;
+    border-bottom: 8px solid $color-background !important;
+  }
+
+  .driver-popover-arrow-side-left {
+    border-top: 8px solid transparent !important;
+    border-bottom: 8px solid transparent !important;
+    border-left: 8px solid $color-background !important;
+  }
+
+  .driver-popover-arrow-side-right {
+    border-top: 8px solid transparent !important;
+    border-bottom: 8px solid transparent !important;
+    border-right: 8px solid $color-background !important;
+  }
+  .driver-popover-arrow-align-start {
+    top: 35px !important;
+  }
+  .driver-popover-arrow-align-end {
+    bottom: 35px !important;
+  }
+  .driver-popover-arrow-align-left {
+    left: 35px !important;
+  }
+  .driver-popover-arrow-align-right {
+    right: 35px !important;
+  }
+  .driver-popover-progress-text {
+    font-size: $font-size-detail !important;
+    font-family: $font-medium !important;
+    color: $color-text-secondary !important;
+    opacity: 0.7 !important;
+    margin-top: 2px !important;
+  }
+  .driver-popover-footer {
+    display: flex !important;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 16px;
+
+    .driver-popover-navigation-btns {
+      gap: 6px !important;
+
+      .driver-popover-next-btn,
+      .driver-popover-prev-btn,
+      .driver-popover-close-btn {
+        background-color: $color-primary !important;
+        color: white !important;
+        border: none !important;
+        padding: 10px 14px !important;
+        border-radius: 30px !important;
+        font-family: $font-medium !important;
+        font-weight: 500 !important;
+        cursor: pointer !important;
+        font-size: 0.875rem !important;
+        text-shadow: none !important;
+      }
+      .driver-popover-next-btn {
+        &:hover {
+          background: color.adjust($color-primary, $lightness: -5%) !important;
+        }
+      }
+
+      .driver-popover-prev-btn {
+        background-color: transparent !important;
+        color: $color-text-primary !important;
+        border: 1px solid $color-border !important;
+
+        &:hover {
+          background: $color-light-grey !important;
+        }
+      }
+
+      .driver-popover-close-btn {
+        background-color: transparent !important;
+        color: $color-text-secondary !important;
+      }
+    }
+  }
 }

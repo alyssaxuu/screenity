@@ -287,6 +287,7 @@ const RecordingType = (props) => {
           <>
             <div className="popup-content-divider"></div>
             <TooltipWrap
+              id="pro-onboarding-instant-mode-field"
               content={
                 chrome.i18n.getMessage("instantRecordingModeTooltip") ||
                 "Instant download, but camera and layout won’t be editable later."
@@ -302,6 +303,8 @@ const RecordingType = (props) => {
                   }
                   name="instantMode"
                   value="instantMode"
+                  anchorId="pro-onboarding-instant-mode-toggle"
+                  rowAnchorId="pro-onboarding-instant-mode-toggle-row"
                   onChange={async (checked) => {
                     if (checked) {
                       contentState.openModal(

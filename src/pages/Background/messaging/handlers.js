@@ -7,7 +7,7 @@ import {
   setSurface,
 } from "../tabManagement";
 
-import { startRecording } from "../recording/startRecording";
+import { startAfterCountdown, startRecording } from "../recording/startRecording";
 import {
   handleStopRecordingTab,
   handleStopRecordingTabBackup,
@@ -28,7 +28,6 @@ import {
 } from "../tabManagement";
 import {
   handleRestart,
-  handleRestartRecordingTab,
 } from "../recording/restartRecording";
 import { checkRecording } from "../recording/checkRecording";
 import {
@@ -60,6 +59,9 @@ const CLOUD_FEATURES_ENABLED =
   process.env.SCREENITY_ENABLE_CLOUD_FEATURES === "true";
 // Debug toggle for post-stop/chunk flow
 const DEBUG_POSTSTOP = true;
+const STOP_RECORDING_TAB_DEBOUNCE_MS = 1200;
+let stopRecordingTabInFlight = false;
+let stopRecordingTabLastAt = 0;
 
 const ensureAudioOffscreen = async () => {
   if (!chrome.offscreen) return false;
@@ -341,6 +343,8 @@ const handleFinishMultiRecording = async () => {
 
 let activeRecordingSession = null;
 let recordingTabListener = null;
+let desktopCaptureInFlight = false;
+let lastDesktopCaptureAt = 0;
 
 const clearRecordingSession = () => {
   activeRecordingSession = null;
@@ -350,19 +354,134 @@ const clearRecordingSession = () => {
   }
 };
 
-const registerRecordingTabListener = (tabId) => {
-  if (!tabId || recordingTabListener) return;
+const clearRecordingSessionSafe = async (reason = "unknown", details = {}) => {
+  const prev = activeRecordingSession;
+  clearRecordingSession();
+  try {
+    await chrome.storage.local.set({
+      lastRecordingSessionClear: {
+        ts: Date.now(),
+        reason,
+        previousSessionId: prev?.id || null,
+        previousRecorderTabId: prev?.recorderTabId || prev?.tabId || null,
+        ...details,
+      },
+    });
+  } catch {}
+};
+
+const registerRecordingTabListener = (ownerTabId) => {
+  if (!ownerTabId) return;
+  if (recordingTabListener) {
+    chrome.tabs.onRemoved.removeListener(recordingTabListener);
+    recordingTabListener = null;
+  }
   recordingTabListener = (closedTabId) => {
-    if (closedTabId === tabId) {
+    if (closedTabId === ownerTabId) {
       chrome.runtime.sendMessage({
         type: "stop-recording-tab",
-        reason: "recording-tab-closed",
+        reason: "recorder-owner-tab-closed",
         tabId: closedTabId,
       });
-      clearRecordingSession();
+      clearRecordingSessionSafe("owner-tab-removed", { closedTabId });
     }
   };
   chrome.tabs.onRemoved.addListener(recordingTabListener);
+};
+
+const isSessionRecording = (session) => session?.status === "recording";
+
+const doesTabExist = async (tabId) => {
+  if (!Number.isInteger(tabId)) return false;
+  try {
+    await chrome.tabs.get(tabId);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+const normalizeIncomingSession = (incoming = {}, sender) => {
+  const ownerTabId = incoming.recorderTabId || sender?.tab?.id || null;
+  const capturedTabId = incoming.capturedTabId || incoming.tabId || null;
+  return {
+    ...incoming,
+    recorderTabId: ownerTabId,
+    capturedTabId,
+    // Keep tabId for backward compatibility.
+    tabId: capturedTabId,
+  };
+};
+
+const isActiveSessionAlive = async (session) => {
+  if (!session?.id) return false;
+  const ownerTabId = session.recorderTabId || session.tabId || null;
+  const ownerTabAlive = await doesTabExist(ownerTabId);
+  const {
+    recording,
+    pendingRecording,
+    restarting,
+    recorderSession: storedSession,
+  } = await chrome.storage.local.get([
+    "recording",
+    "pendingRecording",
+    "restarting",
+    "recorderSession",
+  ]);
+  const flagsActive = Boolean(recording || pendingRecording || restarting);
+  const storedMatches =
+    storedSession?.id === session.id && isSessionRecording(storedSession);
+  return ownerTabAlive && (storedMatches || flagsActive);
+};
+
+const resolveActiveSessionConflict = async (incomingSession) => {
+  if (!incomingSession?.id) {
+    return { allow: true, staleRecovered: false };
+  }
+
+  if (!activeRecordingSession?.id) {
+    const { recorderSession: storedSession } = await chrome.storage.local.get([
+      "recorderSession",
+    ]);
+    if (storedSession?.id && isSessionRecording(storedSession)) {
+      activeRecordingSession = {
+        ...storedSession,
+        recorderTabId: storedSession.recorderTabId || storedSession.tabId || null,
+        capturedTabId:
+          storedSession.capturedTabId || storedSession.tabId || null,
+        tabId: storedSession.capturedTabId || storedSession.tabId || null,
+      };
+    }
+  }
+
+  if (!activeRecordingSession?.id) return { allow: true, staleRecovered: false };
+  if (activeRecordingSession.id === incomingSession.id) {
+    return { allow: true, staleRecovered: false };
+  }
+
+  if (!isSessionRecording(activeRecordingSession)) {
+    await clearRecordingSessionSafe("non-recording-session-conflict");
+    return { allow: true, staleRecovered: true };
+  }
+
+  const alive = await isActiveSessionAlive(activeRecordingSession);
+  if (alive) {
+    console.warn("[Screenity][BG] session_conflict_rejected", {
+      activeId: activeRecordingSession.id,
+      incomingId: incomingSession.id,
+      activeRecorderTabId:
+        activeRecordingSession.recorderTabId || activeRecordingSession.tabId,
+    });
+    return { allow: false, staleRecovered: false };
+  }
+
+  await clearRecordingSessionSafe("stale-conflict-recovered", {
+    incomingId: incomingSession.id,
+  });
+  console.warn("[Screenity][BG] session_conflict_stale_recovered", {
+    incomingId: incomingSession.id,
+  });
+  return { allow: true, staleRecovered: true };
 };
 
 export const copyToClipboard = (text) => {
@@ -387,19 +506,87 @@ export const copyToClipboard = (text) => {
 
 // Initialize message router and register all handlers
 export const setupHandlers = () => {
-  registerMessage("desktop-capture", (message) => desktopCapture(message));
+  registerMessage("desktop-capture", async (message) => {
+    const now = Date.now();
+    // Some pages (notably playground) can trigger duplicate start messages.
+    // Gate starts briefly so Chrome doesn't show capture permission twice.
+    if (desktopCaptureInFlight || now - lastDesktopCaptureAt < 1200) {
+      return { ok: true, deduped: true };
+    }
+
+    desktopCaptureInFlight = true;
+    lastDesktopCaptureAt = now;
+    try {
+      await desktopCapture(message);
+      return { ok: true };
+    } finally {
+      // Keep the lock briefly to absorb closely-following duplicate dispatches.
+      setTimeout(() => {
+        desktopCaptureInFlight = false;
+      }, 1000);
+    }
+  });
   registerMessage("backup-created", (message) =>
     offscreenDocument(message.request, message.tabId),
   );
   registerMessage("write-file", (message) => writeFile(message));
-  registerMessage("handle-restart", (message) => handleRestart(message));
+  registerMessage("handle-restart", (message, sender) =>
+    handleRestart(message, sender),
+  );
   registerMessage("handle-dismiss", (message) => handleDismiss(message));
   registerMessage("reset-active-tab", () => resetActiveTab(false));
   registerMessage("reset-active-tab-restart", (message) =>
     resetActiveTabRestart(message),
   );
-  registerMessage("video-ready", (message) => videoReady(message));
+  registerMessage("video-ready", async (message) => {
+    await videoReady(message);
+    await clearRecordingSessionSafe("video-ready");
+  });
   registerMessage("start-recording", (message) => startRecording(message));
+  registerMessage("countdown-finished", async (message) => {
+    const { recording, restarting, pendingRecording } =
+      await chrome.storage.local.get([
+      "recording",
+      "restarting",
+      "pendingRecording",
+    ]);
+    // pendingRecording/restarting are expected transitional flags while countdown
+    // runs. During restart, `recording` may still be true briefly from the
+    // previous session, so only block when recording is active AND not restarting.
+    if (recording && !restarting) {
+      const decisionAt = Date.now();
+      await chrome.storage.local.set({
+        lastCountdownFinishedDecision: {
+          ts: decisionAt,
+          startedAt: null,
+          endedAt: message?.endedAt || null,
+          acceptedCountdownFinishedAt: false,
+          recording: Boolean(recording),
+          restarting: Boolean(restarting),
+          pendingRecording: Boolean(pendingRecording),
+          started: false,
+          reason: "already-recording",
+        },
+      });
+      return { ok: true, skipped: true };
+    }
+    const decisionAt = Date.now();
+    await chrome.storage.local.set({
+      countdownFinishedAt: message?.endedAt || decisionAt,
+      lastCountdownFinishedDecision: {
+        ts: decisionAt,
+        startedAt: decisionAt,
+        endedAt: message?.endedAt || null,
+        acceptedCountdownFinishedAt: true,
+        recording: Boolean(recording),
+        restarting: Boolean(restarting),
+        pendingRecording: Boolean(pendingRecording),
+        started: true,
+      },
+    });
+    startAfterCountdown();
+    return { ok: true };
+  });
   registerMessage("restarted", (message) => restartActiveTab(message));
   const sendChunksToSandbox = async (sender) => {
     if (DEBUG_POSTSTOP)
@@ -466,14 +653,39 @@ export const setupHandlers = () => {
       await new Promise((r) => setTimeout(r, delayMs));
     }
 
-    if (DEBUG_POSTSTOP)
-      console.debug("[Screenity][BG] calling sendChunks() to deliver", {
-        targetTab,
-        chunkCount,
+    let result = null;
+    const maxDeliveryAttempts = 6;
+    for (
+      let deliveryAttempt = 1;
+      deliveryAttempt <= maxDeliveryAttempts;
+      deliveryAttempt += 1
+    ) {
+      if (DEBUG_POSTSTOP)
+        console.debug("[Screenity][BG] calling sendChunks() to deliver", {
+          targetTab,
+          chunkCount,
+          deliveryAttempt,
+        });
+      // eslint-disable-next-line no-await-in-loop
+      result = await sendChunks(false, {
+        tabId: targetTab,
+        frameId: sender?.frameId,
       });
-    await sendChunks(false, { tabId: targetTab, frameId: sender?.frameId });
-    if (DEBUG_POSTSTOP) console.debug("[Screenity][BG] sendChunks() completed");
-    return { status: "ok", chunkCount };
+      if (result?.status === "ok") {
+        if (DEBUG_POSTSTOP)
+          console.debug("[Screenity][BG] sendChunks() completed", result);
+        return { status: "ok", chunkCount: result.chunkCount };
+      }
+      // eslint-disable-next-line no-await-in-loop
+      await new Promise((r) => setTimeout(r, 1000));
+    }
+
+    if (DEBUG_POSTSTOP)
+      console.warn("[Screenity][BG] sendChunks() did not find chunks", {
+        targetTab,
+        result,
+      });
+    return { status: "empty", chunkCount: 0 };
   };
 
   registerMessage("send-chunks-to-sandbox", (message, sender) =>
@@ -492,13 +704,38 @@ export const setupHandlers = () => {
   registerMessage("cancel-recording", (message) => cancelRecording(message));
   registerMessage("stop-recording-tab", (message, sender, sendResponse) => {
     logStopRecordingTabEvent(message, sender);
-    handleStopRecordingTab(message);
+    const now = Date.now();
+    if (
+      stopRecordingTabInFlight ||
+      now - stopRecordingTabLastAt < STOP_RECORDING_TAB_DEBOUNCE_MS
+    ) {
+      if (DEBUG_POSTSTOP) {
+        console.warn(
+          "[Screenity][BG] Suppressed duplicate stop-recording-tab message",
+          {
+            inFlight: stopRecordingTabInFlight,
+            deltaMs: now - stopRecordingTabLastAt,
+            reason: message?.reason || null,
+          },
+        );
+      }
+      sendResponse({ ok: true, deduped: true });
+      return true;
+    }
+
+    stopRecordingTabInFlight = true;
+    stopRecordingTabLastAt = now;
+    Promise.resolve(handleStopRecordingTab(message))
+      .catch((err) => {
+        console.error("Failed to handle stop-recording-tab", err);
+      })
+      .finally(() => {
+        stopRecordingTabInFlight = false;
+        stopRecordingTabLastAt = Date.now();
+      });
     sendResponse({ ok: true });
     return true;
   });
-  registerMessage("restart-recording-tab", (message) =>
-    handleRestartRecordingTab(message),
-  );
   registerMessage("dismiss-recording-tab", (message) =>
     handleDismissRecordingTab(message),
   );
@@ -509,9 +746,12 @@ export const setupHandlers = () => {
     sendMessageRecord({ type: "resume-recording-tab" }),
   );
   registerMessage("set-mic-active-tab", (message) => setMicActiveTab(message));
-  registerMessage("recording-error", (message) =>
-    handleRecordingError(message),
-  );
+  registerMessage("recording-error", async (message) => {
+    await handleRecordingError(message);
+    await clearRecordingSessionSafe("recording-error", {
+      error: message?.error || null,
+    });
+  });
   registerMessage("on-get-permissions", (message) =>
     handleOnGetPermissions(message),
   );
@@ -688,17 +928,14 @@ export const setupHandlers = () => {
   registerMessage("add-alarm-listener", (payload) => addAlarmListener(payload));
   registerMessage(
     "check-auth-status",
-    async (message, sender, sendResponse) => {
+    async () => {
       if (!CLOUD_FEATURES_ENABLED) {
-        sendResponse({
+        return {
           authenticated: false,
           message: "Cloud features disabled",
-        });
-        return true;
+        };
       }
-      const result = await loginWithWebsite();
-      sendResponse(result);
-      return true;
+      return await loginWithWebsite();
     },
   );
   registerMessage(
@@ -752,9 +989,17 @@ export const setupHandlers = () => {
       "lastAuthCheck",
       "isSubscribed",
       "isLoggedIn",
-      "wasLoggedIn",
       "proSubscription",
     ]);
+
+    // Preserve a post-logout marker so popup can render the LoggedOut state.
+    await chrome.storage.local.set({
+      isLoggedIn: false,
+      wasLoggedIn: true,
+      isSubscribed: false,
+      proSubscription: null,
+      screenityUser: null,
+    });
 
     sendResponse({ success: true });
     return true;
@@ -1170,14 +1415,10 @@ export const setupHandlers = () => {
   });
   registerMessage(
     "register-recording-session",
-    (message, sender, sendResponse) => {
-      const incoming = message.session || {};
-      if (
-        activeRecordingSession &&
-        activeRecordingSession.id &&
-        incoming.id &&
-        activeRecordingSession.id !== incoming.id
-      ) {
+    async (message, sender, sendResponse) => {
+      const incoming = normalizeIncomingSession(message.session || {}, sender);
+      const resolution = await resolveActiveSessionConflict(incoming);
+      if (!resolution.allow) {
         sendResponse({
           ok: false,
           error: "Another recording session is already active",
@@ -1186,18 +1427,37 @@ export const setupHandlers = () => {
         return true;
       }
 
-      const tabId = incoming.tabId || sender?.tab?.id || null;
-      activeRecordingSession = { ...incoming, tabId };
-      registerRecordingTabListener(tabId);
-      sendResponse({ ok: true, session: activeRecordingSession });
+      activeRecordingSession = incoming;
+      registerRecordingTabListener(incoming.recorderTabId);
+      sendResponse({
+        ok: true,
+        session: activeRecordingSession,
+        staleRecovered: resolution.staleRecovered,
+      });
       return true;
     },
   );
 
   registerMessage(
     "clear-recording-session",
-    (message, sender, sendResponse) => {
-      clearRecordingSession();
+    async (message, sender, sendResponse) => {
+      await clearRecordingSessionSafe(
+        message?.reason || "clear-recording-session",
+      );
+      sendResponse({ ok: true });
+      return true;
+    },
+  );
+
+  registerMessage(
+    "clear-recording-session-safe",
+    async (message, sender, sendResponse) => {
+      await clearRecordingSessionSafe(
+        message?.reason || "clear-recording-session-safe",
+        {
+          sourceTabId: sender?.tab?.id || null,
+        },
+      );
       sendResponse({ ok: true });
       return true;
     },

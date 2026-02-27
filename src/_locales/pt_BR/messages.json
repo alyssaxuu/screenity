@@ -95,7 +95,6 @@
     "message": "Mostrar mais opções",
     "description": "Etiqueta de mostrar mais opções"
   },
-
   "systemAudioLabel": {
     "message": "Incluir áudio do sistema",
     "description": "Rótulo de áudio do sistema/guia"
@@ -525,7 +524,7 @@
     "description": "Rótulo de corte"
   },
   "preparingLabel": {
-    "message": "Preparando o vídeo, por favor, aguarde...",
+    "message": "Preparando...",
     "description": "Rótulo de preparação"
   },
   "cropButtonTitle": {
@@ -1010,7 +1009,6 @@
     "message": "Certifique-se de ativar a opção 'Compartilhar áudio do sistema' se desejar gravar áudio do computador. Se você não vir essa opção, tente atualizar o Chrome ou alternar para a gravação da guia.",
     "description": "Descrição de Aviso de Áudio para Outros Sistemas"
   },
-
   "maxResolutionLabel": {
     "message": "Resolução máxima",
     "description": "Etiqueta de resolução máxima no menu de configurações"
@@ -1398,5 +1396,57 @@
   "webcodecsFailedOffToast": {
     "message": "Fast MP4 falhou — off",
     "description": "WebCodecs failure auto-disable toast"
+  },
+  "proOnboardingWelcomeTitle": {
+    "message": "Boas-vindas à extensão Screenity Pro",
+    "description": "Pro onboarding welcome step title"
+  },
+  "proOnboardingWelcomeDescription": {
+    "message": "Algumas dicas rápidas antes de gravar.<br/>Os zooms automáticos funcionam apenas em cliques dentro de <strong>abas do Chrome</strong>. Você ainda pode adicionar zoom manualmente depois.",
+    "description": "Pro onboarding welcome step description"
+  },
+  "proOnboardingToolbarTitle": {
+    "message": "Barra de gravação e efeitos",
+    "description": "Pro onboarding toolbar step title"
+  },
+  "proOnboardingToolbarDescription": {
+    "message": "Use esta barra para desenhar, aplicar efeitos de cursor, desfocar e controlar a gravação.<br/><br/><strong>Esta barra aparece no vídeo</strong> se você não ocultá-la.",
+    "description": "Pro onboarding toolbar step description"
+  },
+  "proOnboardingCameraTitle": {
+    "message": "A câmera é capturada separadamente",
+    "description": "Pro onboarding camera step title"
+  },
+  "proOnboardingCameraDescription": {
+    "message": "Sua câmera pode <strong>sumir ou ir para PiP</strong> durante a gravação, isso é normal.<br/><br/>Ela é capturada separadamente para você posicioná-la como quiser depois.",
+    "description": "Pro onboarding camera step description"
+  },
+  "proOnboardingInstantTitle": {
+    "message": "Modo instantâneo",
+    "description": "Pro onboarding instant mode step title"
+  },
+  "proOnboardingInstantDescription": {
+    "message": "Ideal para compartilhar rápido com <strong>downloads ilimitados</strong>.<br/><br/>Layouts e opções avançadas de edição não ficam disponíveis neste modo.",
+    "description": "Pro onboarding instant mode step description"
+  },
+  "proOnboardingDone": {
+    "message": "Entendi",
+    "description": "Pro onboarding done button text"
+  },
+  "proOnboardingNext": {
+    "message": "Próximo",
+    "description": "Pro onboarding next button text"
+  },
+  "proOnboardingBack": {
+    "message": "Voltar",
+    "description": "Pro onboarding back button text"
+  },
+  "proOnboardingToolbarLearnMore": {
+    "message": "Saiba mais",
+    "description": "Pro onboarding toolbar learn more link label"
+  },
+  "resetOnboardingOption": {
+    "message": "Redefinir onboarding",
+    "description": "Reset pro onboarding option label in popup settings menu"
   }
 }

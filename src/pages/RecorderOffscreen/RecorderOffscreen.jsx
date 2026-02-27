@@ -463,13 +463,42 @@ const RecorderOffscreen = () => {
   };
 
   const restartRecording = async () => {
+    if (isRestarting.current) return false;
     isRestarting.current = true;
     pausedStateRef.current = false;
-    if (recorder.current !== null) {
-      recorder.current.stop();
+    if (recorder.current !== null && recorder.current.state !== "inactive") {
+      await new Promise((resolve) => {
+        let done = false;
+        const finish = () => {
+          if (done) return;
+          done = true;
+          clearTimeout(timeoutId);
+          resolve();
+        };
+        const timeoutId = setTimeout(finish, 1600);
+        try {
+          recorder.current.addEventListener("stop", finish, { once: true });
+        } catch {}
+        try {
+          recorder.current.stop();
+        } catch {
+          finish();
+        }
+      });
     }
     recorder.current = null;
-    chrome.runtime.sendMessage({ type: "reset-active-tab-restart" });
+    pending.current = [];
+    pendingBytes.current = 0;
+    await chunksStore.clear();
+    await setRecordingTimingState({
+      recording: false,
+      paused: false,
+      recordingStartTime: null,
+      pausedAt: null,
+      totalPausedMs: 0,
+    });
+    isRestarting.current = false;
+    return true;
   };
 
   async function startAudioStream(id) {
@@ -852,7 +881,21 @@ const RecorderOffscreen = () => {
       } else if (request.type === "start-recording-tab") {
         startRecording();
       } else if (request.type === "restart-recording-tab") {
-        restartRecording();
+        Promise.resolve(restartRecording())
+          .then((restarted) => {
+            if (!restarted) {
+              sendResponse?.({ ok: false, error: "restart-teardown-failed" });
+              return;
+            }
+            sendResponse?.({ ok: true, restarted: true });
+          })
+          .catch((error) => {
+            sendResponse?.({
+              ok: false,
+              error: error?.message || String(error),
+            });
+          });
+        return true;
       } else if (request.type === "stop-recording-tab") {
         stopRecording();
       } else if (request.type === "set-mic-active-tab") {

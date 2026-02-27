@@ -524,7 +524,7 @@
     "description": "Trim label"
   },
   "preparingLabel": {
-    "message": "正在準備影片，請稍候...",
+    "message": "正在準備...",
     "description": "Preparing label"
   },
   "cropButtonTitle": {
@@ -1396,5 +1396,57 @@
   "webcodecsFailedOffToast": {
     "message": "快速 MP4 失敗 — 關閉",
     "description": "WebCodecs failure auto-disable toast"
+  },
+  "proOnboardingWelcomeTitle": {
+    "message": "歡迎使用 Screenity Pro 擴充功能",
+    "description": "Pro onboarding welcome step title"
+  },
+  "proOnboardingWelcomeDescription": {
+    "message": "開始錄製前，先看幾個快速提示。<br/>自動縮放只會在 <strong>Chrome 分頁</strong>內點擊時生效。之後仍可手動新增縮放。",
+    "description": "Pro onboarding welcome step description"
+  },
+  "proOnboardingToolbarTitle": {
+    "message": "錄製工具列與效果",
+    "description": "Pro onboarding toolbar step title"
+  },
+  "proOnboardingToolbarDescription": {
+    "message": "可使用此工具列進行繪圖、游標效果、模糊與錄製控制。<br/><br/><strong>若未隱藏，這個工具列會出現在影片中</strong>。",
+    "description": "Pro onboarding toolbar step description"
+  },
+  "proOnboardingCameraTitle": {
+    "message": "攝影機會分開擷取",
+    "description": "Pro onboarding camera step title"
+  },
+  "proOnboardingCameraDescription": {
+    "message": "錄製時攝影機可能會<strong>隱藏或切換到 PiP</strong>，這是正常的。<br/><br/>它會分開擷取，方便你之後調整位置。",
+    "description": "Pro onboarding camera step description"
+  },
+  "proOnboardingInstantTitle": {
+    "message": "即時模式",
+    "description": "Pro onboarding instant mode step title"
+  },
+  "proOnboardingInstantDescription": {
+    "message": "最適合快速分享，並提供<strong>無限制下載</strong>。<br/><br/>此模式不提供進階版面與編輯選項。",
+    "description": "Pro onboarding instant mode step description"
+  },
+  "proOnboardingDone": {
+    "message": "知道了",
+    "description": "Pro onboarding done button text"
+  },
+  "proOnboardingNext": {
+    "message": "下一步",
+    "description": "Pro onboarding next button text"
+  },
+  "proOnboardingBack": {
+    "message": "返回",
+    "description": "Pro onboarding back button text"
+  },
+  "proOnboardingToolbarLearnMore": {
+    "message": "瞭解更多",
+    "description": "Pro onboarding toolbar learn more link label"
+  },
+  "resetOnboardingOption": {
+    "message": "重設導覽",
+    "description": "Reset pro onboarding option label in popup settings menu"
   }
 }

@@ -8,13 +8,19 @@ const CLOUD_FEATURES_ENABLED =
 
 // Utility to handle tab messaging logic
 const handleTabMessaging = async (tab) => {
-  const { activeTab } = await chrome.storage.local.get(["activeTab"]);
+  const { activeTab, recordingUiTabId } = await chrome.storage.local.get([
+    "activeTab",
+    "recordingUiTabId",
+  ]);
+  const preferredTabId = recordingUiTabId || activeTab;
 
   try {
-    const targetTab = await chrome.tabs.get(activeTab);
+    const targetTab = preferredTabId
+      ? await chrome.tabs.get(preferredTabId)
+      : null;
 
     if (targetTab) {
-      sendMessageTab(activeTab, { type: "stop-recording-tab" });
+      sendMessageTab(preferredTabId, { type: "stop-recording-tab" });
     } else {
       sendMessageTab(tab.id, { type: "stop-recording-tab" });
       chrome.storage.local.set({ activeTab: tab.id });
@@ -108,9 +114,19 @@ const openPlaygroundOrPopup = async (tab) => {
 export const onActionButtonClickedListener = () => {
   chrome.action.onClicked.addListener(async (tab) => {
     try {
-      const { recording } = await chrome.storage.local.get(["recording"]);
+      const { recording, pendingRecording, restarting, recorderSession } =
+        await chrome.storage.local.get([
+          "recording",
+          "pendingRecording",
+          "restarting",
+          "recorderSession",
+        ]);
+      const sessionRecording = recorderSession?.status === "recording";
+      const isRecordingActive = Boolean(
+        recording || pendingRecording || restarting || sessionRecording,
+      );
 
-      if (recording) {
+      if (isRecordingActive) {
         await handleTabMessaging(tab);
       } else {
         // Reset storage keys before opening the popup

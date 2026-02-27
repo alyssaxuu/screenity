@@ -7,6 +7,8 @@
 @use "../region/styles/_Region.scss";
 @use "../camera-only/styles/CameraOnly.scss";
 @use "../warning/styles/Warning.scss";
+@use "./_variables" as *;
+@use "sass:color";
 
 html {
   font-size: 16px;
@@ -38,7 +40,6 @@ html {
   border: 4px solid #f4f4f4;
 }
 
-
 .ScreenityDropdownMenuContent {
   min-width: 200px;
   background-color: white;
@@ -48,8 +49,8 @@ html {
   padding-bottom: 12px;
   border-radius: 15px;
   z-index: 99999;
-  font-family: 'Satoshi-Medium', sans-serif;
-  color: #29292F;
+  font-family: "Satoshi-Medium", sans-serif;
+  color: #29292f;
   box-shadow: 0px 10px 38px -10px rgba(22, 23, 24, 0.35),
     0px 10px 20px -15px rgba(22, 23, 24, 0.2);
   animation-duration: 400ms;
@@ -70,10 +71,10 @@ html {
 }
 .ScreenityItemIndicator {
   position: absolute;
-  right: 12px; 
+  right: 12px;
   width: 18px;
   height: 18px;
-  background: #3080F8;
+  background: #3080f8;
   border-radius: 50%;
   display: inline-flex;
   align-items: center;
@@ -94,11 +95,165 @@ html {
   outline: none;
 }
 .ScreenityDropdownMenuItem:hover {
-    background-color: #F6F7FB !important;
-    cursor: pointer;
+  background-color: #f6f7fb !important;
+  cursor: pointer;
 }
 .ScreenityDropdownMenuItem[data-disabled] {
-  color: #6E7684 !important;
+  color: #6e7684 !important;
   cursor: not-allowed;
-  background-color: #F6F7FB !important;
+  background-color: #f6f7fb !important;
+}
+
+// Onboarding (driver.js)
+.driver-popover.ScreenityOnboardingPopover,
+.ScreenityOnboardingPopover,
+.onboarding-popover {
+  border-radius: $container-border-radius !important;
+  background: $color-background !important;
+  color: $color-text-primary !important;
+  font-family: $font-regular !important;
+  box-shadow: $container-soft-shadow !important;
+  padding: 20px !important;
+  max-width: 340px !important;
+  font-size: $font-size-normal !important;
+  z-index: $z-index-max !important;
+
+  .driver-popover-title {
+    font-size: 1rem !important;
+    font-family: $font-medium !important;
+    margin-bottom: 12px !important;
+    color: $color-text-primary !important;
+  }
+
+  .driver-popover-description {
+    font-size: $font-size-normal !important;
+    font-family: $font-medium !important;
+    color: $color-text-secondary !important;
+    line-height: 1.5 !important;
+    margin-bottom: 18px !important;
+
+    a {
+      color: #3b82f6 !important;
+      font-family: $font-bold !important;
+      text-decoration: none !important;
+    }
+  }
+
+  .driver-popover-close-btn {
+    top: 14px;
+    right: 12px;
+    color: $color-text-secondary !important;
+    font-size: 1.5rem !important;
+  }
+
+  .driver-popover-arrow {
+    width: 0px;
+    height: 0px;
+    // border: 4px solid #fff;
+    background: none !important;
+    box-shadow: none !important;
+    box-sizing: border-box;
+  }
+
+  .driver-popover-arrow-side-top {
+    border-left: 8px solid transparent !important;
+    border-right: 8px solid transparent !important;
+    border-top: 8px solid $color-background !important;
+  }
+
+  .driver-popover-arrow-side-bottom {
+    border-left: 8px solid transparent !important;
+    border-right: 8px solid transparent !important;
+    border-bottom: 8px solid $color-background !important;
+  }
+
+  .driver-popover-arrow-side-left {
+    border-top: 8px solid transparent !important;
+    border-bottom: 8px solid transparent !important;
+    border-left: 8px solid $color-background !important;
+  }
+
+  .driver-popover-arrow-side-right {
+    border-top: 8px solid transparent !important;
+    border-bottom: 8px solid transparent !important;
+    border-right: 8px solid $color-background !important;
+  }
+  .driver-popover-arrow-align-start {
+    top: 35px !important;
+  }
+  .driver-popover-arrow-align-end {
+    bottom: 35px !important;
+  }
+  .driver-popover-arrow-align-left {
+    left: 35px !important;
+  }
+  .driver-popover-arrow-align-right {
+    right: 35px !important;
+  }
+  .driver-popover-progress-text {
+    font-size: $font-size-detail !important;
+    font-family: $font-medium !important;
+    color: $color-text-secondary !important;
+    opacity: 0.7 !important;
+    margin-top: 2px !important;
+  }
+  .driver-popover-footer {
+    display: flex !important;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 16px;
+
+    .driver-popover-navigation-btns {
+      gap: 6px !important;
+
+      .driver-popover-next-btn,
+      .driver-popover-prev-btn,
+      .driver-popover-close-btn {
+        background-color: $color-primary !important;
+        color: white !important;
+        border: none !important;
+        padding: 10px 14px !important;
+        border-radius: 30px !important;
+        font-family: $font-medium !important;
+        font-weight: 500 !important;
+        cursor: pointer !important;
+        font-size: 0.875rem !important;
+        text-shadow: none !important;
+      }
+      .driver-popover-next-btn {
+        &:hover {
+          background: color.adjust($color-primary, $lightness: -5%) !important;
+        }
+      }
+
+      .driver-popover-prev-btn {
+        background-color: transparent !important;
+        color: $color-text-primary !important;
+        border: 1px solid $color-border !important;
+
+        &:hover {
+          background: $color-light-grey !important;
+        }
+      }
+
+      .driver-popover-close-btn {
+        background-color: transparent !important;
+        color: $color-text-secondary !important;
+      }
+    }
+  }
+}
+
+// Keep driver overlay/stage above extension UI layers during onboarding.
+.driver-overlay {
+  z-index: 2147483645 !important;
+}
+
+.driver-stage {
+  z-index: 2147483646 !important;
+}
+
+.driver-popover,
+.driver-popover.ScreenityOnboardingPopover {
+  z-index: 2147483647 !important;
 }

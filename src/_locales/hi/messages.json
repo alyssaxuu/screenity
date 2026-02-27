@@ -95,7 +95,6 @@
     "message": "अधिक विकल्प दिखाएं",
     "description": "अधिक विकल्प लेबल"
   },
-
   "systemAudioLabel": {
     "message": "सिस्टम ऑडियो शामिल करें",
     "description": "टैब/सिस्टम ऑडियो लेबल"
@@ -525,7 +524,7 @@
     "description": "ट्रिम लेबल"
   },
   "preparingLabel": {
-    "message": "वीडियो की तैयारी हो रही है, कृपया प्रतीक्षा करें...",
+    "message": "तैयारी हो रही है...",
     "description": "तैयारी लेबल"
   },
   "cropButtonTitle": {
@@ -900,12 +899,10 @@
     "message": "लंबे वीडियो को प्रोसेस करने के बारे में और जानें।",
     "description": "5 मिनट सीमा मॉडल की अधिक जानकारी वाला लिंक"
   },
-
   "recoveryModeTitle": {
     "message": "पुनर्प्राप्ति मोड",
     "description": "पुनर्प्राप्ति मोड का शीर्षक"
   },
-
   "downloadForTroubleshootingOption": {
     "message": "समस्या समाधान के लिए डेटा डाउनलोड करें",
     "description": "समस्या समाधान के लिए डाउनलोड करने का विकल्प"
@@ -1012,7 +1009,6 @@
     "message": "कंप्यूटर ऑडियो को रिकॉर्ड करना चाहते हैं तो 'सिस्टम ऑडियो साझा करें' विकल्प को टॉगल करने की सुनिश्चित करें। इस विकल्प को दिखाई नहीं देता है, तो कृपया Chrome को अपडेट करने का प्रयास करें, या टैब रिकॉर्डिंग पर स्विच करें।",
     "description": "अन्य ऑडियो चेतावना विवरण"
   },
-
   "maxResolutionLabel": {
     "message": "अधिकतम रिज़ॉल्यूशन",
     "description": "सेटिंग्स मेनू में अधिकतम रिज़ॉल्यूशन का लेबल"
@@ -1021,7 +1017,6 @@
     "message": "अधिकतम FPS",
     "description": "सेटिंग्स मेनू में अधिकतम FPS का लेबल"
   },
-
   "notEnoughRAM": {
     "message": "पर्याप्त रैम नहीं",
     "description": "सेटिंग्स मेनू में 'पर्याप्त रैम नहीं' लेबल"
@@ -1401,5 +1396,57 @@
   "webcodecsFailedOffToast": {
     "message": "Fast MP4 विफल — ऑफ",
     "description": "WebCodecs failure auto-disable toast"
+  },
+  "proOnboardingWelcomeTitle": {
+    "message": "Screenity Pro एक्सटेंशन में आपका स्वागत है",
+    "description": "Pro onboarding welcome step title"
+  },
+  "proOnboardingWelcomeDescription": {
+    "message": "रिकॉर्डिंग शुरू करने से पहले कुछ ज़रूरी टिप्स।<br/>ऑटो-ज़ूम केवल <strong>Chrome टैब्स</strong> के अंदर किए गए क्लिक पर काम करता है। बाद में आप ज़ूम मैन्युअली जोड़ सकते हैं।",
+    "description": "Pro onboarding welcome step description"
+  },
+  "proOnboardingToolbarTitle": {
+    "message": "रिकॉर्डिंग टूलबार और इफेक्ट्स",
+    "description": "Pro onboarding toolbar step title"
+  },
+  "proOnboardingToolbarDescription": {
+    "message": "इस टूलबार से ड्रॉ करें, कर्सर इफेक्ट्स लगाएँ, ब्लर करें और रिकॉर्डिंग कंट्रोल करें।<br/><br/><strong>यह टूलबार वीडियो में दिखेगा</strong> अगर आप इसे छिपाएँगे नहीं।",
+    "description": "Pro onboarding toolbar step description"
+  },
+  "proOnboardingCameraTitle": {
+    "message": "कैमरा अलग से कैप्चर होता है",
+    "description": "Pro onboarding camera step title"
+  },
+  "proOnboardingCameraDescription": {
+    "message": "रिकॉर्डिंग के दौरान आपका कैमरा <strong>छिप सकता है या PiP में जा सकता है</strong>, यह सामान्य है।<br/><br/>इसे अलग से कैप्चर किया जाता है ताकि आप बाद में इसकी पोज़िशन बदल सकें।",
+    "description": "Pro onboarding camera step description"
+  },
+  "proOnboardingInstantTitle": {
+    "message": "इंस्टेंट मोड",
+    "description": "Pro onboarding instant mode step title"
+  },
+  "proOnboardingInstantDescription": {
+    "message": "तेज़ शेयरिंग और <strong>अनलिमिटेड डाउनलोड्स</strong> के लिए सबसे अच्छा।<br/><br/>इस मोड में एडवांस लेआउट और एडिटर विकल्प उपलब्ध नहीं हैं।",
+    "description": "Pro onboarding instant mode step description"
+  },
+  "proOnboardingDone": {
+    "message": "ठीक है",
+    "description": "Pro onboarding done button text"
+  },
+  "proOnboardingNext": {
+    "message": "आगे",
+    "description": "Pro onboarding next button text"
+  },
+  "proOnboardingBack": {
+    "message": "वापस",
+    "description": "Pro onboarding back button text"
+  },
+  "proOnboardingToolbarLearnMore": {
+    "message": "और जानें",
+    "description": "Pro onboarding toolbar learn more link label"
+  },
+  "resetOnboardingOption": {
+    "message": "ऑनबोर्डिंग रीसेट करें",
+    "description": "Reset pro onboarding option label in popup settings menu"
   }
 }

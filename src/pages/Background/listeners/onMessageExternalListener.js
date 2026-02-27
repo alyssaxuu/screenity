@@ -10,12 +10,13 @@ export const onMessageExternalListener = () => {
   chrome.runtime.onMessageExternal.addListener(
     async (message, sender, sendResponse) => {
       if (message.type === "AUTH_SUCCESS" && message.token) {
-        chrome.storage.local.set({
+        await chrome.storage.local.set({
           screenityToken: message.token,
           screenityUser: null,
           proSubscription: null,
           lastAuthCheck: 0,
           wasLoggedIn: true,
+          isLoggedIn: false,
           pushToTalk: false,
           onboarding: false,
           showProSplash: false,
@@ -23,7 +24,16 @@ export const onMessageExternalListener = () => {
 
         const auth = await loginWithWebsite();
 
+        if (!auth?.authenticated) {
+          await chrome.storage.local.set({
+            isLoggedIn: false,
+          });
+          return true;
+        }
+
         await chrome.storage.local.set({
+          isLoggedIn: true,
+          wasLoggedIn: false,
           screenityUser: auth.user,
           isSubscribed: auth.subscribed,
           proSubscription: auth.proSubscription,

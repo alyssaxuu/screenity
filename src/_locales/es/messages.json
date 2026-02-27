@@ -95,7 +95,6 @@
     "message": "Mostrar más opciones",
     "description": "Etiqueta de mostrar más opciones"
   },
-
   "systemAudioLabel": {
     "message": "Incluir audio del sistema",
     "description": "Etiqueta de audio del sistema/tabulador"
@@ -525,7 +524,7 @@
     "description": "Etiqueta de recorte"
   },
   "preparingLabel": {
-    "message": "Preparando el vídeo, por favor espera...",
+    "message": "Preparando...",
     "description": "Etiqueta de preparación"
   },
   "cropButtonTitle": {
@@ -756,7 +755,6 @@
     "message": "Oculta los controles cuando no los uses",
     "description": "Botón para mostrar la barra de herramientas solo al pasar el cursor"
   },
-
   "stopRecording": {
     "message": "Detener grabación",
     "description": "Stop recording button in recording screen"
@@ -1011,7 +1009,6 @@
     "message": "Asegúrate de activar la opción 'Compartir audio del sistema' si deseas grabar audio de la computadora. Si no ves esta opción, intenta actualizar Chrome o cambia a la opción de grabación de pestañas.",
     "description": "Descripción de advertencia de audio para otros sistemas"
   },
-
   "maxResolutionLabel": {
     "message": "Resolución máxima",
     "description": "Etiqueta de resolución máxima en el menú de configuración"
@@ -1020,7 +1017,6 @@
     "message": "FPS máximos",
     "description": "Etiqueta de FPS máximos en el menú de configuración"
   },
-
   "notEnoughRAM": {
     "message": "No hay suficiente RAM",
     "description": "Etiqueta de 'No hay suficiente RAM' en el menú de configuración"
@@ -1400,5 +1396,57 @@
   "webcodecsFailedOffToast": {
     "message": "Fast MP4 falló — off",
     "description": "WebCodecs failure auto-disable toast"
+  },
+  "proOnboardingWelcomeTitle": {
+    "message": "Bienvenido a la extensión Screenity Pro",
+    "description": "Pro onboarding welcome step title"
+  },
+  "proOnboardingWelcomeDescription": {
+    "message": "Unos consejos rápidos antes de grabar.<br/>Los zooms automáticos solo funcionan con clics dentro de <strong>pestañas de Chrome</strong>. Siempre puedes añadir más zooms manualmente después.",
+    "description": "Pro onboarding welcome step description"
+  },
+  "proOnboardingToolbarTitle": {
+    "message": "Barra de grabación y efectos",
+    "description": "Pro onboarding toolbar step title"
+  },
+  "proOnboardingToolbarDescription": {
+    "message": "Usa esta barra para dibujar, aplicar efectos del cursor, desenfocar y controlar la grabación.<br/><br/><strong>Esta barra se verá en el video</strong> si no la ocultas.",
+    "description": "Pro onboarding toolbar step description"
+  },
+  "proOnboardingCameraTitle": {
+    "message": "La cámara se captura por separado",
+    "description": "Pro onboarding camera step title"
+  },
+  "proOnboardingCameraDescription": {
+    "message": "Tu cámara puede <strong>ocultarse o pasar a PiP</strong> durante la grabación; es normal.<br/><br/>Se captura por separado para que puedas colocarla después donde quieras.",
+    "description": "Pro onboarding camera step description"
+  },
+  "proOnboardingInstantTitle": {
+    "message": "Modo instantáneo",
+    "description": "Pro onboarding instant mode step title"
+  },
+  "proOnboardingInstantDescription": {
+    "message": "Ideal para compartir rápido con <strong>descargas ilimitadas</strong>.<br/><br/>En este modo no están disponibles los diseños ni opciones avanzadas de edición.",
+    "description": "Pro onboarding instant mode step description"
+  },
+  "proOnboardingDone": {
+    "message": "Entendido",
+    "description": "Pro onboarding done button text"
+  },
+  "proOnboardingNext": {
+    "message": "Siguiente",
+    "description": "Pro onboarding next button text"
+  },
+  "proOnboardingBack": {
+    "message": "Atrás",
+    "description": "Pro onboarding back button text"
+  },
+  "proOnboardingToolbarLearnMore": {
+    "message": "Más información",
+    "description": "Pro onboarding toolbar learn more link label"
+  },
+  "resetOnboardingOption": {
+    "message": "Reiniciar onboarding",
+    "description": "Reset pro onboarding option label in popup settings menu"
   }
 }

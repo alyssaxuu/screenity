@@ -524,7 +524,7 @@
     "description": "Kırpma etiketi"
   },
   "preparingLabel": {
-    "message": "Video hazırlanıyor, lütfen bekleyin...",
+    "message": "Hazırlanıyor...",
     "description": "Hazırlanıyor etiketi"
   },
   "cropButtonTitle": {
@@ -899,12 +899,10 @@
     "message": "Uzun videoları işleme hakkında daha fazla bilgi edinin.",
     "description": "5 dakika sınırlı modal daha fazla bilgi öğrenme bağlantısı"
   },
-
   "recoveryModeTitle": {
     "message": "Kurtarma Modu",
     "description": "Kurtarma Modu Başlığı"
   },
-
   "downloadForTroubleshootingOption": {
     "message": "Sorunları Gidermek için Verileri İndir",
     "description": "Sorunları Giderme Seçeneği"
@@ -1011,7 +1009,6 @@
     "message": "Bilgisayar sesini kaydetmek istiyorsanız, 'Sistem Sesini Paylaş' seçeneğinin etkin olduğundan emin olun. Bu seçeneği görmüyorsanız, Chrome'u güncellemeyi deneyin veya sekme kaydı seçeneğine geçin.",
     "description": "Diğer Sistemler İçin Ses Uyarı Açıklaması"
   },
-
   "maxResolutionLabel": {
     "message": "Maksimum çözünürlük",
     "description": "Ayarlar menüsündeki maksimum çözünürlük etiketi"
@@ -1020,7 +1017,6 @@
     "message": "Maksimum FPS",
     "description": "Ayarlar menüsündeki maksimum FPS etiketi"
   },
-
   "notEnoughRAM": {
     "message": "Yetersiz RAM",
     "description": "Ayarlar menüsünde yetersiz RAM etiketi"
@@ -1400,5 +1396,57 @@
   "webcodecsFailedOffToast": {
     "message": "Fast MP4 hata — kapalı",
     "description": "WebCodecs failure auto-disable toast"
+  },
+  "proOnboardingWelcomeTitle": {
+    "message": "Screenity Pro uzantısına hoş geldin",
+    "description": "Pro onboarding welcome step title"
+  },
+  "proOnboardingWelcomeDescription": {
+    "message": "Kayda başlamadan önce birkaç hızlı ipucu.<br/>Otomatik yakınlaştırma yalnızca <strong>Chrome sekmeleri</strong> içindeki tıklamalarda çalışır. Daha sonra manuel olarak yakınlaştırma ekleyebilirsin.",
+    "description": "Pro onboarding welcome step description"
+  },
+  "proOnboardingToolbarTitle": {
+    "message": "Kayıt araç çubuğu ve efektler",
+    "description": "Pro onboarding toolbar step title"
+  },
+  "proOnboardingToolbarDescription": {
+    "message": "Bu çubuğu çizim, imleç efektleri, bulanıklaştırma ve kayıt kontrolleri için kullan.<br/><br/><strong>Bu çubuk, gizlemezsen videoda görünür</strong>.",
+    "description": "Pro onboarding toolbar step description"
+  },
+  "proOnboardingCameraTitle": {
+    "message": "Kamera ayrı kaydedilir",
+    "description": "Pro onboarding camera step title"
+  },
+  "proOnboardingCameraDescription": {
+    "message": "Kayıt sırasında kamera <strong>gizlenebilir veya PiP'e geçebilir</strong>, bu normaldir.<br/><br/>Daha sonra istediğin gibi konumlandırabilmen için ayrı kaydedilir.",
+    "description": "Pro onboarding camera step description"
+  },
+  "proOnboardingInstantTitle": {
+    "message": "Anlık mod",
+    "description": "Pro onboarding instant mode step title"
+  },
+  "proOnboardingInstantDescription": {
+    "message": "Hızlı paylaşım ve <strong>sınırsız indirme</strong> için en iyi seçenek.<br/><br/>Bu modda gelişmiş düzen ve düzenleyici seçenekleri kullanılamaz.",
+    "description": "Pro onboarding instant mode step description"
+  },
+  "proOnboardingDone": {
+    "message": "Anladım",
+    "description": "Pro onboarding done button text"
+  },
+  "proOnboardingNext": {
+    "message": "İleri",
+    "description": "Pro onboarding next button text"
+  },
+  "proOnboardingBack": {
+    "message": "Geri",
+    "description": "Pro onboarding back button text"
+  },
+  "proOnboardingToolbarLearnMore": {
+    "message": "Daha fazla bilgi",
+    "description": "Pro onboarding toolbar learn more link label"
+  },
+  "resetOnboardingOption": {
+    "message": "Onboarding'i sıfırla",
+    "description": "Reset pro onboarding option label in popup settings menu"
   }
 }

@@ -524,7 +524,7 @@
     "description": "Trim label"
   },
   "preparingLabel": {
-    "message": "Preparing video, please wait...",
+    "message": "Preparing...",
     "description": "Preparing label"
   },
   "cropButtonTitle": {
@@ -1396,5 +1396,57 @@
   "webcodecsFailedOffToast": {
     "message": "Fast MP4 failed — off",
     "description": "WebCodecs failure auto-disable toast"
+  },
+  "proOnboardingWelcomeTitle": {
+    "message": "Welcome to the Screenity Pro extension",
+    "description": "Pro onboarding welcome step title"
+  },
+  "proOnboardingWelcomeDescription": {
+    "message": "A few quick tips before you record.<br/>Auto-zooms only work for clicks inside <strong>Chrome tabs</strong>. You can still add zooms manually later.",
+    "description": "Pro onboarding welcome step description"
+  },
+  "proOnboardingToolbarTitle": {
+    "message": "Recording toolbar & effects",
+    "description": "Pro onboarding toolbar step title"
+  },
+  "proOnboardingToolbarDescription": {
+    "message": "Use this toolbar for drawing, cursor effects, blur, and recording controls.<br/><br/><strong>This toolbar is included in the video</strong> unless you hide it.",
+    "description": "Pro onboarding toolbar step description"
+  },
+  "proOnboardingCameraTitle": {
+    "message": "Camera is captured separately",
+    "description": "Pro onboarding camera step title"
+  },
+  "proOnboardingCameraDescription": {
+    "message": "Your camera may <strong>hide or move to PiP</strong> while recording, that's normal.<br/><br/>It's captured separately so you can position it later.",
+    "description": "Pro onboarding camera step description"
+  },
+  "proOnboardingInstantTitle": {
+    "message": "Instant mode",
+    "description": "Pro onboarding instant mode step title"
+  },
+  "proOnboardingInstantDescription": {
+    "message": "Best for quick sharing with <strong>unlimited downloads</strong>.<br/><br/>Advanced layouts/editor options aren't available in this mode.",
+    "description": "Pro onboarding instant mode step description"
+  },
+  "proOnboardingDone": {
+    "message": "Got it",
+    "description": "Pro onboarding done button text"
+  },
+  "proOnboardingNext": {
+    "message": "Next",
+    "description": "Pro onboarding next button text"
+  },
+  "proOnboardingBack": {
+    "message": "Back",
+    "description": "Pro onboarding back button text"
+  },
+  "proOnboardingToolbarLearnMore": {
+    "message": "Learn more",
+    "description": "Pro onboarding toolbar learn more link label"
+  },
+  "resetOnboardingOption": {
+    "message": "Reset onboarding",
+    "description": "Reset pro onboarding option label in popup settings menu"
   }
 }
