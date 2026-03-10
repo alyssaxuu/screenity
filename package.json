@@ -1,6 +1,6 @@
 {
   "name": "screenity",
-  "version": "4.0.0",
+  "version": "4.3.0",
   "description": "The free and privacy-friendly screen recorder with no sign in needed.",
   "scripts": {
     "build": "cross-env NODE_ENV=production node utils/build.js",
@@ -72,7 +72,6 @@
     "@types/react": "^18.3.21",
     "@types/react-dom": "^18.3.7",
     "babel-loader": "^9.1.3",
-    "clean-webpack-plugin": "^4.0.0",
     "copy-webpack-plugin": "^7.0.0",
     "cross-env": "^7.0.3",
     "css-loader": "^6.7.2",

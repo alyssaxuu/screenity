@@ -9,7 +9,7 @@ import TooltipWrap from "../components/TooltipWrap";
 
 import { CheckWhiteIcon, DropdownGroup } from "../../images/popup/images";
 
-import JSZip from "jszip";
+import { buildDiagnosticZip } from "../../../utils/buildDiagnosticZip";
 
 // Context
 import { contentStateContext } from "../../context/ContentState";
@@ -27,6 +27,7 @@ const CLOUD_FEATURES_ENABLED =
 const SettingsMenu = (props) => {
   const [contentState, setContentState] = useContext(contentStateContext);
   const [restore, setRestore] = useState(false);
+  const [cloudRestore, setCloudRestore] = useState(false);
   const [oldChrome, setOldChrome] = useState(false);
   const [openQuality, setOpenQuality] = useState(false);
   const [openResize, setOpenResize] = useState(false);
@@ -61,82 +62,49 @@ const SettingsMenu = (props) => {
         chrome.i18n.getMessage("troubleshootModalDescription"),
         chrome.i18n.getMessage("troubleshootModalButton"),
         chrome.i18n.getMessage("sandboxEditorCancelButton"),
-        () => {
-          const userAgent = navigator.userAgent;
-          let platformInfo = {};
-          chrome.runtime
-            .sendMessage({ type: "get-platform-info" })
-            .then((response) => {
-              platformInfo = response;
-              const manifestInfo = chrome.runtime.getManifest().version;
-              chrome.storage.local.get(
-                [
-                  "fastRecorderBeta",
-                  "fastRecorderDecision",
-                  "fastRecorderDisabledForDevice",
-                  "fastRecorderDisabledReason",
-                  "fastRecorderDisabledDetails",
-                  "fastRecorderDisabledAt",
-                  "fastRecorderProbe",
-                  "fastRecorderValidation",
-                  "fastRecorderValidationFailed",
-                  "fastRecorderInUse",
-                ],
-                (fastRecorderData) => {
-                  const data = {
-                    userAgent: userAgent,
-                    platformInfo: platformInfo,
-                    manifestInfo: manifestInfo,
-                    defaultAudioInput: contentState.defaultAudioInput,
-                    defaultAudioOutput: contentState.defaultAudioOutput,
-                    defaultVideoInput: contentState.defaultVideoInput,
-                    quality: contentState.quality,
-                    systemAudio: contentState.systemAudio,
-                    audioInput: contentState.audioInput,
-                    audioOutput: contentState.audioOutput,
-                    backgroundEffectsActive: contentState.backgroundEffectsActive,
-                    recording: contentState.recording,
-                    recordingType: contentState.recordingType,
-                    askForPermissions: contentState.askForPermissions,
-                    cameraPermission: contentState.cameraPermission,
-                    microphonePermission: contentState.microphonePermission,
-                    askMicrophone: contentState.askMicrophone,
-                    cursorMode: contentState.cursorMode,
-                    zoomEnabled: contentState.zoomEnabled,
-                    offscreenRecording: contentState.offscreenRecording,
-                    updateChrome: contentState.updateChrome,
-                    permissionsChecked: contentState.permissionsChecked,
-                    permissionsLoaded: contentState.permissionsLoaded,
-                    hideUI: contentState.hideUI,
-                    alarm: contentState.alarm,
-                    alarmTime: contentState.alarmTime,
-                    surface: contentState.surface,
-                    blurMode: contentState.blurMode,
-                    fastRecorder: fastRecorderData,
-                    //contentState: contentStateData,
-                  };
-                  // Create a zip file with the original recording and the data
-                  const zip = new JSZip();
-                  zip.file("troubleshooting.json", JSON.stringify(data));
-                  zip.generateAsync({ type: "blob" }).then(function (blob) {
-                    const url = window.URL.createObjectURL(blob);
-
-                    // Download file
-                    const a = document.createElement("a");
-                    a.href = url;
-                    a.download = "screenity-troubleshooting.zip";
-                    a.click();
-                    window.URL.revokeObjectURL(url);
-
-                    chrome.runtime.sendMessage({
-                      type: "indexed-db-download",
-                    });
-                  });
-                }
-              );
+        async () => {
+          try {
+            const { blob, filename } = await buildDiagnosticZip({
+              source: "popup-settings",
+              extraConfig: {
+                defaultAudioInput: contentState.defaultAudioInput,
+                defaultAudioOutput: contentState.defaultAudioOutput,
+                defaultVideoInput: contentState.defaultVideoInput,
+                quality: contentState.quality,
+                systemAudio: contentState.systemAudio,
+                audioInput: contentState.audioInput,
+                audioOutput: contentState.audioOutput,
+                backgroundEffectsActive: contentState.backgroundEffectsActive,
+                recording: contentState.recording,
+                recordingType: contentState.recordingType,
+                askForPermissions: contentState.askForPermissions,
+                cameraPermission: contentState.cameraPermission,
+                microphonePermission: contentState.microphonePermission,
+                askMicrophone: contentState.askMicrophone,
+                cursorMode: contentState.cursorMode,
+                zoomEnabled: contentState.zoomEnabled,
+                offscreenRecording: contentState.offscreenRecording,
+                updateChrome: contentState.updateChrome,
+                permissionsChecked: contentState.permissionsChecked,
+                permissionsLoaded: contentState.permissionsLoaded,
+                hideUI: contentState.hideUI,
+                alarm: contentState.alarm,
+                alarmTime: contentState.alarmTime,
+                surface: contentState.surface,
+                blurMode: contentState.blurMode,
+              },
             });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = filename;
+            a.click();
+            window.URL.revokeObjectURL(url);
+          } catch (err) {
+            console.error("[Screenity] Troubleshooting export failed:", err);
+          }
         },
-        () => {}
+        () => {},
       );
     }
   };
@@ -313,6 +281,15 @@ const SettingsMenu = (props) => {
           .then((response) => {
             setRestore(response.restore);
           });
+
+        if (CLOUD_FEATURES_ENABLED && contentState.isSubscribed) {
+          chrome.runtime
+            .sendMessage({ type: "check-cloud-restore" })
+            .then((response) => {
+              setCloudRestore(response?.cloudRestore ?? false);
+            })
+            .catch(() => setCloudRestore(false));
+        }
 
         chrome.storage.local.get(["fastRecorderStatus"], (result) => {
           const status = result.fastRecorderStatus || null;
@@ -880,6 +857,20 @@ const SettingsMenu = (props) => {
                 >
                   {chrome.i18n.getMessage("resetOnboardingOption") ||
                     "Reset onboarding"}
+                </DropdownMenu.Item>
+              )}
+              {contentState.isLoggedIn && contentState.isSubscribed && (
+                <DropdownMenu.Item
+                  className="DropdownMenuItem"
+                  onSelect={(e) => {
+                    e.preventDefault();
+                    chrome.runtime.sendMessage({
+                      type: "restore-cloud-recording",
+                    });
+                  }}
+                  disabled={!cloudRestore}
+                >
+                  {chrome.i18n.getMessage("recoverLastRecordingOption")}
                 </DropdownMenu.Item>
               )}
             </>

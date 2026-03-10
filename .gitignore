@@ -13,3 +13,4 @@ node_modules/
 .env.*.local
 build/
 docs/
+tools/

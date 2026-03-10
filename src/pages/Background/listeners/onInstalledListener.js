@@ -1,5 +1,6 @@
 import { removeTab } from "../tabManagement";
 import { executeScripts } from "../utils/executeScripts";
+import { supportContextQuery } from "../../utils/buildSupportContext";
 
 const cloudFeaturesEnabled =
   process.env.SCREENITY_ENABLE_CLOUD_FEATURES === "true";
@@ -14,10 +15,12 @@ export const onInstalledListener = () => {
       chrome.storage.local.clear();
 
       // Set uninstall URL based on locale
+      const installQs = await supportContextQuery({ source: "uninstall" });
+      const installUrl = `https://tally.so/r/w8Zro5?${installQs}`;
       chrome.runtime.setUninstallURL(
         locale.includes("en")
-          ? `https://tally.so/r/w8Zro5?version=${version}`
-          : `http://translate.google.com/translate?js=n&sl=auto&tl=${locale}&u=https://tally.so/r/w8Zro5?version=${version}`
+          ? installUrl
+          : `http://translate.google.com/translate?js=n&sl=auto&tl=${locale}&u=${encodeURIComponent(installUrl)}`
       );
 
       chrome.storage.local.set({
@@ -50,10 +53,12 @@ export const onInstalledListener = () => {
         }
       }
 
+      const updateQs = await supportContextQuery({ source: "uninstall" });
+      const updateUrl = `https://tally.so/r/3Ex6kX?${updateQs}`;
       chrome.runtime.setUninstallURL(
         locale.includes("en")
-          ? `https://tally.so/r/3Ex6kX?version=${version}`
-          : `http://translate.google.com/translate?js=n&sl=auto&tl=${locale}&u=https://tally.so/r/3Ex6kX?version=${version}`
+          ? updateUrl
+          : `http://translate.google.com/translate?js=n&sl=auto&tl=${locale}&u=${encodeURIComponent(updateUrl)}`
       );
     }
 

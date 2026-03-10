@@ -1,7 +1,7 @@
 import React, { useContext, useEffect, useState, useRef } from "react";
 import styles from "../../styles/player/_RightPanel.module.scss";
 
-import JSZip from "jszip";
+import { buildDiagnosticZip } from "../../../utils/buildDiagnosticZip";
 
 import { ReactSVG } from "react-svg";
 
@@ -214,41 +214,39 @@ const RightPanel = () => {
         chrome.i18n.getMessage("troubleshootModalDescription"),
         chrome.i18n.getMessage("troubleshootModalButton"),
         chrome.i18n.getMessage("sandboxEditorCancelButton"),
-        () => {
-          // Need to create a file with the original data, any console logs, and system info
-          const userAgent = navigator.userAgent;
-          let platformInfo = {};
-          chrome.runtime.getPlatformInfo(function (info) {
-            platformInfo = info;
-            const manifestInfo = chrome.runtime.getManifest().version;
-            const blob = contentStateRef.current.rawBlob;
-
-            // Now we need to create a file with all of this data
-            const data = {
-              userAgent: userAgent,
-              platformInfo: platformInfo,
-              manifestInfo: manifestInfo,
-              contentState: contentStateRef.current,
-            };
-            // Create a zip file with the original recording and the data
-            const zip = new JSZip();
-            zip.file("recording.webm", blob);
-            zip.file("troubleshooting.json", JSON.stringify(data));
-            zip.generateAsync({ type: "blob" }).then(function (blob) {
-              const url = window.URL.createObjectURL(blob);
-              chrome.downloads.download(
-                {
-                  url: url,
-                  filename: "troubleshooting.zip",
-                },
-                () => {
-                  window.URL.revokeObjectURL(url);
-                }
-              );
+        async () => {
+          try {
+            const cs = contentStateRef.current;
+            const { blob, filename } = await buildDiagnosticZip({
+              source: "sandbox-editor",
+              extraConfig: {
+                editorMode: cs.mode || null,
+                duration: cs.duration || null,
+                width: cs.width || null,
+                height: cs.height || null,
+                hasBlobReady: Boolean(cs.blob || cs.rawBlob),
+                mp4ready: Boolean(cs.mp4ready),
+                ffmpegLoaded: Boolean(cs.ffmpegLoaded),
+                fallback: Boolean(cs.fallback),
+                offline: Boolean(cs.offline),
+                noffmpeg: Boolean(cs.noffmpeg),
+                updateChrome: Boolean(cs.updateChrome),
+                hasBeenEdited: Boolean(cs.hasBeenEdited),
+                editLimit: cs.editLimit || null,
+              },
             });
-          });
+            const url = window.URL.createObjectURL(blob);
+            chrome.downloads.download(
+              { url, filename },
+              () => {
+                window.URL.revokeObjectURL(url);
+              },
+            );
+          } catch (err) {
+            console.error("[Screenity] Troubleshooting export failed:", err);
+          }
         },
-        () => {}
+        () => {},
       );
     }
   };

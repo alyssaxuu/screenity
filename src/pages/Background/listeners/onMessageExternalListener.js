@@ -1,4 +1,10 @@
-import { getCurrentTab, sendMessageTab, removeTab } from "../tabManagement";
+import {
+  getCurrentTab,
+  sendMessageTab,
+  parseEditorTargetUrl,
+  setEditorTabReference,
+  clearEditorTabReference,
+} from "../tabManagement";
 import { loginWithWebsite } from "../auth/loginWithWebsite";
 
 const CLOUD_FEATURES_ENABLED =
@@ -90,8 +96,23 @@ export const onMessageExternalListener = () => {
             instantMode: false,
             projectId: message.projectId,
             activeSceneId: message.activeSceneId,
-            editorTab: tab.id, // Set editorTab in storage
           });
+
+          const parsedTarget = parseEditorTargetUrl(tab.url);
+          if (parsedTarget?.projectId === message.projectId) {
+            await setEditorTabReference({
+              tabId: tab.id,
+              tabUrl: tab.url,
+              source: "webapp-open-popup-project",
+              expectedProjectId: message.projectId,
+            });
+          } else {
+            await clearEditorTabReference("webapp-open-popup-project-not-editor", {
+              tabId: tab.id,
+              tabUrl: tab.url,
+              expectedProjectId: message.projectId,
+            });
+          }
 
           const result = await loginWithWebsite();
 

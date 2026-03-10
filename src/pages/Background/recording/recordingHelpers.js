@@ -9,6 +9,7 @@ import { stopRecording } from "./stopRecording";
 import { addAlarmListener } from "../alarms/addAlarmListener";
 import { getStreamingData } from "./getStreamingData";
 import { discardOffscreenDocuments } from "../offscreen/discardOffscreenDocuments";
+import { diagEvent, endDiagSession } from "../../utils/diagnosticLog";
 export const checkCapturePermissions = async ({ isLoggedIn, isSubscribed }) => {
   const permissions = ["desktopCapture", "alarms", "offscreen"];
 
@@ -102,15 +103,23 @@ export const handleRecordingError = async (request) => {
     pendingRecording: false,
   });
 
+  const isWarningOnly = request.error === "stream-ended";
+  diagEvent(isWarningOnly ? "warning" : "error", {
+    error: request?.error || null,
+    why: request?.why || null,
+  });
+
   // For stream-ended, we just notify the user but DON'T stop the recording
   // The user can decide whether to continue or stop
-  if (request.error === "stream-ended") {
+  if (isWarningOnly) {
     sendMessageTab(activeTab, {
       type: "stream-ended-warning",
       message: request.why || "Screen sharing stopped unexpectedly.",
     }).catch(() => {});
     return; // Don't continue with the normal error handling
   }
+
+  endDiagSession("error");
 
   await chrome.storage.local.set({
     recording: false,

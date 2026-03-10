@@ -1,5 +1,6 @@
 import { sendMessageRecord } from "./sendMessageRecord";
 import { resetActiveTabRestart } from "../tabManagement/resetActiveTab";
+import { diagEvent } from "../../utils/diagnosticLog";
 
 const RESTART_ACK_TIMEOUT_MS = 7000;
 
@@ -33,6 +34,7 @@ export const handleRestart = async (message = {}, sender = null) => {
       : {}),
   });
   await persistRestartFlow("requested", { sourceTabId });
+  diagEvent("restart-requested");
 
   try {
     const response = await withTimeout(
@@ -53,11 +55,13 @@ export const handleRestart = async (message = {}, sender = null) => {
     });
     await resetActiveTabRestart({ sourceTabId });
     await persistRestartFlow("countdown-dispatched", { sourceTabId });
+    diagEvent("restart-completed");
     return { ok: true, restarted: true };
   } catch (error) {
     const reason = error?.message || String(error);
     await chrome.storage.local.set({ restarting: false });
     await persistRestartFlow("failed", { sourceTabId, reason });
+    diagEvent("restart-failed", { reason });
     return { ok: false, error: reason };
   }
 };

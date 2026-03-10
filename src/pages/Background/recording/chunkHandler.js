@@ -12,7 +12,7 @@ export const chunksStore = localforage.createInstance({ name: "chunks" });
 export const localDirectoryStore = localforage.createInstance({
   name: "localDirectory",
 });
-const DEBUG_POSTSTOP = true;
+const DEBUG_POSTSTOP = false;
 
 export const clearAllRecordings = async () => {
   try {

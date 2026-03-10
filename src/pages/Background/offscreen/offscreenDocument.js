@@ -54,10 +54,16 @@ const openRecorderTab = async (
       chrome.tabs.onUpdated.addListener(function _(tabId, changeInfo) {
         if (tabId === tab.id && changeInfo.status === "complete") {
           chrome.tabs.onUpdated.removeListener(_);
+          // Include tabPreferred in the message so CloudRecorder can use it
+          // synchronously without racing against its own storage read.
+          const isPlayground = activeTab.url.includes(
+            chrome.runtime.getURL("playground.html")
+          );
           sendMessageRecord({
             type: "loaded",
             request: request,
             backup: backup,
+            tabPreferred: isPlayground,
             ...(isRegion
               ? {
                   isTab: true,

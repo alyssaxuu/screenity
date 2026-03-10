@@ -872,11 +872,11 @@
     "description": "Raw recording modal button"
   },
   "troubleshootModalTitle": {
-    "message": "Download system information and video data and send for troubleshooting",
+    "message": "Download diagnostic report for troubleshooting",
     "description": "Troubleshoot modal title"
   },
   "troubleshootModalDescription": {
-    "message": "After downloading, send the file to support@screenity.io with any relevant information. We will use this data to help you troubleshoot any issues you are having with the extension, and recover your video if possible.",
+    "message": "This will download a diagnostic report with system info and recent recording session data. Send it to support@screenity.io to help us troubleshoot your issue. No video or audio data is included.",
     "description": "Troubleshoot modal description"
   },
   "troubleshootModalButton": {
@@ -1448,5 +1448,29 @@
   "resetOnboardingOption": {
     "message": "Reset onboarding",
     "description": "Reset pro onboarding option label in popup settings menu"
+  },
+  "recoverLastRecordingOption": {
+    "message": "Recover last recording",
+    "description": "Settings menu item to manually trigger cloud recording recovery"
+  },
+  "toastRecoveredSession": {
+    "message": "Recovered unsaved recording from the previous session.",
+    "description": "Toast shown when a crashed recording session is auto-recovered on startup"
+  },
+  "toastStorageCritical": {
+    "message": "Low disk space detected. Recording is stopping to avoid corruption.",
+    "description": "Toast shown when available storage drops below the critical threshold during recording"
+  },
+  "toastStorageLow": {
+    "message": "Storage is running low. Upload reliability may degrade for long recordings.",
+    "description": "Toast shown when available storage drops below the warning threshold during recording"
+  },
+  "toastAudioCaptureDegraded": {
+    "message": "Transcription capture paused due to memory pressure. Video upload continues.",
+    "description": "Toast shown when the audio recorder is stopped early because the audio buffer limit was reached"
+  },
+  "toastNetworkOffline": {
+    "message": "Network offline. Upload paused. Screen chunks are saved locally.",
+    "description": "Toast shown when the browser goes offline during a cloud recording upload"
   }
 }

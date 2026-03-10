@@ -25,6 +25,8 @@ import {
   restartActiveTab,
   getCurrentTab,
   sendMessageTab,
+  parseEditorTargetUrl,
+  resolveEditorTabForTarget,
 } from "../tabManagement";
 import {
   handleRestart,
@@ -38,6 +40,15 @@ import {
 } from "../utils/browserHelpers";
 import { requestDownload, downloadIndexedDB } from "../utils/downloadHelpers";
 import { restoreRecording, checkRestore } from "../recording/restoreRecording";
+import {
+  checkCloudRestore,
+  restoreCloudRecording,
+} from "../recording/restoreCloudRecording";
+import {
+  CLOUD_LOCAL_PLAYBACK_KEY,
+  CLOUD_LOCAL_PLAYBACK_EVENT_KEY,
+  CLOUD_LOCAL_PLAYBACK_ALARM,
+} from "../recording/cloudLocalPlaybackConstants";
 import { desktopCapture } from "../recording/desktopCapture";
 import {
   writeFile,
@@ -53,15 +64,165 @@ import { newChunk, clearAllRecordings } from "../recording/chunkHandler";
 import { setMicActiveTab } from "../tabManagement/tabHelpers";
 import { handleSignOutDrive } from "../drive/handleSignOutDrive";
 import { loginWithWebsite } from "../auth/loginWithWebsite";
+import {
+  getDiagnosticLog,
+  getErrorSnapshot,
+  getStorageFlags,
+  diagEvent,
+} from "../../utils/diagnosticLog";
+import { supportContextQuery } from "../../utils/buildSupportContext";
 
 const API_BASE = process.env.SCREENITY_API_BASE_URL;
+const APP_BASE = process.env.SCREENITY_APP_BASE;
 const CLOUD_FEATURES_ENABLED =
   process.env.SCREENITY_ENABLE_CLOUD_FEATURES === "true";
 // Debug toggle for post-stop/chunk flow
 const DEBUG_POSTSTOP = true;
 const STOP_RECORDING_TAB_DEBOUNCE_MS = 1200;
+const CLOUD_LOCAL_PLAYBACK_MAX_BYTES = 250 * 1024 * 1024;
+const CLOUD_LOCAL_PLAYBACK_MAX_CHUNKS = 4000;
+const CLOUD_LOCAL_PLAYBACK_MIN_TTL_MS = 60 * 1000;
+const CLOUD_LOCAL_PLAYBACK_MAX_TTL_MS = 24 * 60 * 60 * 1000;
 let stopRecordingTabInFlight = false;
 let stopRecordingTabLastAt = 0;
+
+const getEditorTargetUrl = ({ projectId, instantMode = false } = {}) => {
+  if (!projectId) return null;
+  if (instantMode) {
+    return `${APP_BASE}/view/${projectId}?load=true`;
+  }
+  return `${APP_BASE}/editor/${projectId}/edit?load=true`;
+};
+
+const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
+
+const normalizeLocalPlaybackOffer = (offer = {}) => {
+  const now = Date.now();
+  const expiresAtRaw = Number(offer.expiresAt) || 0;
+  const ttl =
+    expiresAtRaw > now
+      ? clamp(
+          expiresAtRaw - now,
+          CLOUD_LOCAL_PLAYBACK_MIN_TTL_MS,
+          CLOUD_LOCAL_PLAYBACK_MAX_TTL_MS,
+        )
+      : CLOUD_LOCAL_PLAYBACK_MIN_TTL_MS;
+  const expiresAt = now + ttl;
+  const chunkCount = Math.max(
+    0,
+    Math.min(CLOUD_LOCAL_PLAYBACK_MAX_CHUNKS, Number(offer.chunkCount) || 0),
+  );
+  const estimatedBytes = Math.max(0, Number(offer.estimatedBytes) || 0);
+  const createdAt = Number(offer.createdAt) || now;
+
+  return {
+    offerId: offer.offerId || crypto.randomUUID(),
+    projectId: offer.projectId || null,
+    sceneId: offer.sceneId || null,
+    recordingSessionId: offer.recordingSessionId || null,
+    trackType: "screen",
+    source: offer.source || "indexeddb-screen-chunks",
+    status: offer.status || "available",
+    chunkCount,
+    estimatedBytes,
+    mediaId: offer.mediaId || null,
+    bunnyVideoId: offer.bunnyVideoId || null,
+    createdAt,
+    expiresAt,
+    updatedAt: now,
+  };
+};
+
+const isLocalPlaybackOfferExpired = (offer) =>
+  !offer || Number(offer.expiresAt || 0) <= Date.now();
+
+const scheduleLocalPlaybackAlarm = async (offer) => {
+  if (!offer?.expiresAt || !chrome.alarms?.create) return;
+  try {
+    await chrome.alarms.clear(CLOUD_LOCAL_PLAYBACK_ALARM);
+    await chrome.alarms.create(CLOUD_LOCAL_PLAYBACK_ALARM, {
+      when: Number(offer.expiresAt),
+    });
+  } catch (err) {
+    console.warn("[Screenity][BG] Failed to schedule local playback alarm", err);
+  }
+};
+
+const getStoredLocalPlaybackOffer = async () => {
+  const result = await chrome.storage.local.get([CLOUD_LOCAL_PLAYBACK_KEY]);
+  return result?.[CLOUD_LOCAL_PLAYBACK_KEY] || null;
+};
+
+const clearStoredLocalPlaybackOffer = async ({
+  reason = "unknown",
+  clearChunks = true,
+  onlyIfOfferId = null,
+} = {}) => {
+  const existing = await getStoredLocalPlaybackOffer();
+  if (onlyIfOfferId && existing?.offerId && existing.offerId !== onlyIfOfferId) {
+    return { ok: true, skipped: true, reason: "offer-id-mismatch" };
+  }
+
+  await chrome.storage.local.remove([CLOUD_LOCAL_PLAYBACK_KEY]);
+  if (chrome.alarms?.clear) {
+    await chrome.alarms.clear(CLOUD_LOCAL_PLAYBACK_ALARM).catch(() => {});
+  }
+
+  if (clearChunks) {
+    await chunksStore.clear().catch((err) => {
+      console.warn(
+        "[Screenity][BG] Failed to clear chunksStore while clearing local playback offer",
+        err,
+      );
+    });
+  }
+
+  await chrome.storage.local.set({
+    [CLOUD_LOCAL_PLAYBACK_EVENT_KEY]: {
+      event: "offer-cleared",
+      reason,
+      clearedAt: Date.now(),
+      clearedOfferId: existing?.offerId || null,
+      clearChunks: Boolean(clearChunks),
+    },
+  });
+
+  if (existing?.offerId) {
+    console.info("[Screenity][BG] Cleared local screen playback offer", {
+      reason,
+      offerId: existing.offerId,
+      clearChunks: Boolean(clearChunks),
+    });
+  }
+
+  return { ok: true, clearedOfferId: existing?.offerId || null };
+};
+
+const getValidLocalPlaybackOffer = async ({
+  offerId = null,
+  projectId = null,
+  sceneId = null,
+} = {}) => {
+  const offer = await getStoredLocalPlaybackOffer();
+  if (!offer) return null;
+
+  if (isLocalPlaybackOfferExpired(offer)) {
+    await clearStoredLocalPlaybackOffer({
+      reason: "offer-expired",
+      clearChunks: true,
+      onlyIfOfferId: offer.offerId || null,
+    });
+    return null;
+  }
+
+  if (offerId && offer.offerId !== offerId) return null;
+  if (projectId && offer.projectId !== projectId) return null;
+  if (sceneId && offer.sceneId && offer.sceneId !== sceneId) return null;
+  if (offer.trackType !== "screen") return null;
+  if (!offer.chunkCount || !offer.estimatedBytes) return null;
+
+  return offer;
+};
 
 const ensureAudioOffscreen = async () => {
   if (!chrome.offscreen) return false;
@@ -290,26 +451,43 @@ const handleFinishMultiRecording = async () => {
         }
       });
     } else {
-      // Multi recording on existing project
-      const { editorTab } = await chrome.storage.local.get(["editorTab"]);
-      // check if editor tab is valid, if so focus to it, otherwise use active tab
-      if (editorTab) {
-        focusTab(editorTab);
-        sendMessageTab(editorTab, {
+      // Multi recording on existing project: only reuse editorTab if it still
+      // matches this project and expected editor/view URL.
+      const { projectId, instantMode } = await chrome.storage.local.get([
+        "projectId",
+        "instantMode",
+      ]);
+      const targetUrl = getEditorTargetUrl({
+        projectId,
+        instantMode: Boolean(instantMode),
+      });
+      const expectedKind = instantMode ? "view" : "editor";
+      const resolved = await resolveEditorTabForTarget({
+        targetUrl,
+        expectedProjectId: projectId || null,
+        expectedKind,
+        reason: "finish-multi-recording",
+      });
+      const messageTab = resolved.tabId || (await getCurrentTab())?.id || null;
+
+      if (messageTab) {
+        await focusTab(messageTab, { reason: "finish-multi-recording:notify" });
+        await sendMessageTab(messageTab, {
           type: "update-project-ready",
           share: false,
           newProject: false,
-        });
+          projectId: projectId || null,
+        }).catch((err) =>
+          console.warn(
+            "[Screenity][BG] Failed to send update-project-ready (finish-multi-recording)",
+            err,
+          ),
+        );
       } else {
-        const activeTab = (await getCurrentTab())?.id || null;
-        if (activeTab) {
-          focusTab(activeTab);
-          sendMessageTab(activeTab, {
-            type: "update-project-ready",
-            share: false,
-            newProject: false,
-          });
-        }
+        console.warn(
+          "[Screenity][BG] No tab available for update-project-ready (finish-multi-recording)",
+          { projectId, instantMode: Boolean(instantMode) },
+        );
       }
 
       chrome.storage.local.set({
@@ -320,6 +498,7 @@ const handleFinishMultiRecording = async () => {
         multiMode: false,
         multiProjectId: null,
         editorTab: null,
+        editorTabMeta: null,
       });
 
       const tab = await getCurrentTab();
@@ -554,6 +733,7 @@ export const setupHandlers = () => {
     // runs. During restart, `recording` may still be true briefly from the
     // previous session, so only block when recording is active AND not restarting.
     if (recording && !restarting) {
+      diagEvent("countdown-finished", { skipped: true, reason: "already-recording" });
       const decisionAt = Date.now();
       await chrome.storage.local.set({
         lastCountdownFinishedDecision: {
@@ -570,6 +750,7 @@ export const setupHandlers = () => {
       });
       return { ok: true, skipped: true };
     }
+    diagEvent("countdown-finished", { skipped: false });
     const decisionAt = Date.now();
     await chrome.storage.local.set({
       countdownFinishedAt: message?.endedAt || decisionAt,
@@ -739,13 +920,19 @@ export const setupHandlers = () => {
   registerMessage("dismiss-recording-tab", (message) =>
     handleDismissRecordingTab(message),
   );
-  registerMessage("pause-recording-tab", () =>
-    sendMessageRecord({ type: "pause-recording-tab" }),
-  );
-  registerMessage("resume-recording-tab", () =>
-    sendMessageRecord({ type: "resume-recording-tab" }),
-  );
+  registerMessage("pause-recording-tab", () => {
+    diagEvent("pause");
+    return sendMessageRecord({ type: "pause-recording-tab" });
+  });
+  registerMessage("resume-recording-tab", () => {
+    diagEvent("resume");
+    return sendMessageRecord({ type: "resume-recording-tab" });
+  });
   registerMessage("set-mic-active-tab", (message) => setMicActiveTab(message));
+
+  // Diagnostic events routed from content scripts
+  registerMessage("diag-countdown-started", () => diagEvent("countdown-started"));
+  registerMessage("diag-countdown-cancelled", () => diagEvent("countdown-cancelled"));
   registerMessage("recording-error", async (message) => {
     await handleRecordingError(message);
     await clearRecordingSessionSafe("recording-error", {
@@ -854,14 +1041,13 @@ export const setupHandlers = () => {
   registerMessage("open-home", () =>
     createTab("https://screenity.io/", false, true),
   );
-  registerMessage("report-bug", () =>
-    createTab(
-      "https://tally.so/r/3ElpXq?version=" +
-        chrome.runtime.getManifest().version,
-      false,
-      true,
-    ),
-  );
+  registerMessage("report-bug", async () => {
+    const qs = await supportContextQuery({
+      includeRecordingState: true,
+      source: "settings",
+    });
+    createTab(`https://tally.so/r/3ElpXq?${qs}`, false, true);
+  });
   registerMessage("clear-recordings", () => clearAllRecordings());
   registerMessage("force-processing", (message) => forceProcessing(message));
   registerMessage("focus-this-tab", (message, sender) =>
@@ -874,12 +1060,31 @@ export const setupHandlers = () => {
     downloadIndexedDB(message),
   );
   registerMessage("get-platform-info", async () => await getPlatformInfo());
+  registerMessage(
+    "get-diagnostic-log",
+    async (_message, _sender, sendResponse) => {
+      const log = await getDiagnosticLog();
+      const errors = await getErrorSnapshot();
+      const flags = await getStorageFlags();
+      sendResponse({ log, errors, flags });
+      return true;
+    },
+  );
   registerMessage("restore-recording", (message) => restoreRecording(message));
   registerMessage("check-restore", async (message, sender, sendResponse) => {
     const response = await checkRestore();
     sendResponse(response);
     return true;
   });
+  registerMessage(
+    "check-cloud-restore",
+    async (_message, _sender, sendResponse) => {
+      const response = await checkCloudRestore();
+      sendResponse(response);
+      return true;
+    },
+  );
+  registerMessage("restore-cloud-recording", () => restoreCloudRecording());
   registerMessage(
     "check-capture-permissions",
     async (message, sender, sendResponse) => {
@@ -1201,8 +1406,40 @@ export const setupHandlers = () => {
       console.warn("Cloud features disabled");
       return;
     }
-    const createdTab = await createTab(message.url, true, true);
-    chrome.storage.local.set({ editorTab: createdTab?.id || null });
+    const targetUrl = message.url || null;
+    const parsedTarget = parseEditorTargetUrl(targetUrl);
+    const expectedProjectId = message.projectId || parsedTarget?.projectId || null;
+
+    await chrome.storage.local.set({
+      pendingEditorOpen: {
+        url: targetUrl,
+        publicUrl: message.publicUrl || null,
+        projectId: expectedProjectId,
+        instantMode: Boolean(message.instantMode),
+        ts: Date.now(),
+      },
+    });
+
+    console.info("[Screenity][BG] prepare-open-editor", {
+      projectId: expectedProjectId,
+      targetUrl,
+      instantMode: Boolean(message.instantMode),
+      hasPublicUrl: Boolean(message.publicUrl),
+    });
+
+    const expectedKind = message.instantMode ? "view" : "editor";
+    const resolved = await resolveEditorTabForTarget({
+      targetUrl,
+      expectedProjectId: expectedProjectId,
+      expectedKind,
+      reason: "prepare-open-editor",
+    });
+    console.info("[Screenity][BG] prepare-open-editor resolved", {
+      tabId: resolved.tabId || null,
+      reused: Boolean(resolved.reused),
+      opened: Boolean(resolved.opened),
+      projectId: expectedProjectId,
+    });
   });
   registerMessage("prepare-editor-existing", async (message) => {
     if (!CLOUD_FEATURES_ENABLED) {
@@ -1214,15 +1451,36 @@ export const setupHandlers = () => {
     if (message.multiMode) {
       messageTab = (await getCurrentTab())?.id || null;
     } else {
-      const { editorTab } = await chrome.storage.local.get(["editorTab"]);
-      messageTab = editorTab;
-      focusTab(editorTab);
+      const { projectId, instantMode } = await chrome.storage.local.get([
+        "projectId",
+        "instantMode",
+      ]);
+      const targetUrl = getEditorTargetUrl({
+        projectId,
+        instantMode: Boolean(instantMode),
+      });
+      const resolved = await resolveEditorTabForTarget({
+        targetUrl,
+        expectedProjectId: projectId || null,
+        expectedKind: instantMode ? "view" : "editor",
+        reason: "prepare-editor-existing",
+      });
+      messageTab = resolved.tabId;
     }
 
-    sendMessageTab(messageTab, {
-      type: "update-project-loading",
-      multiMode: message.multiMode,
-    });
+    if (messageTab) {
+      await sendMessageTab(messageTab, {
+        type: "update-project-loading",
+        multiMode: message.multiMode,
+      }).catch((err) =>
+        console.warn(
+          "[Screenity][BG] Failed to send update-project-loading",
+          err,
+        ),
+      );
+    } else {
+      console.warn("❗ No valid messageTab found in prepare-editor-existing");
+    }
   });
   registerMessage("preparing-recording", async () => {
     const tab = await getCurrentTab();
@@ -1239,60 +1497,303 @@ export const setupHandlers = () => {
       console.warn("Cloud features disabled");
       return;
     }
+    const { pendingEditorOpen } = await chrome.storage.local.get([
+      "pendingEditorOpen",
+    ]);
+
     let messageTab = null;
+    const projectId = message.projectId || pendingEditorOpen?.projectId || null;
+    const instantMode = Boolean(
+      message.instantMode ?? pendingEditorOpen?.instantMode,
+    );
+    const targetUrl = getEditorTargetUrl({
+      projectId,
+      instantMode,
+    });
+    const editorUrl = message.editorUrl || pendingEditorOpen?.url || targetUrl;
+    const expectedKind = instantMode ? "view" : "editor";
+    const publicUrl = message.publicUrl || pendingEditorOpen?.publicUrl || null;
     const sceneId = message.sceneId || null;
+    const localPlaybackOffer =
+      (await getValidLocalPlaybackOffer({
+        offerId: message?.localPlayback?.offerId || null,
+        projectId: projectId || null,
+        sceneId: sceneId || null,
+      })) ||
+      null;
+
+    console.info("[Screenity][BG] editor-ready received", {
+      newProject: Boolean(message.newProject),
+      multiMode: Boolean(message.multiMode),
+      projectId,
+      hasSceneId: Boolean(sceneId),
+      editorUrl,
+      hasPendingOpen: Boolean(pendingEditorOpen),
+      localPlaybackAvailable: Boolean(localPlaybackOffer?.offerId),
+      localPlaybackOfferId: localPlaybackOffer?.offerId || null,
+    });
 
     if (message.newProject) {
-      const { editorTab } = await chrome.storage.local.get(["editorTab"]);
-      messageTab = editorTab;
+      const resolved = await resolveEditorTabForTarget({
+        targetUrl: editorUrl,
+        expectedProjectId: projectId,
+        expectedKind,
+        reason: "editor-ready:new-project",
+      });
+      messageTab = resolved.tabId;
 
       chrome.runtime.sendMessage({ type: "turn-off-pip" });
 
-      // FLAG: this should go here right?
-      const res = await fetch(
-        `${API_BASE}/videos/${message.projectId}/auto-publish`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${await chrome.storage.local
-              .get("screenityToken")
-              .then((r) => r.screenityToken)}`,
-          },
-        },
-      );
+      // Copy to clipboard immediately after focusTab, before the auto-publish
+      // network request.  The auto-publish await can take hundreds of ms, during
+      // which the renderer may lose document focus — causing navigator.clipboard
+      // to throw "Document is not focused".  Copying here gives the best chance
+      // the tab is still the topmost focused document.
+      if (publicUrl) {
+        copyToClipboard(publicUrl);
+      }
 
-      if (editorTab) {
-        focusTab(editorTab);
+      if (projectId) {
+        await fetch(
+          `${API_BASE}/videos/${projectId}/auto-publish`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${await chrome.storage.local
+                .get("screenityToken")
+                .then((r) => r.screenityToken)}`,
+            },
+          },
+        ).catch((err) =>
+          console.warn("[Screenity][BG] Failed to auto-publish project", err),
+        );
       }
     } else if (message.multiMode) {
       messageTab = (await getCurrentTab())?.id || null;
     } else {
-      const { editorTab } = await chrome.storage.local.get(["editorTab"]);
-      messageTab = editorTab;
+      const resolved = await resolveEditorTabForTarget({
+        targetUrl: editorUrl,
+        expectedProjectId: projectId,
+        expectedKind,
+        reason: "editor-ready:existing-project",
+      });
+      messageTab = resolved.tabId;
 
       chrome.runtime.sendMessage({ type: "turn-off-pip" });
-
-      if (editorTab) {
-        focusTab(editorTab);
-      }
     }
 
-    // Only copy once if there's a publicUrl
-    if (message.publicUrl) {
-      copyToClipboard(message.publicUrl);
+    // Copy for the non-newProject paths (scene additions are excluded because
+    // publicUrl is null there; multiMode new-project is excluded because it
+    // goes through handleFinishMultiRecording which has its own clipboard call).
+    if (publicUrl && !message.newProject) {
+      copyToClipboard(publicUrl);
     }
 
     if (messageTab) {
-      sendMessageTab(messageTab, {
+      await sendMessageTab(messageTab, {
         type: "update-project-ready",
-        share: Boolean(message.publicUrl),
+        share: Boolean(publicUrl),
         newProject: Boolean(message.newProject),
         sceneId: sceneId,
-      });
+        projectId,
+        localPlayback: localPlaybackOffer
+          ? {
+              available: true,
+              offerId: localPlaybackOffer.offerId,
+              trackType: "screen",
+              chunkCount: localPlaybackOffer.chunkCount,
+              estimatedBytes: localPlaybackOffer.estimatedBytes,
+              expiresAt: localPlaybackOffer.expiresAt,
+              source: localPlaybackOffer.source || "indexeddb-screen-chunks",
+              mediaId: localPlaybackOffer.mediaId || null,
+              bunnyVideoId: localPlaybackOffer.bunnyVideoId || null,
+            }
+          : {
+              available: false,
+              trackType: "screen",
+            },
+      }).catch((err) =>
+        console.warn("[Screenity][BG] Failed to send update-project-ready", err),
+      );
     } else {
       console.warn("❗ No valid messageTab found in editor-ready");
     }
+
+    if (pendingEditorOpen) {
+      await chrome.storage.local.remove(["pendingEditorOpen"]);
+    }
+  });
+  registerMessage("cloud-local-playback-register", async (message) => {
+    const normalizedOffer = normalizeLocalPlaybackOffer(message?.offer || {});
+    if (!normalizedOffer.projectId || !normalizedOffer.sceneId) {
+      return { ok: false, error: "missing-project-or-scene" };
+    }
+    if (!normalizedOffer.chunkCount || !normalizedOffer.estimatedBytes) {
+      return { ok: false, error: "missing-local-screen-bytes" };
+    }
+    if (normalizedOffer.estimatedBytes > CLOUD_LOCAL_PLAYBACK_MAX_BYTES) {
+      return {
+        ok: false,
+        error: "offer-too-large",
+        maxBytes: CLOUD_LOCAL_PLAYBACK_MAX_BYTES,
+      };
+    }
+
+    await chrome.storage.local.set({
+      [CLOUD_LOCAL_PLAYBACK_KEY]: normalizedOffer,
+      [CLOUD_LOCAL_PLAYBACK_EVENT_KEY]: {
+        event: "offer-registered",
+        at: Date.now(),
+        offerId: normalizedOffer.offerId,
+        projectId: normalizedOffer.projectId,
+        sceneId: normalizedOffer.sceneId,
+        chunkCount: normalizedOffer.chunkCount,
+        estimatedBytes: normalizedOffer.estimatedBytes,
+        expiresAt: normalizedOffer.expiresAt,
+      },
+    });
+    await scheduleLocalPlaybackAlarm(normalizedOffer);
+
+    console.info("[Screenity][BG] Registered local screen playback offer", {
+      offerId: normalizedOffer.offerId,
+      projectId: normalizedOffer.projectId,
+      sceneId: normalizedOffer.sceneId,
+      chunkCount: normalizedOffer.chunkCount,
+      estimatedBytes: normalizedOffer.estimatedBytes,
+      expiresAt: normalizedOffer.expiresAt,
+    });
+
+    return { ok: true, offer: normalizedOffer };
+  });
+  registerMessage("cloud-local-playback-clear", async (message) => {
+    const result = await clearStoredLocalPlaybackOffer({
+      reason: message?.reason || "explicit-clear",
+      clearChunks: message?.clearChunks !== false,
+      onlyIfOfferId: message?.offerId || null,
+    });
+    return result;
+  });
+  registerMessage("cloud-local-playback-get-offer", async (message) => {
+    const offer = await getValidLocalPlaybackOffer({
+      offerId: message?.offerId || null,
+      projectId: message?.projectId || null,
+      sceneId: message?.sceneId || null,
+    });
+    if (!offer) {
+      return { ok: false, error: "offer-unavailable" };
+    }
+    return { ok: true, offer };
+  });
+  registerMessage("cloud-local-playback-read-chunk", async (message) => {
+    const offer = await getValidLocalPlaybackOffer({
+      offerId: message?.offerId || null,
+      projectId: message?.projectId || null,
+      sceneId: message?.sceneId || null,
+    });
+    if (!offer) {
+      return { ok: false, error: "offer-unavailable" };
+    }
+
+    const index = Number(message?.index);
+    if (!Number.isInteger(index) || index < 0 || index >= offer.chunkCount) {
+      return { ok: false, error: "chunk-index-out-of-range", index };
+    }
+
+    const item = await chunksStore.getItem(`chunk_${index}`).catch(() => null);
+    if (!item?.chunk) {
+      return { ok: false, error: "chunk-missing", index };
+    }
+
+    const blob =
+      item.chunk instanceof Blob
+        ? item.chunk
+        : new Blob([item.chunk], { type: "video/webm" });
+    const arrayBuffer = await blob.arrayBuffer();
+    const base64 = btoa(
+      new Uint8Array(arrayBuffer).reduce(
+        (data, byte) => data + String.fromCharCode(byte),
+        "",
+      ),
+    );
+
+    return {
+      ok: true,
+      chunk: {
+        index,
+        size: blob.size,
+        mimeType: blob.type || "video/webm",
+        base64,
+      },
+      offer: {
+        offerId: offer.offerId,
+        expiresAt: offer.expiresAt,
+      },
+    };
+  });
+  registerMessage("cloud-local-playback-mark-used", async (message) => {
+    const offer = await getValidLocalPlaybackOffer({
+      offerId: message?.offerId || null,
+      projectId: message?.projectId || null,
+      sceneId: message?.sceneId || null,
+    });
+    if (!offer) {
+      return { ok: false, error: "offer-unavailable" };
+    }
+    const updated = {
+      ...offer,
+      status: "used",
+      usedAt: Date.now(),
+      usedBy: message?.usedBy || "editor",
+      updatedAt: Date.now(),
+    };
+    await chrome.storage.local.set({
+      [CLOUD_LOCAL_PLAYBACK_KEY]: updated,
+      [CLOUD_LOCAL_PLAYBACK_EVENT_KEY]: {
+        event: "offer-used",
+        at: Date.now(),
+        offerId: updated.offerId,
+        projectId: updated.projectId,
+        sceneId: updated.sceneId,
+      },
+    });
+    console.info("[Screenity][BG] Local screen playback offer marked used", {
+      offerId: updated.offerId,
+      projectId: updated.projectId,
+      sceneId: updated.sceneId,
+    });
+    return { ok: true, offer: updated };
+  });
+  registerMessage("cloud-local-playback-mark-fallback", async (message) => {
+    const offer = await getValidLocalPlaybackOffer({
+      offerId: message?.offerId || null,
+      projectId: message?.projectId || null,
+      sceneId: message?.sceneId || null,
+    });
+    if (!offer) {
+      return { ok: false, error: "offer-unavailable" };
+    }
+    const updated = {
+      ...offer,
+      status: "fallback",
+      fallbackReason: message?.reason || "unknown",
+      fallbackAt: Date.now(),
+      updatedAt: Date.now(),
+    };
+    await chrome.storage.local.set({
+      [CLOUD_LOCAL_PLAYBACK_KEY]: updated,
+      [CLOUD_LOCAL_PLAYBACK_EVENT_KEY]: {
+        event: "offer-fallback",
+        at: Date.now(),
+        offerId: updated.offerId,
+        reason: updated.fallbackReason,
+      },
+    });
+    console.info("[Screenity][BG] Local screen playback offer fallback", {
+      offerId: updated.offerId,
+      reason: updated.fallbackReason,
+    });
+    return { ok: true, offer: updated };
   });
   registerMessage("finish-multi-recording", async () => {
     if (!CLOUD_FEATURES_ENABLED) {
@@ -1349,13 +1850,12 @@ export const setupHandlers = () => {
     }
 
     const { name, email } = user;
-    const query = new URLSearchParams({
-      extension: "true",
-      name,
-      email,
+    const qs = await supportContextQuery({
+      includeRecordingState: true,
+      source: "settings",
+      user: { name, email },
     });
-
-    const url = `https://tally.so/r/310MNg?${query.toString()}`;
+    const url = `https://tally.so/r/310MNg?extension=true&${qs}`;
     createTab(url, true, true);
   });
   registerMessage("check-banner-support", async (message, sendResponse) => {

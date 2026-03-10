@@ -276,14 +276,20 @@ const ContentState = (props) => {
       element.classList.remove("screenity-blur");
     });
     setTimer(0);
-    chrome.runtime.sendMessage({ type: "stop-recording-tab" }, (res) => {
+    chrome.runtime.sendMessage(
+      { type: "stop-recording-tab", reason: "content-toolbar-stop" },
+      (res) => {
       if (!res || res.ok !== true) {
         console.warn("Stop command not acknowledged, retrying…");
         setTimeout(() => {
-          chrome.runtime.sendMessage({ type: "stop-recording-tab" });
+          chrome.runtime.sendMessage({
+            type: "stop-recording-tab",
+            reason: "content-toolbar-stop-retry",
+          });
         }, 200);
       }
-    });
+      },
+    );
   });
 
   const pauseRecording = useCallback((dismiss) => {
@@ -636,7 +642,7 @@ const ContentState = (props) => {
         pipEnded: false,
       }));
     }
-  }, [contentState, contentStateRef]);
+  }, [contentStateRef]);
 
   const tryRestartRecording = useCallback(() => {
     if (!contentStateRef.current.paused) {
@@ -676,7 +682,7 @@ const ContentState = (props) => {
     } else {
       contentStateRef.current.dismissRecording();
     }
-  }, [contentState, contentStateRef.current]);
+  }, [contentStateRef]);
 
   const handleDevicePermissions = (data) => {
     if (data && data != undefined && data.success) {
@@ -965,6 +971,15 @@ const ContentState = (props) => {
       }
     },
     cancelCountdown: () => {
+      // Eagerly clear recording flags in storage so the action button never
+      // sees a stale isRecordingActive state between now and when the
+      // background processes dismiss-recording-tab.
+      chrome.storage.local.set({
+        pendingRecording: false,
+        recording: false,
+        restarting: false,
+      });
+      chrome.runtime.sendMessage({ type: "diag-countdown-cancelled" }).catch(() => {});
       setContentState((prev) => ({
         ...prev,
         countdownActive: false,

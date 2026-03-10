@@ -1,4 +1,5 @@
 import { sendMessageRecord } from "./sendMessageRecord";
+import { initDiagSession, diagEvent } from "../../utils/diagnosticLog";
 
 export const startRecording = async () => {
   chrome.storage.local.set({
@@ -55,6 +56,34 @@ export const startRecording = async () => {
     chrome.storage.local.remove(["recordingMeta"]);
   }
 
+  // Initialize diagnostic session for this recording
+  const { quality, systemAudio, audioInput, backup, offscreen, alarm, alarmTime, countdown } =
+    await chrome.storage.local.get([
+      "quality",
+      "systemAudio",
+      "audioInput",
+      "backup",
+      "offscreen",
+      "alarm",
+      "alarmTime",
+      "countdown",
+    ]);
+  await initDiagSession({
+    recordingType: recordingType || "screen",
+    quality: quality || null,
+    region: Boolean(customRegion),
+    systemAudio: Boolean(systemAudio),
+    audioInput: Boolean(audioInput),
+    backup: Boolean(backup),
+    offscreen: Boolean(offscreen),
+    alarm: Boolean(alarm),
+    alarmTime: alarm ? (alarmTime || null) : null,
+    countdown: Boolean(countdown),
+  });
+  // Log session-start immediately (not inside the async .then() callback) so
+  // the event is flushed to storage before the SW can be killed.
+  diagEvent("session-start", { region: Boolean(customRegion) });
+
   if (customRegion) {
     sendMessageRecord({ type: "start-recording-tab", region: true })
       .then(() => {
@@ -75,6 +104,7 @@ export const startRecording = async () => {
             error: String(err),
           },
         });
+        diagEvent("start-fail", { region: true, error: String(err) });
       });
   } else {
     sendMessageRecord({ type: "start-recording-tab" })
@@ -96,12 +126,11 @@ export const startRecording = async () => {
             error: String(err),
           },
         });
+        diagEvent("start-fail", { region: false, error: String(err) });
       });
   }
   chrome.action.setIcon({ path: "assets/recording-logo.png" });
   // Set up alarm if set in storage
-  const { alarm } = await chrome.storage.local.get(["alarm"]);
-  const { alarmTime } = await chrome.storage.local.get(["alarmTime"]);
   if (alarm) {
     const seconds = parseFloat(alarmTime);
     chrome.alarms.create("recording-alarm", { delayInMinutes: seconds / 60 });

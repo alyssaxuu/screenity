@@ -1,5 +1,6 @@
-import { sendMessageTab } from "../tabManagement";
+import { sendMessageTab, clearEditorTabReference } from "../tabManagement";
 import { sendMessageRecord } from "../recording/sendMessageRecord";
+import { diagEvent, endDiagSession } from "../../utils/diagnosticLog";
 
 /**
  * Listener for when a tab is removed.
@@ -17,6 +18,7 @@ export const onTabRemovedListener = () => {
         recordingUiTabId,
         activeTab,
         recorderSession,
+        editorTab,
       } = await chrome.storage.local.get([
         "recording",
         "pendingRecording",
@@ -26,7 +28,12 @@ export const onTabRemovedListener = () => {
         "recordingUiTabId",
         "activeTab",
         "recorderSession",
+        "editorTab",
       ]);
+
+      if (tabId === editorTab) {
+        await clearEditorTabReference("editor-tab-closed", { tabId });
+      }
 
       const recordedTabId = tabRecordedID || recordingTab;
 
@@ -46,6 +53,7 @@ export const onTabRemovedListener = () => {
           .catch(() => {});
 
         if (recorderSession && recorderSession.status === "recording") {
+          diagEvent("crash", { reason: "recorder-owner-tab-removed", tabId });
           await chrome.storage.local.set({
             recorderSession: {
               ...recorderSession,
@@ -54,11 +62,13 @@ export const onTabRemovedListener = () => {
             },
             recording: false,
           });
+          endDiagSession("crashed");
         }
       }
 
       // If the removed tab is the one being recorded (for tab capture)
       if (!restarting && isActivelyRecording && tabId === recordedTabId) {
+        diagEvent("recorded-tab-closed");
         // Clear reference to the removed tab
         chrome.storage.local.set({ recordingTab: null, tabRecordedID: null });
 
@@ -89,6 +99,8 @@ export const onTabRemovedListener = () => {
         tabId === recordingTab &&
         recordingTab !== recordedTabId
       ) {
+        diagEvent("crash", { reason: "cloud-recorder-tab-closed", tabId });
+        endDiagSession("crashed");
         console.error("CloudRecorder tab was closed during recording!");
         chrome.storage.local.set({
           recording: false,

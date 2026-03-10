@@ -1,4 +1,5 @@
 import { sendMessageTab } from "../tabManagement";
+import { diagEvent } from "../../utils/diagnosticLog";
 
 export const handleTabUpdate = async (tabId, changeInfo, tab) => {
   try {
@@ -36,6 +37,7 @@ export const handleTabUpdate = async (tabId, changeInfo, tab) => {
         sendMessageTab(tabId, { type: "recording-ended" });
       } else if (isActivelyRecording) {
         if (tabRecordedID && tabRecordedID === tabId) {
+          diagEvent("recorded-tab-navigated");
           sendMessageTab(tabId, {
             type: "recording-check",
             force: true,

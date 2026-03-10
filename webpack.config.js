@@ -5,7 +5,8 @@ const env = require("./utils/env");
 const CopyWebpackPlugin = require("copy-webpack-plugin");
 const HtmlWebpackPlugin = require("html-webpack-plugin");
 const TerserPlugin = require("terser-webpack-plugin");
-const { CleanWebpackPlugin } = require("clean-webpack-plugin");
+
+const isDev = env.NODE_ENV === "development";
 
 const ASSET_PATH = process.env.ASSET_PATH || "/";
 
@@ -95,7 +96,7 @@ const htmlPlugins = Object.keys(entryPoints)
       template: templatePath,
       filename: `${entryName}.html`,
       chunks: [entryName],
-      cache: false,
+      cache: true,
     };
 
     // Add favicon only for backup page
@@ -139,10 +140,18 @@ const config = {
   performance: { hints: false },
   entry: entryPoints,
 
+  // Persistent filesystem cache for fast rebuilds
+  cache: {
+    type: "filesystem",
+    buildDependencies: {
+      config: [__filename],
+    },
+  },
+
   output: {
     filename: "[name].bundle.js",
     path: path.resolve(__dirname, "build"),
-    clean: true,
+    clean: !isDev, // Only wipe build dir in production; dev keeps it to avoid re-copying 40MB of assets
     publicPath: ASSET_PATH,
   },
   module: {
@@ -172,10 +181,15 @@ const config = {
         test: /\.(ts|tsx)$/,
         loader: "ts-loader",
         exclude: /node_modules/,
+        options: {
+          transpileOnly: isDev,
+        },
       },
       {
         test: /\.(js|jsx)$/,
-        use: [{ loader: "source-map-loader" }, { loader: "babel-loader" }],
+        use: isDev
+          ? [{ loader: "babel-loader" }]
+          : [{ loader: "source-map-loader" }, { loader: "babel-loader" }],
         exclude: /node_modules/,
       },
     ],
@@ -186,12 +200,10 @@ const config = {
       "react-dom": path.resolve("./node_modules/react-dom"),
       "react/jsx-runtime": path.resolve("./node_modules/react/jsx-runtime"),
     },
-    extensions: fileExtensions
-      .map((extension) => `.${extension}`)
-      .concat([".js", ".jsx", ".ts", ".tsx", ".css"]),
+    // Code extensions first — image/font extensions are only needed for explicit imports with extensions
+    extensions: [".js", ".jsx", ".ts", ".tsx", ".css"],
   },
   plugins: [
-    new CleanWebpackPlugin({ verbose: false }),
     new webpack.ProgressPlugin(),
     new webpack.DefinePlugin({
       "process.env.SCREENITY_APP_BASE": JSON.stringify(
@@ -252,7 +264,7 @@ const config = {
   ],
 };
 
-if (env.NODE_ENV === "development") {
+if (isDev) {
   config.devtool = "cheap-module-source-map";
 } else {
   config.optimization = {

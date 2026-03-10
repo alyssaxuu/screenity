@@ -1,5 +1,6 @@
 import { chunksStore } from "./chunkHandler";
 import { handleChunks } from "./chunkHandler";
+import { diagEvent } from "../../utils/diagnosticLog";
 
 export const sendChunks = async (override = false, target = null) => {
   try {
@@ -34,6 +35,7 @@ export const sendChunks = async (override = false, target = null) => {
           },
         });
       } catch {}
+      diagEvent("chunks-fail", { why: "no-chunks-after-wait" });
       return { status: "empty", chunkCount: 0 };
     }
 
@@ -46,6 +48,7 @@ export const sendChunks = async (override = false, target = null) => {
     });
     // Await handleChunks to ensure messaging completes before returning
     await handleChunks(chunks, override, target);
+    diagEvent("chunks-sent", { count: chunks.length });
     return { status: "ok", chunkCount: chunks.length };
   } catch (error) {
     console.error("Failed to send chunks. Reloading extension.", error);

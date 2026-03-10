@@ -40,6 +40,7 @@ import {
 
 // Context
 import { contentStateContext } from "../context/ContentState";
+import { supportContextQuery } from "../../utils/buildSupportContext";
 
 const PopupContainer = (props) => {
   const [contentState, setContentState] = useContext(contentStateContext);
@@ -90,32 +91,35 @@ const PopupContainer = (props) => {
   ]);
 
   useEffect(() => {
-    const locale = chrome.i18n.getMessage("@@ui_locale");
+    const buildURL = async () => {
+      const locale = chrome.i18n.getMessage("@@ui_locale");
 
-    // Default URL
-    let baseURL = "https://help.screenity.io/";
+      // Default URL
+      let baseURL = "https://help.screenity.io/";
 
-    // If logged in, switch to Tally with prefilled params
-    if (contentState?.isLoggedIn && contentState?.screenityUser) {
-      const { name, email } = contentState.screenityUser;
-      const query = new URLSearchParams({
-        extension: "true",
-        name,
-        email,
-      });
-      baseURL = `https://tally.so/r/310MNg?${query.toString()}`;
-    }
+      // If logged in, switch to Tally with prefilled params
+      if (contentState?.isLoggedIn && contentState?.screenityUser) {
+        const { name, email } = contentState.screenityUser;
+        const qs = await supportContextQuery({
+          includeRecordingState: true,
+          source: "popup",
+          user: { name, email },
+        });
+        baseURL = `https://tally.so/r/310MNg?extension=true&${qs}`;
+      }
 
-    // If non-English locale, wrap with Google Translate
-    if (!locale.includes("en")) {
-      setURL(
-        `https://translate.google.com/translate?sl=en&tl=${locale}&u=${encodeURIComponent(
-          baseURL
-        )}`
-      );
-    } else {
-      setURL(baseURL);
-    }
+      // If non-English locale, wrap with Google Translate
+      if (!locale.includes("en")) {
+        setURL(
+          `https://translate.google.com/translate?sl=en&tl=${locale}&u=${encodeURIComponent(
+            baseURL
+          )}`
+        );
+      } else {
+        setURL(baseURL);
+      }
+    };
+    buildURL();
   }, [contentState]);
 
   const onValueChange = (tab) => {

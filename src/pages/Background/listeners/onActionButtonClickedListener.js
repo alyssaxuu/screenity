@@ -1,4 +1,9 @@
-import { sendMessageTab, getCurrentTab } from "../tabManagement";
+import {
+  sendMessageTab,
+  getCurrentTab,
+  setEditorTabReference,
+  clearEditorTabReference,
+} from "../tabManagement";
 import { sendMessageRecord } from "../recording/sendMessageRecord.js";
 import { stopRecording } from "../recording/stopRecording.js";
 import { loginWithWebsite } from "../auth/loginWithWebsite.js";
@@ -33,18 +38,22 @@ const handleTabMessaging = async (tab) => {
 // Utility to open Playground or inject popup
 const openPlaygroundOrPopup = async (tab) => {
   const editorUrlPattern =
-    /https?:\/\/(app\.screenity\.io|localhost:3000)\/editor\/([^\/]+)(\/edit)?\/?/;
+    /https:\/\/app\.screenity\.io\/editor\/([^\/]+)(\/edit)?\/?/;
 
   if (tab.url && editorUrlPattern.test(tab.url)) {
-    await chrome.storage.local.set({ editorTab: tab.id });
+    const match = tab.url.match(editorUrlPattern);
+    const projectIdFromUrl = match?.[2] || null;
+    await setEditorTabReference({
+      tabId: tab.id,
+      tabUrl: tab.url,
+      source: "action-click-editor",
+      expectedProjectId: projectIdFromUrl,
+    });
 
     if (CLOUD_FEATURES_ENABLED) {
       const result = await loginWithWebsite();
 
       if (result?.authenticated) {
-        const match = tab.url.match(editorUrlPattern);
-        const projectIdFromUrl = match[2];
-
         await chrome.storage.local.set({
           projectId: projectIdFromUrl,
           recordingToScene: true,
@@ -69,6 +78,10 @@ const openPlaygroundOrPopup = async (tab) => {
       });
     }
   } else {
+    await clearEditorTabReference("action-click-non-editor-tab", {
+      tabId: tab.id,
+      tabUrl: tab.url,
+    });
     await chrome.storage.local.set({
       projectId: null,
       recordingToScene: false,
@@ -127,7 +140,34 @@ export const onActionButtonClickedListener = () => {
       );
 
       if (isRecordingActive) {
-        await handleTabMessaging(tab);
+        // Check whether an actual recorder still exists before treating this as
+        // an active recording. If no recorder is present, the flags are stale
+        // (e.g. countdown was cancelled while a race left recording:true in
+        // storage). Reset and open the popup instead of silently swallowing the
+        // click.
+        const { recordingTab, offscreen } = await chrome.storage.local.get([
+          "recordingTab",
+          "offscreen",
+        ]);
+        const hasActiveRecorder = recordingTab || offscreen || sessionRecording;
+
+        if (!hasActiveRecorder) {
+          console.warn(
+            "[Screenity] Stale recording flags detected (no recorder). Resetting.",
+            { recording, pendingRecording, restarting, sessionRecording },
+          );
+          await chrome.storage.local.set({
+            recording: false,
+            pendingRecording: false,
+            restarting: false,
+            recordingToScene: false,
+            projectId: null,
+            activeSceneId: null,
+          });
+          await openPlaygroundOrPopup(tab);
+        } else {
+          await handleTabMessaging(tab);
+        }
       } else {
         // Reset storage keys before opening the popup
         await chrome.storage.local.set({

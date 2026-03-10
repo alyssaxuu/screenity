@@ -3,6 +3,7 @@ import { discardOffscreenDocuments } from "../offscreen/discardOffscreenDocument
 import { sendMessageRecord } from "./sendMessageRecord";
 import { sendChunks } from "./sendChunks";
 import { waitForContentScript } from "../utils/waitForContentScript";
+import { diagEvent, endDiagSession } from "../../utils/diagnosticLog";
 
 const acquirePostStopEditorLock = async (recordingId = null) => {
   const { postStopEditorOpening } = await chrome.storage.local.get([
@@ -28,13 +29,14 @@ const releasePostStopEditorLock = async (overrides = {}) => {
 export const stopRecording = async () => {
   chrome.action.setIcon({ path: "assets/icon-34.png" });
   chrome.storage.local.set({ restarting: false });
-  const { recordingStartTime, isSubscribed, paused, pausedAt, totalPausedMs } =
+  const { recordingStartTime, isSubscribed, paused, pausedAt, totalPausedMs, recordingDuration: storedDuration } =
     await chrome.storage.local.get([
       "recordingStartTime",
       "isSubscribed",
       "paused",
       "pausedAt",
       "totalPausedMs",
+      "recordingDuration",
     ]);
 
   const startTime = Number(recordingStartTime);
@@ -50,7 +52,16 @@ export const stopRecording = async () => {
     Number.isFinite(startTime) && startTime > 0
       ? Math.max(0, now - startTime - basePaused - extraPaused)
       : 0;
+
+  // Recorder clears recordingStartTime before stopRecording() runs via
+  // videoReady(), so the computed duration can be 0 for valid recordings.
+  // Fall back to the previously stored recordingDuration if available.
+  if (duration === 0 && Number(storedDuration) > 0) {
+    duration = Number(storedDuration);
+  }
   const maxDuration = 7 * 60 * 1000;
+
+  diagEvent("stop", { duration, isSubscribed: Boolean(isSubscribed) });
 
   chrome.storage.local.set({
     recording: false,
@@ -104,6 +115,7 @@ export const stopRecording = async () => {
     // Editor already opened by stop-recording-tab flow; avoid opening a second tab.
     // That flow will trigger processing when the tab finishes loading.
   } else if (hasWebCodecs) {
+    diagEvent("editor-open", { type: "editorwebcodecs" });
     // Use Mediabunny (editorwebcodecs.html) when WebCodecs is supported
     const query = postStopRecordingId
       ? `?mode=postStop&recordingId=${encodeURIComponent(postStopRecordingId)}`
@@ -134,6 +146,7 @@ export const stopRecording = async () => {
 
     chrome.runtime.sendMessage({ type: "turn-off-pip" });
   } else if (duration > maxDuration) {
+    diagEvent("editor-open", { type: "editorviewer", duration });
     // Fallback for large recordings without WebCodecs - use viewer mode
 
     const query = postStopRecordingId
@@ -165,6 +178,7 @@ export const stopRecording = async () => {
 
     chrome.runtime.sendMessage({ type: "turn-off-pip" });
   } else {
+    diagEvent("editor-open", { type: "editor-ffmpeg" });
     // Use FFmpeg (editor.html) for browsers without WebCodecs
     const query = postStopRecordingId
       ? `?mode=postStop&recordingId=${encodeURIComponent(postStopRecordingId)}`
@@ -193,6 +207,11 @@ export const stopRecording = async () => {
     chrome.runtime.sendMessage({ type: "turn-off-pip" });
   }
 
+  // End the diagnostic session for all paths (subscriber, free webcodecs,
+  // free viewer, free ffmpeg, and already-opened-editor).  Error/crash paths
+  // end the session separately via their own endDiagSession calls.
+  endDiagSession("ok");
+
   const { wasRegion } = await chrome.storage.local.get(["wasRegion"]);
   if (wasRegion) {
     chrome.storage.local.set({ wasRegion: false, region: true });
@@ -205,6 +224,7 @@ export const stopRecording = async () => {
 export const handleStopRecordingTab = async (request) => {
   chrome.action.setIcon({ path: "assets/icon-34.png" });
   if (request.memoryError) {
+    diagEvent("error", { type: "memory-error" });
     chrome.storage.local.set({
       recording: false,
       restarting: false,
@@ -228,6 +248,20 @@ export const handleStopRecordingTab = async (request) => {
     "totalPausedMs",
     "fastRecorderInUse",
   ]);
+  const stopTabNow = Date.now();
+  const stopTabStartTime = Number(recordingStartTime);
+  const stopTabBasePaused = Number(totalPausedMs) || 0;
+  const stopTabPausedAtMs = Number(pausedAt);
+  const stopTabExtraPaused =
+    paused && Number.isFinite(stopTabPausedAtMs) && stopTabPausedAtMs > 0
+      ? Math.max(0, stopTabNow - stopTabPausedAtMs)
+      : 0;
+  const stopTabDuration =
+    Number.isFinite(stopTabStartTime) && stopTabStartTime > 0
+      ? Math.max(0, stopTabNow - stopTabStartTime - stopTabBasePaused - stopTabExtraPaused)
+      : 0;
+  diagEvent("stop-tab", { duration: stopTabDuration, reason: request.reason || null, memoryError: Boolean(request.memoryError), fastRecorderInUse: Boolean(fastRecorderInUse) });
+
   if (!isSubscribed) {
     const { fastRecorderActiveRecordingId } = await chrome.storage.local.get([
       "fastRecorderActiveRecordingId",
@@ -258,6 +292,7 @@ export const handleStopRecordingTab = async (request) => {
     }
 
     if (fastRecorderInUse) {
+      diagEvent("editor-open", { type: "editorwebcodecs", via: "stop-tab" });
       const editorUrl = "editorwebcodecs.html";
       // Open editor immediately in postStop mode (WebCodecs only)
       chrome.tabs.create(
@@ -300,6 +335,7 @@ export const handleStopRecordingTab = async (request) => {
     } else {
       const editorUrl =
         duration > maxDuration ? "editorviewer.html" : "editor.html";
+      diagEvent("editor-open", { type: editorUrl.replace(".html", ""), via: "stop-tab", duration });
       // MediaRecorder/FFmpeg path: open editor normally (no postStop gating)
       chrome.tabs.create({ url: editorUrl, active: true }, (tab) => {
         if (chrome.runtime.lastError || !tab?.id) {
