@@ -800,10 +800,16 @@ export const setupHandlers = () => {
         updateFromStorage(true, sender.id);
       }
     } else {
+      // After navigation, PiP is always destroyed (the iframe that owned it
+      // was torn down with the old page).  Set pipEnded: true so the inline
+      // camera overlay is visible immediately.  If the camera iframe
+      // successfully re-enters PiP later, a "pip-started" message will flip
+      // this back to false.
       setContentState((prev) => ({
         ...prev,
         showExtension: true,
         recording: true,
+        pipEnded: true,
       }));
       updateFromStorage(false, sender.id);
     }

@@ -1,7 +1,11 @@
 import React, { useEffect, useRef, useState } from "react";
 import Background from "./components/Background";
 import { useCameraContext } from "./context/CameraContext";
-import { getCameraStream, stopCameraStream } from "./utils/cameraUtils";
+import {
+  getCameraStream,
+  stopCameraStream,
+  surfaceHandler,
+} from "./utils/cameraUtils";
 import { setupHandlers } from "./messaging/handlers";
 
 const Camera = () => {
@@ -109,6 +113,23 @@ const Camera = () => {
       );
     });
   }, [videoRef.current]); // Will run once when videoRef is set
+
+  // After the camera stream is ready, check if we should re-enter PiP.
+  // This handles the case where the user navigated while recording a monitor —
+  // the old PiP was destroyed with the old page, so we need to re-enter it
+  // once the new camera iframe has a live stream.
+  useEffect(() => {
+    if (!videoRef.current || !streamRef.current?.active) return;
+
+    chrome.storage.local.get(
+      ["surface", "recording"],
+      (result) => {
+        if (result.recording && result.surface) {
+          surfaceHandler({ surface: result.surface }, videoRef);
+        }
+      },
+    );
+  }, [videoRef.current, streamRef.current?.active]);
 
   // Handle PiP events
   const handleEnterPip = () => {
