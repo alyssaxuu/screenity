@@ -10,6 +10,7 @@ import { addAlarmListener } from "../alarms/addAlarmListener";
 import { getStreamingData } from "./getStreamingData";
 import { discardOffscreenDocuments } from "../offscreen/discardOffscreenDocuments";
 import { diagEvent, endDiagSession } from "../../utils/diagnosticLog";
+import { classifyError } from "../../utils/errorCodes";
 export const checkCapturePermissions = async ({ isLoggedIn, isSubscribed }) => {
   const permissions = ["desktopCapture", "alarms", "offscreen"];
 
@@ -65,30 +66,42 @@ export const handleRecordingComplete = async () => {
 
   if (recordingTab) {
     chrome.tabs.get(recordingTab, (tab) => {
-      if (tab) {
-        // Check if tab url contains chrome-extension and recorder.html
-        if (
-          tab.url.includes("chrome-extension") &&
-          tab.url.includes("recorder.html")
-        ) {
-          // FLAG: For testing purposes -> comment to debug
-          removeTab(recordingTab);
-        }
+      if (chrome.runtime.lastError || !tab) return;
+      // Check if tab url contains chrome-extension and recorder.html
+      if (
+        tab.url.includes("chrome-extension") &&
+        tab.url.includes("recorder.html")
+      ) {
+        // FLAG: For testing purposes -> comment to debug
+        removeTab(recordingTab);
       }
     });
   }
+  // Clear so subsequent recordings don't conflict
+  chrome.storage.local.set({ recordingTab: null });
 };
 
 export const handleRecordingError = async (request) => {
   if (globalThis.SCREENITY_VERBOSE_LOGS) {
     console.log("handleRecordingError called with request:", request);
   }
+
+  // Propagate or derive error code
+  const errorCode =
+    request?.errorCode ||
+    classifyError(request?.why || "", request?.error || "");
+
   try {
+    const { recordingAttemptId } = await chrome.storage.local.get([
+      "recordingAttemptId",
+    ]);
     await chrome.storage.local.set({
       lastRecordingError: {
         ts: Date.now(),
         error: request?.error || null,
         why: request?.why || null,
+        errorCode,
+        recordingAttemptId: recordingAttemptId || null,
       },
     });
   } catch {}
@@ -107,6 +120,7 @@ export const handleRecordingError = async (request) => {
   diagEvent(isWarningOnly ? "warning" : "error", {
     error: request?.error || null,
     why: request?.why || null,
+    errorCode,
   });
 
   // For stream-ended, we just notify the user but DON'T stop the recording
@@ -114,8 +128,10 @@ export const handleRecordingError = async (request) => {
   if (isWarningOnly) {
     sendMessageTab(activeTab, {
       type: "stream-ended-warning",
-      message: request.why || "Screen sharing stopped unexpectedly.",
-    }).catch(() => {});
+      message: request.why || chrome.i18n.getMessage("streamEndedWarningToast"),
+    }).catch((err) => {
+      diagEvent("warning", { note: "stream-ended-warning undelivered", err: String(err).slice(0, 80) });
+    });
     return; // Don't continue with the normal error handling
   }
 
@@ -132,7 +148,9 @@ export const handleRecordingError = async (request) => {
       type: "clear-recording-session-safe",
       reason: "recording-error-terminal",
     })
-    .catch(() => {});
+    .catch((err) => {
+      diagEvent("warning", { note: "clear-session-safe undelivered", err: String(err).slice(0, 80) });
+    });
 
   sendMessageRecord({ type: "recording-error" }).then(() => {
     const candidateTabs = [activeTab, recordingUiTabId, tabRecordedID].filter(
@@ -143,9 +161,9 @@ export const handleRecordingError = async (request) => {
     });
     focusTab(activeTab);
     if (request.error === "stream-error") {
-      sendMessageTab(activeTab, { type: "stream-error" });
+      sendMessageTab(activeTab, { type: "stream-error", errorCode });
     } else if (request.error === "backup-error") {
-      sendMessageTab(activeTab, { type: "backup-error" });
+      sendMessageTab(activeTab, { type: "backup-error", errorCode });
     }
   });
 
@@ -174,8 +192,10 @@ export const videoReady = async () => {
       type: "clear-recording-session-safe",
       reason: "video-ready-terminal",
     })
-    .catch(() => {});
-  stopRecording();
+    .catch((err) => {
+      diagEvent("warning", { note: "clear-session-safe undelivered (video-ready)", err: String(err).slice(0, 80) });
+    });
+  await stopRecording();
 };
 
 export const writeFile = async (request) => {

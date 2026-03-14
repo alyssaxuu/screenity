@@ -12,6 +12,7 @@ import {
   VideoSampleSink,
   AudioSampleSink,
 } from "mediabunny";
+import { videoConverter } from "./videoConverter";
 
 export class VideoCutter {
   async cut(sourceBlob, { cutStart, cutEnd, onProgress }) {
@@ -31,8 +32,10 @@ export class VideoCutter {
     const videoTrack = await input.getPrimaryVideoTrack();
     const audioTrack = await input.getPrimaryAudioTrack().catch(() => null);
 
+    const codecInfo = await videoConverter.detectBestCodec("mp4");
+    const videoCodec = codecInfo?.codec ?? "avc";
     const videoSource = new VideoSampleSource({
-      codec: "avc",
+      codec: videoCodec,
       bitrate: QUALITY_HIGH,
       sizeChangeBehavior: "passThrough",
     });

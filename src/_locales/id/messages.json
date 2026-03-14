@@ -1458,8 +1458,8 @@
     "description": "Toast shown when a crashed recording session is auto-recovered on startup"
   },
   "toastStorageCritical": {
-    "message": "Low disk space detected. Recording is stopping to avoid corruption.",
-    "description": "Toast shown when available storage drops below the critical threshold during recording"
+    "message": "Ruang disk rendah. Menyimpan rekaman Anda. Semua yang direkam sejauh ini aman.",
+    "description": "Toast shown when available storage drops below the critical threshold during recording; reassures that captured data is preserved"
   },
   "toastStorageLow": {
     "message": "Storage is running low. Upload reliability may degrade for long recordings.",
@@ -1472,5 +1472,105 @@
   "toastNetworkOffline": {
     "message": "Network offline. Upload paused. Screen chunks are saved locally.",
     "description": "Toast shown when the browser goes offline during a cloud recording upload"
+  },
+  "longRecordingTitle": {
+    "message": "Rekaman panjang",
+    "description": "Banner title shown when a recording exceeds the local processing limit but is otherwise successful"
+  },
+  "longRecordingDescription": {
+    "message": "Rekaman Anda lengkap dan aman. Unduh sebagai WebM di bawah.",
+    "description": "Banner description for long recordings that can be downloaded but not edited locally"
+  },
+  "notAvailableLongRecording": {
+    "message": "Tidak tersedia untuk rekaman panjang",
+    "description": "Disabled button label for features not available due to recording length"
+  },
+  "notAvailableRecoveryMode": {
+    "message": "Tidak tersedia dalam mode pemulihan",
+    "description": "Disabled button label for features not available in recovery/fallback mode"
+  },
+  "editTooLongTitle": {
+    "message": "Pengeditan audio terlalu panjang",
+    "description": "Alert title when an audio mute/mix edit is rejected because the clip exceeds 15 minutes"
+  },
+  "editTooLongDescription": {
+    "message": "Pengeditan audio ini tidak didukung untuk klip lebih dari 15 menit. File asli Anda tidak berubah. Coba potong klip terlebih dahulu.",
+    "description": "Alert body explaining the 15-minute limit and suggesting trimming first"
+  },
+  "editTimeoutTitle": {
+    "message": "Pengeditan habis waktu",
+    "description": "Alert title when an edit operation does not complete within the 5-minute watchdog period"
+  },
+  "editTimeoutDescription": {
+    "message": "Pengeditan tidak selesai tepat waktu. Rekaman asli Anda tidak berubah. Coba lagi atau potong klip terlebih dahulu.",
+    "description": "Alert body for the timeout case, prompting retry or shorter clip"
+  },
+  "streamEndedWarningToast": {
+    "message": "Berbagi layar berhenti. Rekaman Anda tersimpan. Hentikan saat Anda siap.",
+    "description": "Toast shown when screen share track ends mid-recording. Recording continues; removes false urgency about data loss."
+  },
+  "recoveryModeDescription": {
+    "message": "Terjadi masalah pemrosesan, tetapi rekaman Anda aman. Anda dapat mengunduhnya di bawah.",
+    "description": "Recovery mode banner description — reassures user their recording is accessible despite the processing failure"
+  },
+  "editProcessingSafeDescription": {
+    "message": "Memproses pengeditan Anda. Rekaman asli tidak berubah.",
+    "description": "Shown in the editor processing alert when a user-initiated edit is running, to reassure the original is safe"
+  },
+  "editFailedTitle": {
+    "message": "Pengeditan tidak dapat diterapkan",
+    "description": "Alert title when an edit operation fails due to an encoding or processing error"
+  },
+  "editFailedDescription": {
+    "message": "Terjadi kesalahan saat pemrosesan. Rekaman asli Anda aman. Anda dapat mencoba lagi atau mengunduhnya apa adanya.",
+    "description": "Alert body for edit failure; explicitly confirms the original recording is untouched"
+  },
+  "videoTrackEndedToast": {
+    "message": "Berbagi layar berhenti. Menyimpan rekaman Anda. Semua yang direkam sejauh ini aman.",
+    "description": "Toast shown when the video track ends mid-recording (e.g. monitor disconnected, screen share revoked)"
+  },
+  "audioTrackEndedToast": {
+    "message": "Audio terputus. Menyimpan rekaman Anda. Video yang direkam sejauh ini aman.",
+    "description": "Toast shown when the audio track ends mid-recording (e.g. mic unplugged, permission revoked)"
+  },
+  "editorRecoveryToast": {
+    "message": "Rekaman Anda tersimpan. Editor tidak terbuka. Klik ikon Screenity untuk mencoba lagi.",
+    "description": "Toast shown on the active tab when the post-recording editor tab fails to open"
+  },
+  "stopAckTimeoutToast": {
+    "message": "Penyimpanan memakan waktu lebih lama dari yang diharapkan. Data Anda aman. Editor akan segera terbuka.",
+    "description": "Toast shown when the recorder does not acknowledge the stop request within a few seconds"
+  },
+  "copyDebugInfoButton": {
+    "message": "Salin info debug",
+    "description": "Button to copy technical debug info to clipboard for support"
+  },
+  "debugInfoCopiedToast": {
+    "message": "Info debug disalin",
+    "description": "Toast shown after debug info is copied"
+  },
+  "getHelpButton": {
+    "message": "Dapatkan bantuan",
+    "description": "Side button on error modals that opens a prefilled support form"
+  },
+  "recordingTooShortToast": {
+    "message": "Rekaman terlalu singkat untuk disimpan",
+    "description": "Toast shown when a region recording is stopped by navigation but no chunks were saved"
+  },
+  "fastRecorderFailedTitle": {
+    "message": "Perekam cepat gagal",
+    "description": "Title for the modal shown when the fast MP4 recorder output could not be validated"
+  },
+  "fastRecorderFailedDescription": {
+    "message": "Output perekam cepat tidak dapat divalidasi di perangkat ini.\nAnda tetap dapat mengunduh filenya.",
+    "description": "Body text for the fast recorder failure modal"
+  },
+  "downloadAnywayButton": {
+    "message": "Unduh saja",
+    "description": "Button to download the recording file despite validation failure"
+  },
+  "cancelButton": {
+    "message": "Batal",
+    "description": "Generic cancel button label"
   }
 }

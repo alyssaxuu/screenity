@@ -1,18 +1,10 @@
 /**
- * Builds a flat, URL-safe support-context object for Tally form prefills.
- *
- * Privacy rules:
- *  - No full URLs, user IDs, auth tokens, or page content
- *  - Error messages are stripped of URL-like substrings and truncated
- *  - No raw diagnostic logs, video blobs, or storage dumps
- *  - User name/email only included when caller explicitly passes them
- *
- * All values are short strings safe for URLSearchParams.
+ * Builds a URL-safe support-context object for Tally form prefills.
+ * No URLs, tokens, page content, or blobs — only sanitized technical metadata.
  */
 
 const MAX_ERR_LEN = 120;
 
-/** Strip anything that looks like a URL from an error string. */
 const sanitizeError = (err) => {
   if (!err) return "";
   const str = typeof err === "string" ? err : String(err);
@@ -22,7 +14,6 @@ const sanitizeError = (err) => {
     .slice(0, MAX_ERR_LEN);
 };
 
-/** Extract "Chrome/124" or "Edg/124" from the user-agent string. */
 const shortBrowser = () => {
   const ua = navigator.userAgent || "";
   const edg = ua.match(/Edg\/(\d+)/);
@@ -32,15 +23,7 @@ const shortBrowser = () => {
   return "Unknown";
 };
 
-/**
- * Build support context.
- *
- * @param {Object}  [opts]
- * @param {boolean} [opts.includeRecordingState] — pull last-recording fields from storage
- * @param {string}  [opts.source]               — where the form was opened (e.g. "popup", "settings", "editor")
- * @param {{name:string, email:string}} [opts.user] — only pass when the user is already authenticated
- * @returns {Promise<Record<string, string>>}    flat key-value pairs for URLSearchParams
- */
+/** Build support context. Returns flat key-value pairs for URLSearchParams. */
 export const buildSupportContext = async (opts = {}) => {
   const ctx = {};
 
@@ -55,6 +38,10 @@ export const buildSupportContext = async (opts = {}) => {
   } catch {
     ctx.os = "unknown";
   }
+
+  // Human-readable platform for Tally choice prefill
+  const platformMap = { mac: "macOS", win: "Windows", linux: "Linux", cros: "ChromeOS" };
+  ctx.platform = platformMap[ctx.os] || "Other";
 
   ctx.cloud =
     process.env.SCREENITY_ENABLE_CLOUD_FEATURES === "true" ? "1" : "0";
@@ -73,6 +60,7 @@ export const buildSupportContext = async (opts = {}) => {
         "fastRecorderDisabledReason",
         "isSubscribed",
         "diagnosticLog",
+        "recordingAttemptId",
       ];
       const store = await chrome.storage.local.get(keys);
 
@@ -81,10 +69,19 @@ export const buildSupportContext = async (opts = {}) => {
         ctx.fast = store.fastRecorderInUse ? "1" : "0";
       if (store.fastRecorderDisabledReason)
         ctx.fastOff = String(store.fastRecorderDisabledReason).slice(0, 60);
-      if (store.isSubscribed != null)
+      if (store.isSubscribed != null) {
         ctx.sub = store.isSubscribed ? "1" : "0";
-      if (store.lastRecordingError)
+        // Override the build-time cloud flag with actual subscription state
+        // so the support URL reflects whether this attempt used cloud or local.
+        ctx.cloud = store.isSubscribed ? "1" : "0";
+      }
+      if (store.lastRecordingError) {
         ctx.lastErr = sanitizeError(store.lastRecordingError);
+        if (store.lastRecordingError.errorCode)
+          ctx.errCode = store.lastRecordingError.errorCode;
+      }
+      if (store.recordingAttemptId)
+        ctx.attemptId = store.recordingAttemptId;
 
       // Last diagnostic session outcome (compact — just the outcome string)
       if (store.diagnosticLog?.sessions?.length) {
@@ -93,10 +90,31 @@ export const buildSupportContext = async (opts = {}) => {
             store.diagnosticLog.sessions.length - 1
           ];
         if (last?.outcome) ctx.lastOutcome = last.outcome;
+        // Detect incomplete editor handoff (editor opened but never loaded)
+        if (last?.events?.length) {
+          const hasEditorOpen = last.events.some(
+            (ev) => ev.e === "editor-open" && ev.d?.type === "editorwebcodecs",
+          );
+          const hasEditorReady = last.events.some(
+            (ev) => ev.e === "editor-load-ready",
+          );
+          if (hasEditorOpen && !hasEditorReady) ctx.editorHandoff = "incomplete";
+        }
       }
     } catch {
       // storage read failed — continue without recording state
     }
+  }
+
+  // ---- explicit error overrides (from error modal "Get help" button) ----
+  if (opts.errorCode) ctx.errCode = opts.errorCode;
+  if (opts.errorWhy) ctx.lastErr = sanitizeError(opts.errorWhy);
+
+  // ---- support code (short human-readable reference) ----
+  if (ctx.attemptId) {
+    const hash = ctx.attemptId.replace(/[^a-z0-9]/gi, "").slice(-4).toUpperCase();
+    const date = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+    ctx.supportCode = `SCR-${hash}-${date}`;
   }
 
   // ---- user info (only when explicitly provided) ----
@@ -108,10 +126,7 @@ export const buildSupportContext = async (opts = {}) => {
   return ctx;
 };
 
-/**
- * Convenience: build context and return it as a query string.
- * Drops any key whose value is empty/undefined.
- */
+/** Build context and return as a query string. */
 export const supportContextQuery = async (opts = {}) => {
   const ctx = await buildSupportContext(opts);
   const params = new URLSearchParams();

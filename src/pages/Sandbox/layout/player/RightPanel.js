@@ -30,6 +30,17 @@ const RightPanel = () => {
     contentStateRef.current = contentState;
   }, [contentState]);
 
+  // Returns a context-specific "not available" label for disabled buttons
+  const getNotAvailableLabel = () => {
+    if (contentState.fallback && contentState.noffmpeg && contentState.editLimit === 0) {
+      return chrome.i18n.getMessage("notAvailableLongRecording");
+    }
+    if (contentState.fallback && contentState.noffmpeg) {
+      return chrome.i18n.getMessage("notAvailableRecoveryMode");
+    }
+    return chrome.i18n.getMessage("notAvailableLabel");
+  };
+
   const getPreparingLabel = () => {
     const base = chrome.i18n.getMessage("preparingLabel");
     const pct = Math.round(contentState.processingProgress || 0);
@@ -40,27 +51,67 @@ const RightPanel = () => {
   };
 
   const saveToDrive = () => {
-    //if (contentState.noffmpeg) return;
     setContentState((prevContentState) => ({
       ...prevContentState,
       saveDrive: true,
     }));
 
+    const handleDriveResponse = (response) => {
+      if (!response || response.status === "ew" || response.error) {
+        console.error("[Drive] drive_save_failed:", response?.error || "unknown error");
+        setContentState((prevContentState) => ({
+          ...prevContentState,
+          saveDrive: false,
+        }));
+      }
+      // On success, saveDrive is reset by the "saved-to-drive" message from background
+    };
+
+    const handleDriveError = (err) => {
+      console.error("[Drive] drive_save_error:", err);
+      setContentState((prevContentState) => ({
+        ...prevContentState,
+        saveDrive: false,
+      }));
+    };
+
     if (contentState.noffmpeg || !contentState.mp4ready || !contentState.blob) {
-      chrome.runtime
-        .sendMessage({
-          type: "save-to-drive-fallback",
-          title: contentState.title,
-        })
-        .then((response) => {
-          if (response.status === "ew") {
-            // Cancel saving to drive
-            setContentState((prevContentState) => ({
-              ...prevContentState,
-              saveDrive: false,
-            }));
-          }
-        });
+      // Prefer the duration-fixed webm blob over rebuilding from raw chunks
+      const fixedWebm = contentState.webm;
+      if (fixedWebm && fixedWebm instanceof Blob && fixedWebm.size > 0) {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const dataUrl = reader.result;
+          const base64 = dataUrl.split(",")[1];
+          chrome.runtime
+            .sendMessage({
+              type: "save-to-drive",
+              base64: base64,
+              title: contentState.title,
+              isWebm: true,
+            })
+            .then(handleDriveResponse)
+            .catch(handleDriveError);
+        };
+        reader.onerror = () => {
+          chrome.runtime
+            .sendMessage({
+              type: "save-to-drive-fallback",
+              title: contentState.title,
+            })
+            .then(handleDriveResponse)
+            .catch(handleDriveError);
+        };
+        reader.readAsDataURL(fixedWebm);
+      } else {
+        chrome.runtime
+          .sendMessage({
+            type: "save-to-drive-fallback",
+            title: contentState.title,
+          })
+          .then(handleDriveResponse)
+          .catch(handleDriveError);
+      }
     } else {
       // Blob to base64
       const reader = new FileReader();
@@ -74,15 +125,15 @@ const RightPanel = () => {
             base64: base64,
             title: contentState.title,
           })
-          .then((response) => {
-            if (response.status === "ew") {
-              // Cancel saving to drive
-              setContentState((prevContentState) => ({
-                ...prevContentState,
-                saveDrive: false,
-              }));
-            }
-          });
+          .then(handleDriveResponse)
+          .catch(handleDriveError);
+      };
+      reader.onerror = () => {
+        console.error("[Drive] FileReader failed to read blob for Drive upload");
+        setContentState((prevContentState) => ({
+          ...prevContentState,
+          saveDrive: false,
+        }));
       };
       if (
         !contentState.noffmpeg &&
@@ -179,6 +230,23 @@ const RightPanel = () => {
     }
   };
 
+  // Download best available blob: edited MP4 → fixed WebM → raw WebM.
+  const handleDownloadOriginal = () => {
+    const s = contentStateRef.current;
+    const source = s.blob || s.webm || s.rawBlob;
+    if (!source) return;
+    const blob =
+      source instanceof Blob
+        ? source
+        : new Blob([source], { type: "video/webm" });
+    const ext = blob.type.includes("mp4") ? "mp4" : "webm";
+    const title = s.title || "screenity-recording";
+    const url = window.URL.createObjectURL(blob);
+    chrome.downloads.download({ url, filename: `${title}.${ext}` }, () => {
+      window.URL.revokeObjectURL(url);
+    });
+  };
+
   const handleRawRecording = () => {
     if (typeof contentStateRef.current.openModal === "function") {
       contentStateRef.current.openModal(
@@ -187,7 +255,12 @@ const RightPanel = () => {
         chrome.i18n.getMessage("rawRecordingModalButton"),
         chrome.i18n.getMessage("sandboxEditorCancelButton"),
         () => {
-          const blob = contentStateRef.current.rawBlob;
+          const s = contentStateRef.current;
+          const blob = s.rawBlob;
+          if (!blob) {
+            console.error("[Screenity][WebM] raw download: no rawBlob available");
+            return;
+          }
           const url = window.URL.createObjectURL(blob);
 
           const ext = blob.type.includes("mp4") ? "mp4" : "webm";
@@ -275,7 +348,28 @@ const RightPanel = () => {
               </div>
             </div>
           )}
-          {contentState.fallback && contentState.noffmpeg && (
+          {contentState.fallback && contentState.noffmpeg && contentState.editLimit === 0 && (
+            <div className={styles.alert}>
+              <div className={styles.buttonLeft}>
+                <ReactSVG src={URL + "editor/icons/alert.svg"} />
+              </div>
+              <div className={styles.buttonMiddle}>
+                <div className={styles.buttonTitle}>
+                  {chrome.i18n.getMessage("longRecordingTitle")}
+                </div>
+                <div className={styles.buttonDescription}>
+                  {chrome.i18n.getMessage("longRecordingDescription")}
+                </div>
+              </div>
+              <div
+                className={styles.buttonRight}
+                onClick={handleDownloadOriginal}
+              >
+                {chrome.i18n.getMessage("rawRecordingModalButton")}
+              </div>
+            </div>
+          )}
+          {contentState.fallback && contentState.noffmpeg && contentState.editLimit !== 0 && (
             <div className={styles.alert}>
               <div className={styles.buttonLeft}>
                 <ReactSVG src={URL + "editor/icons/alert.svg"} />
@@ -285,8 +379,14 @@ const RightPanel = () => {
                   {chrome.i18n.getMessage("recoveryModeTitle")}
                 </div>
                 <div className={styles.buttonDescription}>
-                  {chrome.i18n.getMessage("overLimitLabelDescription")}
+                  {chrome.i18n.getMessage("recoveryModeDescription")}
                 </div>
+              </div>
+              <div
+                className={styles.buttonRight}
+                onClick={handleDownloadOriginal}
+              >
+                {chrome.i18n.getMessage("rawRecordingModalButton")}
               </div>
             </div>
           )}
@@ -381,9 +481,12 @@ const RightPanel = () => {
                     {chrome.i18n.getMessage("videoProcessingLabelTitle")}
                   </div>
                   <div className={styles.buttonDescription}>
-                    {chrome.i18n.getMessage("videoProcessingLabelDescription")}
+                    {contentState.isFfmpegRunning
+                      ? chrome.i18n.getMessage("editProcessingSafeDescription")
+                      : chrome.i18n.getMessage("videoProcessingLabelDescription")}
                   </div>
                 </div>
+                {!contentState.isFfmpegRunning && (
                 <div
                   className={styles.buttonRight}
                   onClick={() => {
@@ -394,9 +497,79 @@ const RightPanel = () => {
                 >
                   {chrome.i18n.getMessage("learnMoreLabel")}
                 </div>
+                )}
               </div>
             )}
 
+          {!contentState.fallback && contentState.editErrorType === "too-long" && (
+            <div className={styles.alert}>
+              <div className={styles.buttonLeft}>
+                <ReactSVG src={URL + "editor/icons/alert.svg"} />
+              </div>
+              <div className={styles.buttonMiddle}>
+                <div className={styles.buttonTitle}>
+                  {chrome.i18n.getMessage("editTooLongTitle")}
+                </div>
+                <div className={styles.buttonDescription}>
+                  {chrome.i18n.getMessage("editTooLongDescription")}
+                </div>
+              </div>
+              <div
+                className={styles.buttonRight}
+                onClick={() =>
+                  setContentState((prev) => ({ ...prev, editErrorType: null }))
+                }
+              >
+                {chrome.i18n.getMessage("permissionsModalDismiss")}
+              </div>
+            </div>
+          )}
+          {!contentState.fallback && contentState.editErrorType === "timeout" && (
+            <div className={styles.alert}>
+              <div className={styles.buttonLeft}>
+                <ReactSVG src={URL + "editor/icons/alert.svg"} />
+              </div>
+              <div className={styles.buttonMiddle}>
+                <div className={styles.buttonTitle}>
+                  {chrome.i18n.getMessage("editTimeoutTitle")}
+                </div>
+                <div className={styles.buttonDescription}>
+                  {chrome.i18n.getMessage("editTimeoutDescription")}
+                </div>
+              </div>
+              <div
+                className={styles.buttonRight}
+                onClick={() =>
+                  setContentState((prev) => ({ ...prev, editErrorType: null }))
+                }
+              >
+                {chrome.i18n.getMessage("permissionsModalDismiss")}
+              </div>
+            </div>
+          )}
+          {!contentState.fallback && contentState.editErrorType === "failed" && (
+            <div className={styles.alert}>
+              <div className={styles.buttonLeft}>
+                <ReactSVG src={URL + "editor/icons/alert.svg"} />
+              </div>
+              <div className={styles.buttonMiddle}>
+                <div className={styles.buttonTitle}>
+                  {chrome.i18n.getMessage("editFailedTitle")}
+                </div>
+                <div className={styles.buttonDescription}>
+                  {chrome.i18n.getMessage("editFailedDescription")}
+                </div>
+              </div>
+              <div
+                className={styles.buttonRight}
+                onClick={() =>
+                  setContentState((prev) => ({ ...prev, editErrorType: null }))
+                }
+              >
+                {chrome.i18n.getMessage("permissionsModalDismiss")}
+              </div>
+            </div>
+          )}
           <div className={styles.section}>
             <div className={styles.sectionTitle}>
               {chrome.i18n.getMessage("sandboxEditTitle")}
@@ -427,7 +600,7 @@ const RightPanel = () => {
                         contentState.noffmpeg ||
                         (contentState.duration > contentState.editLimit &&
                           !contentState.override)
-                      ? chrome.i18n.getMessage("notAvailableLabel")
+                      ? getNotAvailableLabel()
                       : contentState.mp4ready
                       ? chrome.i18n.getMessage("editButtonDescription")
                       : getPreparingLabel()}
@@ -462,7 +635,7 @@ const RightPanel = () => {
                         contentState.noffmpeg ||
                         (contentState.duration > contentState.editLimit &&
                           !contentState.override)
-                      ? chrome.i18n.getMessage("notAvailableLabel")
+                      ? getNotAvailableLabel()
                       : contentState.mp4ready
                       ? chrome.i18n.getMessage("cropButtonDescription")
                       : getPreparingLabel()}
@@ -497,7 +670,7 @@ const RightPanel = () => {
                         contentState.noffmpeg ||
                         (contentState.duration > contentState.editLimit &&
                           !contentState.override)
-                      ? chrome.i18n.getMessage("notAvailableLabel")
+                      ? getNotAvailableLabel()
                       : contentState.mp4ready
                       ? chrome.i18n.getMessage("addAudioButtonDescription")
                       : getPreparingLabel()}
@@ -615,7 +788,7 @@ const RightPanel = () => {
                         contentState.noffmpeg ||
                         (contentState.duration > contentState.editLimit &&
                           !contentState.override)
-                      ? chrome.i18n.getMessage("notAvailableLabel")
+                      ? getNotAvailableLabel()
                       : contentState.mp4ready && !contentState.isFfmpegRunning
                       ? chrome.i18n.getMessage("downloadMP4ButtonDescription")
                       : getPreparingLabel()}
@@ -684,7 +857,7 @@ const RightPanel = () => {
                         contentState.noffmpeg ||
                         (contentState.duration > contentState.editLimit &&
                           !contentState.override)
-                      ? chrome.i18n.getMessage("notAvailableLabel")
+                      ? getNotAvailableLabel()
                       : contentState.mp4ready
                       ? chrome.i18n.getMessage("downloadGIFButtonDescription")
                       : getPreparingLabel()}

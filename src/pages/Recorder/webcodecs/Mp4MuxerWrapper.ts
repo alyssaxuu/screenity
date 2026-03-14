@@ -84,12 +84,16 @@ export class Mp4MuxerWrapper {
   addVideoChunk(chunk: EncodedVideoChunk, meta: any) {
     if (meta?.decoderConfig) {
       this._lastDecoderConfig = meta.decoderConfig;
-    } else if (!meta.decoderConfig && this._lastDecoderConfig) {
-      meta.decoderConfig = this._lastDecoderConfig;
     }
 
-    const packet = this.buildPacket(chunk, meta, "video");
-    return this.videoSource.add(packet, meta);
+    // Meta is read-only — supply cached decoderConfig when the chunk lacks one.
+    const effectiveMeta =
+      !meta?.decoderConfig && this._lastDecoderConfig
+        ? { ...meta, decoderConfig: this._lastDecoderConfig }
+        : meta;
+
+    const packet = this.buildPacket(chunk, effectiveMeta, "video");
+    return this.videoSource.add(packet, effectiveMeta);
   }
 
   addAudioChunk(chunk: EncodedAudioChunk, meta: any) {
@@ -117,9 +121,9 @@ export class Mp4MuxerWrapper {
     }
   }
 
-  setPausedOffset(offsetUs: number) {
-    this.pausedOffsetUs = offsetUs;
-  }
+  // No-op: WebCodecsRecorder already subtracts paused time from timestamps,
+  // so a second subtraction here would break monotonicity. Kept for API compat.
+  setPausedOffset(_offsetUs: number) {}
 
   setAudioOffset(offsetUs: number) {
     this.audioTimestampOffsetUs = offsetUs;
@@ -159,6 +163,8 @@ export class Mp4MuxerWrapper {
     const last = (this as any)[key] ?? 0;
 
     if (type === "audio") {
+      // Audio ts is already monotonic from WebCodecsRecorder's sample counter.
+      // Just accumulate for logging.
       const next = last + durationUs;
       (this as any)[key] = next;
       this.log(`[MUX] audio ts +${durationUs} => ${next}`);
@@ -172,13 +178,16 @@ export class Mp4MuxerWrapper {
       return fallback;
     }
 
+    // Pin offset to the first frame so output starts at 0.
+    // Don't subtract pausedOffsetUs — WebCodecsRecorder already excludes
+    // paused time, and double-subtracting breaks monotonicity.
     if (this.videoTimestampOffsetUs == null) {
       this.videoTimestampOffsetUs = timestampUs;
     }
 
     const relative = Math.max(
       0,
-      timestampUs - this.videoTimestampOffsetUs - this.pausedOffsetUs
+      timestampUs - this.videoTimestampOffsetUs
     );
 
     (this as any)[key] = relative;

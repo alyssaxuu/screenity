@@ -2656,16 +2656,6 @@ const CloudRecorder = () => {
     await ensureAudioChunkStoreReady();
     await ensureCameraChunkStoreReady();
 
-    const pinned = await chrome.runtime
-      .sendMessage({ type: "is-pinned" })
-      .catch(() => true);
-    if (pinned === false) {
-      sendRecordingError(
-        "Screenity must stay pinned to record. Pin the extension and try again.",
-      );
-      return;
-    }
-
     if (!uploadersInitialized.current) {
       sendRecordingError(
         "Uploaders not initialized. Please restart recording.",
@@ -4988,6 +4978,8 @@ const CloudRecorder = () => {
     } else if (request.type === "stop-recording-tab") {
       if (!isInit.current) return;
       stopRecording(true, request.reason || "message-stop");
+      sendResponse?.({ ok: true });
+      return true;
     } else if (request.type === "set-mic-active-tab") {
       if (!isInit.current) return;
       setMic(request);

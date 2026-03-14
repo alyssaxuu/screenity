@@ -38,7 +38,7 @@ const Sandbox = () => {
 
   function isMp4Blob(blob) {
     return blob
-      .slice(4, 12)
+      .slice(4, 8)
       .text()
       .then((t) => t === "ftyp");
   }
@@ -89,6 +89,7 @@ const Sandbox = () => {
             base64,
             topLevel: true,
             fromAudio: true,
+            _opId: message._opId,
           });
           break;
         }
@@ -111,6 +112,7 @@ const Sandbox = () => {
             type: "updated-blob",
             base64,
             topLevel: true,
+            _opId: message._opId,
           });
           break;
         }
@@ -118,7 +120,7 @@ const Sandbox = () => {
         case "base64-to-blob": {
           const rawBlob = await fetch(message.base64).then((r) => r.blob());
 
-          const header = await rawBlob.slice(4, 12).text();
+          const header = await rawBlob.slice(4, 8).text();
           const looksMp4 = header === "ftyp";
 
           if (looksMp4) {
@@ -165,7 +167,7 @@ const Sandbox = () => {
             (progress) => sendMessage({ type: "ffmpeg-progress", progress })
           );
           const base64 = await toBase64(blob);
-          sendMessage({ type: "updated-blob", base64, topLevel: true });
+          sendMessage({ type: "updated-blob", base64, topLevel: true, _opId: message._opId });
           break;
         }
 
@@ -186,6 +188,7 @@ const Sandbox = () => {
             base64,
             addToHistory: true,
             topLevel: true,
+            _opId: message._opId,
           });
           break;
         }
@@ -221,6 +224,7 @@ const Sandbox = () => {
             base64,
             addToHistory: true,
             topLevel: true,
+            _opId: message._opId,
           });
           break;
         }
@@ -237,7 +241,7 @@ const Sandbox = () => {
               })
           );
           const base64 = await toBase64(blob);
-          sendMessage({ type: "updated-blob", base64, topLevel: true });
+          sendMessage({ type: "updated-blob", base64, topLevel: true, _opId: message._opId });
           break;
         }
 
@@ -271,7 +275,12 @@ const Sandbox = () => {
           break;
       }
     } catch (error) {
-      sendMessage({ type: "ffmpeg-error", error: JSON.stringify(error) });
+      const errMsg = error instanceof Error ? error.message : String(error);
+      if (errMsg.includes("too long")) {
+        sendMessage({ type: "edit-too-long", _opId: message._opId });
+      } else {
+        sendMessage({ type: "ffmpeg-error", error: JSON.stringify(error), _opId: message._opId });
+      }
     }
   };
 

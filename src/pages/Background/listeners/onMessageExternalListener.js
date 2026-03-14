@@ -16,6 +16,13 @@ export const onMessageExternalListener = () => {
   chrome.runtime.onMessageExternal.addListener(
     async (message, sender, sendResponse) => {
       if (message.type === "AUTH_SUCCESS" && message.token) {
+        // User explicitly chose to stay logged out — ignore incoming tokens
+        // until they initiate a login themselves.
+        const { stayLoggedOut } = await chrome.storage.local.get([
+          "stayLoggedOut",
+        ]);
+        if (stayLoggedOut) return true;
+
         await chrome.storage.local.set({
           screenityToken: message.token,
           screenityUser: null,
@@ -40,6 +47,7 @@ export const onMessageExternalListener = () => {
         await chrome.storage.local.set({
           isLoggedIn: true,
           wasLoggedIn: false,
+          stayLoggedOut: false,
           screenityUser: auth.user,
           isSubscribed: auth.subscribed,
           proSubscription: auth.proSubscription,

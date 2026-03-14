@@ -12,6 +12,7 @@ import {
   ALL_FORMATS,
   QUALITY_HIGH,
 } from "mediabunny";
+import { videoConverter } from "./videoConverter";
 
 export class VideoAudioMixer {
   async addAudio(
@@ -39,13 +40,24 @@ export class VideoAudioMixer {
 
     const videoTrack = await input.getPrimaryVideoTrack();
     const videoSink = new VideoSampleSink(videoTrack);
+    const codecInfo = await videoConverter.detectBestCodec("mp4");
+    const videoCodec = codecInfo?.codec ?? "avc";
     const videoSource = new VideoSampleSource({
-      codec: "avc",
+      codec: videoCodec,
       bitrate: QUALITY_HIGH,
     });
     output.addVideoTrack(videoSource);
 
     const videoDuration = await this._getDuration(videoBlob);
+
+    // Mixing decodes the full audio track + allocates a mixBuffer — cap at
+    // 15 min to avoid OOM in the renderer process.
+    if (videoDuration > 900) {
+      throw new Error(
+        `Video is too long for in-browser audio mixing (${Math.round(videoDuration / 60)} min). ` +
+          `Maximum supported length is 15 minutes.`
+      );
+    }
 
     const hasVideoAudio = await input
       .getPrimaryAudioTrack()
@@ -58,9 +70,15 @@ export class VideoAudioMixer {
     });
     output.addAudioTrack(audioSource);
 
-    const bgArrayBuffer = await audioBlob.arrayBuffer();
+    let bgArrayBuffer = await audioBlob.arrayBuffer();
     const audioCtx = new AudioContext();
-    const decodedAudio = await audioCtx.decodeAudioData(bgArrayBuffer);
+    let decodedAudio;
+    try {
+      decodedAudio = await audioCtx.decodeAudioData(bgArrayBuffer);
+      bgArrayBuffer = null; // release compressed audio bytes; PCM is now in decodedAudio
+    } finally {
+      audioCtx.close().catch(() => {});
+    }
     const sr = decodedAudio.sampleRate;
     const audioDur = decodedAudio.duration;
 
@@ -81,15 +99,18 @@ export class VideoAudioMixer {
     };
 
     if (hasVideoAudio && mode === "mix") {
+      const videoAudioCtx = new AudioContext();
       try {
         const videoArrayBuffer = await videoBlob.arrayBuffer();
-        const videoAudioCtx = new AudioContext();
         const decodedVideoAudio = await videoAudioCtx.decodeAudioData(
           videoArrayBuffer
         );
         const videoSamples = decodedVideoAudio.getChannelData(0);
         writeMix(videoSamples, 0, videoVolume);
-      } catch {}
+      } catch {
+      } finally {
+        videoAudioCtx.close().catch(() => {});
+      }
     }
 
     const loopCount = loop

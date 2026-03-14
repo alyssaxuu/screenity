@@ -1458,8 +1458,8 @@
     "description": "Toast shown when a crashed recording session is auto-recovered on startup"
   },
   "toastStorageCritical": {
-    "message": "Low disk space detected. Recording is stopping to avoid corruption.",
-    "description": "Toast shown when available storage drops below the critical threshold during recording"
+    "message": "디스크 공간이 부족합니다. 녹화를 저장하고 있어요. 지금까지 캡처된 내용은 안전합니다.",
+    "description": "Toast shown when available storage drops below the critical threshold during recording; reassures that captured data is preserved"
   },
   "toastStorageLow": {
     "message": "Storage is running low. Upload reliability may degrade for long recordings.",
@@ -1472,5 +1472,105 @@
   "toastNetworkOffline": {
     "message": "Network offline. Upload paused. Screen chunks are saved locally.",
     "description": "Toast shown when the browser goes offline during a cloud recording upload"
+  },
+  "longRecordingTitle": {
+    "message": "긴 녹화",
+    "description": "Banner title shown when a recording exceeds the local processing limit but is otherwise successful"
+  },
+  "longRecordingDescription": {
+    "message": "녹화가 완료되었고 안전합니다. 아래에서 WebM으로 다운로드하세요.",
+    "description": "Banner description for long recordings that can be downloaded but not edited locally"
+  },
+  "notAvailableLongRecording": {
+    "message": "긴 녹화에는 사용할 수 없어요",
+    "description": "Disabled button label for features not available due to recording length"
+  },
+  "notAvailableRecoveryMode": {
+    "message": "복구 모드에서 사용할 수 없어요",
+    "description": "Disabled button label for features not available in recovery/fallback mode"
+  },
+  "editTooLongTitle": {
+    "message": "오디오 편집이 너무 깁니다",
+    "description": "Alert title when an audio mute/mix edit is rejected because the clip exceeds 15 minutes"
+  },
+  "editTooLongDescription": {
+    "message": "이 오디오 편집은 15분이 넘는 클립에는 지원되지 않습니다. 원본은 변경되지 않았습니다. 먼저 클립을 다듬어 보세요.",
+    "description": "Alert body explaining the 15-minute limit and suggesting trimming first"
+  },
+  "editTimeoutTitle": {
+    "message": "편집 시간이 초과되었습니다",
+    "description": "Alert title when an edit operation does not complete within the 5-minute watchdog period"
+  },
+  "editTimeoutDescription": {
+    "message": "편집이 제시간에 완료되지 않았습니다. 원본 녹화는 변경되지 않았습니다. 다시 시도하거나 먼저 클립을 다듬어 보세요.",
+    "description": "Alert body for the timeout case, prompting retry or shorter clip"
+  },
+  "streamEndedWarningToast": {
+    "message": "화면 공유가 중단되었어요. 녹화는 저장되었습니다. 준비되면 중지하세요.",
+    "description": "Toast shown when screen share track ends mid-recording. Recording continues; removes false urgency about data loss."
+  },
+  "recoveryModeDescription": {
+    "message": "처리 중 문제가 있었지만 녹화는 안전해요. 아래에서 다운로드할 수 있습니다.",
+    "description": "Recovery mode banner description — reassures user their recording is accessible despite the processing failure"
+  },
+  "editProcessingSafeDescription": {
+    "message": "편집을 처리하고 있어요. 원본 녹화는 변경되지 않았습니다.",
+    "description": "Shown in the editor processing alert when a user-initiated edit is running, to reassure the original is safe"
+  },
+  "editFailedTitle": {
+    "message": "편집을 적용할 수 없어요",
+    "description": "Alert title when an edit operation fails due to an encoding or processing error"
+  },
+  "editFailedDescription": {
+    "message": "처리 중 문제가 발생했어요. 원본 녹화는 안전합니다. 다시 시도하거나 그대로 다운로드할 수 있어요.",
+    "description": "Alert body for edit failure; explicitly confirms the original recording is untouched"
+  },
+  "videoTrackEndedToast": {
+    "message": "화면 공유가 중단되었어요. 녹화를 저장하고 있습니다. 지금까지 캡처된 내용은 안전합니다.",
+    "description": "Toast shown when the video track ends mid-recording (e.g. monitor disconnected, screen share revoked)"
+  },
+  "audioTrackEndedToast": {
+    "message": "오디오가 연결 해제되었어요. 녹화를 저장하고 있습니다. 지금까지 캡처된 영상은 안전합니다.",
+    "description": "Toast shown when the audio track ends mid-recording (e.g. mic unplugged, permission revoked)"
+  },
+  "editorRecoveryToast": {
+    "message": "녹화가 저장되었어요. 편집기가 열리지 않았습니다. Screenity 아이콘을 클릭해서 다시 시도하세요.",
+    "description": "Toast shown on the active tab when the post-recording editor tab fails to open"
+  },
+  "stopAckTimeoutToast": {
+    "message": "저장이 예상보다 오래 걸리고 있어요. 데이터는 안전합니다. 편집기가 곧 열릴 거예요.",
+    "description": "Toast shown when the recorder does not acknowledge the stop request within a few seconds"
+  },
+  "copyDebugInfoButton": {
+    "message": "디버그 정보 복사",
+    "description": "Button to copy technical debug info to clipboard for support"
+  },
+  "debugInfoCopiedToast": {
+    "message": "디버그 정보가 복사되었어요",
+    "description": "Toast shown after debug info is copied"
+  },
+  "getHelpButton": {
+    "message": "도움 받기",
+    "description": "Side button on error modals that opens a prefilled support form"
+  },
+  "recordingTooShortToast": {
+    "message": "녹화 시간이 너무 짧아 저장할 수 없습니다",
+    "description": "Toast shown when a region recording is stopped by navigation but no chunks were saved"
+  },
+  "fastRecorderFailedTitle": {
+    "message": "빠른 녹화기 실패",
+    "description": "Title for the modal shown when the fast MP4 recorder output could not be validated"
+  },
+  "fastRecorderFailedDescription": {
+    "message": "이 기기에서 빠른 녹화기 출력을 검증할 수 없습니다.\n파일을 그대로 다운로드할 수 있습니다.",
+    "description": "Body text for the fast recorder failure modal"
+  },
+  "downloadAnywayButton": {
+    "message": "그래도 다운로드",
+    "description": "Button to download the recording file despite validation failure"
+  },
+  "cancelButton": {
+    "message": "취소",
+    "description": "Generic cancel button label"
   }
 }

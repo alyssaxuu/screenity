@@ -67,63 +67,36 @@ const Content = () => {
 }
 
 .screenity-shadow-dom .TooltipContent[data-state='delayed-open'][data-side='top'] {
-	animation-name: slideDownAndFade;
+	animation-name: screenity-slideDownAndFade;
 }
 .screenity-shadow-dom .TooltipContent[data-state='delayed-open'][data-side='right'] {
-  animation-name: slideLeftAndFade;
+  animation-name: screenity-slideLeftAndFade;
 }
 .screenity-shadow-dom.TooltipContent[data-state='delayed-open'][data-side='bottom'] {
-  animation-name: slideUpAndFade;
+  animation-name: screenity-slideUpAndFade;
 }
 .screenity-shadow-dom.TooltipContent[data-state='delayed-open'][data-side='left'] {
-  animation-name: slideRightAndFade;
+  animation-name: screenity-slideRightAndFade;
 }
 
-@keyframes slideUpAndFade {
-  from {
-    opacity: 0;
-    transform: translateY(2px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+@keyframes screenity-slideUpAndFade {
+  from { opacity: 0; transform: translateY(2px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes screenity-slideRightAndFade {
+  from { opacity: 0; transform: translateX(-2px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+@keyframes screenity-slideDownAndFade {
+  from { opacity: 0; transform: translateY(-2px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes screenity-slideLeftAndFade {
+  from { opacity: 0; transform: translateX(2px); }
+  to   { opacity: 1; transform: translateX(0); }
 }
 
-@keyframes slideRightAndFade {
-  from {
-    opacity: 0;
-    transform: translateX(-2px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
-}
-
-@keyframes slideDownAndFade {
-  from {
-    opacity: 0;
-    transform: translateY(-2px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes slideLeftAndFade {
-  from {
-    opacity: 0;
-    transform: translateX(2px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
-}
-
-#screenity-ui [data-radix-popper-content-wrapper] { z-index: 999999999999!important; } 
+#screenity-ui [data-radix-popper-content-wrapper] { z-index: 999999999999!important; }
 
 .screenity-shadow-dom .CanvasContainer {
 	position: fixed;
@@ -156,7 +129,6 @@ const Content = () => {
   padding-top: 12px;
   padding-bottom: 12px;
   border-radius: 15px;
-  z-index: 99999;
   font-family: 'Satoshi-Medium', sans-serif;
   color: #29292F;
   box-shadow: 0px 10px 38px -10px rgba(22, 23, 24, 0.35),
@@ -166,20 +138,20 @@ const Content = () => {
   will-change: transform, opacity;
 }
 .ScreenityDropdownMenuContent[data-side="top"] {
-  animation-name: slideDownAndFade;
+  animation-name: screenity-slideDownAndFade;
 }
 .ScreenityDropdownMenuContent[data-side="right"] {
-  animation-name: slideLeftAndFade;
+  animation-name: screenity-slideLeftAndFade;
 }
 .ScreenityDropdownMenuContent[data-side="bottom"] {
-  animation-name: slideUpAndFade;
+  animation-name: screenity-slideUpAndFade;
 }
 .ScreenityDropdownMenuContent[data-side="left"] {
-  animation-name: slideRightAndFade;
+  animation-name: screenity-slideRightAndFade;
 }
 .ScreenityItemIndicator {
   position: absolute;
-  right: 12px; 
+  right: 12px;
   width: 18px;
   height: 18px;
   background: #3080F8;
@@ -207,55 +179,9 @@ const Content = () => {
     cursor: pointer;
 }
 .ScreenityDropdownMenuItem[data-disabled] {
-  color: #6E7684; !important;
+  color: #6E7684 !important;
   cursor: not-allowed;
   background-color: #F6F7FB !important;
-}
-
-
-
-@keyframes slideUpAndFade {
-  from {
-    opacity: 0;
-    transform: translateY(2px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes slideRightAndFade {
-  from {
-    opacity: 0;
-    transform: translateX(-2px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
-}
-
-@keyframes slideDownAndFade {
-  from {
-    opacity: 0;
-    transform: translateY(-2px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes slideLeftAndFade {
-  from {
-    opacity: 0;
-    transform: translateX(2px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
 }
 
 `}</style>

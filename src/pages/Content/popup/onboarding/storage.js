@@ -2,7 +2,7 @@ const ONBOARDING_SEEN_KEY = "onboardingSeen";
 
 export const hasSeenOnboarding = async (key) => {
   try {
-    const result = await chrome.storage.local.get([ONBOARDING_SEEN_KEY]);
+    const result = await chrome.storage.sync.get([ONBOARDING_SEEN_KEY]);
     const seen = result?.[ONBOARDING_SEEN_KEY];
     return Boolean(seen && typeof seen === "object" && seen[key] === true);
   } catch {
@@ -12,13 +12,13 @@ export const hasSeenOnboarding = async (key) => {
 
 export const markOnboardingSeen = async (key) => {
   try {
-    const result = await chrome.storage.local.get([ONBOARDING_SEEN_KEY]);
+    const result = await chrome.storage.sync.get([ONBOARDING_SEEN_KEY]);
     const current =
       result?.[ONBOARDING_SEEN_KEY] &&
       typeof result[ONBOARDING_SEEN_KEY] === "object"
         ? result[ONBOARDING_SEEN_KEY]
         : {};
-    await chrome.storage.local.set({
+    await chrome.storage.sync.set({
       [ONBOARDING_SEEN_KEY]: {
         ...current,
         [key]: true,
@@ -29,7 +29,7 @@ export const markOnboardingSeen = async (key) => {
 
 export const resetOnboardingSeen = async (keys = []) => {
   try {
-    const result = await chrome.storage.local.get([ONBOARDING_SEEN_KEY]);
+    const result = await chrome.storage.sync.get([ONBOARDING_SEEN_KEY]);
     const current =
       result?.[ONBOARDING_SEEN_KEY] &&
       typeof result[ONBOARDING_SEEN_KEY] === "object"
@@ -46,7 +46,7 @@ export const resetOnboardingSeen = async (keys = []) => {
       });
     }
 
-    await chrome.storage.local.set({
+    await chrome.storage.sync.set({
       [ONBOARDING_SEEN_KEY]: current,
     });
   } catch {}

@@ -47,6 +47,10 @@
   font-weight: 300 !important;
   font-family: $font-light !important;
   font-size: 48px !important;
+  line-height: 60px !important;
+  letter-spacing: normal !important;
+  text-transform: none !important;
+  word-spacing: normal !important;
   color: $color-text-contrast;
   text-align: center;
   display: block;
@@ -150,6 +154,10 @@
   display: block;
   padding: 10px 20px;
   font-family: $font-medium;
+  font-size: $font-size-normal;
+  line-height: 1.4;
+  letter-spacing: normal;
+  text-transform: none;
   color: $color-text-contrast;
   z-index: $z-index-max;
   width: fit-content;

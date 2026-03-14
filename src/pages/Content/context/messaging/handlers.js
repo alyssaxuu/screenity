@@ -648,8 +648,11 @@ export const setupHandlers = () => {
     }));
   });
 
-  registerMessage("stream-error", () => {
+  registerMessage("stream-error", (message) => {
     const state = getState();
+    const errorCode = message?.errorCode || null;
+    const errorWhy = message?.why || message?.error || null;
+
     state.openModal(
       chrome.i18n.getMessage("streamErrorModalTitle"),
       chrome.i18n.getMessage("streamErrorModalDescription"),
@@ -661,6 +664,19 @@ export const setupHandlers = () => {
       () => {
         state.dismissRecording();
       },
+      null, // image
+      null, // learnMore
+      null, // learnMoreLink
+      false, // colorSafe
+      chrome.i18n.getMessage("getHelpButton"),
+      () => {
+        chrome.runtime.sendMessage({
+          type: "report-error",
+          errorCode,
+          errorWhy,
+          source: "stream-error",
+        });
+      },
     );
   });
 
@@ -671,7 +687,7 @@ export const setupHandlers = () => {
     if (state.openToast) {
       state.openToast(
         message.message ||
-          "Screen sharing stopped. Stop recording to save your video.",
+          chrome.i18n.getMessage("streamEndedWarningToast"),
         () => {},
         10000, // Show for 10 seconds
       );
@@ -775,10 +791,10 @@ export const setupHandlers = () => {
     };
 
     state.openModal(
-      "Fast recorder failed",
-      "The fast recorder output couldn't be validated on this device.\nYou can download the file anyway.",
-      "Download anyway",
-      "Cancel",
+      chrome.i18n.getMessage("fastRecorderFailedTitle"),
+      chrome.i18n.getMessage("fastRecorderFailedDescription"),
+      chrome.i18n.getMessage("downloadAnywayButton"),
+      chrome.i18n.getMessage("cancelButton"),
       () => {
         chrome.runtime.sendMessage({ type: "open-download-mp4" });
       },

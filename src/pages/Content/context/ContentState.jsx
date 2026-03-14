@@ -10,6 +10,7 @@ import { updateFromStorage } from "./utils/updateFromStorage";
 
 // Shortcuts
 import Shortcuts from "../shortcuts/Shortcuts";
+import DevHUD from "../DevHUD";
 
 // import { initializeContentMessageListener } from "./messaging/messageListener";
 import { setupHandlers } from "./messaging/handlers";
@@ -552,6 +553,15 @@ const ContentState = (props) => {
           null,
           chrome.i18n.getMessage("learnMoreDot"),
           helpURL,
+          false, // colorSafe
+          chrome.i18n.getMessage("getHelpButton"),
+          () => {
+            chrome.runtime.sendMessage({
+              type: "report-error",
+              errorCode: "REC_RUN_MEMORY",
+              source: "not-enough-space",
+            });
+          },
         );
       }
       setContentState((prevContentState) => ({
@@ -1588,6 +1598,9 @@ const ContentState = (props) => {
     >
       {props.children}
       <Shortcuts shortcuts={contentState.shortcuts} />
+      {process.env.SCREENITY_DEV_MODE === "true" && (
+        <DevHUD contentStateRef={contentStateRef} setContentState={setContentState} />
+      )}
     </contentStateContext.Provider>
   );
 };

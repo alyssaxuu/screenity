@@ -1458,8 +1458,8 @@
     "description": "Toast shown when a crashed recording session is auto-recovered on startup"
   },
   "toastStorageCritical": {
-    "message": "Low disk space detected. Recording is stopping to avoid corruption.",
-    "description": "Toast shown when available storage drops below the critical threshold during recording"
+    "message": "Mało miejsca na dysku. Zapisywanie nagrania. Wszystko, co zostało przechwycone, jest bezpieczne.",
+    "description": "Toast shown when available storage drops below the critical threshold during recording; reassures that captured data is preserved"
   },
   "toastStorageLow": {
     "message": "Storage is running low. Upload reliability may degrade for long recordings.",
@@ -1472,5 +1472,105 @@
   "toastNetworkOffline": {
     "message": "Network offline. Upload paused. Screen chunks are saved locally.",
     "description": "Toast shown when the browser goes offline during a cloud recording upload"
+  },
+  "longRecordingTitle": {
+    "message": "Długie nagranie",
+    "description": "Banner title shown when a recording exceeds the local processing limit but is otherwise successful"
+  },
+  "longRecordingDescription": {
+    "message": "Nagranie jest kompletne i bezpieczne. Pobierz jako WebM poniżej.",
+    "description": "Banner description for long recordings that can be downloaded but not edited locally"
+  },
+  "notAvailableLongRecording": {
+    "message": "Niedostępne dla długich nagrań",
+    "description": "Disabled button label for features not available due to recording length"
+  },
+  "notAvailableRecoveryMode": {
+    "message": "Niedostępne w trybie odzyskiwania",
+    "description": "Disabled button label for features not available in recovery/fallback mode"
+  },
+  "editTooLongTitle": {
+    "message": "Edycja dźwięku zbyt długa",
+    "description": "Alert title when an audio mute/mix edit is rejected because the clip exceeds 15 minutes"
+  },
+  "editTooLongDescription": {
+    "message": "Ta edycja dźwięku nie jest obsługiwana dla klipów dłuższych niż 15 minut. Oryginał nie został zmieniony. Spróbuj najpierw przyciąć klip.",
+    "description": "Alert body explaining the 15-minute limit and suggesting trimming first"
+  },
+  "editTimeoutTitle": {
+    "message": "Czas edycji upłynął",
+    "description": "Alert title when an edit operation does not complete within the 5-minute watchdog period"
+  },
+  "editTimeoutDescription": {
+    "message": "Edycja nie zakończyła się na czas. Oryginalne nagranie nie zostało zmienione. Spróbuj ponownie lub najpierw przytnij klip.",
+    "description": "Alert body for the timeout case, prompting retry or shorter clip"
+  },
+  "streamEndedWarningToast": {
+    "message": "Udostępnianie ekranu zostało zatrzymane. Twoje nagranie jest zapisane. Zatrzymaj, gdy będziesz gotowy.",
+    "description": "Toast shown when screen share track ends mid-recording. Recording continues; removes false urgency about data loss."
+  },
+  "recoveryModeDescription": {
+    "message": "Wystąpił problem z przetwarzaniem, ale Twoje nagranie jest bezpieczne. Możesz je pobrać poniżej.",
+    "description": "Recovery mode banner description — reassures user their recording is accessible despite the processing failure"
+  },
+  "editProcessingSafeDescription": {
+    "message": "Przetwarzanie edycji. Oryginalne nagranie pozostaje niezmienione.",
+    "description": "Shown in the editor processing alert when a user-initiated edit is running, to reassure the original is safe"
+  },
+  "editFailedTitle": {
+    "message": "Nie udało się zastosować edycji",
+    "description": "Alert title when an edit operation fails due to an encoding or processing error"
+  },
+  "editFailedDescription": {
+    "message": "Coś poszło nie tak podczas przetwarzania. Oryginalne nagranie jest bezpieczne. Możesz spróbować ponownie lub pobrać je w obecnej formie.",
+    "description": "Alert body for edit failure; explicitly confirms the original recording is untouched"
+  },
+  "videoTrackEndedToast": {
+    "message": "Udostępnianie ekranu zostało zatrzymane. Zapisywanie nagrania. Wszystko, co zostało przechwycone, jest bezpieczne.",
+    "description": "Toast shown when the video track ends mid-recording (e.g. monitor disconnected, screen share revoked)"
+  },
+  "audioTrackEndedToast": {
+    "message": "Dźwięk został odłączony. Zapisywanie nagrania. Dotychczas przechwycone wideo jest bezpieczne.",
+    "description": "Toast shown when the audio track ends mid-recording (e.g. mic unplugged, permission revoked)"
+  },
+  "editorRecoveryToast": {
+    "message": "Nagranie zostało zapisane. Edytor się nie otworzył. Kliknij ikonę Screenity, aby spróbować ponownie.",
+    "description": "Toast shown on the active tab when the post-recording editor tab fails to open"
+  },
+  "stopAckTimeoutToast": {
+    "message": "Zapisywanie trwa dłużej niż oczekiwano. Twoje dane są bezpieczne. Edytor otworzy się wkrótce.",
+    "description": "Toast shown when the recorder does not acknowledge the stop request within a few seconds"
+  },
+  "copyDebugInfoButton": {
+    "message": "Kopiuj info debugowania",
+    "description": "Button to copy technical debug info to clipboard for support"
+  },
+  "debugInfoCopiedToast": {
+    "message": "Info debugowania skopiowane",
+    "description": "Toast shown after debug info is copied"
+  },
+  "getHelpButton": {
+    "message": "Uzyskaj pomoc",
+    "description": "Side button on error modals that opens a prefilled support form"
+  },
+  "recordingTooShortToast": {
+    "message": "Nagranie było za krótkie, aby je zapisać",
+    "description": "Toast shown when a region recording is stopped by navigation but no chunks were saved"
+  },
+  "fastRecorderFailedTitle": {
+    "message": "Szybki rejestrator nie powi\u00f3d\u0142 si\u0119",
+    "description": "Title for the modal shown when the fast MP4 recorder output could not be validated"
+  },
+  "fastRecorderFailedDescription": {
+    "message": "Wyj\u015bcie szybkiego rejestratora nie mog\u0142o zosta\u0107 zweryfikowane na tym urz\u0105dzeniu.\nMo\u017cesz mimo to pobra\u0107 plik.",
+    "description": "Body text for the fast recorder failure modal"
+  },
+  "downloadAnywayButton": {
+    "message": "Pobierz mimo to",
+    "description": "Button to download the recording file despite validation failure"
+  },
+  "cancelButton": {
+    "message": "Anuluj",
+    "description": "Generic cancel button label"
   }
 }

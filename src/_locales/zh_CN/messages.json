@@ -1454,8 +1454,8 @@
     "description": "Toast shown when a crashed recording session is auto-recovered on startup"
   },
   "toastStorageCritical": {
-    "message": "Low disk space detected. Recording is stopping to avoid corruption.",
-    "description": "Toast shown when available storage drops below the critical threshold during recording"
+    "message": "磁盘空间不足，正在保存录制内容。已录制的内容是安全的。",
+    "description": "Toast shown when available storage drops below the critical threshold during recording; reassures that captured data is preserved"
   },
   "toastStorageLow": {
     "message": "Storage is running low. Upload reliability may degrade for long recordings.",
@@ -1468,5 +1468,105 @@
   "toastNetworkOffline": {
     "message": "Network offline. Upload paused. Screen chunks are saved locally.",
     "description": "Toast shown when the browser goes offline during a cloud recording upload"
+  },
+  "longRecordingTitle": {
+    "message": "长录制",
+    "description": "Banner title shown when a recording exceeds the local processing limit but is otherwise successful"
+  },
+  "longRecordingDescription": {
+    "message": "您的录制已完成且安全。请在下方下载 WebM 文件。",
+    "description": "Banner description for long recordings that can be downloaded but not edited locally"
+  },
+  "notAvailableLongRecording": {
+    "message": "长录制不可用",
+    "description": "Disabled button label for features not available due to recording length"
+  },
+  "notAvailableRecoveryMode": {
+    "message": "恢复模式下不可用",
+    "description": "Disabled button label for features not available in recovery/fallback mode"
+  },
+  "editTooLongTitle": {
+    "message": "音频编辑内容过长",
+    "description": "Alert title when an audio mute/mix edit is rejected because the clip exceeds 15 minutes"
+  },
+  "editTooLongDescription": {
+    "message": "此音频编辑不支持超过15分钟的片段。原始文件未被修改。请先尝试裁剪片段。",
+    "description": "Alert body explaining the 15-minute limit and suggesting trimming first"
+  },
+  "editTimeoutTitle": {
+    "message": "编辑超时",
+    "description": "Alert title when an edit operation does not complete within the 5-minute watchdog period"
+  },
+  "editTimeoutDescription": {
+    "message": "编辑未能及时完成。原始录制内容未被修改。请重试，或先裁剪片段。",
+    "description": "Alert body for the timeout case, prompting retry or shorter clip"
+  },
+  "streamEndedWarningToast": {
+    "message": "屏幕共享已停止。您的录制内容已保存，准备好后即可停止。",
+    "description": "Toast shown when screen share track ends mid-recording. Recording continues; removes false urgency about data loss."
+  },
+  "recoveryModeDescription": {
+    "message": "处理时出现问题，但您的录制内容是安全的。您可以在下方下载。",
+    "description": "Recovery mode banner description — reassures user their recording is accessible despite the processing failure"
+  },
+  "editProcessingSafeDescription": {
+    "message": "正在处理编辑。原始录制内容未受影响。",
+    "description": "Shown in the editor processing alert when a user-initiated edit is running, to reassure the original is safe"
+  },
+  "editFailedTitle": {
+    "message": "无法应用编辑",
+    "description": "Alert title when an edit operation fails due to an encoding or processing error"
+  },
+  "editFailedDescription": {
+    "message": "处理过程中出现问题。原始录制内容是安全的。您可以重试或直接下载。",
+    "description": "Alert body for edit failure; explicitly confirms the original recording is untouched"
+  },
+  "videoTrackEndedToast": {
+    "message": "屏幕共享已停止，正在保存录制内容。已录制的内容是安全的。",
+    "description": "Toast shown when the video track ends mid-recording (e.g. monitor disconnected, screen share revoked)"
+  },
+  "audioTrackEndedToast": {
+    "message": "音频已断开，正在保存录制内容。已录制的视频是安全的。",
+    "description": "Toast shown when the audio track ends mid-recording (e.g. mic unplugged, permission revoked)"
+  },
+  "editorRecoveryToast": {
+    "message": "录制内容已保存。编辑器未打开，请点击 Screenity 图标重试。",
+    "description": "Toast shown on the active tab when the post-recording editor tab fails to open"
+  },
+  "stopAckTimeoutToast": {
+    "message": "保存时间比预期长。您的数据是安全的，编辑器即将打开。",
+    "description": "Toast shown when the recorder does not acknowledge the stop request within a few seconds"
+  },
+  "copyDebugInfoButton": {
+    "message": "复制调试信息",
+    "description": "Button to copy technical debug info to clipboard for support"
+  },
+  "debugInfoCopiedToast": {
+    "message": "调试信息已复制",
+    "description": "Toast shown after debug info is copied"
+  },
+  "getHelpButton": {
+    "message": "获取帮助",
+    "description": "Side button on error modals that opens a prefilled support form"
+  },
+  "recordingTooShortToast": {
+    "message": "录制时间太短，无法保存",
+    "description": "Toast shown when a region recording is stopped by navigation but no chunks were saved"
+  },
+  "fastRecorderFailedTitle": {
+    "message": "快速录制器失败",
+    "description": "Title for the modal shown when the fast MP4 recorder output could not be validated"
+  },
+  "fastRecorderFailedDescription": {
+    "message": "快速录制器的输出无法在此设备上验证。\n您仍可以下载该文件。",
+    "description": "Body text for the fast recorder failure modal"
+  },
+  "downloadAnywayButton": {
+    "message": "仍然下载",
+    "description": "Button to download the recording file despite validation failure"
+  },
+  "cancelButton": {
+    "message": "取消",
+    "description": "Generic cancel button label"
   }
 }

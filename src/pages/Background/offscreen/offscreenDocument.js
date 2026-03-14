@@ -1,4 +1,5 @@
 import { getCurrentTab } from "../tabManagement";
+import { removeTab } from "../tabManagement/removeTab";
 import { sendMessageRecord } from "../recording/sendMessageRecord.js";
 import { closeOffscreenDocument } from "./closeOffscreenDocument.js";
 import { loginWithWebsite } from "../auth/loginWithWebsite.js";
@@ -13,12 +14,11 @@ const openRecorderTab = async (
   let switchTab = true;
 
   // Check subscription status
-  const { authenticated, subscribed } = await loginWithWebsite();
+  const { authenticated, subscribed, cached, transient, error: authError } = await loginWithWebsite();
   const recorderUrl =
     authenticated && subscribed
       ? chrome.runtime.getURL("cloudrecorder.html")
       : chrome.runtime.getURL("recorder.html");
-
   if (!isRegion) {
     if (camera) {
       switchTab = false;
@@ -27,6 +27,29 @@ const openRecorderTab = async (
     switchTab = activeTab.url.includes(
       chrome.runtime.getURL("playground.html")
     );
+  }
+
+  // Close any leftover recorder tab from a previous recording so we don't
+  // end up with two pinned tabs. Only close actual extension recorder pages —
+  // for region recordings, recordingTab can temporarily point to the user's
+  // active page, which we must NOT close.
+  const { recordingTab: prevRecTab } = await chrome.storage.local.get([
+    "recordingTab",
+  ]);
+  if (prevRecTab != null) {
+    try {
+      const prevTab = await chrome.tabs.get(prevRecTab);
+      const prevUrl = prevTab?.url || "";
+      if (
+        prevUrl.includes("recorder.html") ||
+        prevUrl.includes("cloudrecorder.html")
+      ) {
+        await removeTab(prevRecTab);
+      }
+    } catch {
+      // Tab doesn't exist — just clear the reference
+    }
+    chrome.storage.local.set({ recordingTab: null });
   }
 
   chrome.tabs
@@ -39,7 +62,20 @@ const openRecorderTab = async (
     })
     .then((tab) => {
       // Prevent Chrome from discarding this tab during recording
-      chrome.tabs.update(tab.id, { autoDiscardable: false }).catch(() => {});
+      chrome.tabs.update(tab.id, { autoDiscardable: false }).catch((err) => {
+        console.warn(
+          "[Screenity] autoDiscardable failed for recorder tab",
+          tab.id,
+          String(err),
+        );
+        chrome.storage.local.set({
+          lastAutoDiscardableError: {
+            ts: Date.now(),
+            tabId: tab.id,
+            error: String(err),
+          },
+        });
+      });
 
       chrome.storage.local.set({
         recordingTab: tab.id,

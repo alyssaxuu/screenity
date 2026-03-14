@@ -23,9 +23,12 @@ export const sendMessageRecord = (message, responseCallback = null) => {
         sendMessageTab(result.recordingTab, message, responseCallback)
           .then(resolve)
           .catch((err) => {
+            const errStr = String(err);
+            const isDeadTab =
+              errStr.includes("Receiving end does not exist") ||
+              errStr.includes("No tab with id");
             console.warn(
-              "sendMessageRecord: failed to message recordingTab",
-              result.recordingTab,
+              `sendMessageRecord: failed to message recordingTab ${result.recordingTab}${isDeadTab ? " (stale/dead tab)" : ""}`,
               err
             );
             reject(err);

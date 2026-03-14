@@ -15,13 +15,11 @@ export const restartActiveTab = async (message = {}) => {
       sendMessageTab(targetTabId, { type: "ready-to-record" });
 
       const { countdown } = await chrome.storage.local.get(["countdown"]);
-      const delay = countdown ? null : 300;
 
-      if (delay != null) {
-        setTimeout(() => {
-          startRecording();
-        }, delay);
+      if (!countdown) {
+        startRecording();
       }
+      // With countdown, content shows the UI and sends "countdown-finished".
     } else {
       console.error("No active tab found.");
     }
@@ -73,13 +71,14 @@ export const resetActiveTab = async (forceRestart = false, message = {}) => {
         sendMessageTab(targetTabId, { type: "ready-to-record" });
 
         const { countdown } = await chrome.storage.local.get(["countdown"]);
-        const delay = countdown ? null : 300;
 
-        if (delay != null) {
-          setTimeout(() => {
-            startRecording();
-          }, delay);
+        if (!countdown) {
+          // No countdown — start immediately.  The recorder's readiness gate
+          // will wait for the stream to be live before actually recording.
+          startRecording();
         }
+        // With countdown: Content shows the countdown UI and sends
+        // "countdown-finished" when done, which triggers startAfterCountdown().
       } else {
         console.error("No valid tab to send message to.");
       }

@@ -1458,8 +1458,8 @@
     "description": "Toast shown when a crashed recording session is auto-recovered on startup"
   },
   "toastStorageCritical": {
-    "message": "Low disk space detected. Recording is stopping to avoid corruption.",
-    "description": "Toast shown when available storage drops below the critical threshold during recording"
+    "message": "Pouco espaço em disco. Salvando sua gravação. Tudo que foi capturado até agora está seguro.",
+    "description": "Toast shown when available storage drops below the critical threshold during recording; reassures that captured data is preserved"
   },
   "toastStorageLow": {
     "message": "Storage is running low. Upload reliability may degrade for long recordings.",
@@ -1472,5 +1472,105 @@
   "toastNetworkOffline": {
     "message": "Network offline. Upload paused. Screen chunks are saved locally.",
     "description": "Toast shown when the browser goes offline during a cloud recording upload"
+  },
+  "longRecordingTitle": {
+    "message": "Gravação longa",
+    "description": "Banner title shown when a recording exceeds the local processing limit but is otherwise successful"
+  },
+  "longRecordingDescription": {
+    "message": "Sua gravação está completa e segura. Baixe como WebM abaixo.",
+    "description": "Banner description for long recordings that can be downloaded but not edited locally"
+  },
+  "notAvailableLongRecording": {
+    "message": "Indisponível para gravações longas",
+    "description": "Disabled button label for features not available due to recording length"
+  },
+  "notAvailableRecoveryMode": {
+    "message": "Indisponível no modo de recuperação",
+    "description": "Disabled button label for features not available in recovery/fallback mode"
+  },
+  "editTooLongTitle": {
+    "message": "Edição de áudio muito longa",
+    "description": "Alert title when an audio mute/mix edit is rejected because the clip exceeds 15 minutes"
+  },
+  "editTooLongDescription": {
+    "message": "Esta edição de áudio não é suportada para clipes com mais de 15 minutos. Seu original não foi alterado. Tente cortar o clipe primeiro.",
+    "description": "Alert body explaining the 15-minute limit and suggesting trimming first"
+  },
+  "editTimeoutTitle": {
+    "message": "Tempo da edição esgotado",
+    "description": "Alert title when an edit operation does not complete within the 5-minute watchdog period"
+  },
+  "editTimeoutDescription": {
+    "message": "A edição não foi concluída a tempo. Sua gravação original não foi alterada. Tente novamente ou corte o clipe primeiro.",
+    "description": "Alert body for the timeout case, prompting retry or shorter clip"
+  },
+  "streamEndedWarningToast": {
+    "message": "O compartilhamento de tela parou. Sua gravação está salva. Pare quando estiver pronto.",
+    "description": "Toast shown when screen share track ends mid-recording. Recording continues; removes false urgency about data loss."
+  },
+  "recoveryModeDescription": {
+    "message": "Houve um problema no processamento, mas sua gravação está segura. Você pode baixá-la abaixo.",
+    "description": "Recovery mode banner description — reassures user their recording is accessible despite the processing failure"
+  },
+  "editProcessingSafeDescription": {
+    "message": "Processando sua edição. A gravação original não foi alterada.",
+    "description": "Shown in the editor processing alert when a user-initiated edit is running, to reassure the original is safe"
+  },
+  "editFailedTitle": {
+    "message": "Não foi possível aplicar a edição",
+    "description": "Alert title when an edit operation fails due to an encoding or processing error"
+  },
+  "editFailedDescription": {
+    "message": "Algo deu errado durante o processamento. Sua gravação original está segura. Você pode tentar novamente ou baixá-la como está.",
+    "description": "Alert body for edit failure; explicitly confirms the original recording is untouched"
+  },
+  "videoTrackEndedToast": {
+    "message": "O compartilhamento de tela parou. Salvando sua gravação. Tudo que foi capturado até agora está seguro.",
+    "description": "Toast shown when the video track ends mid-recording (e.g. monitor disconnected, screen share revoked)"
+  },
+  "audioTrackEndedToast": {
+    "message": "Áudio desconectado. Salvando sua gravação. O vídeo capturado até agora está seguro.",
+    "description": "Toast shown when the audio track ends mid-recording (e.g. mic unplugged, permission revoked)"
+  },
+  "editorRecoveryToast": {
+    "message": "Sua gravação foi salva. O editor não abriu. Clique no ícone do Screenity para tentar novamente.",
+    "description": "Toast shown on the active tab when the post-recording editor tab fails to open"
+  },
+  "stopAckTimeoutToast": {
+    "message": "O salvamento está demorando mais que o esperado. Seus dados estão seguros. O editor abrirá em breve.",
+    "description": "Toast shown when the recorder does not acknowledge the stop request within a few seconds"
+  },
+  "copyDebugInfoButton": {
+    "message": "Copiar info de depuração",
+    "description": "Button to copy technical debug info to clipboard for support"
+  },
+  "debugInfoCopiedToast": {
+    "message": "Info de depuração copiada",
+    "description": "Toast shown after debug info is copied"
+  },
+  "getHelpButton": {
+    "message": "Obter ajuda",
+    "description": "Side button on error modals that opens a prefilled support form"
+  },
+  "recordingTooShortToast": {
+    "message": "A gravação foi curta demais para salvar",
+    "description": "Toast shown when a region recording is stopped by navigation but no chunks were saved"
+  },
+  "fastRecorderFailedTitle": {
+    "message": "Gravador r\u00e1pido falhou",
+    "description": "Title for the modal shown when the fast MP4 recorder output could not be validated"
+  },
+  "fastRecorderFailedDescription": {
+    "message": "A sa\u00edda do gravador r\u00e1pido n\u00e3o p\u00f4de ser validada neste dispositivo.\nVoc\u00ea pode baixar o arquivo mesmo assim.",
+    "description": "Body text for the fast recorder failure modal"
+  },
+  "downloadAnywayButton": {
+    "message": "Baixar mesmo assim",
+    "description": "Button to download the recording file despite validation failure"
+  },
+  "cancelButton": {
+    "message": "Cancelar",
+    "description": "Generic cancel button label"
   }
 }

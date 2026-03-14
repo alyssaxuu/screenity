@@ -706,7 +706,7 @@ export default class BunnyTusUploader {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${user.token}`,
+            Authorization: `Bearer ${screenityToken}`,
           },
           body: JSON.stringify({
             title,
@@ -785,8 +785,12 @@ export default class BunnyTusUploader {
   }
 
   async refreshTusAuth() {
+    // Prefer stored screenityToken for auth
+    const token = this.userToken || (await chrome.storage.local.get(["screenityToken"]).then(r => r.screenityToken));
+    const headers = token ? { Authorization: `Bearer ${token}` } : {};
     const res = await fetch(
       `${API_BASE}/bunny/videos/tus-auth?videoId=${this.videoId}`,
+      { headers },
     );
     if (!res.ok) throw new Error("Failed to refresh TUS auth");
     const { signature, expires, libraryId } = await res.json();
@@ -819,7 +823,7 @@ export default class BunnyTusUploader {
       : location;
 
     if (this.userToken) {
-      await fetch(`${API_BASE}/bunny/videos/save-upload-meta`, {
+      fetch(`${API_BASE}/bunny/videos/save-upload-meta`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -835,7 +839,9 @@ export default class BunnyTusUploader {
           recordingSessionId: this.sessionId || null,
           type: this.metadata?.type || null,
         }),
-      });
+      }).catch((err) =>
+        this.debugLog("save-upload-meta failed (non-blocking)", { error: String(err) }),
+      );
     } else {
       this.debugLog("Skipping save-upload-meta because user token is missing", {
         mediaId: this.mediaId,

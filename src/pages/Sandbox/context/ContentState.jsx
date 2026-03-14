@@ -11,6 +11,7 @@ import fixWebmDuration from "fix-webm-duration";
 import { default as fixWebmDurationFallback } from "webm-duration-fix";
 
 import localforage from "localforage";
+import DevHUD from "../DevHUD";
 import {
   formatLocalTimestamp,
   getHostnameFromUrl,
@@ -37,7 +38,7 @@ export const ContentStateContext = createContext();
 const DEBUG_RECORDER =
   typeof window !== "undefined" ? !!window.SCREENITY_DEBUG_RECORDER : false;
 // Enable post-stop debug logs for sandbox
-const DEBUG_POSTSTOP = true;
+const DEBUG_POSTSTOP = DEBUG_RECORDER;
 
 const ContentState = (props) => {
   const videoChunks = useRef([]);
@@ -45,6 +46,9 @@ const ContentState = (props) => {
   const chunkCount = useRef(0);
   const recdbgSessionRef = useRef(null);
   const tabIdRef = useRef(null);
+  // Stale-result guard + stuck-edit watchdog.
+  const opIdRef = useRef(0);
+  const editWatchdogRef = useRef(null);
 
   useEffect(() => {
     if (!DEBUG_RECORDER && !isRecordingDebugEnabled()) return;
@@ -101,6 +105,7 @@ const ContentState = (props) => {
     trimming: false,
     cutting: false,
     muting: false,
+    editErrorType: null, // null | "too-long" | "timeout" | "failed"
     history: [{}], // Initialize history with a default state
     redoHistory: [],
     undoDisabled: true,
@@ -557,11 +562,38 @@ const ContentState = (props) => {
   }, [contentState.blob]);
 
   const reconstructVideo = async (withBlob) => {
+    // Sniff MIME type from magic bytes (WebCodecs chunks are MP4, not WebM).
+    let inferredType = "video/webm; codecs=vp8,opus";
+    if (!withBlob && videoChunks.current.length > 0) {
+      try {
+        const head = videoChunks.current[0];
+        if (head && head.length >= 8) {
+          const magic = new TextDecoder().decode(head.slice(4, 8));
+          if (magic === "ftyp") {
+            inferredType = "video/mp4";
+          }
+          if (DEBUG_RECORDER)
+            console.log("[Screenity][Sandbox] reconstructVideo inferred type", {
+              magic,
+              inferredType,
+              chunkCount: videoChunks.current.length,
+              totalSize: videoChunks.current.reduce((s, c) => s + c.length, 0),
+            });
+        }
+      } catch (e) {
+        console.warn("[Screenity][Sandbox] reconstructVideo type sniff failed", e);
+      }
+    }
+
     let blob = withBlob
       ? withBlob
-      : new Blob(videoChunks.current, { type: "video/webm; codecs=vp8,opus" });
+      : new Blob(videoChunks.current, { type: inferredType });
 
     if (blob.type === "video/mp4") {
+      if (DEBUG_RECORDER)
+        console.log("[Screenity][Sandbox] reconstructVideo: fast MP4 path taken", {
+          size: blob.size,
+        });
       //const TOO_BIG_BYTES = 200 * 1024 * 1024;
       // const TOO_BIG_BYTES = 0;
       // if (blob.size > TOO_BIG_BYTES) {
@@ -618,12 +650,51 @@ const ContentState = (props) => {
       video.src = URL.createObjectURL(blob);
 
       chrome.runtime.sendMessage({ type: "recording-complete" });
+      chrome.runtime.sendMessage({ type: "diag-editor-ready", path: "mp4-fast" }).catch(() => {});
       return;
     }
 
-    const { recordingDuration } = await chrome.storage.local.get(
+    let { recordingDuration } = await chrome.storage.local.get(
       "recordingDuration",
     );
+
+    // If recordingDuration is missing or 0, try to probe it from the blob
+    if (!recordingDuration || recordingDuration <= 0) {
+      console.warn(
+        "[Screenity][WebM] recordingDuration missing or 0, probing from blob",
+      );
+      try {
+        const probeDuration = await new Promise((resolve) => {
+          const probe = document.createElement("video");
+          probe.preload = "metadata";
+          const timeout = setTimeout(() => {
+            URL.revokeObjectURL(probe.src);
+            resolve(0);
+          }, 5000);
+          probe.onloadedmetadata = () => {
+            clearTimeout(timeout);
+            const dur = probe.duration;
+            URL.revokeObjectURL(probe.src);
+            if (Number.isFinite(dur) && dur > 0) {
+              resolve(Math.round(dur * 1000));
+            } else {
+              resolve(0);
+            }
+          };
+          probe.onerror = () => {
+            clearTimeout(timeout);
+            URL.revokeObjectURL(probe.src);
+            resolve(0);
+          };
+          probe.src = URL.createObjectURL(blob);
+        });
+        if (probeDuration > 0) {
+          recordingDuration = probeDuration;
+        }
+      } catch (err) {
+        console.warn("[Screenity][WebM] blob duration probe failed:", err);
+      }
+    }
 
     // Check if token is present
     const { token } = await chrome.storage.local.get("token");
@@ -634,21 +705,22 @@ const ContentState = (props) => {
       driveEnabled = true;
     }
 
+    const safeDuration = Number(recordingDuration) || 0;
     setContentState((prevState) => ({
       ...prevState,
       rawBlob: blob,
-      duration: recordingDuration / 1000,
+      duration: safeDuration / 1000,
     }));
 
     // Check if user is in Windows 10
     const isWindows10 = navigator.userAgent.match(/Windows NT 10.0/);
 
     try {
-      if (recordingDuration > 0 && recordingDuration !== null) {
+      if (safeDuration > 0) {
         if (!isWindows10) {
           fixWebmDuration(
             blob,
-            recordingDuration,
+            safeDuration,
             async (fixedWebm) => {
               // Skip conversion only if Chrome is outdated or recording exceeds edit limit
               if (
@@ -684,7 +756,6 @@ const ContentState = (props) => {
           const fixedWebm = await fixWebmDurationFallback(blob, {
             type: "video/webm; codecs=vp8, opus",
           });
-
           // Skip conversion only if Chrome is outdated or recording exceeds edit limit
           if (
             contentStateRef.current.updateChrome ||
@@ -714,7 +785,10 @@ const ContentState = (props) => {
           reader.readAsDataURL(fixedWebm);
         }
       } else {
-        /// Skip fixing duration
+        // Duration unknown — skip fixing, use raw blob as-is
+        console.warn(
+          "[Screenity][WebM] skipping duration fix: safeDuration=0, blob will have broken seek metadata",
+        );
         // Skip conversion only if Chrome is outdated or recording exceeds edit limit
         if (
           contentStateRef.current.updateChrome ||
@@ -744,6 +818,10 @@ const ContentState = (props) => {
         reader.readAsDataURL(blob);
       }
     } catch (error) {
+      console.error(
+        "[Screenity][WebM] duration fix failed, using unfixed blob:",
+        error,
+      );
       setContentState((prevState) => ({
         ...prevState,
         webm: blob,
@@ -770,6 +848,15 @@ const ContentState = (props) => {
             () => {
               chrome.runtime.sendMessage({ type: "memory-limit-help" });
             },
+            false, // colorSafe
+            chrome.i18n.getMessage("getHelpButton"),
+            () => {
+              chrome.runtime.sendMessage({
+                type: "report-error",
+                errorCode: "REC_RUN_MEMORY",
+                source: "memory-limit",
+              });
+            },
           );
         }
       });
@@ -790,7 +877,8 @@ const ContentState = (props) => {
       try {
         await Promise.all(
           chunks.map(async (chunk) => {
-            if (contentStateRef.current.chunkIndex >= chunkCount.current) {
+            // contentStateRef is sync — chunkCount.current lags a render cycle.
+            if (contentStateRef.current.chunkIndex >= contentStateRef.current.chunkCount) {
               return; // Skip processing
             }
 
@@ -855,27 +943,63 @@ const ContentState = (props) => {
     checkMemory();
     reconstructVideo();
 
-    setTimeout(() => {
+    // Timeout: if duration-fix hasn't finished, mark ready so the user
+    // isn't stuck forever. Don't overwrite an already-fixed webm.
+    const safetyCheck = () => {
       const s = contentStateRef.current;
       if (DEBUG_POSTSTOP)
-        console.debug("[Screenity][Sandbox] makeVideoTab: post-check", {
+        console.debug("[Screenity][Sandbox] makeVideoTab: safety-check", {
           chunkCount: s?.chunkCount,
           chunkIndex: s?.chunkIndex,
           rawBlob: Boolean(s?.rawBlob),
+          webm: Boolean(s?.webm),
           ready: s?.ready,
         });
+      if (s?.ready) return; // Fix already completed, nothing to do
+
       const complete = s?.chunkCount > 0 && s?.chunkIndex >= s?.chunkCount;
-      if (complete && !s?.ready && s?.rawBlob) {
-        setContentState((prev) => ({
-          ...prev,
-          webm: prev.webm || prev.rawBlob,
-          ready: true,
-          noffmpeg: true,
-          isFfmpegRunning: false,
-        }));
+      if (complete && s?.rawBlob) {
+        // Keep the fixed webm if it landed between checks.
+        if (s?.webm) {
+          if (DEBUG_RECORDER)
+            console.log(
+              "[Screenity][WebM] safety timeout: webm already set by fix, marking ready",
+            );
+          setContentState((prev) => ({
+            ...prev,
+            ready: true,
+            noffmpeg: true,
+            isFfmpegRunning: false,
+          }));
+        } else {
+          console.warn(
+            "[Screenity][WebM] safety timeout: duration fix did not complete in time, using unfixed rawBlob",
+          );
+          setContentState((prev) => ({
+            ...prev,
+            webm: prev.rawBlob,
+            ready: true,
+            noffmpeg: true,
+            isFfmpegRunning: false,
+          }));
+        }
         chrome.runtime.sendMessage({ type: "recording-complete" });
       }
+    };
+    // First check at 30s; if still not ready, final check at 60s
+    setTimeout(() => {
+      if (!contentStateRef.current?.ready) {
+        safetyCheck();
+      }
     }, 30000);
+    setTimeout(() => {
+      if (!contentStateRef.current?.ready) {
+        console.warn(
+          "[Screenity][WebM] 60s safety timeout: force-marking ready",
+        );
+        safetyCheck();
+      }
+    }, 60000);
 
     if (sendResponse) sendResponse({ status: "ok" });
   };
@@ -1214,6 +1338,10 @@ const ContentState = (props) => {
 
   const onMessage = async (event) => {
     if (event.data.type === "updated-blob") {
+      // Discard results from a timed-out or superseded operation.
+      const msgOpId = event.data._opId;
+      if (msgOpId != null && msgOpId !== opIdRef.current) return;
+
       const base64 = event.data.base64;
 
       const blob = base64ToUint8Array(base64);
@@ -1223,32 +1351,44 @@ const ContentState = (props) => {
       const isFromAudio = event.data.fromAudio === true;
 
       if (isFromAudio) {
+        // Mid-chain: add-audio succeeded; reencode is still pending.
+        // Forward the same opId so the reencode result is also validated.
         sendMessage({
           type: "reencode-video",
           blob,
           duration: contentState.duration,
           topLevel: isTopLevel,
+          _opId: event.data._opId,
         });
         return;
       }
 
-      setContentState((prev) => ({
-        ...prev,
-        blob: blob,
-        mp4ready: true,
-        hasBeenEdited: event.data.edited === false ? prev.hasBeenEdited : true,
-        isFfmpegRunning: false,
-        reencoding: false,
-        trimming: false,
-        cutting: false,
-        muting: false,
-        cropping: false,
-        processingProgress: 0,
-        hasTempChanges: !isTopLevel,
+      clearEditOp();
 
-        ...(prev.fromCropper && { mode: "player", fromCropper: false }),
-        ...(prev.fromAudio && { mode: "player", fromAudio: false }),
-      }));
+      setContentState((prev) => {
+        const wasFirstReady = !prev.mp4ready && isTopLevel;
+        if (wasFirstReady) {
+          chrome.runtime.sendMessage({ type: "diag-editor-ready", path: "updated-blob" }).catch(() => {});
+        }
+        return {
+          ...prev,
+          blob: blob,
+          mp4ready: true,
+          hasBeenEdited: event.data.edited === false ? prev.hasBeenEdited : true,
+          isFfmpegRunning: false,
+          reencoding: false,
+          trimming: false,
+          cutting: false,
+          muting: false,
+          cropping: false,
+          processingProgress: 0,
+          editErrorType: null,
+          hasTempChanges: !isTopLevel,
+
+          ...(prev.fromCropper && { mode: "player", fromCropper: false }),
+          ...(prev.fromAudio && { mode: "player", fromAudio: false }),
+        };
+      });
 
       const video = document.createElement("video");
       video.preload = "metadata";
@@ -1347,20 +1487,45 @@ const ContentState = (props) => {
       // }
     } else if (event.data.type === "ffmpeg-error") {
       console.warn("FFmpeg error:", event.data.error);
+      clearEditOp();
 
       // Fallback: allow playback/download using webm/rawBlob even if conversion fails
-      setContentState((prev) => ({
-        ...prev,
-        noffmpeg: true,
-        ffmpegLoaded: true, // treat as “done trying”
-        isFfmpegRunning: false,
-        processingProgress: 0,
-        ...(prev.rawBlob || prev.webm
-          ? { ready: true, webm: prev.webm || prev.rawBlob }
-          : {}),
-      }));
+      setContentState((prev) => {
+        // If an edit was actively running, surface the failure to the user
+        const wasEditing = prev.isFfmpegRunning && (prev.cutting || prev.trimming || prev.muting || prev.cropping || prev.reencoding);
+        return {
+          ...prev,
+          noffmpeg: true,
+          ffmpegLoaded: true, // treat as "done trying"
+          isFfmpegRunning: false,
+          muting: false,
+          cutting: false,
+          trimming: false,
+          reencoding: false,
+          cropping: false,
+          processingProgress: 0,
+          editErrorType: wasEditing ? "failed" : prev.editErrorType,
+          ...(prev.rawBlob || prev.webm
+            ? { ready: true, webm: prev.webm || prev.rawBlob }
+            : {}),
+        };
+      });
 
       chrome.runtime.sendMessage({ type: "recording-complete" });
+    } else if (event.data.type === "edit-too-long") {
+      // Too long for in-browser processing — reset so user can retry or trim.
+      clearEditOp();
+      setContentState((prev) => ({
+        ...prev,
+        isFfmpegRunning: false,
+        muting: false,
+        cutting: false,
+        trimming: false,
+        reencoding: false,
+        cropping: false,
+        processingProgress: 0,
+        editErrorType: "too-long",
+      }));
     } else if (event.data.type === "crop-update") {
       setContentState((prevContentState) => ({
         ...prevContentState,
@@ -1464,6 +1629,34 @@ const ContentState = (props) => {
     getBlob();
   }, [contentState.base64, contentState.ffmpeg, contentState.ffmpegLoaded]);
 
+  // 30s fallback: if FFmpeg never loads (blocked CDN, worker crash, etc.),
+  // force recovery mode so the user can still download their recording.
+  useEffect(() => {
+    if (!contentState.base64) return;
+    if (!contentState.ffmpeg) return;
+    if (contentState.ffmpegLoaded) return; // FFmpeg loaded normally — nothing to do
+    if (contentState.noffmpeg) return;     // already in fallback — nothing to do
+
+    const timer = setTimeout(() => {
+      // Re-check via ref in case state changed since the effect ran.
+      const current = contentStateRef.current;
+      if (current.ffmpegLoaded || current.noffmpeg) return;
+      chrome.storage.local.set({ editorLoadTimeoutAt: Date.now() });
+      setContentState((prev) => {
+        // Double-check inside the updater for concurrent state races.
+        if (prev.ffmpegLoaded || prev.noffmpeg) return prev;
+        return {
+          ...prev,
+          noffmpeg: true,
+          ffmpegLoaded: true,
+          fallback: true,
+        };
+      });
+    }, 30000);
+
+    return () => clearTimeout(timer);
+  }, [contentState.base64, contentState.ffmpeg, contentState.ffmpegLoaded, contentState.noffmpeg]);
+
   const getImage = useCallback(async () => {
     if (!contentState.blob) return;
     if (!contentState.ffmpeg) return;
@@ -1477,6 +1670,39 @@ const ContentState = (props) => {
     sendMessage({ type: "get-frame", time: 0, blob: contentState.blob });
   }, [contentState.blob, contentState.ffmpeg, contentState.isFfmpegRunning]);
 
+  // Returns the opId to include in outgoing messages for stale-result validation.
+  const beginEditOp = () => {
+    if (editWatchdogRef.current) {
+      clearTimeout(editWatchdogRef.current);
+    }
+    opIdRef.current += 1;
+    const id = opIdRef.current;
+    editWatchdogRef.current = setTimeout(() => {
+      editWatchdogRef.current = null;
+      opIdRef.current += 1; // invalidate any late-arriving result
+      setContentState((prev) => ({
+        ...prev,
+        isFfmpegRunning: false,
+        muting: false,
+        cutting: false,
+        trimming: false,
+        reencoding: false,
+        cropping: false,
+        processingProgress: 0,
+        editErrorType: "timeout",
+      }));
+    }, 5 * 60 * 1000); // 5-minute ceiling
+    return id;
+  };
+
+  // Clears the watchdog when an op completes or fails normally.
+  const clearEditOp = () => {
+    if (editWatchdogRef.current) {
+      clearTimeout(editWatchdogRef.current);
+      editWatchdogRef.current = null;
+    }
+  };
+
   const addAudio = async (videoBlob, audioBlob, volume) => {
     if (contentState.isFfmpegRunning) return;
     if (
@@ -1486,11 +1712,13 @@ const ContentState = (props) => {
       return;
 
     const sourceBlob = videoBlob || contentState.blob || contentState.webm;
+    const opId = beginEditOp();
 
     setContentState((prev) => ({
       ...prev,
       isFfmpegRunning: true,
       processingProgress: 0,
+      editErrorType: null,
     }));
 
     sendMessage({
@@ -1501,6 +1729,7 @@ const ContentState = (props) => {
       volume: volume,
       replaceAudio: contentState.replaceAudio,
       topLevel: false,
+      _opId: opId,
     });
   };
 
@@ -1513,11 +1742,13 @@ const ContentState = (props) => {
       return;
 
     const sourceBlob = contentState.blob;
+    const opId = beginEditOp();
 
     setContentState((prev) => ({
       ...prev,
       isFfmpegRunning: true,
       processingProgress: 0,
+      editErrorType: null,
       [cut ? "cutting" : "trimming"]: true,
     }));
 
@@ -1530,6 +1761,7 @@ const ContentState = (props) => {
       duration: contentState.duration,
       encode: false,
       topLevel: false,
+      _opId: opId,
     });
   };
 
@@ -1542,12 +1774,14 @@ const ContentState = (props) => {
       return;
 
     const sourceBlob = contentState.blob;
+    const opId = beginEditOp();
 
     setContentState((prev) => ({
       ...prev,
       muting: true,
       isFfmpegRunning: true,
       processingProgress: 0,
+      editErrorType: null,
     }));
 
     sendMessage({
@@ -1557,6 +1791,7 @@ const ContentState = (props) => {
       endTime: contentState.end * contentState.duration,
       duration: contentState.duration,
       topLevel: false,
+      _opId: opId,
     });
   };
 
@@ -1568,11 +1803,14 @@ const ContentState = (props) => {
     )
       return;
 
+    const opId = beginEditOp();
+
     setContentState((prevState) => ({
       ...prevState,
       cropping: true,
       isFfmpegRunning: true,
       processingProgress: 0,
+      editErrorType: null,
     }));
 
     const sourceBlob = contentState.blob;
@@ -1585,6 +1823,7 @@ const ContentState = (props) => {
       width,
       height,
       topLevel: false,
+      _opId: opId,
     });
 
     return true;
@@ -1594,12 +1833,14 @@ const ContentState = (props) => {
     if (contentState.isFfmpegRunning) return;
 
     const sourceBlob = contentState.blob;
+    const opId = beginEditOp();
 
     setContentState((prevState) => ({
       ...prevState,
       isFfmpegRunning: true,
       reencoding: true,
-      processingProgress: 0, // Reset progress
+      processingProgress: 0,
+      editErrorType: null,
     }));
 
     sendMessage({
@@ -1607,6 +1848,7 @@ const ContentState = (props) => {
       blob: sourceBlob,
       duration: contentState.duration,
       topLevel,
+      _opId: opId,
     });
 
     return true;
@@ -1852,6 +2094,12 @@ const ContentState = (props) => {
   return (
     <ContentStateContext.Provider value={[contentState, setContentState]}>
       {props.children}
+      {process.env.SCREENITY_DEV_MODE === "true" && (
+        <DevHUD
+          setContentState={setContentState}
+          contentStateRef={contentStateRef}
+        />
+      )}
     </ContentStateContext.Provider>
   );
 };

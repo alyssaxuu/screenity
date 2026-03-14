@@ -1458,8 +1458,8 @@
     "description": "Toast shown when a crashed recording session is auto-recovered on startup"
   },
   "toastStorageCritical": {
-    "message": "Low disk space detected. Recording is stopping to avoid corruption.",
-    "description": "Toast shown when available storage drops below the critical threshold during recording"
+    "message": "டிஸ்க் இடம் குறைவு. உங்கள் பதிவு சேமிக்கப்படுகிறது. இதுவரை பதிவான அனைத்தும் பாதுகாப்பாக உள்ளது.",
+    "description": "Toast shown when available storage drops below the critical threshold during recording; reassures that captured data is preserved"
   },
   "toastStorageLow": {
     "message": "Storage is running low. Upload reliability may degrade for long recordings.",
@@ -1472,5 +1472,105 @@
   "toastNetworkOffline": {
     "message": "Network offline. Upload paused. Screen chunks are saved locally.",
     "description": "Toast shown when the browser goes offline during a cloud recording upload"
+  },
+  "longRecordingTitle": {
+    "message": "நீண்ட பதிவு",
+    "description": "Banner title shown when a recording exceeds the local processing limit but is otherwise successful"
+  },
+  "longRecordingDescription": {
+    "message": "உங்கள் பதிவு முழுமையானது மற்றும் பாதுகாப்பானது. கீழே WebM ஆக பதிவிறக்கம் செய்யுங்கள்.",
+    "description": "Banner description for long recordings that can be downloaded but not edited locally"
+  },
+  "notAvailableLongRecording": {
+    "message": "நீண்ட பதிவுகளுக்கு கிடைக்காது",
+    "description": "Disabled button label for features not available due to recording length"
+  },
+  "notAvailableRecoveryMode": {
+    "message": "மீட்டமைப்பு முறையில் கிடைக்காது",
+    "description": "Disabled button label for features not available in recovery/fallback mode"
+  },
+  "editTooLongTitle": {
+    "message": "ஆடியோ திருத்தம் மிக நீளமானது",
+    "description": "Alert title when an audio mute/mix edit is rejected because the clip exceeds 15 minutes"
+  },
+  "editTooLongDescription": {
+    "message": "இந்த ஆடியோ திருத்தம் 15 நிமிடங்களுக்கு மேல் உள்ள கிளிப்களுக்கு ஆதரவில்லை. அசல் மாற்றப்படவில்லை. முதலில் கிளிப்பை வெட்டி சுருக்க முயற்சிக்கவும்.",
+    "description": "Alert body explaining the 15-minute limit and suggesting trimming first"
+  },
+  "editTimeoutTitle": {
+    "message": "திருத்தத்திற்கான நேரம் முடிந்தது",
+    "description": "Alert title when an edit operation does not complete within the 5-minute watchdog period"
+  },
+  "editTimeoutDescription": {
+    "message": "திருத்தம் சரியான நேரத்தில் முடியவில்லை. அசல் பதிவு மாற்றப்படவில்லை. மீண்டும் முயற்சிக்கவும் அல்லது முதலில் கிளிப்பை வெட்டுங்கள்.",
+    "description": "Alert body for the timeout case, prompting retry or shorter clip"
+  },
+  "streamEndedWarningToast": {
+    "message": "திரைப் பகிர்வு நிறுத்தப்பட்டது. உங்கள் பதிவு சேமிக்கப்பட்டது. தயாரானதும் நிறுத்துங்கள்.",
+    "description": "Toast shown when screen share track ends mid-recording. Recording continues; removes false urgency about data loss."
+  },
+  "recoveryModeDescription": {
+    "message": "செயலாக்கத்தில் சிக்கல் ஏற்பட்டது, ஆனால் உங்கள் பதிவு பாதுகாப்பாக உள்ளது. கீழே பதிவிறக்கம் செய்யலாம்.",
+    "description": "Recovery mode banner description — reassures user their recording is accessible despite the processing failure"
+  },
+  "editProcessingSafeDescription": {
+    "message": "உங்கள் திருத்தம் செயலாக்கப்படுகிறது. அசல் பதிவு மாற்றப்படவில்லை.",
+    "description": "Shown in the editor processing alert when a user-initiated edit is running, to reassure the original is safe"
+  },
+  "editFailedTitle": {
+    "message": "திருத்தத்தைப் பயன்படுத்த முடியவில்லை",
+    "description": "Alert title when an edit operation fails due to an encoding or processing error"
+  },
+  "editFailedDescription": {
+    "message": "செயலாக்கத்தின் போது ஏதோ தவறு ஏற்பட்டது. உங்கள் அசல் பதிவு பாதுகாப்பாக உள்ளது. மீண்டும் முயற்சிக்கலாம் அல்லது அப்படியே பதிவிறக்கம் செய்யலாம்.",
+    "description": "Alert body for edit failure; explicitly confirms the original recording is untouched"
+  },
+  "videoTrackEndedToast": {
+    "message": "திரைப் பகிர்வு நிறுத்தப்பட்டது. உங்கள் பதிவு சேமிக்கப்படுகிறது. இதுவரை பதிவான அனைத்தும் பாதுகாப்பாக உள்ளது.",
+    "description": "Toast shown when the video track ends mid-recording (e.g. monitor disconnected, screen share revoked)"
+  },
+  "audioTrackEndedToast": {
+    "message": "ஆடியோ துண்டிக்கப்பட்டது. உங்கள் பதிவு சேமிக்கப்படுகிறது. இதுவரை பதிவான வீடியோ பாதுகாப்பாக உள்ளது.",
+    "description": "Toast shown when the audio track ends mid-recording (e.g. mic unplugged, permission revoked)"
+  },
+  "editorRecoveryToast": {
+    "message": "உங்கள் பதிவு சேமிக்கப்பட்டது. எடிட்டர் திறக்கப்படவில்லை. மீண்டும் முயற்சிக்க Screenity சின்னத்தைக் கிளிக் செய்யுங்கள்.",
+    "description": "Toast shown on the active tab when the post-recording editor tab fails to open"
+  },
+  "stopAckTimeoutToast": {
+    "message": "சேமிப்பு எதிர்பார்த்ததை விட அதிக நேரம் எடுக்கிறது. உங்கள் தரவு பாதுகாப்பாக உள்ளது. எடிட்டர் விரைவில் திறக்கும்.",
+    "description": "Toast shown when the recorder does not acknowledge the stop request within a few seconds"
+  },
+  "copyDebugInfoButton": {
+    "message": "Debug தகவலை நகலெடு",
+    "description": "Button to copy technical debug info to clipboard for support"
+  },
+  "debugInfoCopiedToast": {
+    "message": "Debug தகவல் நகலெடுக்கப்பட்டது",
+    "description": "Toast shown after debug info is copied"
+  },
+  "getHelpButton": {
+    "message": "உதவி பெறுங்கள்",
+    "description": "Side button on error modals that opens a prefilled support form"
+  },
+  "recordingTooShortToast": {
+    "message": "பதிவு சேமிக்க முடியாத அளவுக்கு சிறியது",
+    "description": "Toast shown when a region recording is stopped by navigation but no chunks were saved"
+  },
+  "fastRecorderFailedTitle": {
+    "message": "வேகமான பதிவி தோல்வியடைந்தது",
+    "description": "Title for the modal shown when the fast MP4 recorder output could not be validated"
+  },
+  "fastRecorderFailedDescription": {
+    "message": "இந்த சாதனத்தில் வேகமான பதிவியின் வெளியீட்டைச் சரிபார்க்க முடியவில்லை.\nநீங்கள் கோப்பை எப்படியும் பதிவிறக்கலாம்.",
+    "description": "Body text for the fast recorder failure modal"
+  },
+  "downloadAnywayButton": {
+    "message": "எப்படியும் பதிவிறக்கு",
+    "description": "Button to download the recording file despite validation failure"
+  },
+  "cancelButton": {
+    "message": "ரத்துசெய்",
+    "description": "Generic cancel button label"
   }
 }

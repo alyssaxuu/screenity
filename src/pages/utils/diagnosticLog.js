@@ -1,14 +1,6 @@
 /**
- * Always-on diagnostic log for free/local recording sessions.
- *
- * Stores a compact ring buffer of session events in chrome.storage.local
- * under the key "diagnosticLog".  Max 5 sessions, 100 events each (~100 KB).
- *
- * Usage (background service worker):
- *   import { initDiagSession, diagEvent, endDiagSession } from '../utils/diagnosticLog';
- *   await initDiagSession({ recordingType: 'screen', quality: '1080p', ... });
- *   diagEvent('chunk', { idx: 10, bytes: 45000 });
- *   await endDiagSession('ok');
+ * Ring-buffer diagnostic log stored in chrome.storage.local ("diagnosticLog").
+ * Max 5 sessions, 100 events each. Used in the background service worker.
  */
 
 const MAX_SESSIONS = 5;
@@ -17,10 +9,6 @@ const FLUSH_EVERY_N = 10; // flush to storage every N events
 
 let _log = null; // in-memory mirror of diagnosticLog
 let _dirty = 0; // events written since last flush
-
-// ---------------------------------------------------------------------------
-// Internal helpers
-// ---------------------------------------------------------------------------
 
 const now = () => Date.now();
 
@@ -50,13 +38,7 @@ const maybeFlush = () => {
   }
 };
 
-// ---------------------------------------------------------------------------
-// Public API
-// ---------------------------------------------------------------------------
-
-/**
- * Hydrate the in-memory log from storage.  Call once on service-worker init.
- */
+/** Hydrate the in-memory log from storage. Call once on SW init. */
 export const hydrateDiagnosticLog = async () => {
   try {
     const res = await chrome.storage.local.get("diagnosticLog");
@@ -66,10 +48,7 @@ export const hydrateDiagnosticLog = async () => {
   }
 };
 
-/**
- * Begin a new diagnostic session.  Call from startRecording().
- * @param {Object} config — snapshot of recording settings
- */
+/** Start a new session. Call from startRecording(). */
 export const initDiagSession = async (config = {}) => {
   if (!_log) await hydrateDiagnosticLog();
 
@@ -93,11 +72,7 @@ export const initDiagSession = async (config = {}) => {
   return session.id;
 };
 
-/**
- * Append an event to the current (open) session.
- * @param {string} eventType — short event name, e.g. "stop", "error"
- * @param {Object}  [data]   — small payload (keep lightweight)
- */
+/** Append an event to the current open session. */
 export const diagEvent = (eventType, data) => {
   const s = currentSession();
   if (!s) return; // no open session
@@ -117,11 +92,7 @@ export const diagEvent = (eventType, data) => {
     s.events.shift();
   }
 
-  // Immediate flush for errors, crashes, and all session lifecycle events.
-  // A normal recording only produces ~6-8 events, which is well under the
-  // FLUSH_EVERY_N threshold of 10.  If the SW is killed before reaching
-  // that threshold, all buffered events are lost.  Force-flushing on every
-  // lifecycle event prevents this at negligible cost.
+  // Force-flush on lifecycle/error events so they survive SW termination.
   const ALWAYS_FLUSH = [
     "error",
     "crash",
@@ -145,6 +116,12 @@ export const diagEvent = (eventType, data) => {
     "alarm-fired",
     "recorded-tab-closed",
     "recorded-tab-navigated",
+    "drive-upload-start",
+    "drive-upload-ok",
+    "drive-upload-fail",
+    "drive-save-fail",
+    "drive-auth-fail",
+    "editor-load-ready",
   ];
   if (ALWAYS_FLUSH.includes(eventType)) {
     flush();
@@ -153,10 +130,7 @@ export const diagEvent = (eventType, data) => {
   }
 };
 
-/**
- * Close the current session with a final outcome.
- * @param {"ok"|"error"|"crashed"|"cancelled"} outcome
- */
+/** Close the current session with a final outcome. */
 export const endDiagSession = async (outcome = "ok") => {
   const s = currentSession();
   if (!s) return;
@@ -165,22 +139,17 @@ export const endDiagSession = async (outcome = "ok") => {
   await flush();
 };
 
-/**
- * Return the full diagnostic log (for export).
- */
+/** Return the full diagnostic log (for export). */
 export const getDiagnosticLog = async () => {
   if (!_log) await hydrateDiagnosticLog();
   return _log;
 };
 
-/**
- * Read all scattered error-state keys and return a consolidated object.
- */
+/** Collect error-state keys from storage into one object. */
 export const getErrorSnapshot = async () => {
   const keys = [
     "lastRecordingError",
     "lastChunkSendFailure",
-    "lastStartRecordingDispatch",
     "recorderSession",
     "freeRecorderSession",
     "fastRecorderValidation",
@@ -190,6 +159,7 @@ export const getErrorSnapshot = async () => {
     "fastRecorderDisabledDetails",
     "fastRecorderDisabledAt",
     "memoryError",
+    "recordingAttemptId",
   ];
   try {
     return await chrome.storage.local.get(keys);
@@ -198,9 +168,7 @@ export const getErrorSnapshot = async () => {
   }
 };
 
-/**
- * Read current boolean/numeric state flags for export.
- */
+/** Read current state flags for export. */
 export const getStorageFlags = async () => {
   const keys = [
     "recording",
@@ -218,6 +186,10 @@ export const getStorageFlags = async () => {
     "sandboxTab",
     "recordingUiTabId",
     "fastRecorderInUse",
+    "memoryError",
+    "lowStorageAbortAt",
+    "lowStorageAbortChunks",
+    "editorLoadTimeoutAt",
   ];
   try {
     return await chrome.storage.local.get(keys);

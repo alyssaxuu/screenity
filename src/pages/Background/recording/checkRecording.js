@@ -10,7 +10,7 @@ export const checkRecording = async () => {
   if (recordingTab && !offscreen) {
     try {
       chrome.tabs.get(recordingTab, (tab) => {
-        if (!tab) {
+        if (chrome.runtime.lastError || !tab) {
           discardRecording();
         }
       });

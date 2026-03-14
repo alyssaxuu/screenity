@@ -93,12 +93,14 @@
 .warning-title {
   color: $color-text-contrast;
   font-family: $font-medium;
+  line-height: 1.4;
 }
 
 .warning-description {
   color: $color-text-contrast;
   opacity: 0.8;
   font-family: $font-medium;
+  line-height: 1.5;
 }
 
 .ToastAction {

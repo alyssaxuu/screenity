@@ -1,14 +1,6 @@
 /**
- * Shared helper that builds the diagnostic ZIP blob used by both:
- *   - popup Settings Menu ("Download data for troubleshooting")
- *   - Sandbox/Editor RightPanel ("Get help with your recording")
- *
- * Returns { blob, filename } so the caller can decide how to trigger the download
- * (content script uses <a>.click(), sandbox uses chrome.downloads.download).
- *
- * @param {Object} [options]
- * @param {Object} [options.extraConfig] — caller-specific config fields merged into config.json
- * @param {string} [options.source]      — label for which entry point triggered the export
+ * Builds a diagnostic ZIP for troubleshooting. Returns { blob, filename }.
+ * Used by the popup settings menu and the editor "Get help" button.
  */
 import JSZip from "jszip";
 
@@ -82,9 +74,26 @@ export const buildDiagnosticZip = async ({
     }),
   );
 
-  // sessions.json — diagnostic session timeline
+  // sessions.json — diagnostic session timeline with derived hints
   if (diagData?.log) {
-    zip.file("sessions.json", JSON.stringify(diagData.log));
+    const annotated = JSON.parse(JSON.stringify(diagData.log));
+    if (annotated.sessions) {
+      for (const session of annotated.sessions) {
+        if (!session.events?.length) continue;
+        const hints = [];
+        const hasEditorOpen = session.events.some(
+          (ev) => ev.e === "editor-open" && ev.d?.type === "editorwebcodecs",
+        );
+        const hasEditorReady = session.events.some(
+          (ev) => ev.e === "editor-load-ready",
+        );
+        if (hasEditorOpen && !hasEditorReady) {
+          hints.push("Editor handoff incomplete: editor opened but never finished loading");
+        }
+        if (hints.length > 0) session.hints = hints;
+      }
+    }
+    zip.file("sessions.json", JSON.stringify(annotated));
   }
 
   // errors.json — consolidated error-state keys

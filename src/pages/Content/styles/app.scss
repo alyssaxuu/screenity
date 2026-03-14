@@ -10,8 +10,18 @@
 @use "./_variables" as *;
 @use "sass:color";
 
-html {
+// Reset inherited properties inside the shadow tree.
+:host {
   font-size: 16px;
+  line-height: normal;
+  letter-spacing: normal;
+  word-spacing: normal;
+  text-transform: none;
+  font-style: normal;
+  font-variant: normal;
+  text-indent: 0;
+  direction: ltr;
+  white-space: normal;
 }
 
 .screenity-scrollbar::-webkit-scrollbar {

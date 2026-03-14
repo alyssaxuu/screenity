@@ -76,8 +76,6 @@ export const debugRecordingEventWithSession = (session, eventType, payload) => {
   try {
     chrome.runtime?.sendMessage?.({
       type: "recdbg",
-      action: "recdbg",
-      kind: "RECDBG",
       eventType,
       payload,
       sessionId: activeSession?.sessionId || null,

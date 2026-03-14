@@ -216,12 +216,8 @@ export class WebCodecsRecorder {
           this.audioReader = this.audioProcessor.readable.getReader();
         }
 
-        if (this.audioReader && this.options.enableAudio) {
-          this.log("[WCR] start buffering audio");
-          this._audioLoopPromise = this.readAudioLoop();
-        }
-
-        // Make sure audio encoder is ready before first video chunk
+        // Init audio encoder first so _audioReady=true when both loops
+        // launch together — avoids audio prebuffering before video starts.
         if (this._pendingAudioConfig) {
           await this.initAudioEncoder(this._pendingAudioConfig);
           this._audioReady = true;
@@ -256,7 +252,12 @@ export class WebCodecsRecorder {
         await Promise.resolve();
 
         setTimeout(() => {
+          // Start both loops together so t=0 is aligned.
           this._videoLoopPromise = this.readVideoLoop();
+          if (this.audioReader && this.options.enableAudio) {
+            this.log("[WCR] start audio loop (aligned with video)");
+            this._audioLoopPromise = this.readAudioLoop();
+          }
 
           if (this._startResolve) {
             this._startResolve(true);
@@ -392,6 +393,14 @@ export class WebCodecsRecorder {
     try {
       this.audioEncoder?.close();
     } catch {}
+
+    // Release any AudioData objects that were queued before the audio encoder
+    // was ready.  If encoder init failed, these would otherwise be held in
+    // memory indefinitely because readAudioLoop never drained the buffer.
+    for (const item of this._prebufferedAudio) {
+      try { item.close?.(); } catch {}
+    }
+    this._prebufferedAudio = [];
 
     this.videoProcessor = null;
     this.audioProcessor = null;
@@ -580,6 +589,20 @@ export class WebCodecsRecorder {
           continue;
         }
 
+        // If the tab was hidden or the system was heavily loaded, we can end
+        // up many frames behind wall-clock.  Filling the entire gap in one
+        // iteration would create hundreds of VideoFrames synchronously and
+        // overflow the encoder's internal queue.  Instead, skip ahead to at
+        // most MAX_GAP_FRAMES behind the target so the burst is bounded.
+        // The skipped indices advance _videoFrameIndex, preventing repeated
+        // catch-up attempts on the next iteration.
+        const MAX_GAP_FRAMES = 8; // ≈ 267 ms at 30 fps
+        const gap = targetIndex - this._videoFrameIndex;
+        if (gap > MAX_GAP_FRAMES) {
+          this.warn(`[WCR] skipping ${gap - MAX_GAP_FRAMES} frames (tab gap)`);
+          this._videoFrameIndex = targetIndex - MAX_GAP_FRAMES;
+        }
+
         const startIndex = this._videoFrameIndex;
         const endIndex = targetIndex;
         for (let i = startIndex; i <= endIndex; i += 1) {
@@ -669,6 +692,15 @@ export class WebCodecsRecorder {
 
         if (!this._audioReady) {
           this._prebufferedAudio.push(audioData);
+          continue;
+        }
+
+        // Drop audio data while the recording is paused.  The sample counter
+        // is not advanced, so audio timestamps resume from the correct
+        // active-recording position when resume() is called — keeping audio
+        // and video aligned across any number of pause/resume cycles.
+        if (this.paused) {
+          audioData.close?.();
           continue;
         }
 

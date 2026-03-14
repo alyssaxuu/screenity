@@ -53,12 +53,13 @@
 .alert {
   display: flex;
   width: 100%;
-  height: 80px;
+  min-height: 80px;
+  padding: 12px 0;
   justify-content: space-between;
   align-items: center;
   position: relative;
-  overflow: hidden;
   background-color: rgba(56, 126, 247, 0.1);
+  box-sizing: border-box;
 
   .buttonRight {
     color: $color-primary;

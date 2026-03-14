@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef, useCallback } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import localforage from "localforage";
 import RecorderUI from "./RecorderUI";
 import { createMediaRecorder } from "./mediaRecorderUtils";
@@ -58,6 +58,25 @@ function debugError(...args) {
   if (!DEBUG_RECORDER) return;
   // eslint-disable-next-line no-console
   console.error(logPrefix, ...args);
+}
+
+// Stream lifecycle ring-buffer — persisted to storage, survives tab discards.
+const SL_KEY = "streamLifecycleLog";
+const SL_MAX = 40; // keep last N entries
+const _slBuffer = [];
+
+function slLog(tag, extra = {}) {
+  const entry = { t: Date.now(), tag, ...extra };
+  if (DEBUG_RECORDER) {
+    // eslint-disable-next-line no-console
+    console.log("[Screenity:SL]", tag, entry);
+  }
+  _slBuffer.push(entry);
+  if (_slBuffer.length > SL_MAX) _slBuffer.splice(0, _slBuffer.length - SL_MAX);
+  // Fire-and-forget persist.
+  try {
+    chrome.storage.local.set({ [SL_KEY]: [..._slBuffer] });
+  } catch { /* storage unavailable — tab possibly being torn down */ }
 }
 
 function logCaptureContext(label, stream) {
@@ -194,6 +213,14 @@ const Recorder = () => {
   const index = useRef(0);
 
   const [started, setStarted] = useState(false);
+  const streamReadyAt = useRef(null);
+
+  // Start gate: defers startRecording() until the stream is ready.
+  const startRequested = useRef(false);
+  const startRequestedAt = useRef(null);
+  // Timeout if the stream never arrives
+  const startGateTimeout = useRef(null);
+  const START_GATE_TIMEOUT_MS = 8000; // max wait for stream after start request
 
   const liveStream = useRef(null);
 
@@ -224,12 +251,15 @@ const Recorder = () => {
   const lastEstimateAt = useRef(0);
   const ESTIMATE_INTERVAL_MS = 5000;
   const MIN_HEADROOM = 25 * 1024 * 1024;
+  const WARN_HEADROOM = 100 * 1024 * 1024; // early warning before hard abort
   const MAX_PENDING_BYTES = 8 * 1024 * 1024;
   const pendingBytes = useRef(0);
+  const lowStorageWarned = useRef(false);
 
   const uiClosing = useRef(false);
 
   const isRecording = useRef(false);
+  const isStarting = useRef(false);
   const pausedStateRef = useRef(false);
   const stopSignalSent = useRef(false);
 
@@ -242,6 +272,7 @@ const Recorder = () => {
   const recordingTick = useRef(null);
 
   debug("Recorder component mounted");
+  slLog("component-mount");
 
   const setRecordingTimingState = async (nextState) => {
     try {
@@ -270,6 +301,15 @@ const Recorder = () => {
           byteLength,
           ok,
         });
+      }
+      // Early warning before hard abort
+      if (!lowStorageWarned.current && remaining < WARN_HEADROOM) {
+        lowStorageWarned.current = true;
+        chrome.runtime.sendMessage({
+          type: "show-toast",
+          message: chrome.i18n.getMessage("toastStorageLow"),
+          timeout: 8000,
+        }).catch(() => {});
       }
       return ok;
     } catch (err) {
@@ -402,7 +442,7 @@ const Recorder = () => {
   };
 
   // Emit stop to background at most once per recording session.
-  const requestStop = (reason = "generic") => {
+  const requestStop = (reason = "generic", extra = {}) => {
     if (stopSignalSent.current) {
       debugWarn("requestStop() ignored; already sent", { reason });
       return false;
@@ -416,7 +456,7 @@ const Recorder = () => {
       return false;
     }
     stopSignalSent.current = true;
-    sendStopRecording(reason);
+    sendStopRecording(reason, extra);
     return true;
   };
 
@@ -425,14 +465,23 @@ const Recorder = () => {
 
     if (!(await canFitChunk(e.data.size))) {
       debugWarn("Low storage, aborting recording");
+      if (!lowStorageAbort.current) {
+        chrome.runtime.sendMessage({
+          type: "show-toast",
+          message: chrome.i18n.getMessage("toastStorageCritical"),
+          timeout: 8000,
+        });
+      }
       lowStorageAbort.current = true;
       chrome.storage.local.set({
         recording: false,
         restarting: false,
         tabRecordedID: null,
         memoryError: true,
+        lowStorageAbortAt: Date.now(),
+        lowStorageAbortChunks: index.current,
       });
-      requestStop("low-storage");
+      requestStop("low-storage", { memoryError: true, savedChunks: savedCount.current });
       return false;
     }
 
@@ -451,14 +500,23 @@ const Recorder = () => {
       }
     } catch (err) {
       debugError("Failed to save chunk, aborting recording", err);
+      if (!lowStorageAbort.current) {
+        chrome.runtime.sendMessage({
+          type: "show-toast",
+          message: chrome.i18n.getMessage("toastStorageCritical"),
+          timeout: 8000,
+        });
+      }
       lowStorageAbort.current = true;
       chrome.storage.local.set({
         recording: false,
         restarting: false,
         tabRecordedID: null,
         memoryError: true,
+        lowStorageAbortAt: Date.now(),
+        lowStorageAbortChunks: index.current,
       });
-      requestStop("chunk-save-failed");
+      requestStop("chunk-save-failed", { memoryError: true, savedChunks: savedCount.current });
       return false;
     }
 
@@ -496,14 +554,23 @@ const Recorder = () => {
 
         if (!(await canFitChunk(e.data.size))) {
           debugWarn("Low storage during drain, stopping recording");
+          if (!lowStorageAbort.current) {
+            chrome.runtime.sendMessage({
+              type: "show-toast",
+              message: chrome.i18n.getMessage("toastStorageCritical"),
+              timeout: 8000,
+            });
+          }
           lowStorageAbort.current = true;
           chrome.storage.local.set({
             recording: false,
             restarting: false,
             tabRecordedID: null,
             memoryError: true,
+            lowStorageAbortAt: Date.now(),
+            lowStorageAbortChunks: index.current,
           });
-          requestStop("low-storage");
+          requestStop("low-storage", { memoryError: true, savedChunks: savedCount.current });
           pending.current.length = 0;
           pendingBytes.current = 0;
           break;
@@ -543,12 +610,152 @@ const Recorder = () => {
     });
   }, []);
 
-  async function startRecording() {
-    if (recorder.current !== null) {
-      debugWarn("startRecording() called but recorder already exists");
+  // Check whether the stream is in a startable state.
+  function getStreamReadiness() {
+    if (!helperVideoStream.current) return { ready: false, reason: "stream-ref-null" };
+    const vt = helperVideoStream.current.getVideoTracks();
+    if (vt.length === 0) return { ready: false, reason: "zero-video-tracks" };
+    if (vt[0].readyState !== "live") return { ready: false, reason: "track-not-live", trackState: vt[0].readyState };
+    return { ready: true };
+  }
+
+  function buildStreamDiagInfo(bucket) {
+    const stream = helperVideoStream.current;
+    const vt = stream?.getVideoTracks?.() ?? [];
+    return {
+      bucket,
+      started,
+      streamReadyAt: streamReadyAt.current,
+      msSinceReady: streamReadyAt.current ? Date.now() - streamReadyAt.current : null,
+      msSinceStartRequested: startRequestedAt.current ? Date.now() - startRequestedAt.current : null,
+      streamExists: !!stream,
+      streamActive: stream?.active ?? null,
+      streamId: stream?.id ?? null,
+      videoTrackCount: vt.length,
+      audioTrackCount: stream?.getAudioTracks?.()?.length ?? null,
+      trackReadyState: vt[0]?.readyState ?? null,
+      trackEnabled: vt[0]?.enabled ?? null,
+      trackMuted: vt[0]?.muted ?? null,
+      docHidden: document.hidden,
+      docVisibility: document.visibilityState,
+    };
+  }
+
+  /** Arm a timeout that errors if the stream never shows up. */
+  function armStartGateTimeout() {
+    clearStartGateTimeout();
+    startGateTimeout.current = setTimeout(() => {
+      if (!startRequested.current) return; // request was fulfilled or cancelled
+      const readiness = getStreamReadiness();
+      if (readiness.ready) {
+        // Race: stream arrived just before timeout
+        slLog("start-gate-timeout-race-ok");
+        tryStartIfReady();
+        return;
+      }
+      const diagInfo = buildStreamDiagInfo("start-gate-timeout");
+      console.warn("[Screenity:startRec] stream never became ready", diagInfo);
+      slLog("start-gate-timeout", diagInfo);
+      chrome.storage.local.set({ lastStreamCheckFail: diagInfo });
+      // Full reset so no gate state leaks into a future session.
+      resetGateState();
+      sendRecordingError(
+        "Recording not ready: screen stream is missing (tab may have been suspended)",
+      );
+    }, START_GATE_TIMEOUT_MS);
+  }
+
+  function clearStartGateTimeout() {
+    if (startGateTimeout.current) {
+      clearTimeout(startGateTimeout.current);
+      startGateTimeout.current = null;
+    }
+  }
+
+  /** Reset gate state on stop/dismiss/restart. */
+  function resetGateState() {
+    startRequested.current = false;
+    startRequestedAt.current = null;
+    isStarting.current = false;
+    clearStartGateTimeout();
+  }
+
+  /** Request recording start — immediate if stream is ready, deferred otherwise. */
+  function requestStart() {
+    if (recorder.current !== null || isStarting.current) {
+      debugWarn("requestStart() called but recorder already exists or start in flight");
+      slLog("requestStart-bail-already-active", {
+        hasRecorder: recorder.current !== null,
+        isStarting: isStarting.current,
+      });
+      return;
+    }
+    if (isRestarting.current) {
+      pendingStartAfterRestart.current = true;
+      slLog("requestStart-queued-restart");
+      debug("Queued start request while restarting");
+      return;
+    }
+    if (startRequested.current) {
+      // Already waiting — ignore duplicate.
+      slLog("requestStart-bail-already-requested");
       return;
     }
 
+    startRequested.current = true;
+    startRequestedAt.current = Date.now();
+    slLog("requestStart", {
+      hasStream: !!helperVideoStream.current,
+      started,
+      docHidden: document.hidden,
+      docVisibility: document.visibilityState,
+    });
+
+    const readiness = getStreamReadiness();
+    if (readiness.ready) {
+      slLog("requestStart-immediate", readiness);
+      startRecording();
+    } else {
+      slLog("requestStart-deferred", readiness);
+      armStartGateTimeout();
+    }
+  }
+
+  /** If a start was requested and the stream is ready, fire startRecording(). */
+  function tryStartIfReady() {
+    if (!startRequested.current) return;
+    const readiness = getStreamReadiness();
+    slLog("tryStartIfReady", readiness);
+    if (readiness.ready) {
+      clearStartGateTimeout();
+      startRecording();
+    }
+    // Otherwise the gate timeout handles it.
+  }
+
+  // startRecording — stream must be ready (verified by the gate above).
+  async function startRecording() {
+    slLog("startRecording-enter", {
+      hasRecorder: recorder.current !== null,
+      hasStream: !!helperVideoStream.current,
+      started,
+      streamReadyAt: streamReadyAt.current,
+      docHidden: document.hidden,
+    });
+
+    // Acting on the request now — reset gate state.
+    resetGateState();
+
+    if (recorder.current !== null || isStarting.current) {
+      debugWarn("startRecording() called but recorder already exists or start in flight");
+      slLog("startRecording-bail-already-active", {
+        hasRecorder: recorder.current !== null,
+        isStarting: isStarting.current,
+      });
+      return;
+    }
+
+    isStarting.current = true;
     debug("startRecording()");
     recordingGeneration.current += 1;
     const runGeneration = recordingGeneration.current;
@@ -559,15 +766,54 @@ const Recorder = () => {
     // Record the start time for session tracking
     recordingStartTime.current = Date.now();
 
+    // Final preflight — edge-case guard in case state changed since the gate.
     navigator.storage.persist();
-    if (
-      !helperVideoStream.current ||
-      helperVideoStream.current.getVideoTracks().length === 0
-    ) {
-      debugError("No video tracks available in helperVideoStream");
+    if (!helperVideoStream.current) {
+      const diagInfo = buildStreamDiagInfo("stream-ref-null");
+      console.warn("[Screenity:startRec] helperVideoStream is null", diagInfo);
+      slLog("startRecording-fail-stream-null", diagInfo);
+      chrome.storage.local.set({ lastStreamCheckFail: diagInfo });
+      sendRecordingError(
+        "Recording not ready: screen stream is missing (tab may have been suspended)",
+      );
+      stopTabKeepAlive();
+      isStarting.current = false;
+      return;
+    }
+    const videoTracks = helperVideoStream.current.getVideoTracks();
+    if (videoTracks.length === 0) {
+      const diagInfo = buildStreamDiagInfo("stream-zero-video-tracks");
+      console.warn("[Screenity:startRec] helperVideoStream has 0 video tracks", diagInfo);
+      slLog("startRecording-fail-zero-tracks", diagInfo);
+      chrome.storage.local.set({ lastStreamCheckFail: diagInfo });
       sendRecordingError("No video tracks available");
       stopTabKeepAlive();
+      isStarting.current = false;
       return;
+    }
+    {
+      const vt = videoTracks[0];
+      const diagInfo = {
+        bucket: "stream-ok",
+        trackReadyState: vt.readyState,
+        trackEnabled: vt.enabled,
+        trackMuted: vt.muted,
+        msSinceReady: streamReadyAt.current
+          ? Date.now() - streamReadyAt.current
+          : null,
+      };
+      slLog("startRecording-preflight-ok", diagInfo);
+      if (vt.readyState === "ended") {
+        console.warn("[Screenity:startRec] video track present but ended", diagInfo);
+        slLog("startRecording-fail-track-ended", diagInfo);
+        chrome.storage.local.set({ lastStreamCheckFail: diagInfo });
+        sendRecordingError(
+          "Recording not ready: screen stream ended (tab may have been suspended)",
+        );
+        stopTabKeepAlive();
+        isStarting.current = false;
+        return;
+      }
     }
 
     await chunksStore.clear();
@@ -701,24 +947,12 @@ const Recorder = () => {
       fps,
     });
 
-    await setRecordingTimingState({
-      recording: true,
-      paused: false,
-      recordingStartTime: recordingStartTime.current,
-      pausedAt: null,
-      totalPausedMs: 0,
-    });
+    // Reset pre-recording state. Recording-committed state (isRecording,
+    // heartbeat, timing) is set after the recorder is created successfully.
     pausedStateRef.current = false;
     chrome.storage.local.set({ restarting: false });
-
-    isRecording.current = true;
     isRestarting.current = false;
     index.current = 0;
-
-    // Start session heartbeat for recovery tracking
-    startSessionHeartbeat();
-    startRecordingTick();
-    persistSessionState("recording");
 
     const handleChunk = async (data, timestampMs) => {
       if (runGeneration !== recordingGeneration.current) {
@@ -817,6 +1051,17 @@ const Recorder = () => {
 
       void drainQueue();
     };
+
+    // Abort if stop/dismiss was requested during async setup.
+    if (isFinishing.current || uiClosing.current) {
+      slLog("startRecording-abort-interrupted", {
+        isFinishing: isFinishing.current,
+        uiClosing: uiClosing.current,
+      });
+      isStarting.current = false;
+      stopTabKeepAlive();
+      return;
+    }
 
     try {
       if (canUseWebCodecs) {
@@ -1028,6 +1273,8 @@ const Recorder = () => {
               sendRecordingError(
                 "Failed to start recording: " + String(initErr),
               );
+              isStarting.current = false;
+              stopTabKeepAlive();
               return;
             }
           }
@@ -1037,6 +1284,9 @@ const Recorder = () => {
         } catch (err) {
           debugError("Failed to start MediaRecorder", err);
           sendRecordingError("Failed to start recording: " + String(err));
+          recorder.current = null;
+          isStarting.current = false;
+          stopTabKeepAlive();
           return;
         }
 
@@ -1107,8 +1357,24 @@ const Recorder = () => {
         });
       }
       sendRecordingError(String(err));
+      isStarting.current = false;
+      stopTabKeepAlive();
       return;
     }
+
+    // Recorder created successfully — now advertise "recording" to the system.
+    await setRecordingTimingState({
+      recording: true,
+      paused: false,
+      recordingStartTime: recordingStartTime.current,
+      pausedAt: null,
+      totalPausedMs: 0,
+    });
+    isStarting.current = false;
+    isRecording.current = true;
+    startSessionHeartbeat();
+    startRecordingTick();
+    persistSessionState("recording");
 
     if (helperAudioStream.current) {
       const track = helperAudioStream.current.getAudioTracks()[0];
@@ -1130,6 +1396,12 @@ const Recorder = () => {
             "[Recorder] Audio track ended unexpectedly",
             diagnosticInfo,
           );
+          // Notify via stream-ended-warning toast
+          chrome.runtime.sendMessage({
+            type: "recording-error",
+            error: "stream-ended",
+            why: chrome.i18n.getMessage("audioTrackEndedToast"),
+          }).catch(() => {});
           chrome.storage.local.set({
             recording: false,
             lastTrackEndEvent: diagnosticInfo,
@@ -1156,6 +1428,12 @@ const Recorder = () => {
           trackReadyState: track?.readyState || null,
         };
         console.warn("[Recorder] liveStream video track ended", diagnosticInfo);
+        // Notify via stream-ended-warning toast
+        chrome.runtime.sendMessage({
+          type: "recording-error",
+          error: "stream-ended",
+          why: chrome.i18n.getMessage("videoTrackEndedToast"),
+        }).catch(() => {});
         chrome.storage.local.set({
           recording: false,
           restarting: false,
@@ -1187,6 +1465,12 @@ const Recorder = () => {
           "[Recorder] helperVideoStream video track ended",
           diagnosticInfo,
         );
+        // Notify via stream-ended-warning toast
+        chrome.runtime.sendMessage({
+          type: "recording-error",
+          error: "stream-ended",
+          why: chrome.i18n.getMessage("videoTrackEndedToast"),
+        }).catch(() => {});
         chrome.storage.local.set({
           recording: false,
           restarting: false,
@@ -1307,6 +1591,8 @@ const Recorder = () => {
       return;
     }
     debug("stopRecording()");
+    // Stop takes priority over any pending start gate.
+    resetGateState();
     isFinishing.current = true;
     isRecording.current = false;
     await updateFreeFinalizeStatus("stopping", 0);
@@ -1360,6 +1646,7 @@ const Recorder = () => {
 
     if (!isRestarting.current) {
       debug("Stopping tracks and clearing streams");
+      slLog("helperVideoStream-nulling", { path: "stopRecording" });
       liveStream.current?.getTracks().forEach((t) => t.stop());
       helperVideoStream.current?.getTracks().forEach((t) => t.stop());
       helperAudioStream.current?.getTracks().forEach((t) => t.stop());
@@ -1375,6 +1662,7 @@ const Recorder = () => {
 
   const dismissRecording = async () => {
     debug("dismissRecording()");
+    resetGateState();
     uiClosing.current = true;
     isRecording.current = false;
 
@@ -1402,6 +1690,9 @@ const Recorder = () => {
 
     debug("restartRecording()");
     recordingGeneration.current += 1;
+
+    // Kill any stale start-gate timeout from the previous session.
+    resetGateState();
 
     isRestarting.current = true;
     isRecording.current = false;
@@ -1477,10 +1768,14 @@ const Recorder = () => {
 
     isRestarting.current = false;
     debug("restartRecording() done, ready to start again");
+    slLog("restart-done", {
+      hasStream: !!helperVideoStream.current,
+      hasPendingStart: pendingStartAfterRestart.current,
+    });
     if (pendingStartAfterRestart.current) {
       pendingStartAfterRestart.current = false;
       debug("Processing queued start after restart");
-      startRecording();
+      requestStart();
     }
     return true;
   };
@@ -1588,6 +1883,11 @@ const Recorder = () => {
   };
 
   async function startStream(data, id, options, permissions, permissions2) {
+    slLog("startStream-enter", {
+      recordingType: data.recordingType,
+      hasId: !!id,
+      isTab: isTab.current,
+    });
     debug("startStream()", {
       recordingType: data.recordingType,
       id,
@@ -1748,15 +2048,18 @@ const Recorder = () => {
     if (data.recordingType === "camera") {
       if (!userStream || typeof userStream.getVideoTracks !== "function") {
         debugWarn("Camera stream unavailable");
+        resetGateState();
         sendRecordingError("Camera stream unavailable");
         return;
       }
       if (!userStream.getVideoTracks().length) {
         debugWarn("Camera stream has no video track");
+        resetGateState();
         sendRecordingError("Camera stream has no video track");
         return;
       }
       helperVideoStream.current = userStream;
+      slLog("helperVideoStream-assigned", { path: "camera", streamId: userStream.id });
     } else {
       const constraints = {
         audio: {
@@ -1779,6 +2082,7 @@ const Recorder = () => {
       };
 
       debug("desktopCapture getUserMedia constraints", constraints);
+      slLog("getUserMedia-start", { isTab: isTab.current });
 
       let stream;
 
@@ -1787,11 +2091,13 @@ const Recorder = () => {
 
         if (stream.getVideoTracks().length === 0) {
           debugError("No video tracks returned from getUserMedia");
+          resetGateState();
           sendRecordingError("No video tracks available");
           return;
         }
       } catch (err) {
         debugError("Failed to get user media for desktop/tab capture", err);
+        resetGateState();
         sendRecordingError("Failed to get user media: " + String(err));
         return;
       }
@@ -1799,6 +2105,12 @@ const Recorder = () => {
       debug("desktop/tab stream acquired", {
         videoTracks: stream.getVideoTracks().length,
         audioTracks: stream.getAudioTracks().length,
+      });
+      slLog("getUserMedia-resolved", {
+        videoTracks: stream.getVideoTracks().length,
+        audioTracks: stream.getAudioTracks().length,
+        streamId: stream.id,
+        trackState: stream.getVideoTracks()[0]?.readyState,
       });
 
       if (isTab.current) {
@@ -1809,6 +2121,7 @@ const Recorder = () => {
       }
 
       helperVideoStream.current = stream;
+      slLog("helperVideoStream-assigned", { path: "desktop/tab", streamId: stream.id });
 
       const surface = stream.getVideoTracks()[0].getSettings().displaySurface;
       debug("Display surface", surface);
@@ -1854,6 +2167,7 @@ const Recorder = () => {
 
     const helperVideoTrack = helperVideoStream.current.getVideoTracks()[0];
     if (!helperVideoTrack) {
+      resetGateState();
       sendRecordingError("Display stream missing video track");
       return;
     }
@@ -1888,14 +2202,27 @@ const Recorder = () => {
     });
 
     setStarted(true);
+    streamReadyAt.current = Date.now();
+    slLog("stream-ready", {
+      streamId: helperVideoStream.current?.id,
+      videoTracks: helperVideoStream.current?.getVideoTracks().length,
+      trackState: helperVideoStream.current?.getVideoTracks()[0]?.readyState,
+      startRequested: startRequested.current,
+    });
 
     await warmUpStream(liveStream.current);
 
+    slLog("warmUp-done");
     chrome.runtime.sendMessage({ type: "reset-active-tab" });
+    slLog("reset-active-tab-sent");
+
+    // If a start was already requested, honour it now that the stream is live.
+    tryStartIfReady();
   }
 
   async function startStreaming(data) {
     debug("startStreaming()", { data });
+    slLog("startStreaming-enter", { recordingType: data?.recordingType });
     const permissions = await navigator.permissions.query({
       name: "camera",
     });
@@ -1921,10 +2248,12 @@ const Recorder = () => {
           captureTypes,
           tabPreferred: tabPreferred.current,
         });
+        slLog("chooseDesktopMedia-show");
         chrome.desktopCapture.chooseDesktopMedia(
           captureTypes,
           null,
           (streamId, options) => {
+            slLog("chooseDesktopMedia-picked", { hasStreamId: !!streamId });
             debug("chooseDesktopMedia callback", { streamId, options });
             if (
               streamId === undefined ||
@@ -1932,6 +2261,7 @@ const Recorder = () => {
               streamId === ""
             ) {
               debugWarn("User cancelled the desktop capture modal");
+              resetGateState();
               sendRecordingError("User cancelled the modal", true);
               return;
             } else {
@@ -1943,6 +2273,7 @@ const Recorder = () => {
         const tabStreamId = await waitForTabStreamId();
         debug("Streaming with pre-resolved tabID", tabStreamId);
         if (!tabStreamId) {
+          resetGateState();
           sendRecordingError("Unable to resolve tab stream id", true);
           return;
         }
@@ -1950,6 +2281,7 @@ const Recorder = () => {
       }
     } catch (err) {
       debugError("startStreaming() error", err);
+      resetGateState();
       sendRecordingError("Failed to start streaming: " + String(err), true);
     }
   }
@@ -1983,6 +2315,12 @@ const Recorder = () => {
   useEffect(() => {
     return () => {
       debug("Component unmounting - cleaning up");
+      slLog("component-unmount", {
+        hadStream: !!helperVideoStream.current,
+        started,
+        startRequested: startRequested.current,
+      });
+      resetGateState();
       stopTabKeepAlive();
       stopSessionHeartbeat();
     };
@@ -2011,129 +2349,162 @@ const Recorder = () => {
     };
   }, []);
 
-  const onMessage = useCallback(
-    (request, sender, sendResponse) => {
-      if (DEBUG_RECORDER) {
-        debug("onMessage()", request.type, { request, sender });
-      }
+  // Message handler — registered once on mount; uses refs so closure stays fresh.
+  const onMessageRef = useRef(null);
+  onMessageRef.current = (request, sender, sendResponse) => {
+    if (DEBUG_RECORDER) {
+      debug("onMessage()", request.type, { request, sender });
+    }
 
-      if (request.type === "loaded") {
-        backupRef.current = request.backup;
-        if (!tabPreferred.current) {
-          isTab.current = request.isTab;
-          if (request.isTab) {
-            getStreamID(request.tabID);
-          }
-        } else {
-          isTab.current = false;
+    if (request.type === "loaded") {
+      slLog("msg-loaded");
+      backupRef.current = request.backup;
+      if (!tabPreferred.current) {
+        isTab.current = request.isTab;
+        if (request.isTab) {
+          getStreamID(request.tabID);
         }
-        chrome.runtime.sendMessage({ type: "get-streaming-data" });
-      } else if (request.type === "streaming-data") {
-        startStreaming(JSON.parse(request.data));
-      } else if (request.type === "start-recording-tab") {
-        if (isRestarting.current) {
-          // Restart teardown can overlap with background's start dispatch.
-          // Queue one start so we begin immediately after cleanup completes.
-          pendingStartAfterRestart.current = true;
-          debug("Queued start-recording-tab while restarting");
-          return;
-        }
-        startRecording();
-      } else if (request.type === "restart-recording-tab") {
-        if (isRestarting.current) {
-          sendResponse?.({ ok: false, error: "restart-in-progress" });
-          return true;
-        }
-        pendingStartAfterRestart.current = false;
-        Promise.resolve(restartRecording())
-          .then((restarted) => {
-            if (!restarted) {
-              sendResponse?.({ ok: false, error: "restart-teardown-failed" });
-              return;
-            }
-            sendResponse?.({ ok: true, restarted: true });
-          })
-          .catch((error) => {
-            sendResponse?.({
-              ok: false,
-              error: error?.message || String(error),
-            });
-          });
+      } else {
+        isTab.current = false;
+      }
+      chrome.runtime.sendMessage({ type: "get-streaming-data" });
+    } else if (request.type === "streaming-data") {
+      slLog("msg-streaming-data");
+      startStreaming(JSON.parse(request.data));
+    } else if (request.type === "start-recording-tab") {
+      slLog("msg-start-recording-tab", {
+        hasStream: !!helperVideoStream.current,
+        streamReady: getStreamReadiness(),
+        isRestarting: isRestarting.current,
+        docHidden: document.hidden,
+        docVisibility: document.visibilityState,
+      });
+      // Request start via the readiness gate.
+      requestStart();
+    } else if (request.type === "restart-recording-tab") {
+      if (isRestarting.current) {
+        sendResponse?.({ ok: false, error: "restart-in-progress" });
         return true;
-      } else if (request.type === "stop-recording-tab") {
-        stopRecording();
-      } else if (request.type === "set-mic-active-tab") {
-        setMic(request);
-      } else if (request.type === "set-audio-output-volume") {
-        setAudioOutputVolume(request.volume);
-      } else if (request.type === "pause-recording-tab") {
-        if (!recorder.current) return;
-        if (pausedStateRef.current) return;
-        if (
-          useWebCodecs.current &&
-          recorder.current instanceof WebCodecsRecorder
-        ) {
-          debug("Pausing WebCodecsRecorder");
-          recorder.current.pause();
-        } else if (recorder.current instanceof MediaRecorder) {
-          debug("Pausing MediaRecorder");
-          recorder.current.pause();
-        }
-        const now = Date.now();
-        pausedStateRef.current = true;
-        void setRecordingTimingState({
-          paused: true,
-          pausedAt: now,
-        });
-      } else if (request.type === "resume-recording-tab") {
-        if (!recorder.current) return;
-        if (!pausedStateRef.current) return;
-        if (
-          useWebCodecs.current &&
-          recorder.current instanceof WebCodecsRecorder
-        ) {
-          debug("Resuming WebCodecsRecorder");
-          recorder.current.resume();
-        } else if (recorder.current instanceof MediaRecorder) {
-          debug("Resuming MediaRecorder");
-          recorder.current.resume();
-        }
-        const now = Date.now();
-        pausedStateRef.current = false;
-        void (async () => {
-          try {
-            const { pausedAt, totalPausedMs } = await chrome.storage.local.get([
-              "pausedAt",
-              "totalPausedMs",
-            ]);
-            const additional = pausedAt ? Math.max(0, now - pausedAt) : 0;
-            await setRecordingTimingState({
-              paused: false,
-              pausedAt: null,
-              totalPausedMs: (totalPausedMs || 0) + additional,
-            });
-          } catch (err) {
-            debugWarn("Failed to update resume timing state", err);
-          }
-        })();
-      } else if (request.type === "dismiss-recording") {
-        dismissRecording();
       }
-    },
-    [recorder.current, tabPreferred.current],
-  );
+      pendingStartAfterRestart.current = false;
+      Promise.resolve(restartRecording())
+        .then((restarted) => {
+          if (!restarted) {
+            sendResponse?.({ ok: false, error: "restart-teardown-failed" });
+            return;
+          }
+          sendResponse?.({ ok: true, restarted: true });
+        })
+        .catch((error) => {
+          sendResponse?.({
+            ok: false,
+            error: error?.message || String(error),
+          });
+        });
+      return true;
+    } else if (request.type === "stop-recording-tab") {
+      stopRecording();
+      sendResponse?.({ ok: true });
+      return true;
+    } else if (request.type === "set-mic-active-tab") {
+      setMic(request);
+    } else if (request.type === "set-audio-output-volume") {
+      setAudioOutputVolume(request.volume);
+    } else if (request.type === "pause-recording-tab") {
+      if (!recorder.current) return;
+      if (pausedStateRef.current) return;
+      if (
+        useWebCodecs.current &&
+        recorder.current instanceof WebCodecsRecorder
+      ) {
+        debug("Pausing WebCodecsRecorder");
+        recorder.current.pause();
+      } else if (recorder.current instanceof MediaRecorder) {
+        debug("Pausing MediaRecorder");
+        recorder.current.pause();
+      }
+      const now = Date.now();
+      pausedStateRef.current = true;
+      void setRecordingTimingState({
+        paused: true,
+        pausedAt: now,
+      });
+    } else if (request.type === "resume-recording-tab") {
+      if (!recorder.current) return;
+      if (!pausedStateRef.current) return;
+      if (
+        useWebCodecs.current &&
+        recorder.current instanceof WebCodecsRecorder
+      ) {
+        debug("Resuming WebCodecsRecorder");
+        recorder.current.resume();
+      } else if (recorder.current instanceof MediaRecorder) {
+        debug("Resuming MediaRecorder");
+        recorder.current.resume();
+      }
+      const now = Date.now();
+      pausedStateRef.current = false;
+      void (async () => {
+        try {
+          const { pausedAt, totalPausedMs } = await chrome.storage.local.get([
+            "pausedAt",
+            "totalPausedMs",
+          ]);
+          const additional = pausedAt ? Math.max(0, now - pausedAt) : 0;
+          await setRecordingTimingState({
+            paused: false,
+            pausedAt: null,
+            totalPausedMs: (totalPausedMs || 0) + additional,
+          });
+        } catch (err) {
+          debugWarn("Failed to update resume timing state", err);
+        }
+      })();
+    } else if (request.type === "dismiss-recording") {
+      dismissRecording();
+    }
+  };
 
+  // Stable wrapper — delegates to the ref so the listener never changes.
   useEffect(() => {
-    debug("Adding chrome.runtime.onMessage listener");
-    chrome.runtime.onMessage.addListener(onMessage);
+    const stableHandler = (request, sender, sendResponse) => {
+      return onMessageRef.current?.(request, sender, sendResponse);
+    };
+    debug("Adding chrome.runtime.onMessage listener (stable)");
+    slLog("listener-add");
+    chrome.runtime.onMessage.addListener(stableHandler);
 
     return () => {
-      debug("Removing chrome.runtime.onMessage listener");
-      chrome.runtime.onMessage.removeListener(onMessage);
+      debug("Removing chrome.runtime.onMessage listener (stable)");
+      slLog("listener-remove");
+      chrome.runtime.onMessage.removeListener(stableHandler);
     };
-  }, [onMessage]);
+  }, []);
 
-  return <RecorderUI started={started} isTab={isTab.current} />;
+  return (
+    <>
+      <RecorderUI started={started} isTab={isTab.current} />
+      {process.env.SCREENITY_DEV_MODE === "true" && (
+        <div
+          style={{
+            position: "fixed",
+            top: 4,
+            right: 4,
+            zIndex: 2147483647,
+            background: "rgba(0,0,0,0.65)",
+            color: "#0f0",
+            fontSize: "10px",
+            padding: "3px 7px",
+            borderRadius: "4px",
+            fontFamily: "monospace",
+            pointerEvents: "none",
+          }}
+        >
+          DEV
+        </div>
+      )}
+    </>
+  );
 };
 
 export default Recorder;

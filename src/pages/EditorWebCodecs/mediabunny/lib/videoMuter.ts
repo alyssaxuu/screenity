@@ -12,6 +12,7 @@ import {
   ALL_FORMATS,
   QUALITY_HIGH,
 } from "mediabunny";
+import { videoConverter } from "./videoConverter";
 
 export class VideoMuter {
   async mute(
@@ -25,6 +26,15 @@ export class VideoMuter {
     } = {}
   ) {
     const videoDuration = await this._getDuration(videoBlob);
+
+    // Cap at 15 min to avoid OOM — re-encoding needs several copies in memory.
+    if (videoDuration > 900) {
+      throw new Error(
+        `Video is too long for in-browser audio muting (${Math.round(videoDuration / 60)} min). ` +
+          `Maximum supported length is 15 minutes.`
+      );
+    }
+
     const input = new Input({
       source: new BlobSource(videoBlob),
       formats: ALL_FORMATS,
@@ -38,18 +48,25 @@ export class VideoMuter {
 
     const videoTrack = await input.getPrimaryVideoTrack();
     const videoSink = new VideoSampleSink(videoTrack);
+    const codecInfo = await videoConverter.detectBestCodec("mp4");
+    const videoCodec = codecInfo?.codec ?? "avc";
     const videoSource = new VideoSampleSource({
-      codec: "avc",
+      codec: videoCodec,
       bitrate: QUALITY_HIGH,
     });
     output.addVideoTrack(videoSource);
 
     let decodedAudio = null;
+    const ctx = new AudioContext();
     try {
-      const buf = await videoBlob.arrayBuffer();
-      const ctx = new AudioContext();
+      let buf = await videoBlob.arrayBuffer();
       decodedAudio = await ctx.decodeAudioData(buf);
-    } catch {}
+      buf = null; // release compressed bytes; PCM is now in decodedAudio
+    } catch {
+      // decode failed; mute returns original blob below
+    } finally {
+      ctx.close().catch(() => {});
+    }
 
     const sr = decodedAudio?.sampleRate || 48000;
     const mixBuffer = new Float32Array(Math.ceil(sr * videoDuration));
@@ -101,9 +118,8 @@ export class VideoMuter {
     }
 
     await output.finalize();
-    return new Blob([outputTarget.buffer], {
-      type: outputFormat === "webm" ? "video/webm" : "video/mp4",
-    });
+    // Always MP4 container — use correct MIME type.
+    return new Blob([outputTarget.buffer], { type: "video/mp4" });
   }
 
   async _getDuration(blob) {

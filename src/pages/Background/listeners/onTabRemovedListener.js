@@ -1,4 +1,5 @@
 import { sendMessageTab, clearEditorTabReference } from "../tabManagement";
+import { removeTab } from "../tabManagement/removeTab";
 import { sendMessageRecord } from "../recording/sendMessageRecord";
 import { diagEvent, endDiagSession } from "../../utils/diagnosticLog";
 
@@ -19,6 +20,7 @@ export const onTabRemovedListener = () => {
         activeTab,
         recorderSession,
         editorTab,
+        sandboxTab,
       } = await chrome.storage.local.get([
         "recording",
         "pendingRecording",
@@ -29,10 +31,39 @@ export const onTabRemovedListener = () => {
         "activeTab",
         "recorderSession",
         "editorTab",
+        "sandboxTab",
       ]);
 
       if (tabId === editorTab) {
         await clearEditorTabReference("editor-tab-closed", { tabId });
+      }
+
+      // Editor/sandbox tab closed — close the orphaned recorder tab (pinned
+      // recorder.html) so it doesn't linger. stopRecording() opens editors as
+      // sandboxTab (not editorTab), so we must check both.
+      const isEditorOrSandbox = tabId === editorTab || tabId === sandboxTab;
+      if (isEditorOrSandbox) {
+        if (tabId === sandboxTab) {
+          chrome.storage.local.set({ sandboxTab: null });
+        }
+        const isStillRecording =
+          recording ||
+          (recorderSession && recorderSession.status === "recording");
+        if (!isStillRecording && recordingTab && recordingTab !== tabId) {
+          try {
+            const recTab = await chrome.tabs.get(recordingTab);
+            const recUrl = recTab?.url || "";
+            if (
+              recUrl.includes("recorder.html") ||
+              recUrl.includes("cloudrecorder.html")
+            ) {
+              removeTab(recordingTab);
+            }
+          } catch {
+            // Tab already gone
+          }
+          chrome.storage.local.set({ recordingTab: null });
+        }
       }
 
       const recordedTabId = tabRecordedID || recordingTab;
@@ -109,6 +140,12 @@ export const onTabRemovedListener = () => {
             : null,
         });
         chrome.action.setIcon({ path: "assets/icon-34.png" });
+      }
+
+      // If the recorder tab (recorder.html) is closed after recording ends,
+      // clear the stale reference so it doesn't break the next recording start.
+      if (tabId === recordingTab && !isActivelyRecording && !pendingRecording) {
+        chrome.storage.local.set({ recordingTab: null });
       }
 
       // If recorder tab is closed before recording starts, clear pending UI state.

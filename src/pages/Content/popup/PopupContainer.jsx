@@ -608,7 +608,10 @@ const PopupContainer = (props) => {
                   chrome.runtime.sendMessage({ type: "handle-login" });
                 }}
                 onDowngradeClick={() => {
-                  chrome.storage.local.set({ wasLoggedIn: false });
+                  chrome.storage.local.set({
+                    wasLoggedIn: false,
+                    stayLoggedOut: true,
+                  });
                   setContentState((prev) => ({
                     ...prev,
                     isLoggedIn: false,

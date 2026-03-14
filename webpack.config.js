@@ -224,6 +224,9 @@ const config = {
       "process.env.RECORDING_WARNING_THRESHOLD": JSON.stringify(
         process.env.RECORDING_WARNING_THRESHOLD || 60 // Default to 1 minute
       ),
+      "process.env.SCREENITY_DEV_MODE": JSON.stringify(
+        process.env.SCREENITY_DEV_MODE || ""
+      ),
     }),
 
     // Copy manifest and transform with package info

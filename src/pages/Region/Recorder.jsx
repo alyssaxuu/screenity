@@ -228,6 +228,13 @@ const Recorder = () => {
     // }
 
     if (!(await canFitChunk(e.data.size))) {
+      if (!lowStorageAbort.current) {
+        chrome.runtime.sendMessage({
+          type: "show-toast",
+          message: chrome.i18n.getMessage("toastStorageCritical"),
+          timeout: 8000,
+        });
+      }
       lowStorageAbort.current = true;
       chrome.storage.local.set({
         recording: false,
@@ -248,6 +255,13 @@ const Recorder = () => {
         timestamp: ts,
       });
     } catch (err) {
+      if (!lowStorageAbort.current) {
+        chrome.runtime.sendMessage({
+          type: "show-toast",
+          message: chrome.i18n.getMessage("toastStorageCritical"),
+          timeout: 8000,
+        });
+      }
       lowStorageAbort.current = true;
       chrome.storage.local.set({
         recording: false,
@@ -330,6 +344,13 @@ const Recorder = () => {
         pendingBytes.current -= e.data.size;
 
         if (!(await canFitChunk(e.data.size))) {
+          if (!lowStorageAbort.current) {
+            chrome.runtime.sendMessage({
+              type: "show-toast",
+              message: chrome.i18n.getMessage("toastStorageCritical"),
+              timeout: 8000,
+            });
+          }
           lowStorageAbort.current = true;
           chrome.storage.local.set({
             recording: false,
@@ -1054,6 +1075,9 @@ const Recorder = () => {
               if (switched && recorder.current instanceof MediaRecorder) {
                 try {
                   recorder.current.start(1000);
+                  setTimeout(() => {
+                    try { recorder.current?.requestData?.(); } catch (_) {}
+                  }, 250);
                 } catch (startErr) {
                   persistRegionStartDebug({
                     stage: "codec-fallback-start-failed",
@@ -1145,6 +1169,11 @@ const Recorder = () => {
     if (isMediaRecorder) {
       try {
         recorder.current.start(1000);
+        // Force an early first chunk so even very short recordings have
+        // data in IndexedDB before the user can navigate away.
+        setTimeout(() => {
+          try { recorder.current?.requestData?.(); } catch (_) {}
+        }, 250);
       } catch (err) {
         persistRegionStartDebug({
           stage: "mediarecorder-start-throw",
@@ -1703,16 +1732,39 @@ const Recorder = () => {
   useEffect(() => {
     const handleBeforeUnload = (e) => {
       if (recordingRef.current && regionRef.current) {
+        // Flush any buffered data from the MediaRecorder into IndexedDB.
+        // The "Leave page?" dialog gives the ondataavailable handler enough
+        // time to persist the chunk before the frame is torn down.
+        try {
+          recorder.current?.requestData?.();
+        } catch (_) {}
         e.preventDefault();
         e.returnValue = "";
-
-        // Save and stop recording
-        stopRecording();
       }
     };
     window.addEventListener("beforeunload", handleBeforeUnload);
+
+    // When the iframe is actually being destroyed (user clicked "Leave" or
+    // the parent page navigated), fire a message to the background to force
+    // stop the recording. pagehide fires synchronously during teardown and
+    // chrome.runtime.sendMessage from an extension page is delivered via IPC
+    // before the frame is gone — no async race.
+    const handlePageHide = () => {
+      if (recordingRef.current && regionRef.current) {
+        try {
+          chrome.runtime.sendMessage({
+            type: "region-iframe-destroyed",
+          });
+        } catch (_) {
+          // Extension context may already be invalidated
+        }
+      }
+    };
+    window.addEventListener("pagehide", handlePageHide);
+
     return () => {
       window.removeEventListener("beforeunload", handleBeforeUnload);
+      window.removeEventListener("pagehide", handlePageHide);
     };
   }, []);
 
@@ -1825,7 +1877,29 @@ const Recorder = () => {
     };
   }, []);
 
-  return <div></div>;
+  return (
+    <div>
+      {process.env.SCREENITY_DEV_MODE === "true" && (
+        <div
+          style={{
+            position: "fixed",
+            top: 4,
+            right: 4,
+            zIndex: 2147483647,
+            background: "rgba(0,0,0,0.65)",
+            color: "#0f0",
+            fontSize: "10px",
+            padding: "3px 7px",
+            borderRadius: "4px",
+            fontFamily: "monospace",
+            pointerEvents: "none",
+          }}
+        >
+          DEV
+        </div>
+      )}
+    </div>
+  );
 };
 
 export default Recorder;

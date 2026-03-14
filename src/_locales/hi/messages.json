@@ -1458,8 +1458,8 @@
     "description": "Toast shown when a crashed recording session is auto-recovered on startup"
   },
   "toastStorageCritical": {
-    "message": "Low disk space detected. Recording is stopping to avoid corruption.",
-    "description": "Toast shown when available storage drops below the critical threshold during recording"
+    "message": "डिस्क में कम जगह। आपकी रिकॉर्डिंग सहेजी जा रही है। अब तक कैप्चर किया गया सब कुछ सुरक्षित है।",
+    "description": "Toast shown when available storage drops below the critical threshold during recording; reassures that captured data is preserved"
   },
   "toastStorageLow": {
     "message": "Storage is running low. Upload reliability may degrade for long recordings.",
@@ -1472,5 +1472,105 @@
   "toastNetworkOffline": {
     "message": "Network offline. Upload paused. Screen chunks are saved locally.",
     "description": "Toast shown when the browser goes offline during a cloud recording upload"
+  },
+  "longRecordingTitle": {
+    "message": "लंबी रिकॉर्डिंग",
+    "description": "Banner title shown when a recording exceeds the local processing limit but is otherwise successful"
+  },
+  "longRecordingDescription": {
+    "message": "आपकी रिकॉर्डिंग पूर्ण और सुरक्षित है। नीचे WebM के रूप में डाउनलोड करें।",
+    "description": "Banner description for long recordings that can be downloaded but not edited locally"
+  },
+  "notAvailableLongRecording": {
+    "message": "लंबी रिकॉर्डिंग के लिए अनुपलब्ध",
+    "description": "Disabled button label for features not available due to recording length"
+  },
+  "notAvailableRecoveryMode": {
+    "message": "पुनर्प्राप्ति मोड में अनुपलब्ध",
+    "description": "Disabled button label for features not available in recovery/fallback mode"
+  },
+  "editTooLongTitle": {
+    "message": "ऑडियो संपादन बहुत लंबा",
+    "description": "Alert title when an audio mute/mix edit is rejected because the clip exceeds 15 minutes"
+  },
+  "editTooLongDescription": {
+    "message": "यह ऑडियो संपादन 15 मिनट से अधिक के क्लिप के लिए समर्थित नहीं है। आपका मूल अपरिवर्तित है। पहले क्लिप को ट्रिम करने का प्रयास करें।",
+    "description": "Alert body explaining the 15-minute limit and suggesting trimming first"
+  },
+  "editTimeoutTitle": {
+    "message": "संपादन का समय समाप्त",
+    "description": "Alert title when an edit operation does not complete within the 5-minute watchdog period"
+  },
+  "editTimeoutDescription": {
+    "message": "संपादन समय पर पूरा नहीं हुआ। आपकी मूल रिकॉर्डिंग अपरिवर्तित है। फिर से प्रयास करें या पहले क्लिप ट्रिम करें।",
+    "description": "Alert body for the timeout case, prompting retry or shorter clip"
+  },
+  "streamEndedWarningToast": {
+    "message": "स्क्रीन शेयरिंग बंद हो गई। आपकी रिकॉर्डिंग सहेजी गई है। जब तैयार हों तब रोकें।",
+    "description": "Toast shown when screen share track ends mid-recording. Recording continues; removes false urgency about data loss."
+  },
+  "recoveryModeDescription": {
+    "message": "प्रोसेसिंग में कोई समस्या थी, लेकिन आपकी रिकॉर्डिंग सुरक्षित है। आप इसे नीचे डाउनलोड कर सकते हैं।",
+    "description": "Recovery mode banner description — reassures user their recording is accessible despite the processing failure"
+  },
+  "editProcessingSafeDescription": {
+    "message": "आपका संपादन प्रोसेस हो रहा है। आपकी मूल रिकॉर्डिंग अपरिवर्तित है।",
+    "description": "Shown in the editor processing alert when a user-initiated edit is running, to reassure the original is safe"
+  },
+  "editFailedTitle": {
+    "message": "संपादन लागू नहीं हो सका",
+    "description": "Alert title when an edit operation fails due to an encoding or processing error"
+  },
+  "editFailedDescription": {
+    "message": "प्रोसेसिंग के दौरान कुछ गलत हो गया। आपकी मूल रिकॉर्डिंग सुरक्षित है। आप फिर से कोशिश कर सकते हैं या इसे वैसे ही डाउनलोड कर सकते हैं।",
+    "description": "Alert body for edit failure; explicitly confirms the original recording is untouched"
+  },
+  "videoTrackEndedToast": {
+    "message": "स्क्रीन शेयरिंग बंद हो गई। आपकी रिकॉर्डिंग सहेजी जा रही है। अब तक कैप्चर किया गया सब कुछ सुरक्षित है।",
+    "description": "Toast shown when the video track ends mid-recording (e.g. monitor disconnected, screen share revoked)"
+  },
+  "audioTrackEndedToast": {
+    "message": "ऑडियो डिस्कनेक्ट हो गया। आपकी रिकॉर्डिंग सहेजी जा रही है। अब तक कैप्चर किया गया वीडियो सुरक्षित है।",
+    "description": "Toast shown when the audio track ends mid-recording (e.g. mic unplugged, permission revoked)"
+  },
+  "editorRecoveryToast": {
+    "message": "आपकी रिकॉर्डिंग सहेजी गई है। एडिटर नहीं खुला। फिर से कोशिश करने के लिए Screenity आइकन पर क्लिक करें।",
+    "description": "Toast shown on the active tab when the post-recording editor tab fails to open"
+  },
+  "stopAckTimeoutToast": {
+    "message": "सहेजने में अपेक्षा से अधिक समय लग रहा है। आपका डेटा सुरक्षित है। एडिटर जल्द खुलेगा।",
+    "description": "Toast shown when the recorder does not acknowledge the stop request within a few seconds"
+  },
+  "copyDebugInfoButton": {
+    "message": "डीबग जानकारी कॉपी करें",
+    "description": "Button to copy technical debug info to clipboard for support"
+  },
+  "debugInfoCopiedToast": {
+    "message": "डीबग जानकारी कॉपी हो गई",
+    "description": "Toast shown after debug info is copied"
+  },
+  "getHelpButton": {
+    "message": "सहायता प्राप्त करें",
+    "description": "Side button on error modals that opens a prefilled support form"
+  },
+  "recordingTooShortToast": {
+    "message": "रिकॉर्डिंग सेव करने के लिए बहुत छोटी थी",
+    "description": "Toast shown when a region recording is stopped by navigation but no chunks were saved"
+  },
+  "fastRecorderFailedTitle": {
+    "message": "तेज़ रिकॉर्डर विफल हुआ",
+    "description": "Title for the modal shown when the fast MP4 recorder output could not be validated"
+  },
+  "fastRecorderFailedDescription": {
+    "message": "इस डिवाइस पर तेज़ रिकॉर्डर का आउटपुट सत्यापित नहीं हो सका।\nआप फिर भी फ़ाइल डाउनलोड कर सकते हैं।",
+    "description": "Body text for the fast recorder failure modal"
+  },
+  "downloadAnywayButton": {
+    "message": "फिर भी डाउनलोड करें",
+    "description": "Button to download the recording file despite validation failure"
+  },
+  "cancelButton": {
+    "message": "रद्द करें",
+    "description": "Generic cancel button label"
   }
 }

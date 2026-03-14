@@ -8,6 +8,14 @@ export const loginWithWebsite = async () => {
   if (!CLOUD_FEATURES_ENABLED) {
     return { authenticated: false, instantMode: false };
   }
+
+  // User explicitly chose to stay logged out — respect that until they
+  // initiate a login themselves (handle-login clears this flag).
+  const { stayLoggedOut } = await chrome.storage.local.get(["stayLoggedOut"]);
+  if (stayLoggedOut) {
+    return { authenticated: false, instantMode: false };
+  }
+
   const { screenityToken, lastAuthCheck, instantMode } =
     await chrome.storage.local.get([
       "screenityToken",
@@ -43,18 +51,6 @@ export const loginWithWebsite = async () => {
         isLoggedIn: true,
         wasLoggedIn: false,
       });
-
-      const { originalTabId } = await chrome.storage.local.get("originalTabId");
-
-      if (originalTabId) {
-        chrome.tabs.update(originalTabId, { active: true });
-
-        sendMessageTab(originalTabId, { type: "LOGIN_SUCCESS" });
-
-        sendMessageTab(originalTabId, {
-          type: "check-auth",
-        });
-      }
 
       return {
         authenticated: true,
@@ -103,6 +99,9 @@ export const loginWithWebsite = async () => {
     const { originalTabId } = await chrome.storage.local.get("originalTabId");
 
     if (originalTabId) {
+      // Clear immediately so subsequent cached calls don't re-fire.
+      await chrome.storage.local.remove("originalTabId");
+
       chrome.tabs.update(originalTabId, { active: true });
 
       sendMessageTab(originalTabId, { type: "LOGIN_SUCCESS" });

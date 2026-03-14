@@ -192,6 +192,17 @@ const Sandbox = () => {
                     () => {
                       chrome.runtime.sendMessage({ type: "report-bug" });
                     },
+                    null, // image
+                    null, // learnMore
+                    null, // learnMoreLink
+                    false, // colorSafe
+                    chrome.i18n.getMessage("getHelpButton"),
+                    () => {
+                      chrome.runtime.sendMessage({
+                        type: "report-error",
+                        source: "processing-stuck",
+                      });
+                    },
                   );
                 }}
               >

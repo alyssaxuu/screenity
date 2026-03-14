@@ -290,7 +290,6 @@ const Wrapper = () => {
             className="root-container"
             id="screenity-root-container"
             style={{
-              // all: "initial",
               display: "block",
               width: "100%",
               height: "100%",
@@ -299,6 +298,22 @@ const Wrapper = () => {
               left: "0px",
               top: "0px",
               zIndex: 9999999999,
+              // Isolation: prevent host-page inherited typography from
+              // leaking through the shadow-DOM boundary.
+              fontFamily: "'Satoshi-Medium', sans-serif",
+              fontSize: "16px",
+              lineHeight: "normal",
+              letterSpacing: "normal",
+              wordSpacing: "normal",
+              textTransform: "none",
+              textIndent: "0",
+              textAlign: "left",
+              color: "#29292F",
+              direction: "ltr",
+              whiteSpace: "normal",
+              fontStyle: "normal",
+              fontVariant: "normal",
+              fontWeight: "normal",
             }}
             ref={shadowRef}
           >

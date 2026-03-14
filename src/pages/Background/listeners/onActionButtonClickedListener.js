@@ -127,6 +127,19 @@ const openPlaygroundOrPopup = async (tab) => {
 export const onActionButtonClickedListener = () => {
   chrome.action.onClicked.addListener(async (tab) => {
     try {
+      // Recover a previous recording whose editor failed to open (expires after 1h).
+      const { editorRecoveryUrl, editorRecoveryAt } = await chrome.storage.local.get(["editorRecoveryUrl", "editorRecoveryAt"]);
+      if (editorRecoveryUrl) {
+        const ageMs = Date.now() - (editorRecoveryAt || 0);
+        if (ageMs < 60 * 60 * 1000) {
+          await chrome.storage.local.remove(["editorRecoveryUrl", "editorRecoveryAt"]);
+          chrome.tabs.create({ url: editorRecoveryUrl, active: true });
+          return;
+        }
+        // Expired — clear and fall through to normal behavior
+        await chrome.storage.local.remove(["editorRecoveryUrl", "editorRecoveryAt"]);
+      }
+
       const { recording, pendingRecording, restarting, recorderSession } =
         await chrome.storage.local.get([
           "recording",

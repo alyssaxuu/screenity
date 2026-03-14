@@ -1,9 +1,14 @@
 import { sendMessageRecord } from "./sendMessageRecord";
+import { sendMessageTab } from "../tabManagement";
 import { initDiagSession, diagEvent } from "../../utils/diagnosticLog";
+import { makeRecordingAttemptId } from "../../utils/errorCodes";
 
 export const startRecording = async () => {
+  // Correlation ID for this recording attempt
+  const recordingAttemptId = makeRecordingAttemptId();
   chrome.storage.local.set({
     restarting: false,
+    recordingAttemptId,
   });
 
   const { activeTab, recordingUiTabId } = await chrome.storage.local.get([
@@ -69,6 +74,7 @@ export const startRecording = async () => {
       "countdown",
     ]);
   await initDiagSession({
+    recordingAttemptId,
     recordingType: recordingType || "screen",
     quality: quality || null,
     region: Boolean(customRegion),
@@ -84,51 +90,51 @@ export const startRecording = async () => {
   // the event is flushed to storage before the SW can be killed.
   diagEvent("session-start", { region: Boolean(customRegion) });
 
-  if (customRegion) {
-    sendMessageRecord({ type: "start-recording-tab", region: true })
-      .then(() => {
-        chrome.storage.local.set({
-          lastStartRecordingDispatch: {
-            ts: Date.now(),
-            ok: true,
-            region: true,
-          },
-        });
-      })
-      .catch((err) => {
-        chrome.storage.local.set({
-          lastStartRecordingDispatch: {
-            ts: Date.now(),
-            ok: false,
-            region: true,
-            error: String(err),
-          },
-        });
-        diagEvent("start-fail", { region: true, error: String(err) });
-      });
-  } else {
-    sendMessageRecord({ type: "start-recording-tab" })
-      .then(() => {
-        chrome.storage.local.set({
-          lastStartRecordingDispatch: {
-            ts: Date.now(),
-            ok: true,
-            region: false,
-          },
-        });
-      })
-      .catch((err) => {
-        chrome.storage.local.set({
-          lastStartRecordingDispatch: {
-            ts: Date.now(),
-            ok: false,
-            region: false,
-            error: String(err),
-          },
-        });
-        diagEvent("start-fail", { region: false, error: String(err) });
-      });
+  // If recordingTab points to a dead tab left over from a previous recording,
+  // clear it so sendMessageRecord doesn't try to message it.
+  const { recordingTab: prevRecTab } = await chrome.storage.local.get([
+    "recordingTab",
+  ]);
+  if (prevRecTab != null) {
+    try {
+      await chrome.tabs.get(prevRecTab);
+      // Tab is alive — this is the current recorder tab, leave it alone.
+    } catch {
+      // Tab doesn't exist — stale reference from a previous recording.
+      diagEvent("stale-recording-tab-cleared", { prevRecTab });
+      chrome.storage.local.set({ recordingTab: null });
+    }
   }
+
+  const startMsg = customRegion
+    ? { type: "start-recording-tab", region: true }
+    : { type: "start-recording-tab" };
+
+  sendMessageRecord(startMsg).catch((err) => {
+    const errStr = String(err).slice(0, 120);
+    const isStaleTab =
+      errStr.includes("Receiving end does not exist") ||
+      errStr.includes("No tab with id") ||
+      errStr.includes("No recording tab available");
+    diagEvent("start-fail", {
+      region: Boolean(customRegion),
+      error: errStr,
+      staleTab: isStaleTab,
+    });
+    // Notify the user that the recording failed to start
+    chrome.storage.local.get(["activeTab"], ({ activeTab }) => {
+      if (activeTab) {
+        sendMessageTab(activeTab, {
+          type: "recording-error",
+          error: "start-failed",
+          why: isStaleTab
+            ? "stale-recorder-tab"
+            : "recorder-tab-unavailable",
+        }).catch(() => {});
+      }
+    });
+    chrome.action.setIcon({ path: "assets/icon-34.png" });
+  });
   chrome.action.setIcon({ path: "assets/recording-logo.png" });
   // Set up alarm if set in storage
   if (alarm) {

@@ -22,11 +22,13 @@ const signInEdge = async () => {
       },
       async (redirectUrl) => {
         if (chrome.runtime.lastError) {
+          console.error("[Drive] drive_auth_failed: Edge auth error:", chrome.runtime.lastError.message);
           reject(new Error(chrome.runtime.lastError.message));
           return;
         }
 
         if (!redirectUrl) {
+          console.error("[Drive] drive_auth_failed: no redirect URL (user cancelled?)");
           reject(new Error("User cancelled sign-in or failed to get token"));
           return;
         }
@@ -37,6 +39,7 @@ const signInEdge = async () => {
         const token = params.get("access_token");
 
         if (!token) {
+          console.error("[Drive] drive_auth_failed: no access_token in redirect");
           reject(new Error("Failed to extract token from redirect"));
           return;
         }
@@ -56,6 +59,7 @@ const signInChrome = async () => {
   const token = await chrome.identity.getAuthToken({ interactive: true });
 
   if (!token) {
+    console.error("[Drive] drive_auth_failed: getAuthToken returned null");
     throw new Error("User cancelled sign-in or failed to get token");
   }
 
@@ -63,8 +67,6 @@ const signInChrome = async () => {
   await new Promise((resolve) =>
     chrome.storage.local.set({ token: token.token }, () => resolve())
   );
-
-  //const userInfo = await chrome.identity.getProfileUserInfo();
 
   return token.token;
 };
@@ -77,7 +79,7 @@ const signIn = async () => {
       return await signInChrome();
     }
   } catch (error) {
-    console.error("Error signing in:", error.message);
+    console.error("[Drive] drive_auth_failed:", error.message);
     return null;
   }
 };

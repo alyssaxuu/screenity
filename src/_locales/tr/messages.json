@@ -1458,8 +1458,8 @@
     "description": "Toast shown when a crashed recording session is auto-recovered on startup"
   },
   "toastStorageCritical": {
-    "message": "Low disk space detected. Recording is stopping to avoid corruption.",
-    "description": "Toast shown when available storage drops below the critical threshold during recording"
+    "message": "Disk alanı düşük. Kaydınız şimdi kaydediliyor. Şimdiye kadar yakalanan her şey güvende.",
+    "description": "Toast shown when available storage drops below the critical threshold during recording; reassures that captured data is preserved"
   },
   "toastStorageLow": {
     "message": "Storage is running low. Upload reliability may degrade for long recordings.",
@@ -1472,5 +1472,105 @@
   "toastNetworkOffline": {
     "message": "Network offline. Upload paused. Screen chunks are saved locally.",
     "description": "Toast shown when the browser goes offline during a cloud recording upload"
+  },
+  "longRecordingTitle": {
+    "message": "Uzun kayıt",
+    "description": "Banner title shown when a recording exceeds the local processing limit but is otherwise successful"
+  },
+  "longRecordingDescription": {
+    "message": "Kaydınız tamamlandı ve güvende. Aşağıdan WebM olarak indirin.",
+    "description": "Banner description for long recordings that can be downloaded but not edited locally"
+  },
+  "notAvailableLongRecording": {
+    "message": "Uzun kayıtlar için kullanılamıyor",
+    "description": "Disabled button label for features not available due to recording length"
+  },
+  "notAvailableRecoveryMode": {
+    "message": "Kurtarma modunda kullanılamıyor",
+    "description": "Disabled button label for features not available in recovery/fallback mode"
+  },
+  "editTooLongTitle": {
+    "message": "Ses düzenlemesi çok uzun",
+    "description": "Alert title when an audio mute/mix edit is rejected because the clip exceeds 15 minutes"
+  },
+  "editTooLongDescription": {
+    "message": "Bu ses düzenlemesi 15 dakikadan uzun klipler için desteklenmiyor. Orijinaliniz değişmedi. Önce klibi kırpmayı deneyin.",
+    "description": "Alert body explaining the 15-minute limit and suggesting trimming first"
+  },
+  "editTimeoutTitle": {
+    "message": "Düzenleme zaman aşımına uğradı",
+    "description": "Alert title when an edit operation does not complete within the 5-minute watchdog period"
+  },
+  "editTimeoutDescription": {
+    "message": "Düzenleme zamanında tamamlanamadı. Orijinal kaydınız değişmedi. Tekrar deneyin veya önce klibi kırpın.",
+    "description": "Alert body for the timeout case, prompting retry or shorter clip"
+  },
+  "streamEndedWarningToast": {
+    "message": "Ekran paylaşımı durdu. Kaydınız kaydedildi. Hazır olduğunuzda durdurun.",
+    "description": "Toast shown when screen share track ends mid-recording. Recording continues; removes false urgency about data loss."
+  },
+  "recoveryModeDescription": {
+    "message": "Bir işleme sorunu oluştu, ancak kaydınız güvende. Aşağıdan indirebilirsiniz.",
+    "description": "Recovery mode banner description — reassures user their recording is accessible despite the processing failure"
+  },
+  "editProcessingSafeDescription": {
+    "message": "Düzenlemeniz işleniyor. Orijinal kaydınız değiştirilmedi.",
+    "description": "Shown in the editor processing alert when a user-initiated edit is running, to reassure the original is safe"
+  },
+  "editFailedTitle": {
+    "message": "Düzenleme uygulanamadı",
+    "description": "Alert title when an edit operation fails due to an encoding or processing error"
+  },
+  "editFailedDescription": {
+    "message": "İşleme sırasında bir sorun oluştu. Orijinal kaydınız güvende. Tekrar deneyebilir veya olduğu gibi indirebilirsiniz.",
+    "description": "Alert body for edit failure; explicitly confirms the original recording is untouched"
+  },
+  "videoTrackEndedToast": {
+    "message": "Ekran paylaşımı durdu. Kaydınız şimdi kaydediliyor. Şimdiye kadar yakalanan her şey güvende.",
+    "description": "Toast shown when the video track ends mid-recording (e.g. monitor disconnected, screen share revoked)"
+  },
+  "audioTrackEndedToast": {
+    "message": "Ses bağlantısı kesildi. Kaydınız şimdi kaydediliyor. Şimdiye kadar yakalanan video güvende.",
+    "description": "Toast shown when the audio track ends mid-recording (e.g. mic unplugged, permission revoked)"
+  },
+  "editorRecoveryToast": {
+    "message": "Kaydınız kaydedildi. Düzenleyici açılmadı. Tekrar denemek için Screenity simgesine tıklayın.",
+    "description": "Toast shown on the active tab when the post-recording editor tab fails to open"
+  },
+  "stopAckTimeoutToast": {
+    "message": "Kaydetme beklenenden uzun sürüyor. Verileriniz güvende. Düzenleyici kısa süre içinde açılacak.",
+    "description": "Toast shown when the recorder does not acknowledge the stop request within a few seconds"
+  },
+  "copyDebugInfoButton": {
+    "message": "Hata ayıklama bilgisini kopyala",
+    "description": "Button to copy technical debug info to clipboard for support"
+  },
+  "debugInfoCopiedToast": {
+    "message": "Hata ayıklama bilgisi kopyalandı",
+    "description": "Toast shown after debug info is copied"
+  },
+  "getHelpButton": {
+    "message": "Yardım al",
+    "description": "Side button on error modals that opens a prefilled support form"
+  },
+  "recordingTooShortToast": {
+    "message": "Kayıt kaydedilemeyecek kadar kısa",
+    "description": "Toast shown when a region recording is stopped by navigation but no chunks were saved"
+  },
+  "fastRecorderFailedTitle": {
+    "message": "H\u0131zl\u0131 kay\u0131t ba\u015far\u0131s\u0131z oldu",
+    "description": "Title for the modal shown when the fast MP4 recorder output could not be validated"
+  },
+  "fastRecorderFailedDescription": {
+    "message": "H\u0131zl\u0131 kaydedicinin \u00e7\u0131kt\u0131s\u0131 bu cihazda do\u011frulanamad\u0131.\nDosyay\u0131 yine de indirebilirsiniz.",
+    "description": "Body text for the fast recorder failure modal"
+  },
+  "downloadAnywayButton": {
+    "message": "Yine de indir",
+    "description": "Button to download the recording file despite validation failure"
+  },
+  "cancelButton": {
+    "message": "\u0130ptal",
+    "description": "Generic cancel button label"
   }
 }

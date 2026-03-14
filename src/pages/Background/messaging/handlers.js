@@ -77,7 +77,7 @@ const APP_BASE = process.env.SCREENITY_APP_BASE;
 const CLOUD_FEATURES_ENABLED =
   process.env.SCREENITY_ENABLE_CLOUD_FEATURES === "true";
 // Debug toggle for post-stop/chunk flow
-const DEBUG_POSTSTOP = true;
+const DEBUG_POSTSTOP = false;
 const STOP_RECORDING_TAB_DEBOUNCE_MS = 1200;
 const CLOUD_LOCAL_PLAYBACK_MAX_BYTES = 250 * 1024 * 1024;
 const CLOUD_LOCAL_PLAYBACK_MAX_CHUNKS = 4000;
@@ -228,19 +228,17 @@ const ensureAudioOffscreen = async () => {
   if (!chrome.offscreen) return false;
   try {
     const contexts = await chrome.runtime.getContexts({});
-    const audioUrl = chrome.runtime.getURL("audiooffscreen.html");
-    const hasAudioOffscreen = contexts.some(
-      (context) =>
-        context.contextType === "OFFSCREEN_DOCUMENT" &&
-        context.documentUrl === audioUrl,
+    const hasAnyOffscreen = contexts.some(
+      (context) => context.contextType === "OFFSCREEN_DOCUMENT",
     );
-    if (!hasAudioOffscreen) {
-      await chrome.offscreen.createDocument({
-        url: "audiooffscreen.html",
-        reasons: ["AUDIO_PLAYBACK"],
-        justification: "Play short UI beep sounds.",
-      });
-    }
+    // If an offscreen document already exists (e.g. the recorder), reuse it
+    // — Chrome only allows one offscreen document per extension.
+    if (hasAnyOffscreen) return true;
+    await chrome.offscreen.createDocument({
+      url: "audiooffscreen.html",
+      reasons: ["AUDIO_PLAYBACK"],
+      justification: "Play short UI beep sounds.",
+    });
     return true;
   } catch (error) {
     console.warn("Failed to ensure audio offscreen document", error);
@@ -375,7 +373,7 @@ const handleReopenPopupMulti = async () => {
   }
 };
 
-const handleCheckStorageQuota = async () => {
+const handleCheckStorageQuota = async (retried = false) => {
   try {
     const { screenityToken } = await chrome.storage.local.get("screenityToken");
 
@@ -386,6 +384,17 @@ const handleCheckStorageQuota = async () => {
       },
       credentials: "include",
     });
+
+    // On 401, invalidate auth cache and retry once so loginWithWebsite()
+    // in the outer handler can refresh the token on the next attempt.
+    if (res.status === 401 && !retried) {
+      await chrome.storage.local.set({ lastAuthCheck: 0 });
+      const refresh = await loginWithWebsite();
+      if (refresh.authenticated) {
+        return handleCheckStorageQuota(true);
+      }
+      return { success: false, error: "Not authenticated" };
+    }
 
     const result = await res.json();
 
@@ -721,6 +730,57 @@ export const setupHandlers = () => {
     await videoReady(message);
     await clearRecordingSessionSafe("video-ready");
   });
+
+  // Fired by Region/Recorder.jsx pagehide — the iframe is being torn down
+  // because the user navigated away from the recorded tab.
+  registerMessage("region-iframe-destroyed", async () => {
+    const { recording, recorderSession, customRegion, recordingType } =
+      await chrome.storage.local.get([
+        "recording",
+        "recorderSession",
+        "customRegion",
+        "recordingType",
+      ]);
+    const isActivelyRecording =
+      recording ||
+      (recorderSession && recorderSession.status === "recording");
+    const isRegionRecording = customRegion || recordingType === "region";
+    if (!isActivelyRecording || !isRegionRecording) return;
+
+    diagEvent("region-iframe-destroyed");
+    await chrome.storage.local.set({
+      recording: false,
+      customRegion: false,
+      // Clear recordingTab so stopRecording() doesn't think the editor was
+      // already opened by the stop-recording-tab flow (recordingTab points
+      // to the pinned recorder.html tab which didn't open any editor).
+      recordingTab: null,
+      postStopEditorOpening: false,
+      postStopEditorOpened: false,
+      recorderSession: recorderSession
+        ? { ...recorderSession, status: "stopped" }
+        : null,
+    });
+
+    // If no chunks were persisted (user navigated almost immediately),
+    // show a toast instead of opening an empty editor.
+    const chunkCount = await chunksStore.length().catch(() => 0);
+    if (chunkCount === 0) {
+      diagEvent("region-nav-no-chunks");
+      const { activeTab } = await chrome.storage.local.get(["activeTab"]);
+      if (activeTab) {
+        sendMessageTab(activeTab, {
+          type: "show-toast",
+          message: chrome.i18n.getMessage("recordingTooShortToast"),
+          timeout: 5000,
+        }).catch(() => {});
+      }
+      return;
+    }
+
+    await videoReady();
+  });
+
   registerMessage("start-recording", (message) => startRecording(message));
   registerMessage("countdown-finished", async (message) => {
     const { recording, restarting, pendingRecording } =
@@ -930,9 +990,18 @@ export const setupHandlers = () => {
   });
   registerMessage("set-mic-active-tab", (message) => setMicActiveTab(message));
 
-  // Diagnostic events routed from content scripts
+  // Diagnostic events routed from content scripts / sandbox
   registerMessage("diag-countdown-started", () => diagEvent("countdown-started"));
   registerMessage("diag-countdown-cancelled", () => diagEvent("countdown-cancelled"));
+  registerMessage("diag-editor-ready", (message) =>
+    diagEvent("editor-load-ready", { path: message?.path || null }),
+  );
+  registerMessage("open-editor-recovery", async () => {
+    const { editorRecoveryUrl } = await chrome.storage.local.get(["editorRecoveryUrl"]);
+    if (!editorRecoveryUrl) return;
+    chrome.storage.local.remove(["editorRecoveryUrl", "editorRecoveryAt"]);
+    chrome.tabs.create({ url: editorRecoveryUrl, active: true });
+  });
   registerMessage("recording-error", async (message) => {
     await handleRecordingError(message);
     await clearRecordingSessionSafe("recording-error", {
@@ -1047,6 +1116,38 @@ export const setupHandlers = () => {
       source: "settings",
     });
     createTab(`https://tally.so/r/3ElpXq?${qs}`, false, true);
+  });
+  registerMessage("report-error", async (message) => {
+    const errorCode = message?.errorCode || null;
+    const errorWhy = message?.errorWhy || null;
+    const source = message?.source || "error-modal";
+
+    // Check auth for form routing
+    let user = null;
+    let isLoggedIn = false;
+    if (CLOUD_FEATURES_ENABLED) {
+      try {
+        const auth = await loginWithWebsite();
+        if (auth.authenticated && auth.user) {
+          user = auth.user;
+          isLoggedIn = true;
+        }
+      } catch {}
+    }
+
+    const qs = await supportContextQuery({
+      includeRecordingState: true,
+      source,
+      errorCode,
+      errorWhy,
+      user: isLoggedIn ? { name: user.name, email: user.email } : undefined,
+    });
+
+    if (isLoggedIn) {
+      createTab(`https://tally.so/r/310MNg?extension=true&${qs}`, false, true);
+    } else {
+      createTab(`https://tally.so/r/3ElpXq?feedbackType=Bug&${qs}`, false, true);
+    }
   });
   registerMessage("clear-recordings", () => clearAllRecordings());
   registerMessage("force-processing", (message) => forceProcessing(message));
@@ -1173,6 +1274,9 @@ export const setupHandlers = () => {
       console.warn("Cloud features disabled, cannot handle login");
       return;
     }
+    // User is explicitly initiating login — clear the stay-logged-out flag.
+    await chrome.storage.local.set({ stayLoggedOut: false });
+
     const currentTab = await getCurrentTab();
 
     if (currentTab?.id) {
@@ -1198,9 +1302,11 @@ export const setupHandlers = () => {
     ]);
 
     // Preserve a post-logout marker so popup can render the LoggedOut state.
+    // stayLoggedOut blocks auto-login until the user explicitly clicks "Log in".
     await chrome.storage.local.set({
       isLoggedIn: false,
       wasLoggedIn: true,
+      stayLoggedOut: true,
       isSubscribed: false,
       proSubscription: null,
       screenityUser: null,
@@ -1367,7 +1473,8 @@ export const setupHandlers = () => {
         sendResponse({ success: false, error: "Cloud features disabled" });
         return true;
       }
-      const { authenticated, subscribed } = await loginWithWebsite();
+      const authResult = await loginWithWebsite();
+      const { authenticated, subscribed } = authResult;
 
       if (!authenticated) {
         sendResponse({ success: false, error: "Not authenticated" });
@@ -1869,6 +1976,19 @@ export const setupHandlers = () => {
   });
   registerMessage("clear-recording-alarm", async () => {
     await chrome.alarms.clear("recording-alarm");
+  });
+  // Relay toasts to the active content script (extension pages can't reach it directly).
+  registerMessage("show-toast", async (message) => {
+    try {
+      const { activeTab } = await chrome.storage.local.get(["activeTab"]);
+      if (activeTab) {
+        sendMessageTab(activeTab, {
+          type: "show-toast",
+          message: message.message,
+          timeout: message.timeout,
+        }).catch(() => {});
+      }
+    } catch {}
   });
   registerMessage("get-tab-id", (message, sender, sendResponse) => {
     sendResponse({ tabId: sender?.tab?.id ?? null });

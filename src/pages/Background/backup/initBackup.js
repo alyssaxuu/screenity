@@ -30,14 +30,14 @@ export const initBackup = async (request, id) => {
 
   if (backupTab) {
     chrome.tabs.get(backupTab, (tab) => {
-      if (tab) {
+      if (chrome.runtime.lastError || !tab) {
+        createBackupTab();
+      } else {
         sendMessageTab(tab.id, {
           type: "init-backup",
           request: request,
           tabId: id,
         });
-      } else {
-        createBackupTab();
       }
     });
   } else {

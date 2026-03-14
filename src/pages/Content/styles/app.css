@@ -278,6 +278,7 @@ iframe {
   width: 42px;
   color: #29292f;
   font-size: 13px;
+  line-height: 1;
   user-select: none;
   -webkit-user-select: none;
   -moz-user-select: none;
@@ -3848,6 +3849,10 @@ button {
   font-weight: 300 !important;
   font-family: "Satoshi-Light", sans-serif !important;
   font-size: 48px !important;
+  line-height: 60px !important;
+  letter-spacing: normal !important;
+  text-transform: none !important;
+  word-spacing: normal !important;
   color: #fff;
   text-align: center;
   display: block;
@@ -3947,6 +3952,10 @@ button {
   display: block;
   padding: 10px 20px;
   font-family: "Satoshi-Medium", sans-serif;
+  font-size: 14px;
+  line-height: 1.4;
+  letter-spacing: normal;
+  text-transform: none;
   color: #fff;
   z-index: 99999999999;
   width: -moz-fit-content;
@@ -3991,6 +4000,7 @@ button {
   margin: 0;
   color: #29292f;
   font-size: 14px;
+  line-height: 1.4;
   font-family: "Satoshi-Bold", sans-serif;
   font-weight: 700;
 }
@@ -4280,12 +4290,14 @@ button {
 .warning-title {
   color: #fff;
   font-family: "Satoshi-Medium", sans-serif;
+  line-height: 1.4;
 }
 
 .warning-description {
   color: #fff;
   opacity: 0.8;
   font-family: "Satoshi-Medium", sans-serif;
+  line-height: 1.5;
 }
 
 .ToastAction {
@@ -4306,8 +4318,17 @@ button {
   cursor: pointer;
 }
 
-html {
+:host {
   font-size: 16px;
+  line-height: normal;
+  letter-spacing: normal;
+  word-spacing: normal;
+  text-transform: none;
+  font-style: normal;
+  font-variant: normal;
+  text-indent: 0;
+  direction: ltr;
+  white-space: normal;
 }
 
 .screenity-scrollbar::-webkit-scrollbar {

@@ -776,12 +776,44 @@
     "description": "Update announcement button for existing users"
   },
   "streamErrorModalTitle": {
-    "message": "Error starting the recording",
+    "message": "Recording stopped",
     "description": "Stream error modal title"
   },
   "streamErrorModalDescription": {
-    "message": "Looks like there was an error starting the recording. Restart your browser and try again. If the issue persists, please contact us at support@screenity.io.",
+    "message": "Looks like something went wrong with the recording. Restart your browser and try again. If the issue persists, please contact us at support@screenity.io.",
     "description": "Stream error modal description"
+  },
+  "copyDebugInfoButton": {
+    "message": "Copy debug info",
+    "description": "Button to copy technical debug info to clipboard for support"
+  },
+  "debugInfoCopiedToast": {
+    "message": "Debug info copied to clipboard",
+    "description": "Toast shown after debug info is copied"
+  },
+  "getHelpButton": {
+    "message": "Get help",
+    "description": "Side button on error modals that opens a prefilled support form"
+  },
+  "recordingTooShortToast": {
+    "message": "Recording was too short to save",
+    "description": "Toast shown when a region recording is stopped by navigation but no chunks were saved"
+  },
+  "fastRecorderFailedTitle": {
+    "message": "Fast recorder failed",
+    "description": "Title for the modal shown when the fast MP4 recorder output could not be validated"
+  },
+  "fastRecorderFailedDescription": {
+    "message": "The fast recorder output couldn't be validated on this device.\nYou can download the file anyway.",
+    "description": "Body text for the fast recorder failure modal"
+  },
+  "downloadAnywayButton": {
+    "message": "Download anyway",
+    "description": "Button to download the recording file despite validation failure"
+  },
+  "cancelButton": {
+    "message": "Cancel",
+    "description": "Generic cancel button label"
   },
   "highestQuality": {
     "message": "Highest quality",
@@ -820,7 +852,7 @@
     "description": "Memory limit reached title"
   },
   "memoryLimitDescription": {
-    "message": "Your device has run out of memory to record, so the recording has stopped automatically. If you'd like to record for longer, you can try lowering the quality of the video, or clearing up some space on your device.",
+    "message": "Your device ran out of storage space, so the recording stopped automatically. Your recording up to that point is safe and you can download it from the editor. To record longer, try lowering the video quality or freeing up space on your device.",
     "description": "Memory limit reached description"
   },
   "understoodButton": {
@@ -902,6 +934,22 @@
   "recoveryModeTitle": {
     "message": "Recovery mode",
     "description": "Recovery mode title"
+  },
+  "longRecordingTitle": {
+    "message": "Long recording",
+    "description": "Banner title shown when a recording exceeds the local processing limit but is otherwise successful"
+  },
+  "longRecordingDescription": {
+    "message": "Your recording is complete and safe. Download as WebM below.",
+    "description": "Banner description for long recordings that can be downloaded but not edited locally"
+  },
+  "notAvailableLongRecording": {
+    "message": "Unavailable for long recordings",
+    "description": "Disabled button label for features not available due to recording length"
+  },
+  "notAvailableRecoveryMode": {
+    "message": "Unavailable in recovery mode",
+    "description": "Disabled button label for features not available in recovery/fallback mode"
   },
   "downloadForTroubleshootingOption": {
     "message": "Download data for troubleshooting",
@@ -1458,8 +1506,8 @@
     "description": "Toast shown when a crashed recording session is auto-recovered on startup"
   },
   "toastStorageCritical": {
-    "message": "Low disk space detected. Recording is stopping to avoid corruption.",
-    "description": "Toast shown when available storage drops below the critical threshold during recording"
+    "message": "Low disk space. Saving your recording now. Everything captured so far is safe.",
+    "description": "Toast when disk space drops below critical threshold during recording"
   },
   "toastStorageLow": {
     "message": "Storage is running low. Upload reliability may degrade for long recordings.",
@@ -1472,5 +1520,57 @@
   "toastNetworkOffline": {
     "message": "Network offline. Upload paused. Screen chunks are saved locally.",
     "description": "Toast shown when the browser goes offline during a cloud recording upload"
+  },
+  "editTooLongTitle": {
+    "message": "Audio edit too long",
+    "description": "Alert title when an audio mute/mix edit is rejected because the clip exceeds 15 minutes"
+  },
+  "editTooLongDescription": {
+    "message": "This audio edit isn't supported for clips over 15 minutes. Your original is unchanged. Try trimming first, then re-apply the edit.",
+    "description": "Alert body explaining the 15-minute limit for in-browser edits"
+  },
+  "editTimeoutTitle": {
+    "message": "Edit timed out",
+    "description": "Alert title when an edit operation does not complete within the 5-minute watchdog period"
+  },
+  "editTimeoutDescription": {
+    "message": "The edit did not complete in time. Your original recording is unchanged. Try again, or trim the clip first.",
+    "description": "Alert body for edit timeout"
+  },
+  "streamEndedWarningToast": {
+    "message": "Screen sharing stopped. Your recording so far is saved. Stop when you're ready.",
+    "description": "Toast shown when screen share track ends mid-recording. Recording continues; removes false urgency about data loss."
+  },
+  "recoveryModeDescription": {
+    "message": "There was a processing issue, but your recording is safe. You can download it below.",
+    "description": "Recovery mode banner description"
+  },
+  "editProcessingSafeDescription": {
+    "message": "Processing your edit. Your original recording is untouched.",
+    "description": "Shown in the editor processing alert when a user-initiated edit is running, to reassure the original is safe"
+  },
+  "editFailedTitle": {
+    "message": "Edit couldn't be applied",
+    "description": "Alert title when an edit operation fails due to an encoding or processing error"
+  },
+  "editFailedDescription": {
+    "message": "Something went wrong during processing. Your original recording is safe. You can try again or download as-is.",
+    "description": "Alert body for edit failure"
+  },
+  "videoTrackEndedToast": {
+    "message": "Screen sharing stopped. Saving your recording now. Everything captured so far is safe.",
+    "description": "Toast shown when the video track ends mid-recording (e.g. monitor disconnected, screen share revoked)"
+  },
+  "audioTrackEndedToast": {
+    "message": "Audio disconnected. Saving your recording now. The video captured so far is safe.",
+    "description": "Toast shown when the audio track ends mid-recording (e.g. mic unplugged, permission revoked)"
+  },
+  "editorRecoveryToast": {
+    "message": "Your recording is saved. The editor didn't open. Click the Screenity icon to try again.",
+    "description": "Toast shown on the active tab when the post-recording editor tab fails to open"
+  },
+  "stopAckTimeoutToast": {
+    "message": "Saving is taking longer than expected. Your captured data is safe. The editor will open shortly.",
+    "description": "Toast shown when the recorder does not acknowledge the stop request within a few seconds"
   }
 }

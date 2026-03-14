@@ -98,6 +98,13 @@ const RecorderOffscreen = () => {
     }
 
     if (!(await canFitChunk(e.data.size))) {
+      if (!lowStorageAbort.current) {
+        chrome.runtime.sendMessage({
+          type: "show-toast",
+          message: chrome.i18n.getMessage("toastStorageCritical"),
+          timeout: 8000,
+        });
+      }
       lowStorageAbort.current = true;
       chrome.storage.local.set({
         recording: false,
@@ -116,6 +123,13 @@ const RecorderOffscreen = () => {
         timestamp: ts,
       });
     } catch (err) {
+      if (!lowStorageAbort.current) {
+        chrome.runtime.sendMessage({
+          type: "show-toast",
+          message: chrome.i18n.getMessage("toastStorageCritical"),
+          timeout: 8000,
+        });
+      }
       lowStorageAbort.current = true;
       chrome.storage.local.set({
         recording: false,
@@ -153,6 +167,13 @@ const RecorderOffscreen = () => {
         pendingBytes.current -= e.data.size;
 
         if (!(await canFitChunk(e.data.size))) {
+          if (!lowStorageAbort.current) {
+            chrome.runtime.sendMessage({
+              type: "show-toast",
+              message: chrome.i18n.getMessage("toastStorageCritical"),
+              timeout: 8000,
+            });
+          }
           lowStorageAbort.current = true;
           chrome.storage.local.set({
             recording: false,
@@ -898,6 +919,8 @@ const RecorderOffscreen = () => {
         return true;
       } else if (request.type === "stop-recording-tab") {
         stopRecording();
+        sendResponse?.({ ok: true });
+        return true;
       } else if (request.type === "set-mic-active-tab") {
         setMic(request);
       } else if (request.type === "set-audio-output-volume") {
@@ -937,6 +960,17 @@ const RecorderOffscreen = () => {
             );
           }
         })();
+      } else if (request.type === "play-beep-offscreen") {
+        // Reuse this offscreen document for beep sounds so Chrome doesn't
+        // need to create a second offscreen document (only one is allowed).
+        try {
+          const audioUrl = chrome.runtime.getURL("assets/sounds/beep.mp3");
+          const audio = new Audio(audioUrl);
+          audio.volume = 0.5;
+          audio.play().catch(() => {});
+        } catch {}
+        sendResponse?.({ ok: true });
+        return true;
       } else if (request.type === "dismiss-recording") {
         dismissRecording();
       }
