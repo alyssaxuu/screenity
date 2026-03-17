@@ -734,6 +734,7 @@ const ContentState = (props) => {
                   ...prevState,
                   webm: fixedWebm,
                   ready: true,
+                  isFfmpegRunning: false,
                 }));
                 chrome.runtime.sendMessage({ type: "recording-complete" });
                 return;
@@ -768,6 +769,7 @@ const ContentState = (props) => {
               ...prevState,
               webm: fixedWebm,
               ready: true,
+              isFfmpegRunning: false,
             }));
             chrome.runtime.sendMessage({ type: "recording-complete" });
             return;
@@ -801,6 +803,7 @@ const ContentState = (props) => {
             ...prevState,
             webm: blob,
             ready: true,
+            isFfmpegRunning: false,
           }));
           chrome.runtime.sendMessage({ type: "recording-complete" });
           return;
@@ -826,8 +829,32 @@ const ContentState = (props) => {
         ...prevState,
         webm: blob,
         ready: true,
+        isFfmpegRunning: false,
       }));
       chrome.runtime.sendMessage({ type: "recording-complete" });
+    }
+
+    // 45s safety timeout for the direct-blob path — force ready if
+    // fixWebmDuration or readAsDataURL hangs.
+    if (withBlob) {
+      setTimeout(() => {
+        const s = contentStateRef.current;
+        if (s?.ready) return;
+        console.warn(
+          "[Screenity][WebM] reconstructVideo(blob) safety timeout: forcing ready with raw blob",
+        );
+        setContentState((prev) => {
+          if (prev.ready) return prev;
+          return {
+            ...prev,
+            webm: prev.webm || prev.rawBlob || withBlob,
+            ready: true,
+            noffmpeg: true,
+            isFfmpegRunning: false,
+          };
+        });
+        chrome.runtime.sendMessage({ type: "recording-complete" });
+      }, 45000);
     }
   };
 
@@ -1104,6 +1131,16 @@ const ContentState = (props) => {
                 ffmpegLoaded: true,
                 processingProgress: 0,
               }));
+              // Try to recover chunks.
+              buildBlobFromChunks()
+                .then((blob) => {
+                  if (!blob) {
+                    chrome.runtime.sendMessage({
+                      type: "send-chunks-to-sandbox",
+                    });
+                  }
+                })
+                .catch(() => {});
               sendResponse({ status: "error", error: result.error });
               return;
             }
@@ -1160,6 +1197,16 @@ const ContentState = (props) => {
                 ffmpegLoaded: true,
                 processingProgress: 0,
               }));
+              // Try to recover chunks.
+              buildBlobFromChunks()
+                .then((blob) => {
+                  if (!blob) {
+                    chrome.runtime.sendMessage({
+                      type: "send-chunks-to-sandbox",
+                    });
+                  }
+                })
+                .catch(() => {});
               sendResponse({ status: "error", error: result.error });
               return;
             }
@@ -1216,6 +1263,8 @@ const ContentState = (props) => {
                 ffmpegLoaded: true,
                 processingProgress: 0,
               }));
+              // Try to recover chunks.
+              buildBlobFromChunks().catch(() => {});
               sendResponse({ status: "error", error: result.error });
               return;
             }
@@ -1469,6 +1518,8 @@ const ContentState = (props) => {
         ffmpegLoaded: true,
         isFfmpegRunning: false,
       }));
+      console.log("[Screenity][Editor] recording-complete sent from ffmpeg-load-error fallback");
+      chrome.runtime.sendMessage({ type: "recording-complete" });
 
       // if (!navigator.onLine) {
       //   setContentState((prevState) => ({
@@ -1645,13 +1696,21 @@ const ContentState = (props) => {
       setContentState((prev) => {
         // Double-check inside the updater for concurrent state races.
         if (prev.ffmpegLoaded || prev.noffmpeg) return prev;
+        // Also set ready when falling back — getBlob() early-returns
+        // when noffmpeg is true, so ready would never be set otherwise.
+        const fallbackWebm = prev.webm || prev.rawBlob;
         return {
           ...prev,
           noffmpeg: true,
           ffmpegLoaded: true,
           fallback: true,
+          ...(fallbackWebm && !prev.ready
+            ? { webm: fallbackWebm, ready: true }
+            : {}),
         };
       });
+      console.log("[Screenity][Editor] recording-complete sent from ffmpeg-load-timeout fallback");
+      chrome.runtime.sendMessage({ type: "recording-complete" });
     }, 30000);
 
     return () => clearTimeout(timer);

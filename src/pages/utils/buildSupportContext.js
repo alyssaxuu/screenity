@@ -7,7 +7,10 @@ const MAX_ERR_LEN = 120;
 
 const sanitizeError = (err) => {
   if (!err) return "";
-  const str = typeof err === "string" ? err : String(err);
+  const str =
+    typeof err === "string"
+      ? err
+      : err.message || err.errorCode || JSON.stringify(err);
   return str
     .replace(/https?:\/\/[^\s)]+/gi, "[url]")
     .replace(/chrome-extension:\/\/[^\s)]+/gi, "[ext]")
@@ -55,6 +58,7 @@ export const buildSupportContext = async (opts = {}) => {
     try {
       const keys = [
         "lastRecordingError",
+        "lastRecordingType",
         "recordingType",
         "fastRecorderInUse",
         "fastRecorderDisabledReason",
@@ -64,19 +68,18 @@ export const buildSupportContext = async (opts = {}) => {
       ];
       const store = await chrome.storage.local.get(keys);
 
-      if (store.recordingType) ctx.recType = store.recordingType;
+      const recType = store.lastRecordingType || store.recordingType;
+      if (recType) ctx.recType = recType;
       if (store.fastRecorderInUse != null)
         ctx.fast = store.fastRecorderInUse ? "1" : "0";
       if (store.fastRecorderDisabledReason)
         ctx.fastOff = String(store.fastRecorderDisabledReason).slice(0, 60);
-      if (store.isSubscribed != null) {
-        ctx.sub = store.isSubscribed ? "1" : "0";
-        // Override the build-time cloud flag with actual subscription state
-        // so the support URL reflects whether this attempt used cloud or local.
-        ctx.cloud = store.isSubscribed ? "1" : "0";
-      }
+      ctx.sub = store.isSubscribed ? "1" : "0";
+      ctx.cloud = store.isSubscribed ? "1" : "0";
       if (store.lastRecordingError) {
-        ctx.lastErr = sanitizeError(store.lastRecordingError);
+        ctx.lastErr = sanitizeError(
+          store.lastRecordingError.why || store.lastRecordingError.error,
+        );
         if (store.lastRecordingError.errorCode)
           ctx.errCode = store.lastRecordingError.errorCode;
       }

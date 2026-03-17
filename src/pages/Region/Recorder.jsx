@@ -111,6 +111,8 @@ const Recorder = () => {
   const hasChunks = useRef(false);
   const lastSize = useRef(0);
   const pausedStateRef = useRef(false);
+  const recordingStartTimeRef = useRef(null);
+  const recordingTick = useRef(null);
 
   // Main stream (recording)
   const liveStream = useRef(null);
@@ -196,6 +198,31 @@ const Recorder = () => {
         "[Region Recorder] Failed to persist recording timing state",
         err,
       );
+    }
+  };
+
+  const startRecordingTick = () => {
+    if (recordingTick.current) clearInterval(recordingTick.current);
+    recordingTick.current = setInterval(async () => {
+      if (!recordingStartTimeRef.current) return;
+      const { totalPausedMs, pausedAt, paused } =
+        await chrome.storage.local.get(["totalPausedMs", "pausedAt", "paused"]);
+      const now = Date.now();
+      const basePaused = Number(totalPausedMs) || 0;
+      const extraPaused =
+        paused && pausedAt ? Math.max(0, now - Number(pausedAt)) : 0;
+      const elapsed = Math.max(
+        0,
+        now - recordingStartTimeRef.current - basePaused - extraPaused,
+      );
+      chrome.storage.local.set({ recordingNow: now, recordingDuration: elapsed });
+    }, 1000);
+  };
+
+  const stopRecordingTick = () => {
+    if (recordingTick.current) {
+      clearInterval(recordingTick.current);
+      recordingTick.current = null;
     }
   };
 
@@ -1201,6 +1228,7 @@ const Recorder = () => {
     }
 
     const recordingStartTime = Date.now();
+    recordingStartTimeRef.current = recordingStartTime;
     await setRecordingTimingState({
       recording: true,
       paused: false,
@@ -1209,6 +1237,7 @@ const Recorder = () => {
       totalPausedMs: 0,
     });
     pausedStateRef.current = false;
+    startRecordingTick();
     chrome.storage.local.set({
       recording: true,
       restarting: false,
@@ -1280,6 +1309,8 @@ const Recorder = () => {
 
   async function stopRecording() {
     clearStartRetry();
+    stopRecordingTick();
+    recordingStartTimeRef.current = null;
     isFinishing.current = true;
     regionRef.current = false;
     await updateFreeFinalizeStatus("stopping", 0);
@@ -1346,6 +1377,8 @@ const Recorder = () => {
 
   const dismissRecording = async () => {
     clearStartRetry();
+    stopRecordingTick();
+    recordingStartTimeRef.current = null;
     regionRef.current = false;
     useWebCodecs.current = false;
     await setRecordingTimingState({
@@ -1387,6 +1420,8 @@ const Recorder = () => {
 
   const restartRecording = async () => {
     clearStartRetry();
+    stopRecordingTick();
+    recordingStartTimeRef.current = null;
     if (isRestarting.current) {
       return false;
     }

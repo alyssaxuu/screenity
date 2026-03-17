@@ -1,5 +1,6 @@
 /**
  * Closes any active offscreen document if it exists.
+ * Also clears the offscreen storage flag to prevent stale state.
  */
 export const discardOffscreenDocuments = async () => {
   try {
@@ -14,4 +15,5 @@ export const discardOffscreenDocuments = async () => {
   } catch (error) {
     console.error("Failed to discard offscreen documents:", error.message);
   }
+  chrome.storage.local.set({ offscreen: false });
 };

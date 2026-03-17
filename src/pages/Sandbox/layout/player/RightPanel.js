@@ -240,9 +240,14 @@ const RightPanel = () => {
         ? source
         : new Blob([source], { type: "video/webm" });
     const ext = blob.type.includes("mp4") ? "mp4" : "webm";
-    const title = s.title || "screenity-recording";
+    const rawTitle = s.title || "screenity-recording";
+    const safe = rawTitle
+      .replace(/[\\:*?"<>|]/g, " ")
+      .replace(/[\u0000-\u001F\u007F]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim() || "screenity-recording";
     const url = window.URL.createObjectURL(blob);
-    chrome.downloads.download({ url, filename: `${title}.${ext}` }, () => {
+    chrome.downloads.download({ url, filename: `${safe}.${ext}` }, () => {
       window.URL.revokeObjectURL(url);
     });
   };

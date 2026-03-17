@@ -14,6 +14,8 @@ export const discardRecording = async () => {
     recording: false,
     restarting: false,
     pendingRecording: false,
+    offscreen: false,
+    postStopEditorOpened: false,
   });
   chrome.storage.local.set({ pipForceClose: Date.now() });
   chrome.storage.local.set({ recordingUiTabId: null });

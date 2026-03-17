@@ -262,6 +262,7 @@ const ContentState = (props) => {
       showPopup: true,
       pendingRecording: false,
       tabCaptureFrame: false,
+      pipEnded: false,
       time: 0,
       timer: 0,
       preparingRecording: false,
@@ -337,6 +338,7 @@ const ContentState = (props) => {
       tabCaptureFrame: false,
       pendingRecording: false,
       preparingRecording: false,
+      pipEnded: false,
       blurMode: false,
       drawingMode: false,
     }));

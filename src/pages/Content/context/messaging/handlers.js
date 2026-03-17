@@ -525,6 +525,7 @@ export const setupHandlers = () => {
         showExtension: false,
         recording: false,
         paused: false,
+        pipEnded: false,
         time: 0,
         timer: 0,
       }));
@@ -536,6 +537,7 @@ export const setupHandlers = () => {
       ...prev,
       pendingRecording: false,
       preparingRecording: false,
+      pipEnded: false,
     }));
   });
 
@@ -547,6 +549,12 @@ export const setupHandlers = () => {
       state.recording ||
       state.pipEnded
     ) {
+      console.warn("[Screenity][Content] start-stream BLOCKED by guard state:", {
+        preparingRecording: state.preparingRecording,
+        pendingRecording: state.pendingRecording,
+        recording: state.recording,
+        pipEnded: state.pipEnded,
+      });
       return;
     }
 
@@ -836,6 +844,7 @@ export const setupHandlers = () => {
       ...prev,
       pendingRecording: false,
       preparingRecording: false,
+      pipEnded: false,
     }));
   });
 

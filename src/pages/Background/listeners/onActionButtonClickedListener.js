@@ -5,7 +5,6 @@ import {
   clearEditorTabReference,
 } from "../tabManagement";
 import { sendMessageRecord } from "../recording/sendMessageRecord.js";
-import { stopRecording } from "../recording/stopRecording.js";
 import { loginWithWebsite } from "../auth/loginWithWebsite.js";
 
 const CLOUD_FEATURES_ENABLED =
@@ -25,13 +24,18 @@ const handleTabMessaging = async (tab) => {
       : null;
 
     if (targetTab) {
-      sendMessageTab(preferredTabId, { type: "stop-recording-tab" });
+      await sendMessageTab(preferredTabId, { type: "stop-recording-tab" });
     } else {
-      sendMessageTab(tab.id, { type: "stop-recording-tab" });
+      await sendMessageTab(tab.id, { type: "stop-recording-tab" });
       chrome.storage.local.set({ activeTab: tab.id });
     }
   } catch (error) {
-    console.error("Error in handleTabMessaging:", error);
+    console.error("[Screenity][ActionClick] handleTabMessaging failed, trying direct recorder stop:", error);
+    try {
+      await sendMessageRecord({ type: "stop-recording-tab" });
+    } catch (recorderErr) {
+      console.error("[Screenity][ActionClick] direct recorder stop also failed:", recorderErr);
+    }
   }
 };
 
@@ -102,7 +106,9 @@ const openPlaygroundOrPopup = async (tab) => {
     tab.url.includes("/playground.html") || tab.url.includes("/setup.html");
 
   if ((!isForbidden || isPlaygroundOrSetup) && navigator.onLine) {
-    sendMessageTab(tab.id, { type: "toggle-popup" });
+    sendMessageTab(tab.id, { type: "toggle-popup" })
+      .then(() => console.log("[Screenity][ActionClick] toggle-popup delivered to tab", tab.id))
+      .catch((err) => console.error("[Screenity][ActionClick] toggle-popup FAILED to tab", tab.id, String(err).slice(0, 120)));
     chrome.storage.local.set({ activeTab: tab.id });
   } else {
     const newTab = await chrome.tabs.create({
@@ -123,65 +129,117 @@ const openPlaygroundOrPopup = async (tab) => {
   }
 };
 
+/** Check whether a tab ID refers to a tab that actually exists. */
+const doesTabExist = async (tabId) => {
+  if (!Number.isInteger(tabId)) return false;
+  try {
+    await chrome.tabs.get(tabId);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+/** Check whether an offscreen document is actually running. */
+const isOffscreenAlive = async () => {
+  try {
+    const contexts = await chrome.runtime.getContexts({});
+    return contexts.some((c) => c.contextType === "OFFSCREEN_DOCUMENT");
+  } catch {
+    return false;
+  }
+};
+
 // Main action button listener
 export const onActionButtonClickedListener = () => {
   chrome.action.onClicked.addListener(async (tab) => {
     try {
-      // Recover a previous recording whose editor failed to open (expires after 1h).
-      const { editorRecoveryUrl, editorRecoveryAt } = await chrome.storage.local.get(["editorRecoveryUrl", "editorRecoveryAt"]);
-      if (editorRecoveryUrl) {
-        const ageMs = Date.now() - (editorRecoveryAt || 0);
-        if (ageMs < 60 * 60 * 1000) {
-          await chrome.storage.local.remove(["editorRecoveryUrl", "editorRecoveryAt"]);
-          chrome.tabs.create({ url: editorRecoveryUrl, active: true });
-          return;
-        }
-        // Expired — clear and fall through to normal behavior
+      const snap = await chrome.storage.local.get([
+        "recording", "pendingRecording", "restarting", "recorderSession",
+        "recordingTab", "offscreen",
+        "postStopEditorOpening", "postStopEditorOpened",
+        "editorRecoveryUrl",
+      ]);
+      console.log("[Screenity][ActionClick] storage:", snap, "tab:", tab.id);
+
+      if (snap.editorRecoveryUrl) {
         await chrome.storage.local.remove(["editorRecoveryUrl", "editorRecoveryAt"]);
       }
 
-      const { recording, pendingRecording, restarting, recorderSession } =
-        await chrome.storage.local.get([
-          "recording",
-          "pendingRecording",
-          "restarting",
-          "recorderSession",
-        ]);
+      const { recording, pendingRecording, restarting, recorderSession } = snap;
       const sessionRecording = recorderSession?.status === "recording";
       const isRecordingActive = Boolean(
         recording || pendingRecording || restarting || sessionRecording,
       );
 
       if (isRecordingActive) {
-        // Check whether an actual recorder still exists before treating this as
-        // an active recording. If no recorder is present, the flags are stale
-        // (e.g. countdown was cancelled while a race left recording:true in
-        // storage). Reset and open the popup instead of silently swallowing the
-        // click.
-        const { recordingTab, offscreen } = await chrome.storage.local.get([
-          "recordingTab",
-          "offscreen",
-        ]);
-        const hasActiveRecorder = recordingTab || offscreen || sessionRecording;
+        const { recordingTab, offscreen } = snap;
+        let hasActiveRecorder = false;
+
+        if (sessionRecording) {
+          const sessionOwnerTabId =
+            recorderSession?.recorderTabId || recorderSession?.tabId || null;
+          if (sessionOwnerTabId && (await doesTabExist(sessionOwnerTabId))) {
+            hasActiveRecorder = true;
+          } else {
+            console.warn(
+              "[Screenity][ActionClick] recorderSession stale (owner tab",
+              sessionOwnerTabId,
+              "is dead) — clearing",
+            );
+            chrome.storage.local.set({
+              recorderSession: recorderSession
+                ? { ...recorderSession, status: "stale-cleared", clearedAt: Date.now() }
+                : null,
+            });
+          }
+        }
+
+        if (recordingTab && !hasActiveRecorder) {
+          if (await doesTabExist(recordingTab)) {
+            hasActiveRecorder = true;
+          } else {
+            console.warn("[Screenity][ActionClick] recordingTab", recordingTab, "is dead — clearing");
+            chrome.storage.local.set({ recordingTab: null });
+          }
+        }
+
+        if (offscreen && !hasActiveRecorder) {
+          if (await isOffscreenAlive()) {
+            hasActiveRecorder = true;
+          } else {
+            console.warn("[Screenity][ActionClick] offscreen flag stale (no document) — clearing");
+            chrome.storage.local.set({ offscreen: false });
+          }
+        }
 
         if (!hasActiveRecorder) {
           console.warn(
-            "[Screenity] Stale recording flags detected (no recorder). Resetting.",
-            { recording, pendingRecording, restarting, sessionRecording },
+            "[Screenity][ActionClick] branch: stale-reset-then-popup.",
+            { recording, pendingRecording, restarting, sessionRecording, recordingTab, offscreen },
           );
           await chrome.storage.local.set({
             recording: false,
             pendingRecording: false,
             restarting: false,
+            offscreen: false,
+            recordingTab: null,
+            postStopEditorOpened: false,
+            postStopEditorOpening: false,
             recordingToScene: false,
             projectId: null,
             activeSceneId: null,
           });
+          chrome.runtime
+            .sendMessage({ type: "clear-recording-session-safe", reason: "action-button-stale-reset" })
+            .catch(() => {});
           await openPlaygroundOrPopup(tab);
         } else {
+          console.log("[Screenity][ActionClick] branch: handle-tab-messaging (active recorder)");
           await handleTabMessaging(tab);
         }
       } else {
+        console.log("[Screenity][ActionClick] branch: normal-popup");
         // Reset storage keys before opening the popup
         await chrome.storage.local.set({
           recordingToScene: false,

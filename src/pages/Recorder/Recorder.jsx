@@ -427,10 +427,19 @@ const Recorder = () => {
    */
   const startRecordingTick = () => {
     if (recordingTick.current) clearInterval(recordingTick.current);
-    recordingTick.current = setInterval(() => {
-      if (isRecording.current) {
-        chrome.storage.local.set({ recordingNow: Date.now() });
-      }
+    recordingTick.current = setInterval(async () => {
+      if (!isRecording.current || !recordingStartTime.current) return;
+      const { totalPausedMs, pausedAt, paused } =
+        await chrome.storage.local.get(["totalPausedMs", "pausedAt", "paused"]);
+      const now = Date.now();
+      const basePaused = Number(totalPausedMs) || 0;
+      const extraPaused =
+        paused && pausedAt ? Math.max(0, now - Number(pausedAt)) : 0;
+      const elapsed = Math.max(
+        0,
+        now - recordingStartTime.current - basePaused - extraPaused,
+      );
+      chrome.storage.local.set({ recordingNow: now, recordingDuration: elapsed });
     }, 1000);
   };
 

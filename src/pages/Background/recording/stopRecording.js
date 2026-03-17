@@ -94,6 +94,7 @@ export const stopRecording = async () => {
     recording: false,
     recordingDuration: duration,
     tabRecordedID: null,
+    offscreen: false,
   });
   chrome.storage.local.set({ recordingUiTabId: null });
   chrome.storage.local.set({ pipForceClose: Date.now() });
@@ -320,6 +321,10 @@ export const handleStopRecordingTab = async (request) => {
       ? Math.max(0, stopTabNow - stopTabStartTime - stopTabBasePaused - stopTabExtraPaused)
       : 0;
   diagEvent("stop-tab", { duration: stopTabDuration, reason: request.reason || null, memoryError: Boolean(request.memoryError), fastRecorderInUse: Boolean(fastRecorderInUse) });
+
+  if (stopTabDuration > 0) {
+    chrome.storage.local.set({ recordingDuration: stopTabDuration });
+  }
 
   if (!isSubscribed) {
     const { fastRecorderActiveRecordingId } = await chrome.storage.local.get([

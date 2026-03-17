@@ -61,6 +61,8 @@ export const startRecording = async () => {
     chrome.storage.local.remove(["recordingMeta"]);
   }
 
+  chrome.storage.local.set({ lastRecordingType: recordingType || "screen" });
+
   // Initialize diagnostic session for this recording
   const { quality, systemAudio, audioInput, backup, offscreen, alarm, alarmTime, countdown } =
     await chrome.storage.local.get([
