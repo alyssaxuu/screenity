@@ -1171,6 +1171,63 @@ export const setupHandlers = () => {
       return true;
     },
   );
+  registerMessage("submit-diagnostic-report", async (message) => {
+    try {
+      const appBase = process.env.SCREENITY_APP_BASE;
+      if (!appBase) return;
+      const { startFlowTrace, screenityToken, projectId, recorderSession } =
+        await chrome.storage.local.get([
+          "startFlowTrace",
+          "screenityToken",
+          "projectId",
+          "recorderSession",
+        ]);
+      if (!startFlowTrace || !screenityToken) return;
+      const trigger = message?.trigger || "manual";
+      const isSuccess = trigger === "success-summary";
+      const trace = startFlowTrace;
+      const ua = navigator.userAgent || "";
+      const payload = {
+        attemptId: trace.attemptId,
+        projectId: projectId || null,
+        recordingSessionId: recorderSession?.id || null,
+        extVersion: chrome.runtime.getManifest().version,
+        trigger,
+        env: {
+          os: (await chrome.runtime.getPlatformInfo()).os || null,
+          browser: (ua.match(/Chrome\/\d+/) || [""])[0] || null,
+        },
+        trace: isSuccess
+          ? {
+              recordingType: trace.recordingType,
+              surface: trace.surface,
+              isPro: trace.isPro,
+              countdown: trace.countdown,
+              outcome: trace.outcome,
+              t: {
+                startStreaming: trace.t?.startStreaming || null,
+                recordingStarted: trace.t?.recordingStarted || null,
+              },
+              routing: null,
+              error: null,
+              errorCode: null,
+              stuck: null,
+            }
+          : trace,
+      };
+      fetch(`${appBase}/api/log/diagnostic-report`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${screenityToken}`,
+        },
+        body: JSON.stringify(payload),
+        keepalive: true,
+      }).catch(() => {});
+    } catch {
+      // best effort
+    }
+  });
   registerMessage("restore-recording", (message) => restoreRecording(message));
   registerMessage("check-restore", async (message, sender, sendResponse) => {
     const response = await checkRestore();
@@ -1590,9 +1647,12 @@ export const setupHandlers = () => {
     }
   });
   registerMessage("preparing-recording", async () => {
-    const tab = await getCurrentTab();
-    if (tab?.id) {
-      await sendMessageTab(tab.id, {
+    // Prefer stored activeTab over getCurrentTab() which can return
+    // the pinned recorder tab instead of the user's page.
+    const { activeTab } = await chrome.storage.local.get(["activeTab"]);
+    const tabId = activeTab || (await getCurrentTab())?.id;
+    if (tabId) {
+      await sendMessageTab(tabId, {
         type: "preparing-recording",
       }).catch((e) =>
         console.warn("Failed to send preparing-recording to tab:", e),

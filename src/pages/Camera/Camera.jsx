@@ -22,11 +22,9 @@ const Camera = () => {
     setPipMode,
     backgroundEffects,
     setBackgroundEffects,
-    imageDataState,
     recordingTypeRef,
     setWidth,
     setHeight,
-    captureFrame,
     videoRef,
     streamRef,
     offScreenCanvasRef,
@@ -161,7 +159,7 @@ const Camera = () => {
 
   return (
     <div style={{ width: "100%", height: "100%", overflow: "hidden" }}>
-      {backgroundEffects && <Background frame={imageDataState} />}
+      {backgroundEffects && <Background />}
       <video
         style={{
           // height: height,

@@ -3,6 +3,7 @@ import { removeTab } from "../tabManagement/removeTab";
 import { sendMessageRecord } from "../recording/sendMessageRecord.js";
 import { closeOffscreenDocument } from "./closeOffscreenDocument.js";
 import { loginWithWebsite } from "../auth/loginWithWebsite.js";
+import { traceStep } from "../../utils/startFlowTrace.js";
 
 const openRecorderTab = async (
   activeTab,
@@ -90,6 +91,7 @@ const openRecorderTab = async (
       chrome.tabs.onUpdated.addListener(function _(tabId, changeInfo) {
         if (tabId === tab.id && changeInfo.status === "complete") {
           chrome.tabs.onUpdated.removeListener(_);
+          traceStep("recorderTabCreated");
           // Include tabPreferred in the message so CloudRecorder can use it
           // synchronously without racing against its own storage read.
           const isPlayground = activeTab.url.includes(

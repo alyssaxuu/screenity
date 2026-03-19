@@ -11,5 +11,6 @@ export const setSurface = async (request) => {
     type: "set-surface",
     surface: request.surface,
     subscribed: result?.subscribed || false,
+    instantMode: result?.instantMode || false,
   });
 };

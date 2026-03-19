@@ -4,6 +4,7 @@
  */
 
 import { makeSupportCode } from "./errorCodes";
+import { getStartFlowTrace, formatStartFlowTimeline } from "./startFlowTrace";
 
 const MAX_ERR_LEN = 120;
 
@@ -127,6 +128,21 @@ export const buildSupportDebugInfo = async (opts = {}) => {
   }
   if (attemptId) lines.push(`Ref:       ${attemptId}`);
   lines.push(`Time:      ${ts}`);
+
+  // Start-flow trace timeline
+  try {
+    const trace = await getStartFlowTrace();
+    if (trace) {
+      const timeline = formatStartFlowTimeline(trace);
+      if (timeline) {
+        lines.push("");
+        lines.push("Start Flow:");
+        lines.push(timeline);
+      }
+    }
+  } catch {
+    // best effort
+  }
 
   return lines.join("\n");
 };

@@ -790,7 +790,7 @@ const RecorderOffscreen = () => {
           stream = await navigator.mediaDevices.getDisplayMedia({
             audio: data.systemAudio,
             video: {
-              frameRate: 30,
+              frameRate: fpsVal,
               displaySurface: "monitor",
             },
             selfBrowserSurface: "exclude",

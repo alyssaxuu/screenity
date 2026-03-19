@@ -16,6 +16,11 @@ import DevHUD from "../DevHUD";
 import { setupHandlers } from "./messaging/handlers";
 
 import { checkAuthStatus } from "./utils/checkAuthStatus";
+import {
+  initStartFlowTrace,
+  traceStep,
+  setStartFlowOutcome,
+} from "../../utils/startFlowTrace";
 
 //create a context, with createContext api
 export const contentStateContext = createContext();
@@ -62,6 +67,7 @@ const ContentState = (props) => {
   const timerReadSeqRef = useRef(0);
   const lastBeepStartTimeRef = useRef(null);
   const recordingBeepTabIdRef = useRef(null);
+  const verifyDebounceRef = useRef(null);
 
   const isTargetTab = useCallback(() => {
     const tabId = tabIdRef.current;
@@ -195,6 +201,8 @@ const ContentState = (props) => {
       recordingBeepTabIdRef.current = preferredTab;
     }
     chrome.storage.local.set({ restarting: false });
+    traceStep("recordingStarted");
+    setStartFlowOutcome("ok");
 
     // This cannot be triggered from here because the user might not have the page focused
     //chrome.runtime.sendMessage({ type: "start-recording" });
@@ -323,6 +331,7 @@ const ContentState = (props) => {
   });
 
   const dismissRecording = useCallback(() => {
+    setStartFlowOutcome("cancelled");
     suppressStopBeepRef.current = true;
     chrome.storage.local.set({ restarting: false });
     chrome.runtime.sendMessage({ type: "dismiss-recording-tab" });
@@ -407,10 +416,29 @@ const ContentState = (props) => {
   }, []);
 
   const startStreaming = useCallback(async () => {
-    // Set this early
+    // Init start-flow trace for this attempt
+    const attemptId = `ra-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+    await initStartFlowTrace(attemptId, {
+      recordingType: contentStateRef.current.recordingType,
+      isPro: Boolean(
+        contentStateRef.current.isLoggedIn &&
+        contentStateRef.current.isSubscribed &&
+        CLOUD_FEATURES_ENABLED,
+      ),
+      countdown: Boolean(contentStateRef.current.countdown),
+    });
+    traceStep("startStreaming");
+
+    // Overlay becomes non-blocking while pending. Popup stays open until the
+    // recorder tab takes focus. Also clear countdownCancelled so a stale
+    // cancellation from a previous attempt can't block this one.
+    // Write to storage immediately (not via useEffect) so the tab activation
+    // listener sees pendingRecording=true before the recorder tab opens.
+    chrome.storage.local.set({ pendingRecording: true });
     setContentState((prev) => ({
       ...prev,
       pendingRecording: true,
+      countdownCancelled: false,
     }));
 
     let permission = false;
@@ -474,6 +502,9 @@ const ContentState = (props) => {
       }
 
       if (!success || (success && canUpload === false)) {
+        setStartFlowOutcome("error", {
+          error: canUpload === false ? "storage-limit" : (error || "quota-check-failed"),
+        });
         setContentState((prev) => ({
           ...prev,
           pendingRecording: false,
@@ -506,6 +537,7 @@ const ContentState = (props) => {
         URL,
         true,
       );
+      setStartFlowOutcome("cancelled", { error: "permission-denied" });
       setContentState((prevContentState) => ({
         ...prevContentState,
         pendingRecording: false,
@@ -566,6 +598,7 @@ const ContentState = (props) => {
           },
         );
       }
+      setStartFlowOutcome("error", { error: "insufficient-memory" });
       setContentState((prevContentState) => ({
         ...prevContentState,
         pendingRecording: false,
@@ -647,6 +680,7 @@ const ContentState = (props) => {
         camera:
           contentStateRef.current.recordingType === "camera" ? true : false,
       });
+      traceStep("desktopCaptureSent");
       setContentState((prevContentState) => ({
         ...prevContentState,
 
@@ -983,6 +1017,7 @@ const ContentState = (props) => {
       }
     },
     cancelCountdown: () => {
+      setStartFlowOutcome("cancelled");
       // Eagerly clear recording flags in storage so the action button never
       // sees a stale isRecordingActive state between now and when the
       // background processes dismiss-recording-tab.
@@ -1115,6 +1150,55 @@ const ContentState = (props) => {
       if (pollTimer) clearInterval(pollTimer);
     };
   }, [contentState.preparingRecording]);
+
+  // Stuck-state detector (diagnostics only).
+  // Writes to startFlowTrace if pending/preparing stays active too long.
+  useEffect(() => {
+    const PENDING_TIMEOUT_MS = 30000;
+    const PREPARING_TIMEOUT_MS = 45000;
+
+    if (contentState.recording) return; // not stuck if recording started
+
+    let timer = null;
+    let fired = false;
+
+    if (
+      contentState.pendingRecording &&
+      !contentState.preparingRecording
+    ) {
+      timer = setTimeout(() => {
+        if (fired) return;
+        fired = true;
+        setStartFlowOutcome("stuck", {
+          stuck: {
+            state: "pending",
+            since: Date.now() - PENDING_TIMEOUT_MS,
+            durationMs: PENDING_TIMEOUT_MS,
+          },
+        });
+      }, PENDING_TIMEOUT_MS);
+    } else if (contentState.preparingRecording) {
+      timer = setTimeout(() => {
+        if (fired) return;
+        fired = true;
+        setStartFlowOutcome("stuck", {
+          stuck: {
+            state: "preparing",
+            since: Date.now() - PREPARING_TIMEOUT_MS,
+            durationMs: PREPARING_TIMEOUT_MS,
+          },
+        });
+      }, PREPARING_TIMEOUT_MS);
+    }
+
+    return () => {
+      if (timer) clearTimeout(timer);
+    };
+  }, [
+    contentState.pendingRecording,
+    contentState.preparingRecording,
+    contentState.recording,
+  ]);
 
   useEffect(() => {
     const isRecording = Boolean(contentState.recording);
@@ -1326,7 +1410,11 @@ const ContentState = (props) => {
         changes.lastAuthCheck ||
         changes.isLoggedIn
       ) {
-        verifyUser();
+        // Debounce: multiple auth-related storage keys change in quick
+        // succession (e.g. loginWithWebsite writes isLoggedIn + isSubscribed
+        // + lastAuthCheck). Coalesce into one verify call.
+        clearTimeout(verifyDebounceRef.current);
+        verifyDebounceRef.current = setTimeout(verifyUser, 2000);
       }
       if (changes.recordingNow) {
         shouldUpdateTimer = true;

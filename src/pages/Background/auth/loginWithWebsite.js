@@ -46,10 +46,18 @@ export const loginWithWebsite = async () => {
     ]);
 
     if (screenityUser) {
+      // Single storage write to avoid multiple onChanged events
       await chrome.storage.local.set({
         onboarding: false,
         isLoggedIn: true,
         wasLoggedIn: false,
+        ...(!instantMode
+          ? {
+              backgroundEffectsActive: false,
+              backgroundEffect: "",
+              fpsValue: "30",
+            }
+          : {}),
       });
 
       return {
@@ -94,6 +102,13 @@ export const loginWithWebsite = async () => {
       pushToTalk: false,
       onboarding: false,
       showProSplash: false,
+      ...(!instantMode
+        ? {
+            backgroundEffectsActive: false,
+            backgroundEffect: "",
+            fpsValue: "30",
+          }
+        : {}),
     });
 
     const { originalTabId } = await chrome.storage.local.get("originalTabId");
@@ -162,7 +177,17 @@ export const loginWithWebsite = async () => {
     ]);
 
     if (screenityUser) {
-      await chrome.storage.local.set({ isLoggedIn: true });
+      await chrome.storage.local.set({
+        isLoggedIn: true,
+        ...(!instantMode
+          ? {
+              backgroundEffectsActive: false,
+              backgroundEffect: "",
+              fpsValue: "30",
+            }
+          : {}),
+      });
+
       return {
         authenticated: true,
         user: screenityUser,

@@ -1,10 +1,10 @@
 import React, { useRef, useEffect, useState } from "react";
 import { useCameraContext } from "../context/CameraContext";
-import { setupCanvasContexts, resizeCanvases } from "../utils/canvasUtils";
-import * as bodySegmentation from "@tensorflow-models/body-segmentation";
+import { resizeCanvases } from "../utils/canvasUtils";
 import {
-  renderEffect,
-  renderBlur,
+  segmentFromVideo,
+  renderBlurFromVideo,
+  renderPersonCutoutFromVideo,
   renderEffectBackground,
 } from "../utils/backgroundUtils";
 
@@ -15,13 +15,12 @@ const Background = () => {
   const bottomCanvasContextRef = useRef(null);
 
   const {
-    currentFrame,
+    videoRef,
     backgroundEffects,
+    setBackgroundEffects,
     segmenterRef,
     blurRef,
     effectRef,
-    offScreenCanvasRef,
-    offScreenCanvasContextRef,
   } = useCameraContext();
 
   const [windowSize, setWindowSize] = useState({
@@ -32,19 +31,16 @@ const Background = () => {
   useEffect(() => {
     if (!canvasRef.current || !bottomCanvasRef.current) return;
 
-    const canvasContext = canvasRef.current.getContext("2d", {
+    canvasContextRef.current = canvasRef.current.getContext("2d", {
       alpha: true,
       willReadFrequently: true,
       preserveDrawingBuffer: true,
     });
-    const bottomCanvasContext = bottomCanvasRef.current.getContext("2d", {
+    bottomCanvasContextRef.current = bottomCanvasRef.current.getContext("2d", {
       alpha: true,
       willReadFrequently: true,
       preserveDrawingBuffer: true,
     });
-
-    canvasContextRef.current = canvasContext;
-    bottomCanvasContextRef.current = bottomCanvasContext;
   }, []);
 
   useEffect(() => {
@@ -59,130 +55,102 @@ const Background = () => {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
+  // Re-render background image on resize or effect change
   useEffect(() => {
     if (!effectRef.current || blurRef.current) return;
 
-    const loadAndRenderBackground = async () => {
-      if (
-        bottomCanvasRef.current &&
-        bottomCanvasContextRef.current &&
-        canvasRef.current
-      ) {
-        renderEffectBackground(
-          effectRef.current,
-          bottomCanvasRef,
-          bottomCanvasContextRef,
-        );
+    if (
+      bottomCanvasRef.current &&
+      bottomCanvasContextRef.current &&
+      canvasRef.current
+    ) {
+      renderEffectBackground(
+        effectRef.current,
+        bottomCanvasRef,
+        bottomCanvasContextRef,
+      );
 
-        resizeCanvases(
-          effectRef.current.width,
-          effectRef.current.height,
-          true, // isBackgroundEffect
-          effectRef.current,
-          canvasRef,
-          bottomCanvasRef,
-          bottomCanvasContextRef,
-        );
-      }
-    };
-
-    loadAndRenderBackground();
+      resizeCanvases(
+        effectRef.current.width,
+        effectRef.current.height,
+        true,
+        effectRef.current,
+        canvasRef,
+        bottomCanvasRef,
+        bottomCanvasContextRef,
+      );
+    }
   }, [windowSize, effectRef.current, blurRef.current]);
 
-  // Process new frame when it arrives
+  // Self-contained render loop — segments video directly, no React state per frame
   useEffect(() => {
-    if (!currentFrame || !canvasContextRef.current) return;
+    if (!backgroundEffects) return;
 
-    const processFrame = async () => {
-      const canvas = canvasRef.current;
-      const ctx = canvasContextRef.current;
+    let animFrameId;
+    let running = true;
+    let consecutiveErrors = 0;
 
-      // Ensure canvas dimensions match the frame
-      if (
-        canvas.width !== currentFrame.width ||
-        canvas.height !== currentFrame.height
-      ) {
-        canvas.width = currentFrame.width;
-        canvas.height = currentFrame.height;
-      }
+    const tick = () => {
+      if (!running) return;
 
-      if (backgroundEffects && segmenterRef.current) {
-        try {
-          const people = await segmenterRef.current.segmentPeople(currentFrame);
+      try {
+        const video = videoRef.current;
+        const segmenter = segmenterRef.current;
 
-          if (people && people.length > 0) {
+        if (video && video.readyState >= 2 && segmenter && video.videoWidth > 0) {
+          const result = segmentFromVideo(video, segmenter);
+
+          if (result && result.categoryMask) {
+            consecutiveErrors = 0;
             if (blurRef.current) {
-              await renderBlur(currentFrame, people[0], canvasRef);
+              renderBlurFromVideo(video, result, canvasRef);
             } else if (effectRef.current) {
-              if (effectRef.current) {
-                renderEffectBackground(
-                  effectRef.current,
-                  bottomCanvasRef,
-                  bottomCanvasContextRef,
-                );
-              }
-
-              // Create a binary mask for the person
-              const personMask = await bodySegmentation.toBinaryMask(
-                people[0],
-                { r: 255, g: 255, b: 255, a: 255 }, // White for the person
-                { r: 0, g: 0, b: 0, a: 0 }, // Transparent for background
-                false,
-                0.6,
+              renderEffectBackground(
+                effectRef.current,
+                bottomCanvasRef,
+                bottomCanvasContextRef,
               );
-
-              // Start with a clear canvas
-              ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-              // Create an RGBA image data with transparency
-              const imageData = ctx.createImageData(
-                canvas.width,
-                canvas.height,
+              renderPersonCutoutFromVideo(
+                video,
+                result,
+                canvasRef,
+                canvasContextRef,
               );
-
-              // Copy RGB from current frame and use mask for alpha
-              for (let i = 0; i < currentFrame.data.length; i += 4) {
-                const maskPixel = personMask.data[i]; // Get mask value
-                imageData.data[i] = currentFrame.data[i]; // R
-                imageData.data[i + 1] = currentFrame.data[i + 1]; // G
-                imageData.data[i + 2] = currentFrame.data[i + 2]; // B
-                imageData.data[i + 3] = maskPixel ? 255 : 0; // A (fully opaque for person, transparent for background)
-              }
-
-              // Put the processed image data on the canvas
-              ctx.putImageData(imageData, 0, 0);
             }
-          } else {
-            ctx.putImageData(currentFrame, 0, 0);
           }
-        } catch (error) {
-          console.error("Error processing frame:", error);
-          ctx.putImageData(currentFrame, 0, 0);
         }
-      } else {
-        // If no background effects enabled, just show the original frame
-        ctx.putImageData(currentFrame, 0, 0);
+      } catch (error) {
+        consecutiveErrors++;
+        console.error("Background segmentation error:", error);
+        if (consecutiveErrors >= 3) {
+          console.warn("Disabling background effects after repeated failures");
+          setBackgroundEffects(false);
+          return;
+        }
       }
+
+      animFrameId = requestAnimationFrame(tick);
     };
 
-    processFrame().catch(console.error);
-  }, [currentFrame, backgroundEffects, blurRef.current, effectRef.current]);
+    animFrameId = requestAnimationFrame(tick);
+
+    return () => {
+      running = false;
+      cancelAnimationFrame(animFrameId);
+    };
+  }, [backgroundEffects]);
 
   // Listen for Chrome extension messages
   useEffect(() => {
     const handleMessage = (request) => {
       if (request.type === "set-background-effect") {
-        // The actual handling is now in message handlers, this just forces a re-render
         if (globalThis.SCREENITY_VERBOSE_LOGS) {
           console.log("Background component received effect change message");
         }
       }
     };
 
-    // Add event listener
     chrome.runtime.onMessage.addListener(handleMessage);
-
-    // Remove event listener on cleanup
     return () => chrome.runtime.onMessage.removeListener(handleMessage);
   }, []);
 

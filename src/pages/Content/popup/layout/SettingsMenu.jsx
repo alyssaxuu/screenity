@@ -595,105 +595,103 @@ const SettingsMenu = (props) => {
               </DropdownMenu.Portal>
             </DropdownMenu.Sub>
           )}
-          {/*
-          <DropdownMenu.Sub
-            open={openFPS}
-            onOpenChange={(open) => {
-              if (open) {
-                setOpenQuality(false);
-              }
-              setOpenFPS(open);
-            }}
-          >
-            <DropdownMenu.SubTrigger className="DropdownMenuItem">
-              {chrome.i18n.getMessage("maxFPSLabel") +
-                " (" +
-                contentState.fpsValue +
-                ")"}
-              <div className="ItemIndicatorArrow">
-                <img src={DropdownGroup} />
-              </div>
-            </DropdownMenu.SubTrigger>
-            <DropdownMenu.Portal>
-              <DropdownMenu.SubContent
-                className="ScreenityDropdownMenuContent"
-                sideOffset={0}
-                alignOffset={-3}
-              >
-                <DropdownMenu.RadioGroup
-                  value={contentState.fpsValue}
-                  onValueChange={(value) => {
-                    setContentState((prevContentState) => ({
-                      ...prevContentState,
-                      fpsValue: value,
-                    }));
-                    chrome.storage.local.set({
-                      fpsValue: value,
-                    });
-                  }}
+          {!contentState.isSubscribed && !contentState.isLoggedIn && (
+            <DropdownMenu.Sub
+              open={openFPS}
+              onOpenChange={(open) => {
+                if (open) {
+                  setOpenQuality(false);
+                  setOpenResize(false);
+                }
+                setOpenFPS(open);
+              }}
+            >
+              <DropdownMenu.SubTrigger className="DropdownMenuItem">
+                {chrome.i18n.getMessage("maxFPSLabel") +
+                  " (" +
+                  contentState.fpsValue +
+                  " fps)"}
+                <div className="ItemIndicatorArrow">
+                  <img src={DropdownGroup} />
+                </div>
+              </DropdownMenu.SubTrigger>
+              <DropdownMenu.Portal>
+                <DropdownMenu.SubContent
+                  className="ScreenityDropdownMenuContent"
+                  sideOffset={0}
+                  alignOffset={-3}
                 >
-                  <DropdownMenu.RadioItem
-                    className="ScreenityDropdownMenuItem"
-                    value="60"
+                  <DropdownMenu.RadioGroup
+                    value={contentState.fpsValue}
+                    onValueChange={(value) => {
+                      setContentState((prevContentState) => ({
+                        ...prevContentState,
+                        fpsValue: value,
+                      }));
+                      chrome.storage.local.set({
+                        fpsValue: value,
+                      });
+                    }}
                   >
-                    60
-                    <DropdownMenu.ItemIndicator className="ScreenityItemIndicator">
-                      <img src={CheckWhiteIcon} />
-                    </DropdownMenu.ItemIndicator>
-                  </DropdownMenu.RadioItem>
-                  <DropdownMenu.RadioItem
-                    className="ScreenityDropdownMenuItem"
-                    value="30"
-                  >
-                    30
-                    <DropdownMenu.ItemIndicator className="ScreenityItemIndicator">
-                      <img src={CheckWhiteIcon} />
-                    </DropdownMenu.ItemIndicator>
-                  </DropdownMenu.RadioItem>
-                  <DropdownMenu.RadioItem
-                    className="ScreenityDropdownMenuItem"
-                    value="24"
-                  >
-                    24
-                    <DropdownMenu.ItemIndicator className="ScreenityItemIndicator">
-                      <img src={CheckWhiteIcon} />
-                    </DropdownMenu.ItemIndicator>
-                  </DropdownMenu.RadioItem>
-                  <DropdownMenu.RadioItem
-                    className="ScreenityDropdownMenuItem"
-                    value="10"
-                  >
-                    10
-                    <DropdownMenu.ItemIndicator className="ScreenityItemIndicator">
-                      <img src={CheckWhiteIcon} />
-                    </DropdownMenu.ItemIndicator>
-                  </DropdownMenu.RadioItem>
-                  <DropdownMenu.RadioItem
-                    className="ScreenityDropdownMenuItem"
-                    value="5"
-                  >
-                    5
-                    <DropdownMenu.ItemIndicator className="ScreenityItemIndicator">
-                      <img src={CheckWhiteIcon} />
-                    </DropdownMenu.ItemIndicator>
-                  </DropdownMenu.RadioItem>
-                  <DropdownMenu.RadioItem
-                    className="ScreenityDropdownMenuItem"
-                    value="1"
-                  >
-                    <DropdownMenu.ItemIndicator className="ScreenityItemIndicator">
-                      <img src={CheckWhiteIcon} />
-                    </DropdownMenu.ItemIndicator>
-                    1
-                    <DropdownMenu.ItemIndicator className="ScreenityItemIndicator">
-                      <img src={CheckWhiteIcon} />
-                    </DropdownMenu.ItemIndicator>
-                  </DropdownMenu.RadioItem>
-                </DropdownMenu.RadioGroup>
-              </DropdownMenu.SubContent>
-            </DropdownMenu.Portal>
-          </DropdownMenu.Sub>
-					*/}
+                    <DropdownMenu.RadioItem
+                      className="ScreenityDropdownMenuItem"
+                      value="60"
+                    >
+                      60 fps
+                      <DropdownMenu.ItemIndicator className="ScreenityItemIndicator">
+                        <img src={CheckWhiteIcon} />
+                      </DropdownMenu.ItemIndicator>
+                    </DropdownMenu.RadioItem>
+                    <DropdownMenu.RadioItem
+                      className="ScreenityDropdownMenuItem"
+                      value="30"
+                    >
+                      30 fps
+                      <DropdownMenu.ItemIndicator className="ScreenityItemIndicator">
+                        <img src={CheckWhiteIcon} />
+                      </DropdownMenu.ItemIndicator>
+                    </DropdownMenu.RadioItem>
+                    <DropdownMenu.RadioItem
+                      className="ScreenityDropdownMenuItem"
+                      value="24"
+                    >
+                      24 fps
+                      <DropdownMenu.ItemIndicator className="ScreenityItemIndicator">
+                        <img src={CheckWhiteIcon} />
+                      </DropdownMenu.ItemIndicator>
+                    </DropdownMenu.RadioItem>
+                    <DropdownMenu.RadioItem
+                      className="ScreenityDropdownMenuItem"
+                      value="15"
+                    >
+                      15 fps
+                      <DropdownMenu.ItemIndicator className="ScreenityItemIndicator">
+                        <img src={CheckWhiteIcon} />
+                      </DropdownMenu.ItemIndicator>
+                    </DropdownMenu.RadioItem>
+                    <DropdownMenu.RadioItem
+                      className="ScreenityDropdownMenuItem"
+                      value="10"
+                    >
+                      10 fps
+                      <DropdownMenu.ItemIndicator className="ScreenityItemIndicator">
+                        <img src={CheckWhiteIcon} />
+                      </DropdownMenu.ItemIndicator>
+                    </DropdownMenu.RadioItem>
+                    <DropdownMenu.RadioItem
+                      className="ScreenityDropdownMenuItem"
+                      value="5"
+                    >
+                      5 fps
+                      <DropdownMenu.ItemIndicator className="ScreenityItemIndicator">
+                        <img src={CheckWhiteIcon} />
+                      </DropdownMenu.ItemIndicator>
+                    </DropdownMenu.RadioItem>
+                  </DropdownMenu.RadioGroup>
+                </DropdownMenu.SubContent>
+              </DropdownMenu.Portal>
+            </DropdownMenu.Sub>
+          )}
           <DropdownMenu.CheckboxItem
             className="DropdownMenuItem"
             onSelect={(e) => {

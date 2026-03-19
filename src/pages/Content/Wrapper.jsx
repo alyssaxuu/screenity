@@ -25,10 +25,8 @@ import { contentStateContext } from "./context/ContentState";
 
 import { startClickTracking } from "./cursor/trackClicks";
 
-const RecordingLoader = ({ progress = 0 }) => {
-  const pct = Math.round(progress || 0);
-  const base = chrome.i18n.getMessage("preparingLabel") || "Preparing recording...";
-  const label = pct > 0 ? `${base} ${pct}%` : base;
+const RecordingLoader = () => {
+  const label = chrome.i18n.getMessage("preparingLabel") || "Preparing...";
   return (
     <div
       style={{
@@ -83,10 +81,9 @@ const RecordingLoader = ({ progress = 0 }) => {
             marginTop: 20,
             fontSize: 15,
             fontWeight: 500,
-            color: "rgba(255, 255, 255, 0.9)",
+            color: "#FFFFFF",
             textAlign: "center",
             letterSpacing: "-0.01em",
-            animation: "pulse 2s ease-in-out infinite",
           }}
         >
           {label}
@@ -243,7 +240,11 @@ const Wrapper = () => {
                   width: "100%",
                   height: "100%",
                   zIndex: 999999999,
-                  pointerEvents: "all",
+                  pointerEvents:
+                    contentState.pendingRecording ||
+                    contentState.preparingRecording
+                      ? "none"
+                      : "all",
                   position: "fixed",
                   background:
                     window.location.href.indexOf(
@@ -252,7 +253,8 @@ const Wrapper = () => {
                     window.location.href.indexOf(
                       chrome.runtime.getURL("playground.html")
                     ) === -1 &&
-                    !contentState.pendingRecording
+                    !contentState.pendingRecording &&
+                    !contentState.preparingRecording
                       ? "rgba(0,0,0,0.15)"
                       : "rgba(0,0,0,0)",
                   top: 0,
@@ -323,7 +325,7 @@ const Wrapper = () => {
                 contentState.customRegion && <Region />}
               {shadowRef.current && <Modal shadowRef={shadowRef} />}
               {contentState.preparingRecording && (
-                <RecordingLoader progress={contentState.processingProgress} />
+                <RecordingLoader />
               )}
               <Countdown />
               {contentState.recordingType != "camera" &&

@@ -9,7 +9,6 @@ import React, {
 import {
   loadSegmentationModel,
   loadEffect,
-  renderEffectBackground,
 } from "../utils/backgroundUtils";
 import { initializeCanvases, setupCanvasContexts } from "../utils/canvasUtils";
 
@@ -89,14 +88,12 @@ export const CameraProvider = ({ children }) => {
   const [backgroundEffects, setBackgroundEffects] = useState(false);
   const [isModelLoaded, setIsModelLoaded] = useState(false);
   const [pipMode, setPipMode] = useState(false);
-  const [currentFrame, setCurrentFrame] = useState(null);
   const [isCameraMode, setIsCameraMode] = useState(false);
 
   const backgroundEffectsRef = useRef(false);
   const recordingTypeRef = useRef("screen");
   const videoRef = useRef(null);
   const streamRef = useRef(new MediaStream());
-  const frameRequestedRef = useRef(false);
 
   const offScreenCanvasRef = useRef(null);
   const offScreenCanvasContextRef = useRef(null);
@@ -127,10 +124,17 @@ export const CameraProvider = ({ children }) => {
     const initializeModel = async () => {
       try {
         const model = await loadSegmentationModel();
-        segmenterRef.current = model;
-        setIsModelLoaded(true);
+        if (model) {
+          segmenterRef.current = model;
+          setIsModelLoaded(true);
+        } else {
+          // Model returned null — fall back to raw camera feed
+          console.warn("Segmentation model unavailable, disabling background effects");
+          handleSetBackgroundEffects(false);
+        }
       } catch (error) {
         console.error("Failed to load segmentation model:", error);
+        handleSetBackgroundEffects(false);
       }
     };
 
@@ -186,66 +190,6 @@ export const CameraProvider = ({ children }) => {
     },
     [videoRef]
   );
-
-  const captureFrame = useCallback(() => {
-    if (
-      !videoRef.current ||
-      !offScreenCanvasRef.current ||
-      frameRequestedRef.current
-    ) {
-      return;
-    }
-
-    frameRequestedRef.current = true;
-
-    if (backgroundEffectsRef.current && videoRef.current.readyState === 4) {
-      const video = videoRef.current;
-      const canvas = offScreenCanvasRef.current;
-      const ctx = offScreenCanvasContextRef.current;
-
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-
-      ctx.drawImage(video, 0, 0);
-      const frame = ctx.getImageData(0, 0, canvas.width, canvas.height);
-
-      if (segmenterRef.current) {
-        segmenterRef.current.segmentPeople(frame).then((segmentation) => {
-          if (blurRef.current) {
-            renderEffectBackground(canvas, ctx, frame, segmentation, "blur");
-          } else if (effectRef.current) {
-            renderEffectBackground(
-              canvas,
-              ctx,
-              frame,
-              segmentation,
-              "custom",
-              effectRef.current
-            );
-          }
-
-          setCurrentFrame(frame);
-          frameRequestedRef.current = false;
-        });
-      }
-    } else {
-      frameRequestedRef.current = false;
-    }
-
-    requestAnimationFrame(captureFrame);
-  }, []);
-
-  useEffect(() => {
-    if (backgroundEffects) {
-      requestAnimationFrame(captureFrame);
-    }
-
-    return () => {
-      if (frameRequestedRef.current) {
-        frameRequestedRef.current = false;
-      }
-    };
-  }, [backgroundEffects, captureFrame]);
 
   const loadCustomEffect = async (effectUrl) => {
     try {
@@ -306,7 +250,6 @@ export const CameraProvider = ({ children }) => {
     backgroundEffects,
     isModelLoaded,
     pipMode,
-    currentFrame,
     isCameraMode,
     videoRef,
     streamRef,
@@ -325,7 +268,6 @@ export const CameraProvider = ({ children }) => {
     enableBlur,
     setCustomEffect,
     clearEffect,
-    captureFrame,
   };
 
   return (

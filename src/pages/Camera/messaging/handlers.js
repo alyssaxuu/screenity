@@ -76,9 +76,17 @@ export const setupHandlers = ({ setLoading }) => {
   registerMessage("set-surface", (message) => {
     console.log("Preparing Picture in Picture request");
 
-    waitForVideoRef((videoEl) => {
-      surfaceHandler(message, { current: videoEl });
-    });
+    // Try synchronously first to preserve user gesture context for PiP.
+    // If videoRef isn't ready yet, fall back to polling (PiP may fail
+    // without gesture, but surfaceHandler handles that gracefully).
+    const { videoRef } = getContextRefs();
+    if (videoRef?.current) {
+      surfaceHandler(message, videoRef);
+    } else {
+      waitForVideoRef((videoEl) => {
+        surfaceHandler(message, { current: videoEl });
+      });
+    }
   });
   registerMessage("camera-toggled-toolbar", cameraToggledToolbar);
   registerMessage("turn-off-pip", () => {

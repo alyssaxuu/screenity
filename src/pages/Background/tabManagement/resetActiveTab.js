@@ -2,6 +2,7 @@ import { focusTab } from "./focusTab";
 import { sendMessageTab } from "./sendMessageTab";
 import { startRecording } from "../recording/startRecording";
 import { getCurrentTab } from "./getCurrentTab";
+import { traceStep } from "../../utils/startFlowTrace";
 
 export const restartActiveTab = async (message = {}) => {
   try {
@@ -64,11 +65,25 @@ export const resetActiveTab = async (forceRestart = false, message = {}) => {
         await focusTab(activeTab);
       }
 
-      // Decide which tab to send message to
-      const targetTabId = shouldFocusTab ? activeTab : currentTab?.id;
+      // Always prefer the stored activeTab (the user's page, set before the
+      // recorder tab is created). Falling back to currentTab can target the
+      // pinned recorder tab when surface === "browser".
+      const targetTabId = activeTab || currentTab?.id;
+
+      // Persist routing decision to the start-flow trace. Awaited so the
+      // write lands before sendMessageTab triggers the content-side write.
+      await traceStep("readyToRecordSent", {
+        routing: {
+          targetTabId,
+          activeTab,
+          currentTabId: currentTab?.id,
+          shouldFocusTab,
+        },
+        surface,
+      });
 
       if (targetTabId) {
-        sendMessageTab(targetTabId, { type: "ready-to-record" });
+        sendMessageTab(targetTabId, { type: "ready-to-record" }).catch(() => {});
 
         const { countdown } = await chrome.storage.local.get(["countdown"]);
 

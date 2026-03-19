@@ -212,13 +212,12 @@ export const surfaceHandler = async (request, videoRef) => {
     return;
   }
 
+  // Auth data is passed along with the set-surface message from the background
+  // script (setSurface.js) to avoid an async round-trip that would lose the
+  // user gesture context required by requestPictureInPicture().
   try {
-    const result = await chrome.runtime.sendMessage({
-      type: "check-auth-status",
-    });
-
-    const isSubscribed = result?.subscribed || false;
-    const instantMode = result?.instantMode || false;
+    const isSubscribed = request.subscribed || false;
+    const instantMode = request.instantMode || false;
 
     const shouldEnterPip =
       (request.surface === "monitor" && (!isSubscribed || instantMode)) ||

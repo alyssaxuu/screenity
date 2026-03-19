@@ -9,6 +9,7 @@ import BunnyTusUploader from "./bunnyTusUploader";
 import localforage from "localforage";
 import { createVideoProject } from "./createVideoProject";
 import { getUserMediaWithFallback } from "../utils/mediaDeviceFallback";
+import { traceStep } from "../utils/startFlowTrace";
 
 localforage.config({
   driver: localforage.INDEXEDDB,
@@ -4386,9 +4387,8 @@ const CloudRecorder = () => {
     //const { qualityValue } = await chrome.storage.local.get(["qualityValue"]);
     const { width = 1920, height = 1080 } = getResolutionForQuality() || {};
 
-    // Defaulting FPS for now
-    // const { fpsValue } = await chrome.storage.local.get(["fpsValue"]);
-    const fps = parseInt(30);
+    const { fpsValue } = await chrome.storage.local.get(["fpsValue"]);
+    const fps = parseInt(fpsValue) || 30;
 
     const { instantMode: instant } = await chrome.storage.local.get([
       "instantMode",
@@ -4570,11 +4570,13 @@ const CloudRecorder = () => {
             .getVideoTracks()[0]
             .getSettings();
 
-          if (surface === "browser") {
-            setTimeout(() => {
-              chrome.runtime.sendMessage({ type: "preparing-recording" });
-            }, 200);
-          }
+          traceStep("streamAcquired", { surface: surface || null });
+
+          // Show "Preparing..." on the user's page while API calls run.
+          setTimeout(() => {
+            traceStep("preparingSent");
+            chrome.runtime.sendMessage({ type: "preparing-recording" });
+          }, 200);
 
           chrome.runtime.sendMessage(
             { type: "get-monitor-for-window" },
@@ -4602,6 +4604,8 @@ const CloudRecorder = () => {
           chrome.runtime.sendMessage({
             type: "set-surface",
             surface: surface,
+            subscribed: true,
+            instantMode: instantMode.current || false,
           });
 
           if (isTab.current) {
@@ -4746,6 +4750,7 @@ const CloudRecorder = () => {
         }
 
         await chrome.storage.local.set({ projectId: videoId });
+        traceStep("apiProjectCreated");
         await setPipelineState("project-ready", {
           projectId: videoId,
           status: multiMode ? "multi" : "single",
@@ -4759,9 +4764,11 @@ const CloudRecorder = () => {
         if (!uploadersInitialized.current) {
           throw new Error("Failed to initialize uploaders");
         }
+        traceStep("apiUploadersReady");
 
         setStarted(true);
         setInitProject(false);
+        traceStep("resetActiveTabSent");
         chrome.runtime.sendMessage({ type: "reset-active-tab" });
         if (pendingStartRef.current) {
           maybeStartRecording("uploaders-ready");

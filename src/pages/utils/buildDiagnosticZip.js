@@ -3,6 +3,7 @@
  * Used by the popup settings menu and the editor "Get help" button.
  */
 import JSZip from "jszip";
+import { getStartFlowTrace } from "./startFlowTrace";
 
 const FAST_RECORDER_KEYS = [
   "fastRecorderBeta",
@@ -104,6 +105,16 @@ export const buildDiagnosticZip = async ({
   // storage-flags.json — current boolean/numeric state flags
   if (diagData?.flags) {
     zip.file("storage-flags.json", JSON.stringify(diagData.flags));
+  }
+
+  // start-flow-trace.json
+  try {
+    const trace = await getStartFlowTrace();
+    if (trace) {
+      zip.file("start-flow-trace.json", JSON.stringify(trace));
+    }
+  } catch {
+    // best effort
   }
 
   const blob = await zip.generateAsync({ type: "blob" });

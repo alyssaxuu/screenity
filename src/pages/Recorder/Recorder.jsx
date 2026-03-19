@@ -153,13 +153,13 @@ const getFreeCaptureCaps = async () => {
     return {
       isPro,
       maxQuality: "1080p",
-      maxFps: 30,
+      maxFps: 60,
     };
   } catch {
     return {
       isPro: false,
       maxQuality: "1080p",
-      maxFps: 30,
+      maxFps: 60,
     };
   }
 };

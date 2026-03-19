@@ -7,6 +7,7 @@ import { setContentState, contentStateRef } from "../ContentState";
 import { updateFromStorage } from "../utils/updateFromStorage";
 
 import { checkAuthStatus } from "../utils/checkAuthStatus";
+import { traceStep, setStartFlowOutcome } from "../../../utils/startFlowTrace";
 import JSZip from "jszip";
 
 const CLOUD_FEATURES_ENABLED =
@@ -385,6 +386,8 @@ export const setupHandlers = () => {
   });
 
   registerMessage("ready-to-record", () => {
+    traceStep("readyToRecordReceived");
+
     setContentState((prev) => ({
       ...prev,
       showPopup: false,
@@ -396,6 +399,7 @@ export const setupHandlers = () => {
 
     if (state.countdown) {
       // Start countdown
+      traceStep("countdownStart");
       setContentState((prev) => ({
         ...prev,
         countdownActive: true,
@@ -404,10 +408,9 @@ export const setupHandlers = () => {
       }));
       chrome.runtime.sendMessage({ type: "diag-countdown-started" }).catch(() => {});
     } else {
-      // Start recording immediately if countdown is disabled
-      if (!state.countdownCancelled) {
-        state.startRecordingAfterCountdown();
-      }
+      // No countdown, start immediately. countdownCancelled is cleared
+      // in startStreaming so it can't be stale here.
+      state.startRecordingAfterCountdown();
     }
   });
 
@@ -533,6 +536,7 @@ export const setupHandlers = () => {
   });
 
   registerMessage("recording-error", () => {
+    setStartFlowOutcome("error");
     setContentState((prev) => ({
       ...prev,
       pendingRecording: false,
@@ -840,6 +844,7 @@ export const setupHandlers = () => {
   });
 
   registerMessage("stop-pending", () => {
+    setStartFlowOutcome("error");
     setContentState((prev) => ({
       ...prev,
       pendingRecording: false,
@@ -1138,6 +1143,7 @@ export const setupHandlers = () => {
     updateFromStorage(false, message.senderId);
   });
   registerMessage("preparing-recording", () => {
+    traceStep("preparingReceived");
     setContentState((prev) => ({
       ...prev,
       preparingRecording: true,

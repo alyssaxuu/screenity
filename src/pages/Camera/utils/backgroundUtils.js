@@ -1,79 +1,211 @@
-import * as bodySegmentation from "@tensorflow-models/body-segmentation";
-import "@tensorflow/tfjs-core";
-import "@mediapipe/selfie_segmentation";
+import {
+  FilesetResolver,
+  ImageSegmenter,
+} from "@mediapipe/tasks-vision";
+
+// Pre-allocated canvases reused across frames to avoid GC pressure
+let _frameCanvas = null;
+let _frameCtx = null;
+let _blurCanvas = null;
+let _blurCtx = null;
+let _maskCanvas = null;
+let _maskCtx = null;
+let _smoothMaskCanvas = null;
+let _smoothMaskCtx = null;
+let _personCanvas = null;
+let _personCtx = null;
+
+function getReusableCanvases() {
+  if (!_frameCanvas) {
+    _frameCanvas = document.createElement("canvas");
+    _frameCtx = _frameCanvas.getContext("2d");
+    _blurCanvas = document.createElement("canvas");
+    _blurCtx = _blurCanvas.getContext("2d");
+    _maskCanvas = document.createElement("canvas");
+    _maskCtx = _maskCanvas.getContext("2d");
+    _smoothMaskCanvas = document.createElement("canvas");
+    _smoothMaskCtx = _smoothMaskCanvas.getContext("2d");
+    _personCanvas = document.createElement("canvas");
+    _personCtx = _personCanvas.getContext("2d");
+  }
+  return {
+    frameCanvas: _frameCanvas, frameCtx: _frameCtx,
+    blurCanvas: _blurCanvas, blurCtx: _blurCtx,
+    maskCanvas: _maskCanvas, maskCtx: _maskCtx,
+    smoothMaskCanvas: _smoothMaskCanvas, smoothMaskCtx: _smoothMaskCtx,
+    personCanvas: _personCanvas, personCtx: _personCtx,
+  };
+}
+
+// Pre-allocated typed array for mask ImageData, reused across frames
+let _maskImageDataCache = null;
+let _maskImageDataCacheSize = 0;
+
+function getOrCreateMaskImageData(ctx, width, height) {
+  const size = width * height;
+  if (_maskImageDataCache && _maskImageDataCacheSize === size) {
+    return _maskImageDataCache;
+  }
+  _maskImageDataCache = ctx.createImageData(width, height);
+  _maskImageDataCacheSize = size;
+  return _maskImageDataCache;
+}
 
 export const loadSegmentationModel = async () => {
   try {
-    const model = bodySegmentation.SupportedModels.MediaPipeSelfieSegmentation;
-    const segmenterConfig = {
-      runtime: "mediapipe",
-      solutionPath: "./assets/selfieSegmentation",
-      modelType: "general",
-    };
+    const vision = await FilesetResolver.forVisionTasks(
+      "./assets/mediapipeVision"
+    );
 
-    return await bodySegmentation.createSegmenter(model, segmenterConfig);
+    const segmenter = await ImageSegmenter.createFromOptions(vision, {
+      baseOptions: {
+        modelAssetPath: "./assets/mediapipeVision/selfie_segmenter.tflite",
+        delegate: "GPU",
+      },
+      outputCategoryMask: true,
+      outputConfidenceMasks: false,
+      runningMode: "VIDEO",
+    });
+
+    return segmenter;
   } catch (error) {
     console.error("Error loading segmentation model:", error);
     return null;
   }
 };
 
-export const segmentPerson = async (img, segmenter) => {
-  if (!img || !segmenter) {
-    console.warn("Missing input: ", {
-      hasImage: !!img,
-      hasSegmenter: !!segmenter,
-    });
-    return null;
-  }
-
-  if (!img.data || img.width === 0 || img.height === 0) {
-    console.warn("Invalid image dimensions or incomplete image data");
-    return null;
-  }
+// Segment directly from a video element — avoids ImageData round-trips.
+// The segmentForVideo callback fires synchronously, so this returns the result directly.
+export const segmentFromVideo = (videoElement, segmenter) => {
+  if (!videoElement || !segmenter) return null;
+  if (videoElement.readyState < 2 || videoElement.videoWidth === 0) return null;
 
   try {
-    const segmentationPromise = segmenter.segmentPeople(img);
-    const timeoutPromise = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error("Segmentation timed out")), 5000)
-    );
+    const timestampMs = performance.now();
+    let result = null;
 
-    const people = await Promise.race([segmentationPromise, timeoutPromise]);
+    segmenter.segmentForVideo(videoElement, timestampMs, (r) => {
+      result = r;
+    });
 
-    if (!people || people.length === 0) {
-      return null;
-    }
-
-    return people;
+    if (!result || !result.categoryMask) return null;
+    return result;
   } catch (error) {
-    console.error("Error during person segmentation:", error);
-
+    console.error("Error during segmentation:", error);
     return null;
   }
 };
 
-export const renderBlur = async (img, people, canvasRef) => {
-  if (!img || !people || !canvasRef.current) return;
+// Build a smoothed person mask from segmentation result onto reusable canvases.
+// Shared by both blur and cutout render paths.
+function buildSmoothedMask(segmentationResult, edgeBlurAmount, personOpaque) {
+  const mask = segmentationResult.categoryMask;
+  const maskData = mask.getAsUint8Array();
+  const maskW = mask.width;
+  const maskH = mask.height;
+
+  const { maskCanvas, maskCtx, smoothMaskCanvas, smoothMaskCtx } = getReusableCanvases();
+
+  if (maskCanvas.width !== maskW || maskCanvas.height !== maskH) {
+    maskCanvas.width = maskW;
+    maskCanvas.height = maskH;
+    smoothMaskCanvas.width = maskW;
+    smoothMaskCanvas.height = maskH;
+  }
+
+  const maskImageData = getOrCreateMaskImageData(maskCtx, maskW, maskH);
+  const maskPixels = maskImageData.data;
+
+  for (let i = 0; i < maskData.length; i++) {
+    const offset = i * 4;
+    const isPerson = maskData[i] === 1;
+    if (personOpaque) {
+      // Person = opaque white, background = transparent (for blur + cutout)
+      maskPixels[offset] = 255;
+      maskPixels[offset + 1] = 255;
+      maskPixels[offset + 2] = 255;
+      maskPixels[offset + 3] = isPerson ? 255 : 0;
+    } else {
+      // Person = transparent, background = opaque black (for destination-out masking)
+      maskPixels[offset] = 0;
+      maskPixels[offset + 1] = 0;
+      maskPixels[offset + 2] = 0;
+      maskPixels[offset + 3] = isPerson ? 0 : 255;
+    }
+  }
+  maskCtx.putImageData(maskImageData, 0, 0);
+
+  smoothMaskCtx.clearRect(0, 0, maskW, maskH);
+  smoothMaskCtx.filter = `blur(${edgeBlurAmount}px)`;
+  smoothMaskCtx.drawImage(maskCanvas, 0, 0);
+  smoothMaskCtx.filter = "none";
+
+  return { smoothMaskCanvas, maskW, maskH };
+}
+
+// Render blur effect using the video element directly (no ImageData round-trip)
+export const renderBlurFromVideo = (videoElement, segmentationResult, canvasRef) => {
+  if (!videoElement || !segmentationResult || !canvasRef.current) return false;
 
   try {
     const backgroundBlurAmount = 16;
-    const edgeBlurAmount = 10;
-    const flipHorizontal = false;
-    const foregroundThresholdProbability = 0.6;
+    const edgeBlurAmount = 8;
 
-    const ratio = img.width / img.height;
-    canvasRef.current.width = window.innerHeight * ratio;
-    canvasRef.current.height = window.innerHeight;
+    const vw = videoElement.videoWidth;
+    const vh = videoElement.videoHeight;
 
-    await bodySegmentation.drawBokehEffect(
-      canvasRef.current,
-      img,
-      people,
-      foregroundThresholdProbability,
-      backgroundBlurAmount,
-      edgeBlurAmount,
-      flipHorizontal
-    );
+    const { frameCanvas, frameCtx, blurCanvas, blurCtx, personCanvas, personCtx } =
+      getReusableCanvases();
+
+    // Resize reusable canvases only when dimensions change
+    if (frameCanvas.width !== vw || frameCanvas.height !== vh) {
+      frameCanvas.width = vw;
+      frameCanvas.height = vh;
+      blurCanvas.width = vw;
+      blurCanvas.height = vh;
+    }
+
+    // Draw original frame from video
+    frameCtx.drawImage(videoElement, 0, 0);
+
+    // Draw blurred version
+    blurCtx.filter = `blur(${backgroundBlurAmount}px)`;
+    blurCtx.drawImage(frameCanvas, 0, 0);
+    blurCtx.filter = "none";
+
+    // Build smoothed person mask
+    const { smoothMaskCanvas, maskW, maskH } =
+      buildSmoothedMask(segmentationResult, edgeBlurAmount, true);
+
+    // Size output canvas
+    const ratio = vw / vh;
+    const outW = Math.round(window.innerHeight * ratio);
+    const outH = window.innerHeight;
+
+    if (canvasRef.current.width !== outW || canvasRef.current.height !== outH) {
+      canvasRef.current.width = outW;
+      canvasRef.current.height = outH;
+    }
+
+    if (personCanvas.width !== outW || personCanvas.height !== outH) {
+      personCanvas.width = outW;
+      personCanvas.height = outH;
+    }
+
+    const outputCtx = canvasRef.current.getContext("2d");
+
+    // Base layer: blurred frame
+    outputCtx.drawImage(blurCanvas, 0, 0, vw, vh, 0, 0, outW, outH);
+
+    // Person layer: mask → source-in with sharp frame
+    personCtx.clearRect(0, 0, outW, outH);
+    personCtx.globalCompositeOperation = "source-over";
+    personCtx.drawImage(smoothMaskCanvas, 0, 0, maskW, maskH, 0, 0, outW, outH);
+    personCtx.globalCompositeOperation = "source-in";
+    personCtx.drawImage(frameCanvas, 0, 0, vw, vh, 0, 0, outW, outH);
+
+    // Composite person on top of blurred background
+    outputCtx.drawImage(personCanvas, 0, 0);
 
     return true;
   } catch (error) {
@@ -82,76 +214,56 @@ export const renderBlur = async (img, people, canvasRef) => {
   }
 };
 
-export const getImageURL = (imageData) => {
-  const canvas = document.createElement("canvas");
-  canvas.width = imageData.width;
-  canvas.height = imageData.height;
-  const context = canvas.getContext("2d");
-  context.putImageData(imageData, 0, 0);
-  return canvas.toDataURL();
-};
-
-export const renderEffect = async (
-  img,
-  people,
-  offScreenCanvasRef,
-  offScreenCanvasContextRef,
+// Render person cutout (transparent background) using the video element directly
+export const renderPersonCutoutFromVideo = (
+  videoElement,
+  segmentationResult,
   canvasRef,
-  canvasContextRef
+  canvasContextRef,
 ) => {
-  if (!img || !people || !offScreenCanvasRef.current || !canvasRef.current)
-    return false;
+  if (!videoElement || !segmentationResult || !canvasRef.current) return false;
 
   try {
-    const ratio = img.width / img.height;
+    const edgeBlurAmount = 4;
 
-    const foregroundColor = { r: 0, g: 0, b: 0, a: 0 };
-    const backgroundColor = { r: 0, g: 0, b: 0, a: 255 };
-    const drawContour = false;
-    const foregroundThresholdProbability = 0.7;
+    const vw = videoElement.videoWidth;
+    const vh = videoElement.videoHeight;
 
-    const backgroundDarkeningMask = await bodySegmentation.toBinaryMask(
-      people,
-      foregroundColor,
-      backgroundColor,
-      drawContour,
-      foregroundThresholdProbability
-    );
+    const { frameCanvas, frameCtx, personCanvas, personCtx } = getReusableCanvases();
 
-    offScreenCanvasRef.current.width = img.width;
-    offScreenCanvasRef.current.height = img.height;
-    canvasRef.current.width = window.innerHeight * ratio;
-    canvasRef.current.height = window.innerHeight;
+    if (frameCanvas.width !== vw || frameCanvas.height !== vh) {
+      frameCanvas.width = vw;
+      frameCanvas.height = vh;
+    }
 
-    offScreenCanvasContextRef.current.putImageData(img, 0, 0);
+    // Draw original frame from video
+    frameCtx.drawImage(videoElement, 0, 0);
 
-    offScreenCanvasContextRef.current.globalCompositeOperation =
-      "destination-out";
-    await bodySegmentation.drawMask(
-      offScreenCanvasRef.current,
-      img,
-      backgroundDarkeningMask,
-      0, // opacity
-      3 // edgeBlurAmount
-    );
+    // Build smoothed person mask
+    const { smoothMaskCanvas, maskW, maskH } =
+      buildSmoothedMask(segmentationResult, edgeBlurAmount, true);
 
-    offScreenCanvasContextRef.current.globalCompositeOperation = "source-over";
+    const canvas = canvasRef.current;
+    const ctx = canvasContextRef.current;
 
-    canvasContextRef.current.drawImage(
-      offScreenCanvasRef.current,
-      0,
-      0,
-      offScreenCanvasRef.current.width,
-      offScreenCanvasRef.current.height,
-      0,
-      0,
-      canvasRef.current.width,
-      canvasRef.current.height
-    );
+    if (personCanvas.width !== canvas.width || personCanvas.height !== canvas.height) {
+      personCanvas.width = canvas.width;
+      personCanvas.height = canvas.height;
+    }
+
+    // Composite: mask → source-in with frame = person-only with smooth edges
+    personCtx.clearRect(0, 0, canvas.width, canvas.height);
+    personCtx.globalCompositeOperation = "source-over";
+    personCtx.drawImage(smoothMaskCanvas, 0, 0, maskW, maskH, 0, 0, canvas.width, canvas.height);
+    personCtx.globalCompositeOperation = "source-in";
+    personCtx.drawImage(frameCanvas, 0, 0, vw, vh, 0, 0, canvas.width, canvas.height);
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(personCanvas, 0, 0);
 
     return true;
   } catch (error) {
-    console.error("Error rendering effect:", error);
+    console.error("Error rendering person cutout:", error);
     return false;
   }
 };
@@ -186,7 +298,6 @@ export const renderEffectBackground = (
     const canvas = bottomCanvasRef.current;
     const ctx = bottomCanvasContextRef.current;
 
-    // Set canvas size to window dimensions
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
 
@@ -197,20 +308,16 @@ export const renderEffectBackground = (
     let drawHeight = canvas.height;
 
     if (canvasRatio > imgRatio) {
-      // Canvas is wider than the image ratio
       drawWidth = canvas.height * imgRatio;
       drawHeight = canvas.height;
     } else {
-      // Canvas is taller than the image ratio
       drawWidth = canvas.width;
       drawHeight = canvas.width / imgRatio;
     }
 
-    // Center the image
     const x = (canvas.width - drawWidth) / 2;
     const y = (canvas.height - drawHeight) / 2;
 
-    // Clear canvas and draw the background
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.drawImage(effectImg, x, y, drawWidth, drawHeight);
 
@@ -218,45 +325,5 @@ export const renderEffectBackground = (
   } catch (error) {
     console.error("Error rendering effect background:", error);
     return false;
-  }
-};
-
-// Process a new video frame with current effect settings
-export const processVideoFrame = async (
-  frameData,
-  segmenter,
-  isBlurEnabled,
-  effectImg,
-  canvasRefs
-) => {
-  if (!frameData || !segmenter) return;
-
-  try {
-    const people = await segmentPerson(frameData, segmenter);
-    if (!people) return;
-
-    const {
-      canvasRef,
-      canvasContextRef,
-      offScreenCanvasRef,
-      offScreenCanvasContextRef,
-      bottomCanvasRef,
-      bottomCanvasContextRef,
-    } = canvasRefs;
-
-    if (isBlurEnabled) {
-      await renderBlur(frameData, people, canvasRef);
-    } else if (effectImg) {
-      await renderEffect(
-        frameData,
-        people,
-        offScreenCanvasRef,
-        offScreenCanvasContextRef,
-        canvasRef,
-        canvasContextRef
-      );
-    }
-  } catch (error) {
-    console.error("Error processing video frame:", error);
   }
 };
