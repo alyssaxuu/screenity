@@ -2,6 +2,8 @@
 import React from "react";
 import Warning from "./warning/Warning";
 
+const isTabFromUrl = new URLSearchParams(window.location.search).has("tab");
+
 const RecorderUI = ({ started, isTab }) => {
   return (
     <div className="wrap">
@@ -16,9 +18,11 @@ const RecorderUI = ({ started, isTab }) => {
           alt="Recording icon"
         />
         <div className="title">
-          {!started
-            ? chrome.i18n.getMessage("recorderSelectTitle")
-            : chrome.i18n.getMessage("recorderSelectProgressTitle")}
+          {started
+            ? chrome.i18n.getMessage("recorderSelectProgressTitle")
+            : (isTab || isTabFromUrl)
+              ? chrome.i18n.getMessage("preparingLabel")
+              : chrome.i18n.getMessage("recorderSelectTitle")}
         </div>
         <div className="subtitle">
           {chrome.i18n.getMessage("recorderSelectDescription")}

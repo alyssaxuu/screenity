@@ -98,45 +98,42 @@ const RecordingTab = (props) => {
               {chrome.i18n.getMessage("addingToLabel") || "Adding to: "}
               {contentState.recordingProjectTitle}
             </div>
-            {(!contentState.multiMode ||
-              contentState.multiSceneCount === 0) && (
-              <div className="projectActiveBannerRight">
-                <div className="projectActiveBannerDivider"></div>
-                <div
-                  className="projectActiveBannerClose"
-                  onClick={() => {
-                    setContentState((prev) => ({
-                      ...prev,
-                      projectTitle: "",
-                      projectId: null,
-                      activeSceneId: null,
-                      recordingToScene: false,
-                      multiMode: false,
-                      multiSceneCount: 0,
-                      multiProjectId: null,
-                    }));
+            <div className="projectActiveBannerRight">
+              <div className="projectActiveBannerDivider"></div>
+              <div
+                className="projectActiveBannerClose"
+                onClick={() => {
+                  setContentState((prev) => ({
+                    ...prev,
+                    projectTitle: "",
+                    projectId: null,
+                    activeSceneId: null,
+                    recordingToScene: false,
+                    multiMode: false,
+                    multiSceneCount: 0,
+                    multiProjectId: null,
+                  }));
 
-                    // also in chrome local storage
-                    chrome.storage.local.set({
-                      recordingProjectTitle: "",
-                      projectId: null,
-                      activeSceneId: null,
-                      recordingToScene: false,
-                      multiMode: false,
-                      multiProjectId: null,
-                    });
+                  chrome.storage.local.set({
+                    recordingProjectTitle: "",
+                    projectId: null,
+                    activeSceneId: null,
+                    recordingToScene: false,
+                    multiMode: false,
+                    multiSceneCount: 0,
+                    multiProjectId: null,
+                    multiLastSceneId: null,
+                  });
 
-                    // show toast
-                    contentState.openToast(
-                      chrome.i18n.getMessage("projectRecordingCancelledToast"),
-                      3000
-                    );
-                  }}
-                >
-                  <img src={CloseWhiteIcon} alt="Close" />
-                </div>
+                  contentState.openToast(
+                    chrome.i18n.getMessage("projectRecordingCancelledToast"),
+                    3000
+                  );
+                }}
+              >
+                <img src={CloseWhiteIcon} alt="Close" />
               </div>
-            )}
+            </div>
           </div>
         )}
         <Tabs.List

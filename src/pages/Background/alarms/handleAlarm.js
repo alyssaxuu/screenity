@@ -9,6 +9,8 @@ import {
   CLOUD_LOCAL_PLAYBACK_ALARM,
 } from "../recording/cloudLocalPlaybackConstants";
 
+export const FIRST_CHUNK_WATCHDOG_ALARM = "first-chunk-watchdog";
+
 // Utility to handle tab messaging logic.
 // `tab` is an optional Chrome Tab object used as a fallback when the stored
 // activeTab is no longer valid (e.g. when called from an action-button click).
@@ -47,6 +49,22 @@ export const handleAlarm = async (alarm) => {
     }
 
     await chrome.alarms.clear("recording-alarm");
+    return;
+  }
+
+  if (alarm.name === FIRST_CHUNK_WATCHDOG_ALARM) {
+    // No data received from MediaRecorder within the timeout
+    const { recording } = await chrome.storage.local.get(["recording"]);
+    if (recording) {
+      diagEvent("error", { note: "first-chunk-watchdog-fired" });
+      sendMessageRecord({
+        type: "recording-error",
+        error: "stream-error",
+        why: "Recording failed — no video data received within 8 seconds. The tab may have been throttled. Please try again.",
+        errorCode: "no-first-chunk",
+      }).catch(() => {});
+    }
+    await chrome.alarms.clear(FIRST_CHUNK_WATCHDOG_ALARM);
     return;
   }
 

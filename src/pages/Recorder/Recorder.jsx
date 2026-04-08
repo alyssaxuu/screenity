@@ -374,6 +374,11 @@ const Recorder = () => {
         .sendMessage({ type: "set-tab-auto-discardable", discardable: true })
         .catch(() => {});
 
+      // Cancel first-chunk watchdog
+      chrome.runtime
+        .sendMessage({ type: "cancel-first-chunk-watchdog" })
+        .catch(() => {});
+
       debug("Tab keep-alive stopped");
     } catch (err) {
       debugWarn("Failed to stop tab keep-alive:", err);
@@ -769,7 +774,7 @@ const Recorder = () => {
     recordingGeneration.current += 1;
     const runGeneration = recordingGeneration.current;
 
-    // Start silent audio to prevent Chrome from freezing this background tab
+    // Ensure keepalive is running
     startTabKeepAlive();
 
     // Record the start time for session tracking
@@ -981,6 +986,12 @@ const Recorder = () => {
             timestamp: ts,
           });
           index.current = i + 1;
+          if (!hasChunks.current) {
+            // Cancel first-chunk watchdog
+            chrome.runtime
+              .sendMessage({ type: "cancel-first-chunk-watchdog" })
+              .catch(() => {});
+          }
           hasChunks.current = true;
           savedCount.current += 1;
 
@@ -1014,6 +1025,10 @@ const Recorder = () => {
       };
 
       if (!hasChunks.current) {
+        // Cancel first-chunk watchdog
+        chrome.runtime
+          .sendMessage({ type: "cancel-first-chunk-watchdog" })
+          .catch(() => {});
         hasChunks.current = true;
         lastTimecode.current = e.timecode;
         lastSize.current = e.data.size;
@@ -1290,6 +1305,11 @@ const Recorder = () => {
 
           recorder.current.start(1000);
           debug("MediaRecorder.start(1000) called");
+
+          // Start first-chunk watchdog (8s, via chrome.alarms)
+          chrome.runtime
+            .sendMessage({ type: "start-first-chunk-watchdog" })
+            .catch(() => {});
         } catch (err) {
           debugError("Failed to start MediaRecorder", err);
           sendRecordingError("Failed to start recording: " + String(err));
@@ -2230,6 +2250,15 @@ const Recorder = () => {
   }
 
   async function startStreaming(data) {
+    startTabKeepAlive();
+
+    if (document.visibilityState === "hidden") {
+      debugWarn("Tab is hidden at recording start, requesting activation");
+      try {
+        await chrome.runtime.sendMessage({ type: "activate-recorder-tab" });
+      } catch {}
+    }
+
     debug("startStreaming()", { data });
     slLog("startStreaming-enter", { recordingType: data?.recordingType });
     const permissions = await navigator.permissions.query({

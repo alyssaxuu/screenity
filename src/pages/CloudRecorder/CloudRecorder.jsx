@@ -932,6 +932,11 @@ const CloudRecorder = () => {
         discardable: true,
       });
 
+      // Cancel first-chunk watchdog
+      chrome.runtime
+        .sendMessage({ type: "cancel-first-chunk-watchdog" })
+        .catch(() => {});
+
       if (globalThis.SCREENITY_VERBOSE_LOGS) {
         if (DEBUG_START_FLOW) {
           console.log("[CloudRecorder] Tab keep-alive stopped");
@@ -2233,7 +2238,7 @@ const CloudRecorder = () => {
     setInitProject(false);
     await cleanupIfEmptyUploads(restarting ? "restart" : "dismiss");
 
-    // Stop the silent audio keep-alive
+    // Stop keepalive (also cancels first-chunk watchdog)
     stopTabKeepAlive();
     await setRecordingTimingState({
       recording: false,
@@ -2649,7 +2654,7 @@ const CloudRecorder = () => {
   const startRecording = async () => {
     setInitProject(false);
     await clearLocalScreenPlaybackOffer("start-recording");
-    // Start silent audio to prevent Chrome from freezing this background tab
+    // Ensure keepalive is running
     startTabKeepAlive();
 
     const storageReady = await ensureChunkStoreReady();
@@ -2820,6 +2825,10 @@ const CloudRecorder = () => {
               hasChunks.current = true;
               lastTimecode.current = timestamp;
               firstChunkTime.current = timestamp;
+              // Cancel first-chunk watchdog
+              chrome.runtime
+                .sendMessage({ type: "cancel-first-chunk-watchdog" })
+                .catch(() => {});
               if (!firstChunkLoggedRef.current) {
                 firstChunkLoggedRef.current = true;
                 logStartFlow("first_chunk", { type: "screen" });
@@ -2890,6 +2899,11 @@ const CloudRecorder = () => {
 
         // Start recording with 2-second time slices
         screenRecorder.current.start(2000);
+
+        // Start first-chunk watchdog (8s, via chrome.alarms)
+        chrome.runtime
+          .sendMessage({ type: "start-first-chunk-watchdog" })
+          .catch(() => {});
 
         if (screenTrack) {
           bindScreenTrack(screenTrack);
@@ -4783,6 +4797,17 @@ const CloudRecorder = () => {
   };
 
   const startStreaming = async (data) => {
+    startTabKeepAlive();
+
+    if (document.visibilityState === "hidden") {
+      if (globalThis.SCREENITY_VERBOSE_LOGS) {
+        console.warn("[CloudRecorder] Tab is hidden at recording start, requesting activation");
+      }
+      try {
+        await chrome.runtime.sendMessage({ type: "activate-recorder-tab" });
+      } catch {}
+    }
+
     try {
       const permissions = await navigator.permissions.query({ name: "camera" });
       const permissions2 = await navigator.permissions.query({

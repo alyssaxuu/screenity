@@ -13,12 +13,21 @@ import { hydrateDiagnosticLog, diagEvent } from "../utils/diagnosticLog";
 // complete well before any queued event is dispatched to the worker.
 const clearStaleLocks = async () => {
   try {
-    const { sendingChunks, postStopEditorOpening, postStopEditorOpened } =
-      await chrome.storage.local.get([
-        "sendingChunks",
-        "postStopEditorOpening",
-        "postStopEditorOpened",
-      ]);
+    const {
+      sendingChunks,
+      postStopEditorOpening,
+      postStopEditorOpened,
+      recording,
+      multiMode,
+      region,
+    } = await chrome.storage.local.get([
+      "sendingChunks",
+      "postStopEditorOpening",
+      "postStopEditorOpened",
+      "recording",
+      "multiMode",
+      "region",
+    ]);
 
     const stale = {};
     if (sendingChunks) {
@@ -32,6 +41,19 @@ const clearStaleLocks = async () => {
     if (postStopEditorOpened) {
       stale.postStopEditorOpened = false;
       console.warn("[Screenity][BG] Stale lock found on startup: postStopEditorOpened — clearing");
+    }
+
+    if (multiMode && !recording) {
+      stale.multiMode = false;
+      stale.multiSceneCount = 0;
+      stale.multiProjectId = null;
+      stale.multiLastSceneId = null;
+      console.warn("[Screenity][BG] Stale multi-mode state found on startup — clearing");
+    }
+
+    if (region && !recording) {
+      stale.region = false;
+      console.warn("[Screenity][BG] Stale region state found on startup — clearing");
     }
 
     if (Object.keys(stale).length > 0) {

@@ -76,3 +76,6 @@
 .region-recording * {
 	pointer-events: none!important;
 }
+.region-recording .resize-handle {
+	visibility: hidden!important;
+}

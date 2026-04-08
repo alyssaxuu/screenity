@@ -49,6 +49,7 @@ import {
   CLOUD_LOCAL_PLAYBACK_EVENT_KEY,
   CLOUD_LOCAL_PLAYBACK_ALARM,
 } from "../recording/cloudLocalPlaybackConstants";
+import { FIRST_CHUNK_WATCHDOG_ALARM } from "../alarms/handleAlarm";
 import { desktopCapture } from "../recording/desktopCapture";
 import {
   writeFile,
@@ -425,6 +426,12 @@ const handleFinishMultiRecording = async () => {
 
       if (!multiProjectId) {
         console.warn("No project ID found for finishing multi recording.");
+        await chrome.storage.local.set({
+          multiMode: false,
+          multiSceneCount: 0,
+          multiProjectId: null,
+          multiLastSceneId: null,
+        });
         return;
       }
 
@@ -446,7 +453,6 @@ const handleFinishMultiRecording = async () => {
 
       if (!res.ok) {
         console.warn("Failed to auto-publish multi recording", res.status);
-        return;
       }
 
       // Open the editor directly
@@ -505,7 +511,9 @@ const handleFinishMultiRecording = async () => {
         activeSceneId: null,
         recordingToScene: false,
         multiMode: false,
+        multiSceneCount: 0,
         multiProjectId: null,
+        multiLastSceneId: null,
         editorTab: null,
         editorTabMeta: null,
       });
@@ -523,9 +531,16 @@ const handleFinishMultiRecording = async () => {
       multiMode: false,
       multiSceneCount: 0,
       multiProjectId: null,
+      multiLastSceneId: null,
     });
   } catch (err) {
     console.warn("Failed to finish multi recording", err);
+    await chrome.storage.local.set({
+      multiMode: false,
+      multiSceneCount: 0,
+      multiProjectId: null,
+      multiLastSceneId: null,
+    }).catch(() => {});
   }
 };
 
@@ -2153,4 +2168,26 @@ export const setupHandlers = () => {
       return true;
     },
   );
+
+  registerMessage("activate-recorder-tab", async (message, sender) => {
+    const tabId = sender?.tab?.id;
+    if (tabId) {
+      try {
+        await chrome.tabs.update(tabId, { active: true });
+      } catch (err) {
+        console.warn("[Screenity] activate-recorder-tab failed:", String(err));
+      }
+    }
+  });
+
+  registerMessage("start-first-chunk-watchdog", async () => {
+    await chrome.alarms.clear(FIRST_CHUNK_WATCHDOG_ALARM).catch(() => {});
+    await chrome.alarms.create(FIRST_CHUNK_WATCHDOG_ALARM, {
+      delayInMinutes: 8 / 60,
+    });
+  });
+
+  registerMessage("cancel-first-chunk-watchdog", async () => {
+    await chrome.alarms.clear(FIRST_CHUNK_WATCHDOG_ALARM).catch(() => {});
+  });
 };

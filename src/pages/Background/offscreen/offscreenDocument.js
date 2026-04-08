@@ -16,8 +16,8 @@ const openRecorderTab = async (
 
   // Check subscription status
   const { authenticated, subscribed, cached, transient, error: authError } = await loginWithWebsite();
-  const recorderUrl =
-    authenticated && subscribed
+  const isCloudRecorder = authenticated && subscribed;
+  const recorderUrl = isCloudRecorder
       ? chrome.runtime.getURL("cloudrecorder.html")
       : chrome.runtime.getURL("recorder.html");
   if (!isRegion) {
@@ -28,6 +28,11 @@ const openRecorderTab = async (
     switchTab = activeTab.url.includes(
       chrome.runtime.getURL("playground.html")
     );
+  }
+
+  // Cloud recordings need the tab active briefly so keepalive can start
+  if (isCloudRecorder && !switchTab) {
+    switchTab = true;
   }
 
   // Close any leftover recorder tab from a previous recording so we don't
@@ -53,9 +58,11 @@ const openRecorderTab = async (
     chrome.storage.local.set({ recordingTab: null });
   }
 
+  const finalUrl = isRegion ? `${recorderUrl}?tab=true` : recorderUrl;
+
   chrome.tabs
     .create({
-      url: recorderUrl,
+      url: finalUrl,
       pinned: true,
       index: 0,
       // FLAG: Check this is ok?

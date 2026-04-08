@@ -92,6 +92,10 @@ export const onTabRemovedListener = () => {
               crashedAt: Date.now(),
             },
             recording: false,
+            multiMode: false,
+            multiSceneCount: 0,
+            multiProjectId: null,
+            multiLastSceneId: null,
           });
           endDiagSession("crashed");
         }
@@ -138,6 +142,10 @@ export const onTabRemovedListener = () => {
           recorderSession: recorderSession
             ? { ...recorderSession, status: "crashed", crashedAt: Date.now() }
             : null,
+          multiMode: false,
+          multiSceneCount: 0,
+          multiProjectId: null,
+          multiLastSceneId: null,
         });
         chrome.action.setIcon({ path: "assets/icon-34.png" });
       }

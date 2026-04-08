@@ -72,7 +72,9 @@ export const onInstalledListener = () => {
       }
     }
 
-    chrome.storage.local.set({ systemAudio: true });
+    if (details.reason === "install") {
+      chrome.storage.local.set({ systemAudio: true });
+    }
 
     const { backupTab } = await chrome.storage.local.get(["backupTab"]);
     if (backupTab) {

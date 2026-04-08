@@ -260,12 +260,13 @@ const ContentState = (props) => {
       cursorMode: "none",
       cursorEffects: [],
     });
+    const isMulti = contentStateRef.current.multiMode;
     setContentState((prevContentState) => ({
       ...prevContentState,
       recording: false,
       paused: false,
       timeWarning: false,
-      showExtension: false,
+      showExtension: isMulti ? true : false,
       blurMode: false,
       showPopup: true,
       pendingRecording: false,
@@ -273,7 +274,7 @@ const ContentState = (props) => {
       pipEnded: false,
       time: 0,
       timer: 0,
-      preparingRecording: false,
+      preparingRecording: isMulti ? true : false,
       drawingMode: false,
       blurMode: false,
       toolbarMode: "",

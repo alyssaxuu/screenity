@@ -144,6 +144,8 @@ export const handleRecordingError = async (request) => {
     tabRecordedID: null,
     offscreen: false,
     postStopEditorOpened: false,
+    region: false,
+    customRegion: false,
   });
 
   chrome.runtime
@@ -171,10 +173,15 @@ export const handleRecordingError = async (request) => {
   });
 
   const { recordingTab } = await chrome.storage.local.get(["recordingTab"]);
-  const { region } = await chrome.storage.local.get(["region"]);
-  if (recordingTab && !region) {
-    // FLAG: For testing purposes -> comment to debug
-    removeTab(recordingTab);
+  if (recordingTab) {
+    try {
+      const tab = await chrome.tabs.get(recordingTab);
+      if (tab?.url?.startsWith(chrome.runtime.getURL(""))) {
+        removeTab(recordingTab);
+      }
+    } catch {
+      // Tab doesn't exist
+    }
   }
   chrome.storage.local.set({ recordingTab: null });
   discardOffscreenDocuments();

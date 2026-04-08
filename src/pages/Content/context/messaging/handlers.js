@@ -429,6 +429,7 @@ export const setupHandlers = () => {
     if (document.hidden || !document.hasFocus()) {
       return;
     }
+    if (contentStateRef.current.recordingType === "camera") return;
     const nextDrawingMode = !contentStateRef.current.drawingMode;
     setContentState((prev) => ({
       ...prev,
@@ -441,6 +442,7 @@ export const setupHandlers = () => {
       if (now - lastToggleDrawingAt < TOGGLE_DRAWING_COOLDOWN_MS) return;
       lastToggleDrawingAt = now;
       if (document.hidden || !document.hasFocus()) return;
+      if (contentStateRef.current.recordingType === "camera") return;
 
       const nextDrawingMode = !contentStateRef.current.drawingMode;
 
@@ -458,6 +460,7 @@ export const setupHandlers = () => {
   });
 
   registerMessage("toggle-blur-mode", () => {
+    if (contentStateRef.current.recordingType === "camera") return;
     const nextBlurMode = !contentStateRef.current.blurMode;
     setContentState((prev) => ({
       ...prev,
@@ -485,6 +488,7 @@ export const setupHandlers = () => {
   });
 
   registerMessage("toggle-cursor-mode", () => {
+    if (contentStateRef.current.recordingType === "camera") return;
     const state = getState();
     const nextMode =
       contentStateRef.current.cursorMode === "none" ? "cursor" : "";
@@ -858,6 +862,7 @@ export const setupHandlers = () => {
       ...prev,
       showExtension: true,
       showPopup: true,
+      preparingRecording: false,
     }));
     updateFromStorage(false, message.senderId);
 

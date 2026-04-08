@@ -17,7 +17,13 @@ export const handleDismiss = async () => {
     chrome.action.setIcon({ path: "assets/icon-34.png" });
     chrome.runtime.sendMessage({ type: "turn-off-pip" });
     chrome.storage.local.set({ pipForceClose: Date.now() });
-    chrome.storage.local.set({ recordingUiTabId: null });
+    chrome.storage.local.set({
+      recordingUiTabId: null,
+      multiMode: false,
+      multiSceneCount: 0,
+      multiProjectId: null,
+      multiLastSceneId: null,
+    });
     chrome.storage.local.remove(["recordingMeta"]);
   } catch (error) {
     console.error("Failed to handle dismiss:", error);
@@ -54,7 +60,13 @@ export const cancelRecording = async () => {
     discardOffscreenDocuments();
     chrome.runtime.sendMessage({ type: "turn-off-pip" });
     chrome.storage.local.set({ pipForceClose: Date.now() });
-    chrome.storage.local.set({ recordingUiTabId: null });
+    chrome.storage.local.set({
+      recordingUiTabId: null,
+      multiMode: false,
+      multiSceneCount: 0,
+      multiProjectId: null,
+      multiLastSceneId: null,
+    });
     chrome.storage.local.remove(["recordingMeta"]);
   } catch (error) {
     console.error("Failed to cancel recording:", error.message);
