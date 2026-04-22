@@ -3,16 +3,20 @@
   "version": "4.3.0",
   "description": "The free and privacy-friendly screen recorder with no sign in needed.",
   "scripts": {
-    "build": "cross-env NODE_ENV=production node utils/build.js",
+    "build": "cross-env NODE_ENV=development node utils/build.js",
+    "build:prod": "cross-env NODE_ENV=production node utils/build.js",
+    "build:release": "cross-env NODE_ENV=production SCREENITY_SKIP_ENV=true node utils/build.js",
     "start": "cross-env NODE_ENV=development node utils/server.js",
     "dev": "npm run hot-reload",
     "watch": "cross-env NODE_ENV=development webpack --watch",
     "hot-reload": "cross-env NODE_ENV=development webpack serve --hot",
     "prettier": "prettier --write '**/*.{js,jsx,ts,tsx,json,css,scss,md}'",
     "postinstall": "patch-package && node scripts/patch-radix.js",
-    "package": "npm run build && cd build && zip -r ../extension.zip . && cd ..",
+    "package": "npm run build:prod && cd build && zip -r ../extension.zip . && cd ..",
+    "package:release": "npm run build:release && cd build && zip -r ../extension.zip . && cd ..",
     "clean": "rm -rf build && mkdir build",
-    "lint": "eslint src/**/*.js --fix"
+    "lint": "eslint src/**/*.js --fix",
+    "build:content-css": "sass src/pages/Content/styles/app.scss src/pages/Content/styles/app.css --no-source-map"
   },
   "dependencies": {
     "@babel/plugin-transform-react-jsx": "^7.27.1",
@@ -79,6 +83,8 @@
     "sass-loader": "^16.0.7",
     "source-map-loader": "^3.0.1",
     "style-loader": "^3.3.1",
+    "stylelint": "^17.8.0",
+    "stylelint-config-standard-scss": "^17.0.0",
     "terser-webpack-plugin": "^5.3.6",
     "ts-loader": "^9.4.1",
     "typescript": "^4.9.3",

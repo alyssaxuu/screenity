@@ -1,5 +1,6 @@
 import localforage from "localforage";
 import { createTab, sendMessageTab } from "../tabManagement";
+import { resetWatchdogState } from "./resetWatchdogState";
 
 const RECOVERABLE_CLOUD_STATUSES = new Set([
   "recording",
@@ -47,6 +48,8 @@ export const checkCloudRestore = async () => {
 export const restoreCloudRecording = async () => {
   const { cloudRestore } = await checkCloudRestore();
   if (!cloudRestore) return;
+
+  await resetWatchdogState();
 
   const tab = await createTab("download.html", true, true);
   if (!tab?.id) return;

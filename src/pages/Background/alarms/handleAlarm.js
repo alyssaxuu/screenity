@@ -3,13 +3,18 @@ import { sendMessageTab } from "../tabManagement";
 import { sendMessageRecord } from "../recording/sendMessageRecord.js";
 import { diagEvent } from "../../utils/diagnosticLog";
 import { chunksStore } from "../recording/chunkHandler";
+import { emitRecordingTelemetry } from "../recording/emitRecordingTelemetry";
 import {
   CLOUD_LOCAL_PLAYBACK_KEY,
   CLOUD_LOCAL_PLAYBACK_EVENT_KEY,
   CLOUD_LOCAL_PLAYBACK_ALARM,
 } from "../recording/cloudLocalPlaybackConstants";
+import {
+  FIRST_CHUNK_WATCHDOG_ALARM,
+  RECORDER_KEEPALIVE_ALARM,
+} from "./alarmConstants";
 
-export const FIRST_CHUNK_WATCHDOG_ALARM = "first-chunk-watchdog";
+export { FIRST_CHUNK_WATCHDOG_ALARM, RECORDER_KEEPALIVE_ALARM };
 
 // Utility to handle tab messaging logic.
 // `tab` is an optional Chrome Tab object used as a fallback when the stored
@@ -35,6 +40,120 @@ const handleTabMessaging = async (tab) => {
 };
 
 export const handleAlarm = async (alarm) => {
+  if (alarm.name === RECORDER_KEEPALIVE_ALARM) {
+    const snap = await chrome.storage.local.get([
+      "recordingTab",
+      "recording",
+      "pendingRecording",
+      "paused",
+      "firstChunkAt",
+      "lastChunkAt",
+      "recordingStallLevel",
+    ]);
+    if (!(snap.recording || snap.pendingRecording) || !snap.recordingTab) {
+      await chrome.alarms.clear(RECORDER_KEEPALIVE_ALARM);
+      await chrome.storage.local.set({
+        recordingStallLevel: 0,
+        firstChunkAt: null,
+        lastChunkAt: null,
+      });
+      return;
+    }
+
+    try {
+      await chrome.tabs.sendMessage(snap.recordingTab, {
+        type: "recorder-keepalive-ping",
+      });
+    } catch {}
+
+    const WATCHDOG_STALE_MS = 90_000; // chunks arrive every 2s; 45x headroom
+    const notReady = !snap.firstChunkAt;
+    const pausedNow = !!snap.paused;
+    const now = Date.now();
+    const age = now - (snap.lastChunkAt || 0);
+    const stallLevel = snap.recordingStallLevel || 0;
+
+    if (notReady || pausedNow || age < WATCHDOG_STALE_MS) {
+      if (stallLevel !== 0) {
+        await chrome.storage.local.set({ recordingStallLevel: 0 });
+      }
+      return;
+    }
+
+    if (stallLevel === 0) {
+      diagEvent("recording-stall-detected", {
+        ageMs: age,
+        tabId: snap.recordingTab,
+      });
+      void emitRecordingTelemetry("recording_stall_detected", {
+        ageMs: age,
+        tabId: snap.recordingTab,
+      });
+      try {
+        await chrome.tabs.sendMessage(snap.recordingTab, {
+          type: "recorder-wake-aggressive",
+        });
+      } catch {}
+      await chrome.storage.local.set({ recordingStallLevel: 1 });
+      return;
+    }
+
+    if (stallLevel === 1) {
+      diagEvent("recording-stall-escalated", {
+        ageMs: age,
+        tabId: snap.recordingTab,
+      });
+      void emitRecordingTelemetry("recording_stall_escalated", {
+        ageMs: age,
+        tabId: snap.recordingTab,
+      });
+      // Force-focus causes a brief tab flash but reliably unfreezes hard-throttled tabs.
+      try {
+        await chrome.tabs.update(snap.recordingTab, { active: true });
+      } catch {}
+      await chrome.storage.local.set({ recordingStallLevel: 2 });
+      return;
+    }
+
+    if (stallLevel === 2) {
+      diagEvent("recording-stall-unrecoverable", {
+        ageMs: age,
+        tabId: snap.recordingTab,
+      });
+      void emitRecordingTelemetry("recording_stall_unrecoverable", {
+        ageMs: age,
+        tabId: snap.recordingTab,
+      });
+      void emitRecordingTelemetry("recording_outcome", {
+        outcome: "unrecoverable",
+        ageMs: age,
+        tabId: snap.recordingTab,
+      });
+      try {
+        await chrome.alarms.clear(RECORDER_KEEPALIVE_ALARM);
+      } catch {}
+      try {
+        await chrome.storage.local.set({
+          recording: false,
+          pendingRecording: false,
+          recordingStallLevel: 0,
+          firstChunkAt: null,
+          lastChunkAt: null,
+        });
+      } catch {}
+      chrome.runtime
+        .sendMessage({
+          type: "recording-error",
+          error: "stream-error",
+          why: "Recording stopped: the recorder tab became unresponsive.",
+          errorCode: "recording-stall-unrecoverable",
+        })
+        .catch(() => {});
+      return;
+    }
+    return;
+  }
+
   if (alarm.name === "recording-alarm") {
     const { recording } = await chrome.storage.local.get(["recording"]);
 

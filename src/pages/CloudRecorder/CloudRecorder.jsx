@@ -10,6 +10,7 @@ import localforage from "localforage";
 import { createVideoProject } from "./createVideoProject";
 import { getUserMediaWithFallback } from "../utils/mediaDeviceFallback";
 import { traceStep } from "../utils/startFlowTrace";
+import { IS_OFFSCREEN_HOST } from "../utils/recordingHost";
 
 localforage.config({
   driver: localforage.INDEXEDDB,
@@ -29,6 +30,8 @@ const STORAGE_CRITICAL_HEADROOM_BYTES = 120 * 1024 * 1024;
 const AUDIO_MAX_BUFFER_BYTES = 150 * 1024 * 1024;
 const LOCAL_SCREEN_PLAYBACK_TTL_MS = 20 * 60 * 1000;
 const LOCAL_SCREEN_PLAYBACK_MAX_BYTES = 250 * 1024 * 1024;
+// Bytes kept past lastServerOffset before purging - covers in-flight PATCHes, HEAD resyncs, 409 retries.
+const CHUNK_PURGE_SAFETY_WINDOW_BYTES = 32 * 1024 * 1024;
 const MAX_UPLOAD_TELEMETRY_EVENTS = 300;
 const UPLOAD_TELEMETRY_KEY = "cloudUploadTelemetryEvents";
 const UPLOAD_TELEMETRY_ENDPOINT = `${API_BASE}/log/upload-event`;
@@ -153,6 +156,12 @@ const CloudRecorder = () => {
   const audioChunkIndexRef = useRef(0);
   const cameraChunkStoreReadyRef = useRef(false);
   const cameraChunkIndexRef = useRef(0);
+  const screenChunkByteRangesRef = useRef([]);
+  const cameraChunkByteRangesRef = useRef([]);
+  const chunksPurgedDuringRecordingRef = useRef(false);
+  const screenChunksPurgedCountRef = useRef(0);
+  const cameraChunksPurgedCountRef = useRef(0);
+  const chunksPurgedBytesRef = useRef(0);
   const sessionStateIndexedRef = useRef(false);
   const sessionHeartbeat = useRef(null);
   const chunkStallTimer = useRef(null);
@@ -234,6 +243,8 @@ const CloudRecorder = () => {
   const keepAliveInterval = useRef(null);
   const keepAliveAudioCtx = useRef(null);
   const keepAliveOscillator = useRef(null);
+  const keepAliveLockAbort = useRef(null);
+  const keepAliveMediaSessionActive = useRef(false);
 
   const logDebugEvent = async () => {
     // debug bundle feature removed; noop
@@ -343,6 +354,12 @@ const CloudRecorder = () => {
   const ensureRecordingSessionId = () => {
     if (!recordingSessionId.current) {
       recordingSessionId.current = crypto.randomUUID();
+      // Persist so telemetry correlation survives document death.
+      try {
+        chrome.storage.local.set({
+          recordingSessionId: recordingSessionId.current,
+        });
+      } catch {}
     }
     return recordingSessionId.current;
   };
@@ -451,7 +468,7 @@ const CloudRecorder = () => {
       screenUploader.current?.getMeta?.()?.mediaId ||
       cameraUploader.current?.getMeta?.()?.mediaId ||
       null;
-    if (!mediaId) {
+    if (!mediaId && eventPayload.event !== "recording_outcome") {
       return null;
     }
 
@@ -583,6 +600,34 @@ const CloudRecorder = () => {
     if (event !== "upload_progress") {
       void sendUploadTelemetryNetwork(eventPayload);
     }
+  };
+
+  const emitRecordingOutcome = (outcome, extra = {}) => {
+    const session = recorderSession.current;
+    const startedAt = session?.startedAt || null;
+    const durationMs = startedAt ? Date.now() - startedAt : null;
+    const screenState = sessionTrackState.current?.screen || {};
+    const cameraState = sessionTrackState.current?.camera || {};
+    const chunksPersisted =
+      (screenState.durableChunkCount || 0) +
+      (cameraState.durableChunkCount || 0);
+    const screenServerBytes =
+      Number(screenUploader.current?.lastServerOffset) ||
+      Number(screenUploader.current?.offset) ||
+      0;
+    const cameraServerBytes =
+      Number(cameraUploader.current?.lastServerOffset) ||
+      Number(cameraUploader.current?.offset) ||
+      0;
+    const serverBytesConfirmed = screenServerBytes + cameraServerBytes;
+    void emitUploadTelemetry("recording_outcome", {
+      outcome,
+      durationMs,
+      chunksPersisted,
+      serverBytesConfirmed,
+      uploaderType: "cloud_recorder",
+      ...extra,
+    });
   };
 
   const resetUnloadGuard = () => {
@@ -876,39 +921,66 @@ const CloudRecorder = () => {
    * which would stop our recording. Playing silent audio keeps the tab active.
    */
   const startTabKeepAlive = () => {
+    if (IS_OFFSCREEN_HOST) return;
+
+    // Multi-layered keepalive - Chrome's background-tab throttling stacks signals.
     try {
-      if (keepAliveAudioCtx.current) return; // Already running
-
-      const ctx = new (window.AudioContext || window.webkitAudioContext)();
-      keepAliveAudioCtx.current = ctx;
-
-      // Create a silent oscillator (inaudible frequency at zero gain)
-      const oscillator = ctx.createOscillator();
-      const gainNode = ctx.createGain();
-
-      oscillator.frequency.value = 0; // DC signal (no audible tone)
-      gainNode.gain.value = 0; // Completely silent
-
-      oscillator.connect(gainNode);
-      gainNode.connect(ctx.destination);
-      oscillator.start();
-
-      keepAliveOscillator.current = oscillator;
-
-      // Also request that Chrome not discard this tab
-      chrome.runtime.sendMessage({
-        type: "set-tab-auto-discardable",
-        discardable: false,
-      });
-
-      if (globalThis.SCREENITY_VERBOSE_LOGS) {
-        if (DEBUG_START_FLOW) {
-          console.log("[CloudRecorder] Tab keep-alive started");
-        }
+      if (!keepAliveAudioCtx.current) {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        keepAliveAudioCtx.current = ctx;
+        const oscillator = ctx.createOscillator();
+        const gainNode = ctx.createGain();
+        oscillator.type = "sine";
+        oscillator.frequency.value = 20000;
+        gainNode.gain.value = 0.0001;
+        oscillator.connect(gainNode);
+        gainNode.connect(ctx.destination);
+        oscillator.start();
+        keepAliveOscillator.current = oscillator;
       }
     } catch (err) {
-      console.warn("[CloudRecorder] Failed to start tab keep-alive:", err);
+      console.warn("[CloudRecorder] keepalive: audio layer failed:", err);
     }
+
+    try {
+      if (typeof navigator.locks !== "undefined" && !keepAliveLockAbort.current) {
+        const ac = new AbortController();
+        keepAliveLockAbort.current = ac;
+        navigator.locks
+          .request(
+            "screenity-recorder-keepalive",
+            { mode: "exclusive", signal: ac.signal },
+            () => new Promise(() => {}),
+          )
+          .catch(() => {});
+      }
+    } catch (err) {
+      console.warn("[CloudRecorder] keepalive: lock layer failed:", err);
+    }
+
+    try {
+      if (navigator.mediaSession && !keepAliveMediaSessionActive.current) {
+        navigator.mediaSession.metadata = new window.MediaMetadata({
+          title: "Screenity recording",
+          artist: "Screenity",
+        });
+        navigator.mediaSession.playbackState = "playing";
+        try {
+          navigator.mediaSession.setActionHandler("pause", () => {});
+        } catch {}
+        keepAliveMediaSessionActive.current = true;
+      }
+    } catch (err) {
+      console.warn("[CloudRecorder] keepalive: mediaSession layer failed:", err);
+    }
+
+    chrome.runtime.sendMessage({
+      type: "set-tab-auto-discardable",
+      discardable: false,
+    });
+    chrome.runtime
+      .sendMessage({ type: "start-recorder-keepalive-alarm" })
+      .catch(() => {});
   };
 
   /**
@@ -917,13 +989,23 @@ const CloudRecorder = () => {
   const stopTabKeepAlive = () => {
     try {
       if (keepAliveOscillator.current) {
-        keepAliveOscillator.current.stop();
-        keepAliveOscillator.current.disconnect();
+        try { keepAliveOscillator.current.stop(); } catch {}
+        try { keepAliveOscillator.current.disconnect(); } catch {}
         keepAliveOscillator.current = null;
       }
       if (keepAliveAudioCtx.current) {
-        keepAliveAudioCtx.current.close();
+        try { keepAliveAudioCtx.current.close(); } catch {}
         keepAliveAudioCtx.current = null;
+      }
+      if (keepAliveLockAbort.current) {
+        try { keepAliveLockAbort.current.abort(); } catch {}
+        keepAliveLockAbort.current = null;
+      }
+      if (keepAliveMediaSessionActive.current && navigator.mediaSession) {
+        try { navigator.mediaSession.playbackState = "none"; } catch {}
+        try { navigator.mediaSession.metadata = null; } catch {}
+        try { navigator.mediaSession.setActionHandler("pause", null); } catch {}
+        keepAliveMediaSessionActive.current = false;
       }
 
       // Allow Chrome to discard this tab again if needed
@@ -931,6 +1013,9 @@ const CloudRecorder = () => {
         type: "set-tab-auto-discardable",
         discardable: true,
       });
+      chrome.runtime
+        .sendMessage({ type: "stop-recorder-keepalive-alarm" })
+        .catch(() => {});
 
       // Cancel first-chunk watchdog
       chrome.runtime
@@ -1137,6 +1222,51 @@ const CloudRecorder = () => {
     }
   };
 
+  // Purge IDB chunks Bunny has confirmed. Keeps chunk_0 (webm init segment).
+  const purgeConfirmedChunks = async (
+    store,
+    rangesRef,
+    uploader,
+    keyPrefix,
+    trackLabel,
+  ) => {
+    if (!uploader || !rangesRef.current.length) return;
+    const lastServerOffset = Number(uploader.lastServerOffset) || 0;
+    if (lastServerOffset <= CHUNK_PURGE_SAFETY_WINDOW_BYTES) return;
+    const cutoff = lastServerOffset - CHUNK_PURGE_SAFETY_WINDOW_BYTES;
+    const ranges = rangesRef.current;
+    let purgedCount = 0;
+    let purgedBytes = 0;
+    while (ranges.length > 0 && ranges[0].endByte <= cutoff) {
+      const entry = ranges[0];
+      if (entry.index === 0) {
+        ranges.shift();
+        continue;
+      }
+      try {
+        await store.removeItem(`${keyPrefix}${entry.index}`);
+      } catch (err) {
+        console.warn(
+          `[CloudRecorder] purge ${trackLabel} chunk_${entry.index} failed`,
+          err,
+        );
+        break;
+      }
+      ranges.shift();
+      purgedCount++;
+      purgedBytes += entry.size || 0;
+    }
+    if (purgedCount > 0) {
+      chunksPurgedDuringRecordingRef.current = true;
+      chunksPurgedBytesRef.current += purgedBytes;
+      if (trackLabel === "screen") {
+        screenChunksPurgedCountRef.current += purgedCount;
+      } else if (trackLabel === "camera") {
+        cameraChunksPurgedCountRef.current += purgedCount;
+      }
+    }
+  };
+
   const clearLocalScreenPlaybackOffer = async (reason = "unknown") => {
     const existingOffer = localScreenPlaybackOfferRef.current;
     localScreenPlaybackOfferRef.current = null;
@@ -1172,6 +1302,19 @@ const CloudRecorder = () => {
     uploadMeta,
   }) => {
     if (!projectId || !sceneId) {
+      return null;
+    }
+
+    if (chunksPurgedDuringRecordingRef.current) {
+      console.info(
+        "[CloudRecorder] Local-first screen offer skipped: chunks were purged mid-recording",
+        {
+          projectId,
+          sceneId,
+          purgedScreenChunks: screenChunksPurgedCountRef.current,
+          purgedBytes: chunksPurgedBytesRef.current,
+        },
+      );
       return null;
     }
 
@@ -2396,6 +2539,15 @@ const CloudRecorder = () => {
     index.current = 0;
     lastTimecode.current = 0;
 
+    try {
+      await chrome.storage.local.set({
+        firstChunkAt: null,
+        lastChunkAt: null,
+        recordingStallLevel: 0,
+        tabStreamIdCache: null,
+      });
+    } catch {}
+
     if (IS_IFRAME_CONTEXT && !target.current) {
       sendRecordingError("No crop target for restart.");
       return false;
@@ -2731,6 +2883,12 @@ const CloudRecorder = () => {
     lastTimecode.current = 0;
     hasChunks.current = false;
     index.current = 0;
+    screenChunkByteRangesRef.current = [];
+    cameraChunkByteRangesRef.current = [];
+    chunksPurgedDuringRecordingRef.current = false;
+    screenChunksPurgedCountRef.current = 0;
+    cameraChunksPurgedCountRef.current = 0;
+    chunksPurgedBytesRef.current = 0;
     firstChunkLoggedRef.current = false;
     resetUnloadGuard();
     recoveryExportedRef.current = false;
@@ -2833,12 +2991,19 @@ const CloudRecorder = () => {
                 firstChunkLoggedRef.current = true;
                 logStartFlow("first_chunk", { type: "screen" });
                 assertCountdownBeforeFirstChunk(timestamp);
+                chrome.storage.local
+                  .set({ firstChunkAt: Date.now() })
+                  .catch(() => {});
               }
             } else if (timestamp < lastTimecode.current) {
               return; // Skip duplicate
             } else {
               lastTimecode.current = timestamp;
             }
+
+            chrome.storage.local
+              .set({ lastChunkAt: Date.now() })
+              .catch(() => {});
 
             await chunksStore
               .setItem(`chunk_${index.current}`, {
@@ -2873,6 +3038,20 @@ const CloudRecorder = () => {
                 }
                 await screenUploader.current.write(blob);
                 consecutiveScreenFailures.current = 0; // Reset on success
+                const endByte =
+                  Number(screenUploader.current?.totalBytes) || 0;
+                screenChunkByteRangesRef.current.push({
+                  index: index.current,
+                  endByte,
+                  size: blob?.size || 0,
+                });
+                void purgeConfirmedChunks(
+                  chunksStore,
+                  screenChunkByteRangesRef,
+                  screenUploader.current,
+                  "chunk_",
+                  "screen",
+                );
               } catch (uploadErr) {
                 console.error("Failed to upload chunk to Bunny:", uploadErr);
                 consecutiveScreenFailures.current++;
@@ -3050,6 +3229,7 @@ const CloudRecorder = () => {
               assertCountdownBeforeFirstChunk(Date.now());
             }
 
+            let cameraPersistedIndex = null;
             if (cameraChunkStoreReadyRef.current) {
               const cameraChunkIndex = cameraChunkIndexRef.current;
               cameraChunkIndexRef.current += 1;
@@ -3062,6 +3242,7 @@ const CloudRecorder = () => {
                     timestamp: Date.now(),
                   },
                 );
+                cameraPersistedIndex = cameraChunkIndex;
                 patchTrackState("camera", {
                   durableChunkCount: cameraChunkIndex + 1,
                   lastPersistedChunkIndex: cameraChunkIndex,
@@ -3083,6 +3264,22 @@ const CloudRecorder = () => {
                 if (cameraUploader.current?.isPaused) return;
                 await cameraUploader.current.write(blob);
                 consecutiveCameraFailures.current = 0; // Reset on success
+                if (cameraPersistedIndex !== null) {
+                  const endByte =
+                    Number(cameraUploader.current?.totalBytes) || 0;
+                  cameraChunkByteRangesRef.current.push({
+                    index: cameraPersistedIndex,
+                    endByte,
+                    size: blob?.size || 0,
+                  });
+                  void purgeConfirmedChunks(
+                    cameraChunksStore,
+                    cameraChunkByteRangesRef,
+                    cameraUploader.current,
+                    "camera_chunk_",
+                    "camera",
+                  );
+                }
               } catch (uploadErr) {
                 console.error(
                   "Failed to upload camera chunk to Bunny:",
@@ -3404,6 +3601,8 @@ const CloudRecorder = () => {
       }
     };
 
+    if (IS_OFFSCREEN_HOST) return undefined;
+
     window.addEventListener("pagehide", onHide);
     return () => window.removeEventListener("pagehide", onHide);
   }, []);
@@ -3413,6 +3612,25 @@ const CloudRecorder = () => {
       if (document.visibilityState === "hidden") {
         persistSessionState({
           visibilityState: "hidden",
+          visibilityChangedAt: Date.now(),
+        });
+      } else if (document.visibilityState === "visible") {
+        // Force stall-recovery on uploaders - in-tab heartbeat may have been throttled while hidden.
+        try {
+          const now = Date.now();
+          const staleThreshold = 10_000;
+          [screenUploader.current, cameraUploader.current].forEach((up) => {
+            if (!up) return;
+            const idle = now - (up.lastProgressAt || 0);
+            if (idle > staleThreshold && up.queuedBytes > 0) {
+              up.attemptStallRecovery?.(idle).catch(() => {});
+            }
+          });
+        } catch (err) {
+          console.warn("[CloudRecorder] visibility-triggered recovery failed:", err);
+        }
+        persistSessionState({
+          visibilityState: "visible",
           visibilityChangedAt: Date.now(),
         });
       }
@@ -3430,6 +3648,8 @@ const CloudRecorder = () => {
         });
       }
     };
+
+    if (IS_OFFSCREEN_HOST) return undefined;
 
     document.addEventListener("visibilitychange", onVisibilityChange);
     window.addEventListener("beforeunload", onBeforeUnload);
@@ -3897,7 +4117,8 @@ const CloudRecorder = () => {
           type: "prepare-editor-existing",
           multiMode: multiMode,
         });
-      } else if (!multiMode && !recordingToScene) {
+      } else if (!multiMode && !recordingToScene && projectId) {
+        // Opening /editor/null on cancelled-before-create yields a broken page.
         chrome.runtime.sendMessage({
           type: "prepare-open-editor",
           projectId,
@@ -3945,6 +4166,9 @@ const CloudRecorder = () => {
       void emitUploadTelemetry("upload_cancelled", {
         reason: reason || "stop-without-finalize",
         uploaderType: "cloud_recorder",
+      });
+      emitRecordingOutcome("abandoned", {
+        reason: reason || "stop-without-finalize",
       });
       try {
         await chrome.storage.local.set({ sceneIdStatus: "cancelled" });
@@ -4046,6 +4270,9 @@ const CloudRecorder = () => {
         reason: "uploader-finalize-incomplete",
         uploaderType: "cloud_recorder",
       });
+      emitRecordingOutcome("unrecoverable", {
+        reason: "uploader-finalize-incomplete",
+      });
       await exportLocalRecovery("finalize-error");
       await chunksStore.clear().catch((e) =>
         console.warn("[CloudRecorder] chunksStore.clear failed (finalize-error):", e),
@@ -4120,6 +4347,7 @@ const CloudRecorder = () => {
         await chunksStore.clear().catch((e) =>
           console.warn("[CloudRecorder] chunksStore.clear failed (no-upload):", e),
         );
+        emitRecordingOutcome("abandoned", { reason: "no-upload" });
         await finalizeRecorderSession("failed");
         await clearAudioChunkStore("no-upload");
         await clearCameraChunkStore("no-upload");
@@ -4150,6 +4378,15 @@ const CloudRecorder = () => {
       projectId,
       sceneId: uploadMeta.sceneId,
     });
+
+    if (chunksPurgedDuringRecordingRef.current) {
+      void emitUploadTelemetry("upload_local_chunks_purged", {
+        screenChunksPurged: screenChunksPurgedCountRef.current,
+        cameraChunksPurged: cameraChunksPurgedCountRef.current,
+        bytesFreed: chunksPurgedBytesRef.current,
+        safetyWindowBytes: CHUNK_PURGE_SAFETY_WINDOW_BYTES,
+      });
+    }
 
     localScreenPlaybackOfferRef.current = await registerLocalScreenPlaybackOffer(
       {
@@ -4208,6 +4445,11 @@ const CloudRecorder = () => {
           projectId,
           sceneId: uploadMeta.sceneId,
         });
+        emitRecordingOutcome("completed", {
+          projectId,
+          sceneId: uploadMeta.sceneId,
+          mediaId: uploadMeta.screen?.mediaId || uploadMeta.camera?.mediaId || null,
+        });
         await finalizeRecorderSession("completed");
         void emitUploadTelemetry("upload_complete_client", {
           projectId,
@@ -4247,6 +4489,13 @@ const CloudRecorder = () => {
           uploaderType: "cloud_recorder",
           projectId,
           sceneId: uploadMeta.sceneId,
+        });
+        emitRecordingOutcome("unrecoverable", {
+          reason: "scene-create-failed",
+          message: err?.message || String(err),
+          projectId,
+          sceneId: uploadMeta.sceneId,
+          mediaId: uploadMeta.screen?.mediaId || uploadMeta.camera?.mediaId || null,
         });
         sendRecordingError(userMessage);
 
@@ -4396,7 +4645,11 @@ const CloudRecorder = () => {
     );
   };
 
-  const startStream = async (data, id, permissions, permissions2) => {
+  const startStream = async (data, id, permissions, permissions2, streamOpts = {}) => {
+    const canCaptureSourceAudio =
+      streamOpts.canRequestAudioTrack !== false;
+    const useDisplayMedia = !!streamOpts.useDisplayMedia;
+    const prewarmedStream = streamOpts.prewarmedStream || null;
     // Defaulting quality for now
     //const { qualityValue } = await chrome.storage.local.get(["qualityValue"]);
     const { width = 1920, height = 1080 } = getResolutionForQuality() || {};
@@ -4529,19 +4782,33 @@ const CloudRecorder = () => {
           return;
         }
       } else {
-        const tabWidth = isTab.current ? window.innerWidth : width;
-        const tabHeight = isTab.current ? window.innerHeight : height;
+        // Offscreen has no viewport - window.innerWidth/Height are 0, so fall back to quality dimensions.
+        const safeInnerWidth =
+          typeof window !== "undefined" && window.innerWidth
+            ? window.innerWidth
+            : width;
+        const safeInnerHeight =
+          typeof window !== "undefined" && window.innerHeight
+            ? window.innerHeight
+            : height;
+        const tabWidth = isTab.current ? safeInnerWidth : width;
+        const tabHeight = isTab.current ? safeInnerHeight : height;
 
         const videoConstraints = isTab.current
-          ? {
-              // Tab recording - minimal constraints, let Chrome determine optimal capture
-              chromeMediaSource: "tab",
-              chromeMediaSourceId: id,
-              maxFrameRate: fps,
-              // No width/height constraints for tabs - Chrome will capture at the tab's natural size
-              maxWidth: tabWidth,
-              maxHeight: tabHeight,
-            }
+          ? IS_OFFSCREEN_HOST
+            ? {
+                // Offscreen can't measure the tab - let Chrome pick sizing or it throws OverconstrainedError.
+                chromeMediaSource: "tab",
+                chromeMediaSourceId: id,
+                maxFrameRate: fps,
+              }
+            : {
+                chromeMediaSource: "tab",
+                chromeMediaSourceId: id,
+                maxFrameRate: fps,
+                maxWidth: tabWidth,
+                maxHeight: tabHeight,
+              }
           : {
               // Desktop/window recording - use quality settings as max bounds
               chromeMediaSource: "desktop",
@@ -4552,21 +4819,85 @@ const CloudRecorder = () => {
             };
 
         const desktopConstraints = {
-          audio: {
-            mandatory: {
-              chromeMediaSource: isTab.current ? "tab" : "desktop",
-              chromeMediaSourceId: id,
-            },
-          },
+          audio: canCaptureSourceAudio
+            ? {
+                mandatory: {
+                  chromeMediaSource: isTab.current ? "tab" : "desktop",
+                  chromeMediaSourceId: id,
+                },
+              }
+            : false,
           video: {
             mandatory: { ...videoConstraints },
           },
         };
 
         try {
-          screenStream.current = await navigator.mediaDevices.getUserMedia(
-            desktopConstraints,
-          );
+          if (prewarmedStream) {
+            console.log(
+              "[CloudRecorder] using prewarmed tab MediaStream",
+              {
+                videoTracks: prewarmedStream.getVideoTracks().length,
+                audioTracks: prewarmedStream.getAudioTracks().length,
+              },
+            );
+            screenStream.current = prewarmedStream;
+            if (typeof window !== "undefined") {
+              window.__screenityPrewarmedTabStream = null;
+            }
+          } else if (useDisplayMedia) {
+            // Aliases to avoid TDZ with the later `const {width, height}` destructuring.
+            const targetFps = fps;
+            const targetWidth = width;
+            const targetHeight = height;
+            const isTabModeRequest =
+              data.recordingType === "region" || isTab.current;
+            const displayConstraints = {
+              audio: data.systemAudio ? true : false,
+              video: {
+                frameRate: { ideal: targetFps, max: targetFps },
+                width: { ideal: targetWidth, max: targetWidth },
+                height: { ideal: targetHeight, max: targetHeight },
+                ...(isTabModeRequest ? { displaySurface: "browser" } : {}),
+              },
+            };
+            console.log(
+              "[CloudRecorder] offscreen getDisplayMedia constraints",
+              displayConstraints,
+            );
+            chrome.runtime
+              .sendMessage({
+                type: "offscreen-diag",
+                source: "getDisplayMedia-attempt",
+                payload: displayConstraints,
+              })
+              .catch(() => {});
+            screenStream.current = await navigator.mediaDevices.getDisplayMedia(
+              displayConstraints,
+            );
+            console.log("[CloudRecorder] offscreen getDisplayMedia OK");
+          } else {
+            console.log("[CloudRecorder] desktop getUserMedia constraints", {
+              audioEnabled: !!desktopConstraints.audio,
+              videoMandatory: desktopConstraints.video?.mandatory,
+              streamIdPrefix: String(id || "").slice(0, 16),
+            });
+            chrome.runtime
+              .sendMessage({
+                type: "offscreen-diag",
+                source: "desktop-gUM-attempt",
+                payload: {
+                  audioEnabled: !!desktopConstraints.audio,
+                  streamIdPrefix: String(id || "").slice(0, 16),
+                  isTab: !!isTab.current,
+                },
+              })
+              .catch(() => {});
+            screenStream.current = await navigator.mediaDevices.getUserMedia(
+              desktopConstraints,
+            );
+            console.log("[CloudRecorder] desktop getUserMedia OK");
+          }
           if (!screenStream.current?.getVideoTracks?.().length) {
             sendRecordingError(
               "Failed to access screen stream: no video track.",
@@ -4575,8 +4906,8 @@ const CloudRecorder = () => {
           }
           const track = screenStream.current.getVideoTracks()[0];
           const {
-            width,
-            height,
+            width: _actualStreamWidth,
+            height: _actualStreamHeight,
             displaySurface: surface,
           } = track.getSettings(); // Always use displaySurface from track
 
@@ -4610,7 +4941,10 @@ const CloudRecorder = () => {
                 displays,
                 recordedMonitorId: monitorId,
                 monitorBounds,
-                recordedStreamDimensions: { width, height },
+                recordedStreamDimensions: {
+                  width: _actualStreamWidth,
+                  height: _actualStreamHeight,
+                },
               });
             },
           );
@@ -4630,12 +4964,64 @@ const CloudRecorder = () => {
 
           bindScreenTrack(screenStream.current.getVideoTracks()[0]);
         } catch (err) {
-          if (isUserCaptureCancel(err)) {
+          console.error("[CloudRecorder] desktop getUserMedia threw", {
+            name: err?.name,
+            message: err?.message,
+            stack: err?.stack,
+          });
+          chrome.runtime.sendMessage({
+            type: "offscreen-diag",
+            source: "desktop-gUM-error",
+            payload: {
+              name: err?.name || null,
+              message: err?.message || null,
+              stack: err?.stack || null,
+            },
+          }).catch(() => {});
+          // Offscreen tab-mode fallback: pre-acquired streamId failed - retry with getDisplayMedia.
+          if (
+            IS_OFFSCREEN_HOST &&
+            isTab.current &&
+            id &&
+            !useDisplayMedia &&
+            (err?.name === "AbortError" || err?.name === "NotAllowedError")
+          ) {
+            console.warn(
+              "[CloudRecorder] tab streamId consumption failed - falling back to getDisplayMedia",
+            );
+            try {
+              const displayConstraints = {
+                audio: data.systemAudio ? true : false,
+                video: {
+                  frameRate: { ideal: fps, max: fps },
+                  width: { ideal: width, max: width },
+                  height: { ideal: height, max: height },
+                  displaySurface: "browser",
+                },
+              };
+              screenStream.current =
+                await navigator.mediaDevices.getDisplayMedia(displayConstraints);
+              console.log(
+                "[CloudRecorder] getDisplayMedia fallback OK after streamId rejection",
+              );
+              bindScreenTrack(screenStream.current.getVideoTracks()[0]);
+            } catch (fallbackErr) {
+              if (isUserCaptureCancel(fallbackErr)) {
+                sendRecordingError("User cancelled stream selection", true);
+                return;
+              }
+              sendRecordingError(
+                "Failed to access screen stream: " + fallbackErr.message,
+              );
+              return;
+            }
+          } else if (isUserCaptureCancel(err)) {
             sendRecordingError("User cancelled stream selection", true);
             return;
+          } else {
+            sendRecordingError("Failed to access screen stream: " + err.message);
+            return;
           }
-          sendRecordingError("Failed to access screen stream: " + err.message);
-          return;
         }
 
         if (shouldUseCamera) {
@@ -4834,23 +5220,33 @@ const CloudRecorder = () => {
 
       if (data.recordingType === "camera") {
         startStream(data, null, permissions, permissions2);
+      } else if (IS_OFFSCREEN_HOST && isTab.current && tabID.current) {
+        // Pre-acquired tab streamId from action-icon click - frictionless path; picker fallback in catch.
+        console.log("[CloudRecorder][offscreen] using pre-acquired tab streamId");
+        startStream(data, tabID.current, permissions, permissions2);
+      } else if (IS_OFFSCREEN_HOST) {
+        startStream(data, null, permissions, permissions2, {
+          useDisplayMedia: true,
+        });
       } else if (!isTab.current && (data.recordingType != "region" || tabPreferred.current)) {
         // Show the desktop picker when:
         //   - not tab-capture mode AND not region recording, OR
         //   - tabPreferred=true (playground) forced isTab=false even for a region
         //     recording — in that case we still need the picker because there is
         //     no pre-obtained stream ID to pass to startStream.
-        chrome.desktopCapture.chooseDesktopMedia(
-          ["screen", "window", "tab", "audio"],
-          null,
-          (streamId) => {
-            if (!streamId) {
-              sendRecordingError("User cancelled stream selection", true);
-            } else {
-              startStream(data, streamId, permissions, permissions2);
-            }
-          },
-        );
+        {
+          chrome.desktopCapture.chooseDesktopMedia(
+            ["screen", "window", "tab", "audio"],
+            null,
+            (streamId) => {
+              if (!streamId) {
+                sendRecordingError("User cancelled stream selection", true);
+              } else {
+                startStream(data, streamId, permissions, permissions2);
+              }
+            },
+          );
+        }
       } else {
         startStream(data, tabID.current, permissions, permissions2);
       }
@@ -4861,9 +5257,25 @@ const CloudRecorder = () => {
 
   const getStreamID = async (id) => {
     try {
-      const streamId = await chrome.tabCapture.getMediaStreamId({
-        targetTabId: id,
-      });
+      let streamId;
+      if (IS_OFFSCREEN_HOST) {
+        // chrome.tabCapture is not callable from offscreen - delegate to SW.
+        const response = await chrome.runtime
+          .sendMessage({
+            type: "offscreen-request-stream",
+            mode: "tab",
+            targetTabId: id,
+          })
+          .catch((err) => ({ ok: false, error: String(err) }));
+        if (!response?.ok || !response.streamId) {
+          throw new Error(response?.error || "offscreen tab stream failed");
+        }
+        streamId = response.streamId;
+      } else {
+        streamId = await chrome.tabCapture.getMediaStreamId({
+          targetTabId: id,
+        });
+      }
       tabID.current = streamId;
     } catch (err) {
       sendRecordingError("Failed to get stream ID: " + err.message);
@@ -4925,12 +5337,12 @@ const CloudRecorder = () => {
       setInitProject(false);
       backupRef.current = request.backup;
       if (IS_IFRAME_CONTEXT) {
-        // Only trigger if it's actually a region recording
-        if (request.region) {
+        // Skip payloads targeted at offscreen - otherwise both contexts race to acquire the stream.
+        if (request.region && request._targetHost !== "offscreen") {
           isInit.current = true;
           chrome.runtime.sendMessage({ type: "get-streaming-data" });
         }
-      } else if (!request.region) {
+      } else if (!request.region || (IS_OFFSCREEN_HOST && request.isTab)) {
         // If the background included tabPreferred in the message, apply it
         // synchronously before we use it — this eliminates a race where
         // chrome.storage.local.get(["tabPreferred"]) hasn't completed yet when
@@ -4946,7 +5358,11 @@ const CloudRecorder = () => {
         if (!tabPreferred.current) {
           isTab.current = request.isTab;
           recordingTabId.current = request.tabID || null;
-          if (request.isTab) getStreamID(request.tabID);
+          if (IS_OFFSCREEN_HOST && request.isTab && request.tabStreamId) {
+            tabID.current = request.tabStreamId;
+          } else if (request.isTab && !IS_OFFSCREEN_HOST) {
+            getStreamID(request.tabID);
+          }
         } else {
           isTab.current = false;
         }
@@ -4959,7 +5375,7 @@ const CloudRecorder = () => {
         if (regionRef.current) {
           startStreaming(JSON.parse(request.data));
         }
-      } else if (!regionRef.current) {
+      } else if (!regionRef.current || (IS_OFFSCREEN_HOST && isTab.current)) {
         startStreaming(JSON.parse(request.data));
       }
     } else if (request.type === "start-recording-tab") {
@@ -4982,7 +5398,7 @@ const CloudRecorder = () => {
           pendingStartAttempts.current = 0;
           maybeStartRecording("start-message");
         }
-      } else if (!regionRef.current) {
+      } else if (!regionRef.current || (IS_OFFSCREEN_HOST && isTab.current)) {
         pendingStartRef.current = true;
         pendingStartAttempts.current = 0;
         maybeStartRecording("start-message");
@@ -5011,6 +5427,36 @@ const CloudRecorder = () => {
       if (!isInit.current) return;
       stopRecording(true, request.reason || "message-stop");
       sendResponse?.({ ok: true });
+      return true;
+    } else if (request.type === "offscreen-shutdown") {
+      const timeoutMs = Number(request.timeoutMs) || 20000;
+      (async () => {
+        try {
+          if (isInit.current) {
+            await stopRecording(
+              request.shouldFinalize !== false,
+              request.reason || "offscreen-shutdown"
+            );
+          }
+          const drainPromise = Promise.all([
+            screenUploader.current?.waitForPendingUploads?.() ??
+              Promise.resolve(),
+            cameraUploader.current?.waitForPendingUploads?.() ??
+              Promise.resolve(),
+          ]);
+          await Promise.race([
+            drainPromise,
+            new Promise((resolve) => setTimeout(resolve, timeoutMs)),
+          ]);
+        } catch (err) {
+          console.warn("[CloudRecorder] offscreen-shutdown error", err);
+        } finally {
+          chrome.runtime
+            .sendMessage({ type: "offscreen-shutdown-complete" })
+            .catch(() => {});
+        }
+      })();
+      sendResponse?.({ ok: true, accepted: true });
       return true;
     } else if (request.type === "set-mic-active-tab") {
       if (!isInit.current) return;

@@ -103,15 +103,13 @@ const ContentState = (props) => {
     }));
 
     if (result.authenticated) {
-      // Offscreen recording and client-side zoom are not available
+      // Client-side zoom is not available for authenticated users.
       setContentState((prev) => ({
         ...prev,
-        offscreenRecording: false,
         zoomEnabled: false,
       }));
 
       chrome.storage.local.set({
-        offscreenRecording: false,
         zoomEnabled: false,
         wasLoggedIn: false,
       });

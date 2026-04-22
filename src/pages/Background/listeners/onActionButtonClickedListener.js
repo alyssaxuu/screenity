@@ -6,16 +6,33 @@ import {
 } from "../tabManagement";
 import { sendMessageRecord } from "../recording/sendMessageRecord.js";
 import { loginWithWebsite } from "../auth/loginWithWebsite.js";
+import { tryResumePendingUploads } from "../recording/resumePendingUploads";
 
 const CLOUD_FEATURES_ENABLED =
   process.env.SCREENITY_ENABLE_CLOUD_FEATURES === "true";
 
 // Utility to handle tab messaging logic
 const handleTabMessaging = async (tab) => {
-  const { activeTab, recordingUiTabId } = await chrome.storage.local.get([
-    "activeTab",
-    "recordingUiTabId",
-  ]);
+  const { activeTab, recordingUiTabId, offscreen } =
+    await chrome.storage.local.get([
+      "activeTab",
+      "recordingUiTabId",
+      "offscreen",
+    ]);
+
+  if (offscreen) {
+    try {
+      await sendMessageRecord({ type: "stop-recording-tab" });
+      return;
+    } catch (err) {
+      console.error(
+        "[Screenity][ActionClick] offscreen stop-recording send failed:",
+        err,
+      );
+      return;
+    }
+  }
+
   const preferredTabId = recordingUiTabId || activeTab;
 
   try {
@@ -153,6 +170,7 @@ const isOffscreenAlive = async () => {
 // Main action button listener
 export const onActionButtonClickedListener = () => {
   chrome.action.onClicked.addListener(async (tab) => {
+    tryResumePendingUploads({ trigger: "actionClick" }).catch(() => {});
     try {
       const snap = await chrome.storage.local.get([
         "recording", "pendingRecording", "restarting", "recorderSession",

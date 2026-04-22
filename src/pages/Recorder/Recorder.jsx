@@ -6,6 +6,7 @@ import { sendRecordingError, sendStopRecording } from "./messaging";
 import { getBitrates, getResolutionForQuality } from "./recorderConfig";
 import { WebCodecsRecorder } from "./webcodecs/WebCodecsRecorder";
 import { getUserMediaWithFallback } from "../utils/mediaDeviceFallback";
+import { IS_OFFSCREEN_HOST } from "../utils/recordingHost";
 import {
   debugRecordingEvent,
   resetRecordingDebugSession,
@@ -218,6 +219,8 @@ const Recorder = () => {
   // Start gate: defers startRecording() until the stream is ready.
   const startRequested = useRef(false);
   const startRequestedAt = useRef(null);
+  // Null on start-gate timeout → SW→tab handoff failed (distinct error code).
+  const streamingDataReceivedAt = useRef(null);
   // Timeout if the stream never arrives
   const startGateTimeout = useRef(null);
   const START_GATE_TIMEOUT_MS = 8000; // max wait for stream after start request
@@ -266,6 +269,8 @@ const Recorder = () => {
   // Keep-alive mechanism to prevent Chrome from freezing this background tab
   const keepAliveAudioCtx = useRef(null);
   const keepAliveOscillator = useRef(null);
+  const keepAliveLockAbort = useRef(null);
+  const keepAliveMediaSessionActive = useRef(false);
 
   const recordingStartTime = useRef(null);
   const sessionHeartbeat = useRef(null);
@@ -324,34 +329,67 @@ const Recorder = () => {
    * which would stop our recording. Playing silent audio keeps the tab active.
    */
   const startTabKeepAlive = () => {
+    if (IS_OFFSCREEN_HOST) return;
+
+    // Multi-layered keepalive - Chrome's freeze heuristic stacks several signals.
     try {
-      if (keepAliveAudioCtx.current) return; // Already running
-
-      const ctx = new (window.AudioContext || window.webkitAudioContext)();
-      keepAliveAudioCtx.current = ctx;
-
-      // Create a silent oscillator (inaudible frequency at zero gain)
-      const oscillator = ctx.createOscillator();
-      const gainNode = ctx.createGain();
-
-      oscillator.frequency.value = 0; // DC signal (no audible tone)
-      gainNode.gain.value = 0; // Completely silent
-
-      oscillator.connect(gainNode);
-      gainNode.connect(ctx.destination);
-      oscillator.start();
-
-      keepAliveOscillator.current = oscillator;
-
-      // Request Chrome not to discard this tab
-      chrome.runtime
-        .sendMessage({ type: "set-tab-auto-discardable", discardable: false })
-        .catch(() => {});
-
-      debug("Tab keep-alive started");
+      if (!keepAliveAudioCtx.current) {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        keepAliveAudioCtx.current = ctx;
+        const oscillator = ctx.createOscillator();
+        const gainNode = ctx.createGain();
+        oscillator.type = "sine";
+        oscillator.frequency.value = 20000;
+        gainNode.gain.value = 0.0001;
+        oscillator.connect(gainNode);
+        gainNode.connect(ctx.destination);
+        oscillator.start();
+        keepAliveOscillator.current = oscillator;
+      }
     } catch (err) {
-      debugWarn("Failed to start tab keep-alive:", err);
+      debugWarn("keepalive: audio layer failed:", err);
     }
+
+    try {
+      if (typeof navigator.locks !== "undefined" && !keepAliveLockAbort.current) {
+        const ac = new AbortController();
+        keepAliveLockAbort.current = ac;
+        navigator.locks
+          .request(
+            "screenity-recorder-keepalive",
+            { mode: "exclusive", signal: ac.signal },
+            () => new Promise(() => {}),
+          )
+          .catch(() => {});
+      }
+    } catch (err) {
+      debugWarn("keepalive: lock layer failed:", err);
+    }
+
+    try {
+      if (navigator.mediaSession && !keepAliveMediaSessionActive.current) {
+        navigator.mediaSession.metadata = new window.MediaMetadata({
+          title: "Screenity recording",
+          artist: "Screenity",
+        });
+        navigator.mediaSession.playbackState = "playing";
+        try {
+          navigator.mediaSession.setActionHandler("pause", () => {});
+        } catch {}
+        keepAliveMediaSessionActive.current = true;
+      }
+    } catch (err) {
+      debugWarn("keepalive: mediaSession layer failed:", err);
+    }
+
+    chrome.runtime
+      .sendMessage({ type: "set-tab-auto-discardable", discardable: false })
+      .catch(() => {});
+    chrome.runtime
+      .sendMessage({ type: "start-recorder-keepalive-alarm" })
+      .catch(() => {});
+
+    debug("Tab keep-alive started");
   };
 
   /**
@@ -360,14 +398,27 @@ const Recorder = () => {
   const stopTabKeepAlive = () => {
     try {
       if (keepAliveOscillator.current) {
-        keepAliveOscillator.current.stop();
-        keepAliveOscillator.current.disconnect();
+        try { keepAliveOscillator.current.stop(); } catch {}
+        try { keepAliveOscillator.current.disconnect(); } catch {}
         keepAliveOscillator.current = null;
       }
       if (keepAliveAudioCtx.current) {
-        keepAliveAudioCtx.current.close();
+        try { keepAliveAudioCtx.current.close(); } catch {}
         keepAliveAudioCtx.current = null;
       }
+      if (keepAliveLockAbort.current) {
+        try { keepAliveLockAbort.current.abort(); } catch {}
+        keepAliveLockAbort.current = null;
+      }
+      if (keepAliveMediaSessionActive.current && navigator.mediaSession) {
+        try { navigator.mediaSession.playbackState = "none"; } catch {}
+        try { navigator.mediaSession.metadata = null; } catch {}
+        try { navigator.mediaSession.setActionHandler("pause", null); } catch {}
+        keepAliveMediaSessionActive.current = false;
+      }
+      chrome.runtime
+        .sendMessage({ type: "stop-recorder-keepalive-alarm" })
+        .catch(() => {});
 
       // Allow Chrome to discard this tab again if needed
       chrome.runtime
@@ -505,6 +556,9 @@ const Recorder = () => {
         chunk: e.data,
         timestamp: ts,
       });
+      const heartbeatUpdate = { lastChunkAt: Date.now() };
+      if (i === 0) heartbeatUpdate.firstChunkAt = Date.now();
+      chrome.storage.local.set(heartbeatUpdate).catch(() => {});
       if (DEBUG_RECORDER) {
         debug("Saved chunk to IndexedDB", {
           key: `chunk_${i}`,
@@ -667,15 +721,24 @@ const Recorder = () => {
         tryStartIfReady();
         return;
       }
-      const diagInfo = buildStreamDiagInfo("start-gate-timeout");
+      const diagInfo = {
+        ...buildStreamDiagInfo("start-gate-timeout"),
+        streamingDataReceivedAt: streamingDataReceivedAt.current,
+      };
       console.warn("[Screenity:startRec] stream never became ready", diagInfo);
       slLog("start-gate-timeout", diagInfo);
       chrome.storage.local.set({ lastStreamCheckFail: diagInfo });
       // Full reset so no gate state leaks into a future session.
       resetGateState();
-      sendRecordingError(
-        "Recording not ready: screen stream is missing (tab may have been suspended)",
-      );
+      if (streamingDataReceivedAt.current == null) {
+        sendRecordingError(
+          "Recording not ready: streaming-data never arrived from background (SW→tab handoff failed)",
+        );
+      } else {
+        sendRecordingError(
+          "Recording not ready: screen stream is missing (tab may have been suspended)",
+        );
+      }
     }, START_GATE_TIMEOUT_MS);
   }
 
@@ -690,6 +753,7 @@ const Recorder = () => {
   function resetGateState() {
     startRequested.current = false;
     startRequestedAt.current = null;
+    streamingDataReceivedAt.current = null;
     isStarting.current = false;
     clearStartGateTimeout();
   }
@@ -1694,6 +1758,16 @@ const Recorder = () => {
     resetGateState();
     uiClosing.current = true;
     isRecording.current = false;
+    recordingGeneration.current += 1;
+
+    // Detach callbacks so a late ondataavailable can't re-arm lastChunkAt after watchdog reset.
+    if (recorder.current instanceof MediaRecorder) {
+      try {
+        recorder.current.ondataavailable = null;
+        recorder.current.onstop = null;
+        recorder.current.onerror = null;
+      } catch {}
+    }
 
     // Clean up keep-alive and session tracking
     stopTabKeepAlive();
@@ -2285,28 +2359,68 @@ const Recorder = () => {
         debug("desktopCapture.chooseDesktopMedia", {
           captureTypes,
           tabPreferred: tabPreferred.current,
+          host: IS_OFFSCREEN_HOST ? "offscreen" : "tab",
         });
         slLog("chooseDesktopMedia-show");
-        chrome.desktopCapture.chooseDesktopMedia(
-          captureTypes,
-          null,
-          (streamId, options) => {
-            slLog("chooseDesktopMedia-picked", { hasStreamId: !!streamId });
-            debug("chooseDesktopMedia callback", { streamId, options });
-            if (
-              streamId === undefined ||
-              streamId === null ||
-              streamId === ""
-            ) {
-              debugWarn("User cancelled the desktop capture modal");
-              resetGateState();
-              sendRecordingError("User cancelled the modal", true);
-              return;
-            } else {
-              startStream(data, streamId, options, permissions, permissions2);
-            }
-          },
-        );
+        if (IS_OFFSCREEN_HOST) {
+          const response = await chrome.runtime
+            .sendMessage({
+              type: "offscreen-request-stream",
+              mode: "screen",
+              // "tab" excluded - offscreen can't consume tab-scoped streamIds as desktop sources.
+              sources: captureTypes.filter((t) => t !== "tab"),
+            })
+            .catch((err) => ({ ok: false, error: String(err) }));
+          slLog("chooseDesktopMedia-picked", {
+            hasStreamId: !!response?.streamId,
+            via: "sw",
+          });
+          if (!response?.ok || !response.streamId) {
+            const cancelled =
+              response?.source === "cancelled" || !response?.streamId;
+            debugWarn(
+              cancelled
+                ? "User cancelled the desktop capture modal"
+                : `Stream acquisition failed: ${response?.error || "unknown"}`
+            );
+            resetGateState();
+            sendRecordingError(
+              cancelled
+                ? "User cancelled the modal"
+                : response?.error || "Stream acquisition failed",
+              cancelled
+            );
+            return;
+          }
+          startStream(
+            data,
+            response.streamId,
+            { canRequestAudioTrack: response.canRequestAudioTrack },
+            permissions,
+            permissions2
+          );
+        } else {
+          chrome.desktopCapture.chooseDesktopMedia(
+            captureTypes,
+            null,
+            (streamId, options) => {
+              slLog("chooseDesktopMedia-picked", { hasStreamId: !!streamId });
+              debug("chooseDesktopMedia callback", { streamId, options });
+              if (
+                streamId === undefined ||
+                streamId === null ||
+                streamId === ""
+              ) {
+                debugWarn("User cancelled the desktop capture modal");
+                resetGateState();
+                sendRecordingError("User cancelled the modal", true);
+                return;
+              } else {
+                startStream(data, streamId, options, permissions, permissions2);
+              }
+            },
+          );
+        }
       } else {
         const tabStreamId = await waitForTabStreamId();
         debug("Streaming with pre-resolved tabID", tabStreamId);
@@ -2333,9 +2447,26 @@ const Recorder = () => {
 
   const getStreamID = async (id) => {
     debug("getStreamID()", id);
-    const streamId = await chrome.tabCapture.getMediaStreamId({
-      targetTabId: id,
-    });
+    let streamId;
+    if (IS_OFFSCREEN_HOST) {
+      // chrome.tabCapture is not callable from offscreen - delegate to SW.
+      const response = await chrome.runtime
+        .sendMessage({
+          type: "offscreen-request-stream",
+          mode: "tab",
+          targetTabId: id,
+        })
+        .catch((err) => ({ ok: false, error: String(err) }));
+      if (!response?.ok || !response.streamId) {
+        debug("Offscreen tab stream acquisition failed", response);
+        return;
+      }
+      streamId = response.streamId;
+    } else {
+      streamId = await chrome.tabCapture.getMediaStreamId({
+        targetTabId: id,
+      });
+    }
     debug("Resolved tabCapture streamId", streamId);
     tabID.current = streamId;
   };
@@ -2380,6 +2511,8 @@ const Recorder = () => {
       e.returnValue = "";
     };
 
+    if (IS_OFFSCREEN_HOST) return undefined;
+
     window.addEventListener("beforeunload", handleClose);
     return () => {
       debug("Removing beforeunload handler");
@@ -2408,6 +2541,7 @@ const Recorder = () => {
       chrome.runtime.sendMessage({ type: "get-streaming-data" });
     } else if (request.type === "streaming-data") {
       slLog("msg-streaming-data");
+      streamingDataReceivedAt.current = Date.now();
       startStreaming(JSON.parse(request.data));
     } else if (request.type === "start-recording-tab") {
       slLog("msg-start-recording-tab", {
@@ -2443,6 +2577,22 @@ const Recorder = () => {
     } else if (request.type === "stop-recording-tab") {
       stopRecording();
       sendResponse?.({ ok: true });
+      return true;
+    } else if (request.type === "offscreen-shutdown") {
+      const timeoutMs = Number(request.timeoutMs) || 20000;
+      (async () => {
+        try {
+          if (isRecording.current) stopRecording();
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+        } catch (err) {
+          console.warn("[Recorder] offscreen-shutdown error", err);
+        } finally {
+          chrome.runtime
+            .sendMessage({ type: "offscreen-shutdown-complete" })
+            .catch(() => {});
+        }
+      })();
+      sendResponse?.({ ok: true, accepted: true });
       return true;
     } else if (request.type === "set-mic-active-tab") {
       setMic(request);

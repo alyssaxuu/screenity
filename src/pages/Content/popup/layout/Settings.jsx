@@ -70,16 +70,6 @@ const Settings = () => {
           name="askMicrophone"
           value="askMicrophone"
         />
-        {contentState.recordingType != "region" &&
-          contentState.recordingType != "camera" &&
-          !contentState.isSubscribed &&
-          (chromeVersion === null || chromeVersion >= 109) && (
-            <Switch
-              label={chrome.i18n.getMessage("stayInPagePopup")}
-              name="offscreenRecording"
-              value="offscreenRecording"
-            />
-          )}
         {contentState.recordingType != "camera" &&
           !contentState.isSubscribed && (
             <Switch

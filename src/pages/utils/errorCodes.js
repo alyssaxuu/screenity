@@ -14,6 +14,7 @@ export const REC_START_TAB = "REC_START_TAB"; // tab capture or message routing 
 export const REC_START_TIMEOUT = "REC_START_TIMEOUT"; // start flow timed out
 export const REC_START_CANCEL = "REC_START_CANCEL"; // user cancelled the capture picker
 export const REC_START_NOT_READY = "REC_START_NOT_READY"; // recorder tab not ready (likely discarded)
+export const REC_START_NO_STREAM_MSG = "REC_START_NO_STREAM_MSG"; // start requested but streaming-data message never arrived from SW
 
 // -- Recording Runtime --
 export const REC_RUN_STREAM_END = "REC_RUN_STREAM_END"; // stream ended unexpectedly
@@ -133,6 +134,10 @@ export const classifyError = (errorStr = "", errorType = "") => {
   // Permission denied
   if (PERM_PATTERNS.some((p) => lower.includes(p))) {
     return REC_START_PERM;
+  }
+
+  if (lower.includes("streaming-data never arrived")) {
+    return REC_START_NO_STREAM_MSG;
   }
 
   // Recorder not ready (stream ref missing, likely tab discarded during countdown)

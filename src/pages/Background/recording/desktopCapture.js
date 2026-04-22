@@ -1,9 +1,10 @@
 import { getCurrentTab } from "../tabManagement";
 import { initBackup } from "../backup/initBackup";
-import { offscreenDocument } from "../offscreen/offscreenDocument";
+import { startRecorderSession } from "./openRecorderTab";
 import { localDirectoryStore } from "./chunkHandler";
 
 export const desktopCapture = async (request) => {
+  console.log("[Screenity][desktopCapture] entered", request);
   const { backup } = await chrome.storage.local.get(["backup"]);
   const { backupSetup } = await chrome.storage.local.get(["backupSetup"]);
 
@@ -20,7 +21,6 @@ export const desktopCapture = async (request) => {
     const activeTab = await getCurrentTab();
     initBackup(request, activeTab.id);
   } else {
-    // Proceed with offscreen document creation
-    offscreenDocument(request);
+    startRecorderSession(request);
   }
 };

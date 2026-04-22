@@ -1,8 +1,5 @@
 @use '../../../styles/_variables' as *;
 
-body {
-	background-color: white!important;
-}
 .DrawingToolbar.show-toolbar {
 	opacity: 1!important;
 	pointer-events: all!important;

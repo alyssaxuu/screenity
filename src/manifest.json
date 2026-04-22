@@ -3,7 +3,7 @@
   "name": "__MSG_extName__",
   "description": "__MSG_extDesc__",
   "default_locale": "en",
-  "version": "4.3.5",
+  "version": "4.3.6",
   "background": {
     "service_worker": "background.bundle.js"
   },
@@ -33,7 +33,7 @@
         "vendor/*",
         "cloudrecorder.html",
         "recorder.html",
-        "recorderoffscreen.html",
+        "offscreenrecorder.html",
         "sandbox.html",
         "wrapper.html",
         "camera.html",
@@ -116,7 +116,7 @@
     "managed_schema": "schema.json"
   },
   "externally_connectable": {
-    "matches": ["https://app.screenity.io/*"]
+    "matches": ["https://app.screenity.io/*", "http://localhost:3000/*"]
   },
   "optional_permissions": [
     "offscreen",

@@ -1,13 +1,17 @@
 import { sendMessageRecord } from "./sendMessageRecord";
 import { removeTab } from "../tabManagement/removeTab";
 import { discardOffscreenDocuments } from "../offscreen/discardOffscreenDocuments";
+import { resetWatchdogState } from "./resetWatchdogState";
 
 export const discardRecording = async () => {
   sendMessageRecord({ type: "dismiss-recording" });
   chrome.action.setIcon({ path: "assets/icon-34.png" });
 
-  // Clear offscreen documents if they exist
-  discardOffscreenDocuments();
+  // Await teardown before flipping recording:false - otherwise handleAlarm fires against a torn-down offscreen.
+  try {
+    await discardOffscreenDocuments();
+  } catch {}
+  await resetWatchdogState();
 
   const { multiMode, multiSceneCount, recordingTab } =
     await chrome.storage.local.get([

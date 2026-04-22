@@ -1,6 +1,7 @@
 import localforage from "localforage";
 import { blobToBase64 } from "../utils/blobToBase64";
 import { sendMessageTab } from "../tabManagement";
+import { diagEvent } from "../../utils/diagnosticLog";
 
 localforage.config({
   driver: localforage.INDEXEDDB,
@@ -141,6 +142,14 @@ export const handleChunks = async (chunks, override = false, target = null) => {
     };
 
     let currentIndex = 0;
+    // Sample first 3, last 3, every ~totalBatches/10 between - caps at ~10 diag events.
+    const totalBatches = Math.max(1, Math.ceil(chunks.length / batchSize));
+    const sampleStride = Math.max(1, Math.floor(totalBatches / 10));
+    const shouldEmitBatch = (batchIndex) => {
+      if (batchIndex < 3) return true;
+      if (batchIndex >= totalBatches - 3) return true;
+      return batchIndex % sampleStride === 0;
+    };
 
     while (currentIndex < chunks.length) {
       const end = Math.min(currentIndex + batchSize, chunks.length);
@@ -159,12 +168,21 @@ export const handleChunks = async (chunks, override = false, target = null) => {
 
       const filtered = batch.filter(Boolean);
       if (filtered.length > 0) {
+        const batchIndex = Math.floor(currentIndex / batchSize);
         if (DEBUG_POSTSTOP)
           console.debug("[Screenity][BG] sending filtered batch", {
             filteredLen: filtered.length,
             currentIndex,
           });
         const ok = await sendBatch(filtered);
+        if (shouldEmitBatch(batchIndex)) {
+          diagEvent("sw-sendchunks-batch", {
+            batchIndex,
+            totalBatches,
+            batchSize: filtered.length,
+            ok,
+          });
+        }
         if (!ok) {
           if (DEBUG_POSTSTOP)
             console.warn("[Screenity][BG] failed to send batch, aborting");

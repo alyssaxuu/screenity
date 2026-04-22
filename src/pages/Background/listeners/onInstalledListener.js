@@ -1,6 +1,7 @@
 import { removeTab } from "../tabManagement";
 import { executeScripts } from "../utils/executeScripts";
 import { supportContextQuery } from "../../utils/buildSupportContext";
+import { tryResumePendingUploads } from "../recording/resumePendingUploads";
 
 const cloudFeaturesEnabled =
   process.env.SCREENITY_ENABLE_CLOUD_FEATURES === "true";
@@ -75,6 +76,7 @@ export const onInstalledListener = () => {
     if (details.reason === "install") {
       chrome.storage.local.set({ systemAudio: true });
     }
+    chrome.storage.local.set({ offscreenRecording: false });
 
     const { backupTab } = await chrome.storage.local.get(["backupTab"]);
     if (backupTab) {
@@ -82,5 +84,11 @@ export const onInstalledListener = () => {
     }
 
     executeScripts();
+
+    setTimeout(() => {
+      tryResumePendingUploads({ trigger: `onInstalled:${details.reason}` }).catch(
+        () => {},
+      );
+    }, 5000);
   });
 };

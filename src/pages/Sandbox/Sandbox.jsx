@@ -11,6 +11,7 @@ import HelpButton from "./components/player/HelpButton";
 
 // Context
 import { ContentStateContext } from "./context/ContentState"; // Import the ContentState context
+import { diagForward } from "../utils/diagForward";
 
 const Sandbox = () => {
   const [contentState, setContentState] = useContext(ContentStateContext); // Access the ContentState context
@@ -181,6 +182,13 @@ const Sandbox = () => {
               <div
                 className="button-stop"
                 onClick={() => {
+                  diagForward("sandbox-user-clicked-help", {
+                    chunkCount: contentState?.chunkCount ?? 0,
+                    chunkIndex: contentState?.chunkIndex ?? 0,
+                    hasRawBlob: Boolean(contentState?.rawBlob),
+                    hasBlob: Boolean(contentState?.blob),
+                    ready: Boolean(contentState?.ready),
+                  });
                   contentState.openModal(
                     chrome.i18n.getMessage("havingIssuesModalTitle"),
                     chrome.i18n.getMessage("havingIssuesModalDescription"),

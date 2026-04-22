@@ -1,5 +1,6 @@
 import { sendMessageTab, focusTab } from "../tabManagement";
 import { discardOffscreenDocuments } from "../offscreen/discardOffscreenDocuments";
+import { resetWatchdogState } from "./resetWatchdogState";
 
 export const handleDismiss = async () => {
   try {
@@ -57,7 +58,10 @@ export const cancelRecording = async () => {
       sendMessageTab(id, { type: "stop-pending" }).catch(() => {});
     });
     focusTab(activeTab);
-    discardOffscreenDocuments();
+    try {
+      await discardOffscreenDocuments();
+    } catch {}
+    await resetWatchdogState();
     chrome.runtime.sendMessage({ type: "turn-off-pip" });
     chrome.storage.local.set({ pipForceClose: Date.now() });
     chrome.storage.local.set({

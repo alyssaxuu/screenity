@@ -11,6 +11,7 @@ import { getStreamingData } from "./getStreamingData";
 import { discardOffscreenDocuments } from "../offscreen/discardOffscreenDocuments";
 import { diagEvent, endDiagSession } from "../../utils/diagnosticLog";
 import { classifyError } from "../../utils/errorCodes";
+import { resetWatchdogState } from "./resetWatchdogState";
 export const checkCapturePermissions = async ({ isLoggedIn, isSubscribed }) => {
   const permissions = ["desktopCapture", "alarms", "offscreen"];
 
@@ -19,19 +20,23 @@ export const checkCapturePermissions = async ({ isLoggedIn, isSubscribed }) => {
     permissions.push("clipboardWrite");
   }
 
-  // Check if required APIs are available in this browser context
-  if (
-    chrome.desktopCapture &&
-    chrome.alarms &&
-    chrome.offscreen &&
-    (!permissions.includes("clipboardWrite") || chrome.clipboard)
-  ) {
+  // API objects are exposed before optional_permission is granted - ask the permissions API directly.
+  const alreadyGranted = await new Promise((resolve) => {
+    chrome.permissions.contains({ permissions }, resolve);
+  });
+
+  console.log("[Screenity][PermCheck] requested:", permissions, "alreadyGranted:", alreadyGranted);
+
+  if (alreadyGranted) {
+    addAlarmListener();
     return { status: "ok" };
   }
 
   const granted = await new Promise((resolve) => {
     chrome.permissions.request({ permissions }, resolve);
   });
+
+  console.log("[Screenity][PermCheck] request returned granted:", granted, "lastError:", chrome.runtime.lastError?.message);
 
   if (granted) {
     addAlarmListener();
@@ -83,9 +88,7 @@ export const handleRecordingComplete = async () => {
 };
 
 export const handleRecordingError = async (request) => {
-  if (globalThis.SCREENITY_VERBOSE_LOGS) {
-    console.log("handleRecordingError called with request:", request);
-  }
+  console.warn("[Screenity][handleRecordingError]", request);
 
   // Propagate or derive error code
   const errorCode =
@@ -184,7 +187,10 @@ export const handleRecordingError = async (request) => {
     }
   }
   chrome.storage.local.set({ recordingTab: null });
-  discardOffscreenDocuments();
+  try {
+    await discardOffscreenDocuments();
+  } catch {}
+  await resetWatchdogState();
 };
 
 export const handleGetStreamingData = async () => {
@@ -193,7 +199,14 @@ export const handleGetStreamingData = async () => {
 };
 
 export const videoReady = async () => {
-  const { backupTab } = await chrome.storage.local.get(["backupTab"]);
+  const { backupTab, recordingDuration } = await chrome.storage.local.get([
+    "backupTab",
+    "recordingDuration",
+  ]);
+  diagEvent("sw-received-video-ready", {
+    recordingDurationMs: Number(recordingDuration) || 0,
+    backupTabPresent: Boolean(backupTab),
+  });
   if (backupTab) {
     sendMessageTab(backupTab, { type: "close-writable" });
   }

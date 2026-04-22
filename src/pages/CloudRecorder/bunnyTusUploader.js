@@ -911,9 +911,14 @@ export default class BunnyTusUploader {
 
     for (let attempt = 0; attempt <= this.MAX_RETRIES; attempt++) {
       try {
+        // AuthorizationSignature has ~20min TTL; refresh before every PATCH.
+        await this.checkAuthExpiration();
+
         const currentOffset = this.offset;
 
         const controller = new AbortController();
+        // Exposed so the heartbeat can abort a stalled PATCH.
+        this.currentPatchAbort = controller;
         const timeout = setTimeout(
           () => controller.abort("upload-timeout"),
           this.UPLOAD_TIMEOUT_MS,
@@ -934,6 +939,7 @@ export default class BunnyTusUploader {
           signal: controller.signal,
         });
         clearTimeout(timeout);
+        this.currentPatchAbort = null;
 
         if (res.ok || res.status === 204) {
           // Server is the source of truth
@@ -1008,27 +1014,45 @@ export default class BunnyTusUploader {
           throw new Error(`Upload failed (${res.status}): ${errorText}`);
         }
       } catch (err) {
-        if (err?.name === "AbortError") {
-          console.warn("⚠️ Upload chunk timed out");
+        this.currentPatchAbort = null;
+        // Transient errors (network, timeout, stall-abort, 5xx, 408, 429) retry forever with capped backoff.
+        const isExplicitAbort =
+          this.status === "aborted" || this.isPaused === true;
+        if (isExplicitAbort) {
+          throw err;
         }
-        if (attempt === this.MAX_RETRIES) {
+        const msg = String(err?.message || "");
+        const isTransient =
+          err?.name === "AbortError" || // timeout / stall-recovery
+          err?.name === "TypeError" || // fetch network failure
+          /Upload failed \((?:5\d\d|408|429)\b/.test(msg) ||
+          /network|Failed to fetch|timeout/i.test(msg);
+        if (err?.name === "AbortError") {
+          console.warn("⚠️ Upload chunk aborted (timeout or stall-recovery)");
+        }
+        if (!isTransient && attempt === this.MAX_RETRIES) {
           console.error(
-            `❌ Failed to upload chunk after ${this.MAX_RETRIES} retries:`,
+            `❌ Non-transient failure after ${this.MAX_RETRIES} retries:`,
             err,
           );
           this.setUploaderError("chunk-upload-retries-exhausted", err);
           throw err;
         }
-        console.warn(
-          `⚠️ Upload attempt ${attempt + 1}/${
-            this.MAX_RETRIES + 1
-          } failed, retrying...`,
-          err.message,
-        );
+        const attemptLabel = isTransient
+          ? `transient retry #${attempt + 1}`
+          : `attempt ${attempt + 1}/${this.MAX_RETRIES + 1}`;
+        console.warn(`⚠️ Upload ${attemptLabel} failed, retrying...`, err.message);
         const jitter = Math.random() * 300;
-        await new Promise((r) =>
-          setTimeout(r, this.RETRY_DELAY * Math.pow(2, attempt) + jitter),
+        // Cap backoff at 60s so offline→online reconnects retry within a minute.
+        const baseDelay = Math.min(
+          this.RETRY_DELAY * Math.pow(2, Math.min(attempt, 7)),
+          60_000,
         );
+        await new Promise((r) => setTimeout(r, baseDelay + jitter));
+        // Never trip the permanent-failure branch for transient errors.
+        if (isTransient && attempt >= this.MAX_RETRIES) {
+          attempt = this.MAX_RETRIES - 1;
+        }
       }
     }
   }
@@ -1305,6 +1329,7 @@ export default class BunnyTusUploader {
     this.stopHeartbeat();
     this.lastProgressAt = Date.now();
     this.stalled = false;
+    this.stallRecoveryInFlight = false;
     this.heartbeatTimer = setInterval(() => {
       const now = Date.now();
       const diff = now - this.lastProgressAt;
@@ -1322,8 +1347,55 @@ export default class BunnyTusUploader {
             diff,
           });
         }
+        this.attemptStallRecovery(diff).catch((err) => {
+          console.warn("[bunnyTusUploader] stall recovery failed:", err);
+        });
       }
     }, this.HEARTBEAT_INTERVAL_MS);
+  }
+
+  async attemptStallRecovery(stallMs) {
+    if (this.stallRecoveryInFlight) return;
+    this.stallRecoveryInFlight = true;
+    try {
+      if (this.currentPatchAbort) {
+        try {
+          this.currentPatchAbort.abort("stall-recovery");
+        } catch {}
+        this.currentPatchAbort = null;
+      }
+      // Resync offset from server via HEAD so a partially-applied PATCH doesn't cause duplicate bytes.
+      try {
+        const res = await fetch(this.uploadUrl, {
+          method: "HEAD",
+          headers: {
+            "Tus-Resumable": "1.0.0",
+            AuthorizationSignature: this.signature,
+            AuthorizationExpire: String(this.expires),
+            LibraryId: String(this.libraryId),
+            VideoId: this.videoId,
+          },
+        });
+        if (res.ok || res.status === 204) {
+          const serverOffsetHeader = res.headers.get("Upload-Offset");
+          if (serverOffsetHeader != null) {
+            const serverOffset = parseInt(serverOffsetHeader, 10);
+            if (Number.isFinite(serverOffset)) {
+              this.offset = serverOffset;
+              this.lastServerOffset = serverOffset;
+              this.emitTelemetry("upload_stall_recovered", {
+                stallMs,
+                serverOffset,
+              });
+            }
+          }
+        }
+      } catch (err) {
+        console.warn("[bunnyTusUploader] HEAD offset resync failed:", err);
+      }
+    } finally {
+      this.stallRecoveryInFlight = false;
+    }
   }
 
   stopHeartbeat() {

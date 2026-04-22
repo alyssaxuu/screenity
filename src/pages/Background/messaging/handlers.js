@@ -19,7 +19,9 @@ import { addAlarmListener } from "../alarms/addAlarmListener";
 import { cancelRecording, handleDismiss } from "../recording/cancelRecording";
 import { handleDismissRecordingTab } from "../recording/discardRecording";
 import { sendMessageRecord } from "../recording/sendMessageRecord";
-import { offscreenDocument } from "../offscreen/offscreenDocument";
+import { startRecorderSession } from "../recording/openRecorderTab";
+import { acquireStreamForOffscreen } from "../offscreen/acquireStream";
+import { registerProxyStorageHandlers } from "../offscreen/proxyStorageHandlers";
 import { forceProcessing } from "../recording/forceProcessing";
 import {
   restartActiveTab,
@@ -49,7 +51,7 @@ import {
   CLOUD_LOCAL_PLAYBACK_EVENT_KEY,
   CLOUD_LOCAL_PLAYBACK_ALARM,
 } from "../recording/cloudLocalPlaybackConstants";
-import { FIRST_CHUNK_WATCHDOG_ALARM } from "../alarms/handleAlarm";
+import { FIRST_CHUNK_WATCHDOG_ALARM, RECORDER_KEEPALIVE_ALARM } from "../alarms/alarmConstants";
 import { desktopCapture } from "../recording/desktopCapture";
 import {
   writeFile,
@@ -709,29 +711,83 @@ export const copyToClipboard = (text) => {
 
 // Initialize message router and register all handlers
 export const setupHandlers = () => {
-  registerMessage("desktop-capture", async (message) => {
+  registerProxyStorageHandlers();
+  registerMessage("desktop-capture", async (message, sender) => {
     const now = Date.now();
-    // Some pages (notably playground) can trigger duplicate start messages.
-    // Gate starts briefly so Chrome doesn't show capture permission twice.
     if (desktopCaptureInFlight || now - lastDesktopCaptureAt < 1200) {
       return { ok: true, deduped: true };
     }
 
     desktopCaptureInFlight = true;
     lastDesktopCaptureAt = now;
+
     try {
-      await desktopCapture(message);
+      await desktopCapture({
+        ...message,
+        ...(sender?.tab?.id != null ? { initiatingTabId: sender.tab.id } : {}),
+      });
       return { ok: true };
     } finally {
-      // Keep the lock briefly to absorb closely-following duplicate dispatches.
       setTimeout(() => {
         desktopCaptureInFlight = false;
       }, 1000);
     }
   });
   registerMessage("backup-created", (message) =>
-    offscreenDocument(message.request, message.tabId),
+    startRecorderSession(message.request, message.tabId),
   );
+  registerMessage("start-recorder-keepalive-alarm", async () => {
+    try {
+      await chrome.alarms.create(RECORDER_KEEPALIVE_ALARM, {
+        periodInMinutes: 0.5, // fires every 30s
+      });
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, error: err?.message || String(err) };
+    }
+  });
+  registerMessage("stop-recorder-keepalive-alarm", async () => {
+    try {
+      await chrome.alarms.clear(RECORDER_KEEPALIVE_ALARM);
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, error: err?.message || String(err) };
+    }
+  });
+  registerMessage("offscreen-diag", async (message) => {
+    console.warn("[Screenity][OffscreenDiag]", message.source, message.payload);
+    return { ok: true };
+  });
+  registerMessage("offscreen-ready", async () => {
+    const { pendingOffscreenLoad } = await chrome.storage.local.get([
+      "pendingOffscreenLoad",
+    ]);
+    if (!pendingOffscreenLoad) return { ok: true, delivered: false };
+    await chrome.storage.local.set({ pendingOffscreenLoad: null });
+    chrome.runtime.sendMessage(pendingOffscreenLoad).catch(() => {});
+    return { ok: true, delivered: true };
+  });
+  registerMessage("offscreen-request-stream", async (message, sender) => {
+    try {
+      // Fall back to recordingUiTabId so the picker anchors to the user's tab, not the offscreen doc.
+      let initiatingTabId = message.initiatingTabId || null;
+      if (!initiatingTabId) {
+        const { recordingUiTabId } = await chrome.storage.local.get([
+          "recordingUiTabId",
+        ]);
+        initiatingTabId = recordingUiTabId || null;
+      }
+      const result = await acquireStreamForOffscreen({
+        mode: message.mode,
+        sources: message.sources,
+        initiatingTabId,
+        targetTabId: message.targetTabId,
+      });
+      return { ok: true, ...result };
+    } catch (err) {
+      return { ok: false, error: err?.message || String(err) };
+    }
+  });
   registerMessage("write-file", (message) => writeFile(message));
   registerMessage("handle-restart", (message, sender) =>
     handleRestart(message, sender),
@@ -1011,6 +1067,13 @@ export const setupHandlers = () => {
   registerMessage("diag-editor-ready", (message) =>
     diagEvent("editor-load-ready", { path: message?.path || null }),
   );
+  // Only accept "sandbox-" / "sw-" prefixed events so a compromised context can't spoof lifecycle events.
+  registerMessage("diag-forward", (message) => {
+    const ev = typeof message?.event === "string" ? message.event : null;
+    if (!ev) return;
+    if (!ev.startsWith("sandbox-") && !ev.startsWith("sw-")) return;
+    diagEvent(ev, message?.data ?? null);
+  });
   registerMessage("open-editor-recovery", async () => {
     const { editorRecoveryUrl } = await chrome.storage.local.get(["editorRecoveryUrl"]);
     if (!editorRecoveryUrl) return;

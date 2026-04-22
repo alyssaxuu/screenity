@@ -21,6 +21,7 @@ import {
   debugRecordingEventWithSession,
   isRecordingDebugEnabled,
 } from "../../utils/recordingDebug";
+import { diagForward } from "../../utils/diagForward";
 
 localforage.config({
   driver: localforage.INDEXEDDB,
@@ -71,6 +72,49 @@ const ContentState = (props) => {
         tabIdRef.current = tab?.id || null;
       });
     } catch {}
+  }, []);
+
+  useEffect(() => {
+    diagMountAtRef.current = Date.now();
+    try {
+      chrome.tabs.getCurrent((tab) => {
+        diagForward("sandbox-open", {
+          tabId: tab?.id ?? null,
+          timestamp: diagMountAtRef.current,
+        });
+      });
+    } catch {
+      diagForward("sandbox-open", {
+        tabId: null,
+        timestamp: diagMountAtRef.current,
+      });
+    }
+
+    const MAX_HEARTBEATS = 6;
+    const HEARTBEAT_MS = 30000;
+    const interval = setInterval(() => {
+      const s = contentStateRef.current;
+      if (s?.ready) {
+        clearInterval(interval);
+        return;
+      }
+      if (diagHeartbeatCountRef.current >= MAX_HEARTBEATS) {
+        clearInterval(interval);
+        return;
+      }
+      diagHeartbeatCountRef.current += 1;
+      diagForward("sandbox-stuck-heartbeat", {
+        chunkCount: s?.chunkCount ?? 0,
+        chunkIndex: s?.chunkIndex ?? 0,
+        hasRawBlob: Boolean(s?.rawBlob),
+        hasBlob: Boolean(s?.blob),
+        secondsSinceMount: Math.round(
+          (Date.now() - (diagMountAtRef.current || Date.now())) / 1000,
+        ),
+      });
+    }, HEARTBEAT_MS);
+
+    return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
@@ -162,6 +206,9 @@ const ContentState = (props) => {
   const pseudoProgressTimerRef = useRef(null);
   const pseudoProgressStartRef = useRef(null);
   const pseudoProgressStartAtRef = useRef(null);
+  const diagMountAtRef = useRef(null);
+  const diagMakeVideoAtRef = useRef(null);
+  const diagHeartbeatCountRef = useRef(0);
 
   const setContentState = useCallback((updater) => {
     _setContentState((prev) => {
@@ -585,9 +632,36 @@ const ContentState = (props) => {
       }
     }
 
-    let blob = withBlob
-      ? withBlob
-      : new Blob(videoChunks.current, { type: inferredType });
+    const reconstructStartedAt = Date.now();
+    const totalBytesIn = withBlob
+      ? withBlob.size || 0
+      : videoChunks.current.reduce((s, c) => s + (c?.length || 0), 0);
+    diagForward("sandbox-reconstruct-start", {
+      chunkIndex: contentStateRef.current?.chunkIndex ?? 0,
+      chunkCount: contentStateRef.current?.chunkCount ?? 0,
+      totalBytes: totalBytesIn,
+      withBlob: Boolean(withBlob),
+    });
+
+    let blob;
+    try {
+      blob = withBlob
+        ? withBlob
+        : new Blob(videoChunks.current, { type: inferredType });
+    } catch (err) {
+      diagForward("sandbox-reconstruct-error", {
+        error: String(err?.message || err).slice(0, 200),
+        phase: "blob",
+        chunkIndex: contentStateRef.current?.chunkIndex ?? 0,
+        totalBytes: totalBytesIn,
+      });
+      throw err;
+    }
+    diagForward("sandbox-reconstruct-done", {
+      blobBytes: blob?.size ?? 0,
+      elapsedMs: Date.now() - reconstructStartedAt,
+      type: blob?.type || null,
+    });
 
     if (blob.type === "video/mp4") {
       if (DEBUG_RECORDER)
@@ -647,7 +721,24 @@ const ContentState = (props) => {
 
         URL.revokeObjectURL(video.src);
       };
-      video.src = URL.createObjectURL(blob);
+      video.onerror = () => {
+        diagForward("sandbox-reconstruct-error", {
+          error: "video-element-error",
+          phase: "video-load",
+          chunkIndex: contentStateRef.current?.chunkIndex ?? 0,
+          totalBytes: blob?.size ?? 0,
+        });
+      };
+      try {
+        video.src = URL.createObjectURL(blob);
+      } catch (err) {
+        diagForward("sandbox-reconstruct-error", {
+          error: String(err?.message || err).slice(0, 200),
+          phase: "url",
+          chunkIndex: contentStateRef.current?.chunkIndex ?? 0,
+          totalBytes: blob?.size ?? 0,
+        });
+      }
 
       chrome.runtime.sendMessage({ type: "recording-complete" });
       chrome.runtime.sendMessage({ type: "diag-editor-ready", path: "mp4-fast" }).catch(() => {});
@@ -982,6 +1073,17 @@ const ContentState = (props) => {
           webm: Boolean(s?.webm),
           ready: s?.ready,
         });
+      diagForward("sandbox-safety-fired", {
+        chunkCount: s?.chunkCount ?? 0,
+        chunkIndex: s?.chunkIndex ?? 0,
+        hasRawBlob: Boolean(s?.rawBlob),
+        hasBlob: Boolean(s?.blob),
+        hasWebm: Boolean(s?.webm),
+        ready: Boolean(s?.ready),
+        elapsedSinceMakeVideoMs: diagMakeVideoAtRef.current
+          ? Date.now() - diagMakeVideoAtRef.current
+          : null,
+      });
       if (s?.ready) return; // Fix already completed, nothing to do
 
       const complete = s?.chunkCount > 0 && s?.chunkIndex >= s?.chunkCount;
@@ -1062,6 +1164,9 @@ const ContentState = (props) => {
           console.debug("[Screenity][Sandbox] received chunk-count", {
             count: message.count,
           });
+        diagForward("sandbox-chunk-count-received", {
+          count: message?.count ?? 0,
+        });
         setContentState((prevState) => ({
           ...prevState,
           chunkCount: message.count,
@@ -1078,6 +1183,8 @@ const ContentState = (props) => {
       } else if (message.type === "make-video-tab") {
         if (DEBUG_POSTSTOP)
           console.debug("[Screenity][Sandbox] received make-video-tab");
+        diagMakeVideoAtRef.current = Date.now();
+        diagForward("sandbox-make-video-tab", null);
         makeVideoTab(sendResponse, message);
 
         return true;

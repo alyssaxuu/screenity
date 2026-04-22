@@ -250,6 +250,7 @@ const RecordingType = (props) => {
         (contentState.microphonePermission && contentState.pushToTalk)) && (
         <div>
           <iframe
+            className="screenity-iframe"
             style={{
               width: "100%",
               height: "30px",

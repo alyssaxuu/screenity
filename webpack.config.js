@@ -10,7 +10,13 @@ const isDev = env.NODE_ENV === "development";
 
 const ASSET_PATH = process.env.ASSET_PATH || "/";
 
-require("dotenv").config();
+if (process.env.SCREENITY_SKIP_ENV) {
+  // open-source release build, no dotenv
+} else if (isDev) {
+  require("dotenv").config({ path: ".env.local" });
+} else {
+  require("dotenv").config({ path: ".env.production" });
+}
 
 // Entry points for the different pages
 const entryPoints = {
@@ -24,11 +30,11 @@ const entryPoints = {
     "CloudRecorder",
     "index.jsx"
   ),
-  recorderoffscreen: path.join(
+  offscreenrecorder: path.join(
     __dirname,
     "src",
     "pages",
-    "RecorderOffscreen",
+    "OffscreenRecorder",
     "index.jsx"
   ),
   audiooffscreen: path.join(
@@ -74,7 +80,7 @@ const htmlPlugins = Object.keys(entryPoints)
     // Map entry names to folder names (for multi-word entries)
     const folderNameMap = {
       cloudrecorder: "CloudRecorder",
-      recorderoffscreen: "RecorderOffscreen",
+      offscreenrecorder: "OffscreenRecorder",
       audiooffscreen: "AudioOffscreen",
       editorwebcodecs: "EditorWebCodecs",
       editorviewer: "EditorViewer",
@@ -237,13 +243,22 @@ const config = {
           to: path.join(__dirname, "build"),
           force: true,
           transform: (content) => {
-            return Buffer.from(
-              JSON.stringify({
-                description: process.env.npm_package_description,
-                version: process.env.npm_package_version,
-                ...JSON.parse(content.toString()),
-              })
-            );
+            const manifest = {
+              description: process.env.npm_package_description,
+              version: process.env.npm_package_version,
+              ...JSON.parse(content.toString()),
+            };
+
+            // Strip dev-only origins from production builds.
+            if (!isDev && manifest.externally_connectable?.matches) {
+              manifest.externally_connectable.matches =
+                manifest.externally_connectable.matches.filter(
+                  (m) =>
+                    !m.includes("localhost") && !m.includes("127.0.0.1"),
+                );
+            }
+
+            return Buffer.from(JSON.stringify(manifest));
           },
         },
         {

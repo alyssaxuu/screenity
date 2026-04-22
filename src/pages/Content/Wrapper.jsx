@@ -200,6 +200,7 @@ const Wrapper = () => {
     <div ref={parentRef}>
       {contentState.showExtension && (
         <iframe
+          className="screenity-iframe"
           style={{
             // all: "unset",
             display: "none",
@@ -212,6 +213,7 @@ const Wrapper = () => {
       )}
       {contentState.hasOpenedBefore && (
         <iframe
+          className="screenity-iframe"
           style={{
             // all: "unset",
             display: "none",

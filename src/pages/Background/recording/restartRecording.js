@@ -1,6 +1,7 @@
 import { sendMessageRecord } from "./sendMessageRecord";
 import { resetActiveTabRestart } from "../tabManagement/resetActiveTab";
 import { diagEvent } from "../../utils/diagnosticLog";
+import { resetWatchdogState } from "./resetWatchdogState";
 
 const RESTART_ACK_TIMEOUT_MS = 7000;
 
@@ -27,6 +28,8 @@ const resolveSourceTabId = (message, sender) =>
 
 export const handleRestart = async (message = {}, sender = null) => {
   const sourceTabId = resolveSourceTabId(message, sender);
+  // Reset watchdog BEFORE the round-trip so a mid-flight alarm can't fire tier-3 against stale keys.
+  await resetWatchdogState();
   await chrome.storage.local.set({
     restarting: true,
     ...(sourceTabId != null

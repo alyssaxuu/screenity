@@ -3,6 +3,7 @@ import { handleChunks } from "./chunkHandler";
 import { diagEvent } from "../../utils/diagnosticLog";
 
 export const sendChunks = async (override = false, target = null) => {
+  const startedAt = Date.now();
   try {
     // Wait briefly for chunks to be flushed to IndexedDB
     const maxAttempts = 50;
@@ -20,6 +21,11 @@ export const sendChunks = async (override = false, target = null) => {
       if (chunkCount > 0) break;
       await new Promise((r) => setTimeout(r, delayMs));
     }
+    diagEvent("sw-sendchunks-start", {
+      initialCount: chunkCount,
+      override: Boolean(override),
+      targetTabId: target?.tabId ?? null,
+    });
 
     if (chunkCount === 0) {
       console.warn(
@@ -49,8 +55,16 @@ export const sendChunks = async (override = false, target = null) => {
     // Await handleChunks to ensure messaging completes before returning
     await handleChunks(chunks, override, target);
     diagEvent("chunks-sent", { count: chunks.length });
+    diagEvent("sw-sendchunks-done", {
+      totalSent: chunks.length,
+      elapsedMs: Date.now() - startedAt,
+    });
     return { status: "ok", chunkCount: chunks.length };
   } catch (error) {
+    diagEvent("sw-sendchunks-error", {
+      error: String(error?.message || error).slice(0, 200),
+      elapsedMs: Date.now() - startedAt,
+    });
     console.error("Failed to send chunks. Reloading extension.", error);
     chrome.runtime.reload();
   }
