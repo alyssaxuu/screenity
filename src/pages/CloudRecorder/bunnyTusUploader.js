@@ -788,16 +788,69 @@ export default class BunnyTusUploader {
     // Prefer stored screenityToken for auth
     const token = this.userToken || (await chrome.storage.local.get(["screenityToken"]).then(r => r.screenityToken));
     const headers = token ? { Authorization: `Bearer ${token}` } : {};
-    const res = await fetch(
-      `${API_BASE}/bunny/videos/tus-auth?videoId=${this.videoId}`,
-      { headers },
+    const url = `${API_BASE}/bunny/videos/tus-auth?videoId=${this.videoId}`;
+
+    // Internal retry absorbs short backend blips (5xx/408/429/network) so they
+    // don't burn the outer uploadChunk retry budget. Fatal auth errors
+    // (400/401/403) are surfaced immediately — no recovery possible.
+    const MAX_ATTEMPTS = 4;
+    let lastStatus = null;
+    let lastErr = null;
+    for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+      let res = null;
+      try {
+        res = await fetch(url, { headers });
+      } catch (err) {
+        lastErr = err;
+        this.emitTelemetry("upload_auth_refresh_failed", {
+          attempt: attempt + 1,
+          status: null,
+          reason: "network",
+          errMsg: String(err?.message || err),
+        });
+        if (attempt === MAX_ATTEMPTS - 1) break;
+        await this._sleepWithJitter(500 * Math.pow(2, attempt));
+        continue;
+      }
+
+      if (res.ok) {
+        const { signature, expires, libraryId } = await res.json();
+        this.signature = signature;
+        this.expires = expires;
+        this.libraryId = libraryId;
+        this.scheduleJournalPersist();
+        return;
+      }
+
+      lastStatus = res.status;
+      const isFatalAuth = res.status === 400 || res.status === 401 || res.status === 403;
+      const isTransient = res.status >= 500 || res.status === 408 || res.status === 429;
+      this.emitTelemetry("upload_auth_refresh_failed", {
+        attempt: attempt + 1,
+        status: res.status,
+        reason: isFatalAuth ? "unauthorized" : isTransient ? "network" : "other",
+      });
+      if (isFatalAuth || !isTransient || attempt === MAX_ATTEMPTS - 1) break;
+      await this._sleepWithJitter(500 * Math.pow(2, attempt));
+    }
+
+    // Build a structured error whose message matches the outer transient regex
+    // (/network/i) for 5xx/blip cases, and stays non-transient for 401/403.
+    const classification =
+      lastStatus === 400 || lastStatus === 401 || lastStatus === 403
+        ? "unauthorized"
+        : "network";
+    const err = new Error(
+      `Failed to refresh TUS auth (${classification} ${lastStatus ?? "offline"})`,
     );
-    if (!res.ok) throw new Error("Failed to refresh TUS auth");
-    const { signature, expires, libraryId } = await res.json();
-    this.signature = signature;
-    this.expires = expires;
-    this.libraryId = libraryId;
-    this.scheduleJournalPersist();
+    err.status = lastStatus;
+    err.cause = lastErr || undefined;
+    throw err;
+  }
+
+  _sleepWithJitter(baseMs) {
+    const jitter = Math.random() * 250;
+    return new Promise((r) => setTimeout(r, baseMs + jitter));
   }
 
   async initTusUpload() {
@@ -1022,9 +1075,11 @@ export default class BunnyTusUploader {
           throw err;
         }
         const msg = String(err?.message || "");
+        const status = typeof err?.status === "number" ? err.status : null;
         const isTransient =
           err?.name === "AbortError" || // timeout / stall-recovery
           err?.name === "TypeError" || // fetch network failure
+          (status !== null && (status >= 500 || status === 408 || status === 429)) ||
           /Upload failed \((?:5\d\d|408|429)\b/.test(msg) ||
           /network|Failed to fetch|timeout/i.test(msg);
         if (err?.name === "AbortError") {

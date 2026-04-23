@@ -610,12 +610,21 @@ const ContentState = (props) => {
 
   const reconstructVideo = async (withBlob) => {
     // Sniff MIME type from magic bytes (WebCodecs chunks are MP4, not WebM).
+    // `base64ToUint8Array` returns Blob for data-URL inputs and Uint8Array for
+    // raw base64 — handle both. A Blob has .size; a Uint8Array has .length.
     let inferredType = "video/webm; codecs=vp8,opus";
     if (!withBlob && videoChunks.current.length > 0) {
       try {
         const head = videoChunks.current[0];
-        if (head && head.length >= 8) {
-          const magic = new TextDecoder().decode(head.slice(4, 8));
+        const headLen = head?.length ?? head?.size ?? 0;
+        if (head && headLen >= 8) {
+          let magic = "";
+          const slice = head.slice(4, 8);
+          if (slice instanceof Blob) {
+            magic = await slice.text();
+          } else if (slice instanceof Uint8Array) {
+            magic = new TextDecoder().decode(slice);
+          }
           if (magic === "ftyp") {
             inferredType = "video/mp4";
           }
@@ -662,7 +671,6 @@ const ContentState = (props) => {
       elapsedMs: Date.now() - reconstructStartedAt,
       type: blob?.type || null,
     });
-
     if (blob.type === "video/mp4") {
       if (DEBUG_RECORDER)
         console.log("[Screenity][Sandbox] reconstructVideo: fast MP4 path taken", {
@@ -706,6 +714,10 @@ const ContentState = (props) => {
         rawBlob: blob,
         isFfmpegRunning: false,
         noffmpeg: false,
+        // Native MP4 from WebCodecs: trim/crop go through mediabunny streaming
+        // ops, and mute/add-audio have their own 15-min cap. 7 min is a
+        // leftover from the ffmpeg.wasm era — bump to 15 min to match.
+        editLimit: Math.max(prev.editLimit || 0, 900),
       }));
 
       // Extract duration, width, height
@@ -995,24 +1007,32 @@ const ContentState = (props) => {
       try {
         await Promise.all(
           chunks.map(async (chunk) => {
-            // contentStateRef is sync — chunkCount.current lags a render cycle.
-            if (contentStateRef.current.chunkIndex >= contentStateRef.current.chunkCount) {
-              return; // Skip processing
-            }
-
             const chunkData = base64ToUint8Array(chunk.chunk);
+            // Place at declared index instead of pushing in arrival order.
+            // Makes reassembly correct even when:
+            //   - Messages arrive out of order (concurrent BG sendChunks)
+            //   - The same chunk is delivered twice (idempotent: same slot,
+            //     same content)
+            //   - Batches interleave across multiple BG senders
+            const idx =
+              typeof chunk.index === "number" && chunk.index >= 0
+                ? chunk.index
+                : videoChunks.current.length;
+            const alreadyFilled = videoChunks.current[idx] != null;
             if (DEBUG_POSTSTOP)
-              console.debug("[Screenity][Sandbox] handleBatch pushing chunk", {
-                index: chunk.index,
-                size: chunkData?.size || null,
+              console.debug("[Screenity][Sandbox] handleBatch slot", {
+                index: idx,
+                size: chunkData?.size || chunkData?.length || null,
+                duplicate: alreadyFilled,
               });
-            videoChunks.current.push(chunkData);
-
-            // Assuming setContentState doesn't need to be awaited
-            setContentState((prevState) => ({
-              ...prevState,
-              chunkIndex: prevState.chunkIndex + 1,
-            }));
+            videoChunks.current[idx] = chunkData;
+            if (!alreadyFilled) {
+              // Only count new slots toward progress; duplicates don't advance.
+              setContentState((prevState) => ({
+                ...prevState,
+                chunkIndex: prevState.chunkIndex + 1,
+              }));
+            }
           }),
         );
 

@@ -52,6 +52,8 @@ export class WebCodecsRecorder {
     this._videoFrameIndex = 0;
     this._videoStartUs = null;
     this._frameDurationUs = null;
+    this._lastKeyFrameIndex = 0;
+    this._keyFrameIntervalFrames = 60;
 
     this.audioSamplesWritten = 0;
     this.audioSampleRate = null;
@@ -99,6 +101,7 @@ export class WebCodecsRecorder {
     this._videoFrameIndex = 0;
     this._videoStartUs = null;
     this._frameDurationUs = null;
+    this._lastKeyFrameIndex = 0;
     this.audioSamplesWritten = 0;
 
     if (this.running) return this._startPromise;
@@ -157,6 +160,7 @@ export class WebCodecsRecorder {
 
         const fps = this.options.fps || 30;
         this._frameDurationUs = Math.round(1_000_000 / fps);
+        this._keyFrameIntervalFrames = Math.max(30, Math.round(fps * 2));
         const safeBitrate = this.options.videoBitrate || 10_000_000;
 
         const overrideConfig =
@@ -327,6 +331,9 @@ export class WebCodecsRecorder {
       this.err("[WCR] Error while waiting for loops:", err);
     }
 
+    // First flush: drain all queued audio and video from the main recording.
+    // This is what makes audioSamplesWritten a reliable basis for computing
+    // the final audio track duration below.
     try {
       if (this.videoEncoder && this.videoEncoder.state !== "closed") {
         await this.videoEncoder.flush();
@@ -337,6 +344,69 @@ export class WebCodecsRecorder {
     } catch (err) {
       this.err("[WCR] flush error:", err);
       this.options.onError?.(err);
+    }
+
+    // Now encode trailing hold frames sized to cover the final audio track
+    // end. Done after the first flush so all queued audio has been emitted and
+    // audioSamplesWritten reflects the true audio track duration. Without
+    // these, the audio track extends past the last video sample and players
+    // render the gap as a black frame at the very end.
+    //
+    // We encode MULTIPLE hold frames (not one long-duration frame) because
+    // encoders don't always preserve VideoFrame.duration on the output chunk —
+    // a single hold frame with claimed duration=150ms may get written to MP4
+    // with duration=0 or the default frameDuration, leaving the track at its
+    // pre-hold end. With multiple frames, the muxer derives each sample's
+    // duration from the NEXT sample's timestamp, which is naturally correct.
+    if (
+      this.videoEncoder &&
+      this.videoEncoder.state !== "closed" &&
+      this.resizeCanvas &&
+      this._videoFrameIndex > 0 &&
+      this._frameDurationUs
+    ) {
+      try {
+        const sampleRate = this.audioSampleRate || 48000;
+        const audioEndUs =
+          this.audioSamplesWritten > 0
+            ? Math.round((this.audioSamplesWritten * 1_000_000) / sampleRate)
+            : 0;
+        const holdStartUs = this._videoFrameIndex * this._frameDurationUs;
+        // Generous cushion covers both audio-encoder drain lag and any
+        // muxer-side rounding. 150ms is imperceptible to a user scrubbing to
+        // the end; they see the last captured frame held briefly.
+        const cushionUs = 150_000;
+        const targetEndUs = Math.max(
+          holdStartUs + this._frameDurationUs,
+          audioEndUs + cushionUs,
+        );
+        const framesNeeded = Math.max(
+          1,
+          Math.ceil((targetEndUs - holdStartUs) / this._frameDurationUs),
+        );
+        for (let k = 0; k < framesNeeded; k += 1) {
+          const tsUs = this._videoFrameIndex * this._frameDurationUs;
+          const hold = new VideoFrame(this.resizeCanvas, {
+            timestamp: tsUs,
+            duration: this._frameDurationUs,
+          });
+          this.videoEncoder.encode(hold, {
+            timestamp: tsUs,
+            keyFrame: false,
+          });
+          hold.close();
+          this._videoFrameIndex += 1;
+        }
+        // Second flush: drain the hold frames.
+        await this.videoEncoder.flush();
+        this.log("[WCR] trailing hold frames encoded", {
+          holdStartUs,
+          audioEndUs,
+          framesNeeded,
+        });
+      } catch (err) {
+        this.warn("[WCR] trailing hold frames failed:", err);
+      }
     }
 
     try {
@@ -418,6 +488,7 @@ export class WebCodecsRecorder {
     this._videoFrameIndex = 0;
     this._videoStartUs = null;
     this._frameDurationUs = null;
+    this._lastKeyFrameIndex = 0;
     this.audioSamplesWritten = 0;
     this.audioSampleRate = null;
 
@@ -521,6 +592,20 @@ export class WebCodecsRecorder {
         test.configure(config);
         test.close();
         this.log("[WCR] Selected encoder:", c.codec, c.hw);
+        try {
+          chrome.storage.local.set({
+            fastRecorderSelectedEncoder: {
+              codec: c.codec,
+              hw: c.hw,
+              containerCodec: c.containerCodec,
+              width,
+              height,
+              fps,
+              bitrate,
+              at: Date.now(),
+            },
+          });
+        } catch {}
         return {
           config,
           codec: c.codec,
@@ -612,7 +697,11 @@ export class WebCodecsRecorder {
             duration: frameDurationUs,
           });
 
-          const keyFrame = i === 0 || (this.justResumed && i === startIndex);
+          const keyFrame =
+            i === 0 ||
+            (this.justResumed && i === startIndex) ||
+            i - this._lastKeyFrameIndex >= this._keyFrameIntervalFrames;
+          if (keyFrame) this._lastKeyFrameIndex = i;
           if (this.justResumed && i === startIndex) {
             this.justResumed = false;
           }
@@ -640,7 +729,17 @@ export class WebCodecsRecorder {
       this.err("[WCR] video loop error:", err);
     }
 
-    this.log("[WCR] video loop exit", this.frameCount);
+    this.log("[WCR] video loop exit", this.frameCount, "running=", this.running);
+    // If the loop exits while we still think we're recording, the video source
+    // died unexpectedly. Stop the audio loop too so the output file's audio
+    // track doesn't extend past the last video frame. Don't fire onError —
+    // the partial recording is still valid; let the user's stop flow finalize.
+    if (this.running) {
+      this.warn(
+        "[WCR] video loop exited early while running; stopping audio loop",
+      );
+      this.running = false;
+    }
   }
 
   async readAudioLoop() {

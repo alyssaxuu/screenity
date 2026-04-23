@@ -495,6 +495,10 @@
     "message": "Bearbeitung und MP4-Export nicht verfügbar",
     "description": "Beschreibung für über 5 Minuten in der Bearbeitung"
   },
+  "overLimitLabelDescriptionFastPath": {
+    "message": "Bearbeitungsfunktionen nicht verfügbar",
+    "description": "Over limit description when the recording is a native MP4 (fast recorder / WebCodecs) so MP4 export still works"
+  },
   "videoProcessingLabelTitle": {
     "message": "Das Video wird verarbeitet...",
     "description": "Schriftzug 'Videoverarbeitung' im Editor"
@@ -890,6 +894,10 @@
   "overLimitModalDescription": {
     "message": "Da Screenity komplett privat ist und lokal ausgeführt wird, ist es von der Hardware Ihres Geräts begrenzt. Die Verarbeitung eines Videos dieser Länge würde zu lange dauern und sehr ressourcenintensiv sein. Keine Sorge, Sie können immer noch die WEBM-Datei oder die Rohaufnahme herunterladen, aber Bearbeitung und MP4-Export sind nicht verfügbar. Sie können das Video dennoch versuchen zu verarbeiten, wenn Sie die Risiken verstehen.",
     "description": "Beschreibung des Modals für die 5-Minuten-Limitierung"
+  },
+  "overLimitModalDescriptionFastPath": {
+    "message": "Da Screenity komplett privat ist und lokal ausgeführt wird, ist es von der Hardware Ihres Geräts begrenzt. Die Verarbeitung eines Videos dieser Länge würde zu lange dauern und sehr ressourcenintensiv sein. Ihr MP4 ist bereit zum Herunterladen, aber die Bearbeitung im Browser ist für Clips dieser Länge nicht verfügbar. Sie können das Video dennoch versuchen zu verarbeiten, wenn Sie die Risiken verstehen.",
+    "description": "Over 5 minutes limit modal description when the recording is a native MP4 (fast recorder / WebCodecs)"
   },
   "overLimitModalButton": {
     "message": "Ich verstehe das Risiko, trotzdem versuchen",
@@ -1390,7 +1398,7 @@
     "description": "Bestätigungsbutton im Willkommensmodal für Pro"
   },
   "webcodecsToggleLabel": {
-    "message": "Fast MP4 (beta)",
+    "message": "Fast MP4",
     "description": "WebCodecs recorder toggle label"
   },
   "webcodecsFailedOffToast": {

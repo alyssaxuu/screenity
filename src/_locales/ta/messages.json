@@ -495,6 +495,10 @@
     "message": "திருத்தல் மற்றும் MP4 வடிவம் விரும்பில்லை",
     "description": "எடிட்டரில் 5 நிமிடத்திற்குக் கீழ் வரும் விளக்கம்"
   },
+  "overLimitLabelDescriptionFastPath": {
+    "message": "திருத்தல் அம்சங்கள் கிடைக்கவில்லை",
+    "description": "Over limit description when the recording is a native MP4 (fast recorder / WebCodecs) so MP4 export still works"
+  },
   "videoProcessingLabelTitle": {
     "message": "வீடியோ செயலாக்கப்படுகின்றது...",
     "description": "வீடியோ செயலாக்க லேபிள் இன் பதிவு"
@@ -890,6 +894,10 @@
   "overLimitModalDescription": {
     "message": "Screenity முழுவதும் தனியாக உழைந்து உழைக்கும் போது, உங்கள் சாதனத்தின் உபகரண வகைகளால் கட்டாயமாக வர்ம்வேர் செய்வது. இந்த நீளம் உள்ள விடியோவை செயல்படுத்துவது மிகவும் நேரம் எடுக்கும் மற்றும் மிகவும் வளர்ச்சியடையும். ஆனால் வேறு பரிமாற்றம் முடியும் என்று கவனிக்கவும், நீங்கள் இந்த அபரிசீலிதம் புரிந்திருந்தால்.",
     "description": "5 நிமிட வாரந்தோற்ற உள்ளடக்கம் மோடல் விளக்கம்"
+  },
+  "overLimitModalDescriptionFastPath": {
+    "message": "Screenity முற்றிலும் தனிப்பட்டதாகவும் உள்ளூரில் இயங்குவதால், உங்கள் சாதன வன்பொருளால் வரையறுக்கப்படுகிறது. இந்த நீளமான வீடியோவை செயலாக்க அதிக நேரம் மற்றும் வளங்கள் தேவைப்படும். உங்கள் MP4 பதிவிறக்கத் தயாராக உள்ளது, ஆனால் இவ்வளவு நீளமான கிளிப்புகளுக்கு உலாவியில் திருத்தம் கிடைக்காது. இருந்தாலும், நீங்கள் அபாயங்களைப் புரிந்தால் வீடியோவை செயலாக்க முயற்சி செய்யலாம்.",
+    "description": "Over 5 minutes limit modal description when the recording is a native MP4 (fast recorder / WebCodecs)"
   },
   "overLimitModalButton": {
     "message": "ஞாபகம், அதை முயற்சிக்கவும்",
@@ -1390,7 +1398,7 @@
     "description": "Pro வரவேற்பு தோன்றும் பதிலின் செயல்பாடு பொத்தான்"
   },
   "webcodecsToggleLabel": {
-    "message": "Fast MP4 (beta)",
+    "message": "Fast MP4",
     "description": "WebCodecs recorder toggle label"
   },
   "webcodecsFailedOffToast": {

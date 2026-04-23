@@ -495,6 +495,10 @@
     "message": "Modifica ed esportazione in formato MP4 non disponibili",
     "description": "Descrizione del limite superiore a 5 minuti nell'editor"
   },
+  "overLimitLabelDescriptionFastPath": {
+    "message": "Funzionalità di modifica non disponibili",
+    "description": "Over limit description when the recording is a native MP4 (fast recorder / WebCodecs) so MP4 export still works"
+  },
   "videoProcessingLabelTitle": {
     "message": "Il video è in fase di elaborazione...",
     "description": "Etichetta per l'elaborazione video nell'editor"
@@ -1374,7 +1378,7 @@
     "description": "Pulsante di conferma della finestra di benvenuto per Pro"
   },
   "webcodecsToggleLabel": {
-    "message": "Fast MP4 (beta)",
+    "message": "Fast MP4",
     "description": "WebCodecs recorder toggle label"
   },
   "webcodecsFailedOffToast": {

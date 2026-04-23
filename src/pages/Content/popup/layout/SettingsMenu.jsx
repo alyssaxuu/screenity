@@ -737,7 +737,7 @@ const SettingsMenu = (props) => {
                       : {}),
                   });
                 }}
-                checked={contentState.useWebCodecsRecorder === true}
+                checked={contentState.useWebCodecsRecorder !== false}
               >
                 {chrome.i18n.getMessage("webcodecsToggleLabel")}
                 <DropdownMenu.ItemIndicator className="ItemIndicator">

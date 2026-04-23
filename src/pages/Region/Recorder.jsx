@@ -629,7 +629,8 @@ const Recorder = () => {
       const { useWebCodecsRecorder } = await chrome.storage.local.get([
         "useWebCodecsRecorder",
       ]);
-      const userSetting = useWebCodecsRecorder === true ? true : false;
+      // Default-on as of 4.3.7: treat undefined as enabled; only explicit `false` opts out.
+      const userSetting = useWebCodecsRecorder === false ? false : true;
       const stickyState = await getFastRecorderStickyState();
       const probeResult = await probeFastRecorderSupport();
       const shouldUseFast = shouldUseFastRecorder(
@@ -1101,7 +1102,7 @@ const Recorder = () => {
               const switched = await startMediaRecorderWithCodec("vp8");
               if (switched && recorder.current instanceof MediaRecorder) {
                 try {
-                  recorder.current.start(1000);
+                  recorder.current.start(5000);
                   setTimeout(() => {
                     try { recorder.current?.requestData?.(); } catch (_) {}
                   }, 250);
@@ -1195,7 +1196,7 @@ const Recorder = () => {
     const isMediaRecorder = recorder.current instanceof MediaRecorder;
     if (isMediaRecorder) {
       try {
-        recorder.current.start(1000);
+        recorder.current.start(5000);
         // Force an early first chunk so even very short recordings have
         // data in IndexedDB before the user can navigate away.
         setTimeout(() => {

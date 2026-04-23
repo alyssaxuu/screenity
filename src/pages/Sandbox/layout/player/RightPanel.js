@@ -259,26 +259,99 @@ const RightPanel = () => {
         chrome.i18n.getMessage("rawRecordingModalDescription"),
         chrome.i18n.getMessage("rawRecordingModalButton"),
         chrome.i18n.getMessage("sandboxEditorCancelButton"),
-        () => {
+        async () => {
           const s = contentStateRef.current;
-          const blob = s.rawBlob;
+          const blob = s.rawBlob || s.blob;
           if (!blob) {
-            console.error("[Screenity][WebM] raw download: no rawBlob available");
+            console.error("[Screenity] raw download: no rawBlob available");
+            chrome.runtime.sendMessage({
+              type: "show-toast",
+              message: chrome.i18n.getMessage("rawRecordingModalTitle") + ": no data",
+            });
             return;
           }
-          const url = window.URL.createObjectURL(blob);
 
           const ext = blob.type.includes("mp4") ? "mp4" : "webm";
+          const filename = `raw-recording.${ext}`;
 
-          chrome.downloads.download(
-            {
-              url: url,
-              filename: `raw-recording.${ext}`,
-            },
-            () => {
-              window.URL.revokeObjectURL(url);
+          // Base64-via-BG is the most reliable path from a sandboxed page —
+          // works in Brave, works when blob-URL downloads are restricted, and
+          // doesn't depend on chrome.downloads being accessible from here.
+          // This is the escape hatch, so prioritize reliability over speed.
+          const fallbackViaBackground = async () => {
+            const base64 = await new Promise((resolve, reject) => {
+              const reader = new FileReader();
+              reader.onloadend = () => resolve(reader.result);
+              reader.onerror = () => reject(reader.error);
+              reader.readAsDataURL(blob);
+            });
+            chrome.runtime.sendMessage({
+              type: "request-download",
+              base64,
+              title: filename,
+            });
+          };
+
+          try {
+            const url = window.URL.createObjectURL(blob);
+            const downloadId = await new Promise((resolve, reject) => {
+              try {
+                chrome.downloads.download({ url, filename }, (id) => {
+                  if (chrome.runtime.lastError || !id) {
+                    reject(
+                      chrome.runtime.lastError ||
+                        new Error("download returned no id"),
+                    );
+                  } else {
+                    resolve(id);
+                  }
+                });
+              } catch (err) {
+                reject(err);
+              }
+            });
+            // chrome.downloads.onChanged can tell us if the download was
+            // interrupted (not user-cancel). Same pattern as the main download
+            // flow in ContentState.jsx.
+            const interruptHandler = async (delta) => {
+              if (delta.id !== downloadId || !delta.state) return;
+              if (
+                delta.state.current === "interrupted" &&
+                delta.error?.current !== "USER_CANCELED"
+              ) {
+                chrome.downloads.onChanged.removeListener(interruptHandler);
+                try {
+                  await fallbackViaBackground();
+                } catch (err) {
+                  console.error("[Screenity] raw download fallback failed:", err);
+                }
+              } else if (
+                delta.state.current === "complete" ||
+                delta.state.current === "interrupted"
+              ) {
+                chrome.downloads.onChanged.removeListener(interruptHandler);
+                window.URL.revokeObjectURL(url);
+              }
+            };
+            chrome.downloads.onChanged.addListener(interruptHandler);
+          } catch (err) {
+            console.warn(
+              "[Screenity] raw download direct path failed, using fallback:",
+              err,
+            );
+            try {
+              await fallbackViaBackground();
+            } catch (fallbackErr) {
+              console.error(
+                "[Screenity] raw download fallback failed:",
+                fallbackErr,
+              );
+              chrome.runtime.sendMessage({
+                type: "show-toast",
+                message: chrome.i18n.getMessage("rawRecordingModalTitle") + ": failed",
+              });
             }
-          );
+          }
         },
         () => {}
       );
@@ -435,7 +508,11 @@ const RightPanel = () => {
                     {chrome.i18n.getMessage("overLimitLabelTitle")}
                   </div>
                   <div className={styles.buttonDescription}>
-                    {chrome.i18n.getMessage("overLimitLabelDescription")}
+                    {contentState.blob?.type === "video/mp4"
+                      ? chrome.i18n.getMessage(
+                          "overLimitLabelDescriptionFastPath"
+                        )
+                      : chrome.i18n.getMessage("overLimitLabelDescription")}
                   </div>
                 </div>
                 <div
@@ -445,7 +522,11 @@ const RightPanel = () => {
                     if (typeof contentState.openModal === "function") {
                       contentState.openModal(
                         chrome.i18n.getMessage("overLimitModalTitle"),
-                        chrome.i18n.getMessage("overLimitModalDescription"),
+                        chrome.i18n.getMessage(
+                          contentState.blob?.type === "video/mp4"
+                            ? "overLimitModalDescriptionFastPath"
+                            : "overLimitModalDescription"
+                        ),
                         chrome.i18n.getMessage("overLimitModalButton"),
                         chrome.i18n.getMessage("sandboxEditorCancelButton"),
                         () => {
@@ -506,7 +587,12 @@ const RightPanel = () => {
               </div>
             )}
 
-          {!contentState.fallback && contentState.editErrorType === "too-long" && (
+          {!contentState.fallback &&
+            contentState.editErrorType === "too-long" &&
+            !(
+              contentState.duration > contentState.editLimit &&
+              !contentState.override
+            ) && (
             <div className={styles.alert}>
               <div className={styles.buttonLeft}>
                 <ReactSVG src={URL + "editor/icons/alert.svg"} />
@@ -763,6 +849,25 @@ const RightPanel = () => {
                   </div>
                 </div>
               )}
+              {(() => {
+                // WebCodecs / fast-recorder path produces a native MP4 blob.
+                // Downloading it is just a blob-URL anchor click — no ffmpeg,
+                // no re-encoding — so the editLimit and noffmpeg gates don't
+                // apply. Detect via blob MIME and unblock accordingly.
+                const isNativeMp4 =
+                  contentState.blob?.type === "video/mp4";
+                const mp4Disabled = isNativeMp4
+                  ? contentState.isFfmpegRunning || !contentState.mp4ready
+                  : contentState.isFfmpegRunning ||
+                    contentState.noffmpeg ||
+                    !contentState.mp4ready;
+                const mp4ShowNotAvailable = isNativeMp4
+                  ? false
+                  : contentState.updateChrome ||
+                    contentState.noffmpeg ||
+                    (contentState.duration > contentState.editLimit &&
+                      !contentState.override);
+                return (
               <div
                 role="button"
                 className={styles.button}
@@ -770,12 +875,7 @@ const RightPanel = () => {
                   if (!contentState.mp4ready) return;
                   contentState.download();
                 }}
-                disabled={
-                  contentState.isFfmpegRunning ||
-                  contentState.noffmpeg ||
-                  !contentState.mp4ready ||
-                  contentState.noffmpeg
-                }
+                disabled={mp4Disabled}
               >
                 <div className={styles.buttonLeft}>
                   <ReactSVG src={URL + "editor/icons/download.svg"} />
@@ -787,12 +887,11 @@ const RightPanel = () => {
                       : chrome.i18n.getMessage("downloadMP4ButtonTitle")}
                   </div>
                   <div className={styles.buttonDescription}>
-                    {contentState.offline && !contentState.ffmpegLoaded
+                    {contentState.offline &&
+                    !contentState.ffmpegLoaded &&
+                    !isNativeMp4
                       ? chrome.i18n.getMessage("noConnectionLabel")
-                      : contentState.updateChrome ||
-                        contentState.noffmpeg ||
-                        (contentState.duration > contentState.editLimit &&
-                          !contentState.override)
+                      : mp4ShowNotAvailable
                       ? getNotAvailableLabel()
                       : contentState.mp4ready && !contentState.isFfmpegRunning
                       ? chrome.i18n.getMessage("downloadMP4ButtonDescription")
@@ -803,6 +902,8 @@ const RightPanel = () => {
                   <ReactSVG src={URL + "editor/icons/right-arrow.svg"} />
                 </div>
               </div>
+                );
+              })()}
               {!contentState.fallback && (
                 <div
                   role="button"

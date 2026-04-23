@@ -495,6 +495,10 @@
     "message": "Düzenleme ve MP4 biçiminde dışa aktarma mevcut değil",
     "description": "Editörde 5 dakikadan fazla sınır açıklaması"
   },
+  "overLimitLabelDescriptionFastPath": {
+    "message": "Düzenleme özellikleri mevcut değil",
+    "description": "Over limit description when the recording is a native MP4 (fast recorder / WebCodecs) so MP4 export still works"
+  },
   "videoProcessingLabelTitle": {
     "message": "Video işleniyor...",
     "description": "Editörde video işleme etiketi"
@@ -890,6 +894,10 @@
   "overLimitModalDescription": {
     "message": "Screenity tamamen özel ve yerel olarak çalıştığı için cihazınızın donanımıyla sınırlıdır. Bu uzunluktaki bir videoyu işlemek çok uzun sürer ve çok fazla kaynak kullanır. Ancak, hala WEBM dosyasını veya ham kaydı indirebilirsiniz, ancak düzenleme ve MP4 dışa aktarma seçenekleri mevcut değildir. Yine de riskleri anlıyorsanız, videoyu işlemeyi deneyebilirsiniz.",
     "description": "5 dakika sınırlı modal açıklaması"
+  },
+  "overLimitModalDescriptionFastPath": {
+    "message": "Screenity tamamen özel ve yerel olarak çalıştığı için cihazınızın donanımıyla sınırlıdır. Bu uzunluktaki bir videoyu işlemek çok uzun sürer ve çok fazla kaynak kullanır. MP4 dosyanız indirilmeye hazır, ancak bu uzunluktaki klipler için tarayıcıda düzenleme yapılamaz. Yine de riskleri anlıyorsanız, videoyu işlemeyi deneyebilirsiniz.",
+    "description": "Over 5 minutes limit modal description when the recording is a native MP4 (fast recorder / WebCodecs)"
   },
   "overLimitModalButton": {
     "message": "Riski anladım, yine de dene",
@@ -1390,7 +1398,7 @@
     "description": "Pro karşılama modali eylem düğmesi"
   },
   "webcodecsToggleLabel": {
-    "message": "Fast MP4 (beta)",
+    "message": "Fast MP4",
     "description": "WebCodecs recorder toggle label"
   },
   "webcodecsFailedOffToast": {
@@ -1558,11 +1566,11 @@
     "description": "Toast shown when a region recording is stopped by navigation but no chunks were saved"
   },
   "fastRecorderFailedTitle": {
-    "message": "H\u0131zl\u0131 kay\u0131t ba\u015far\u0131s\u0131z oldu",
+    "message": "Hızlı kayıt başarısız oldu",
     "description": "Title for the modal shown when the fast MP4 recorder output could not be validated"
   },
   "fastRecorderFailedDescription": {
-    "message": "H\u0131zl\u0131 kaydedicinin \u00e7\u0131kt\u0131s\u0131 bu cihazda do\u011frulanamad\u0131.\nDosyay\u0131 yine de indirebilirsiniz.",
+    "message": "Hızlı kaydedicinin çıktısı bu cihazda doğrulanamadı.\nDosyayı yine de indirebilirsiniz.",
     "description": "Body text for the fast recorder failure modal"
   },
   "downloadAnywayButton": {
@@ -1570,7 +1578,7 @@
     "description": "Button to download the recording file despite validation failure"
   },
   "cancelButton": {
-    "message": "\u0130ptal",
+    "message": "İptal",
     "description": "Generic cancel button label"
   }
 }

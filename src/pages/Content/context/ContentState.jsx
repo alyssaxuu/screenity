@@ -397,24 +397,30 @@ const ContentState = (props) => {
     }
   }, []);
 
-  const checkChromeCapturePermissionsSW = useCallback(async () => {
-    const { isLoggedIn, isSubscribed } = contentStateRef.current;
-
+  // Must be called synchronously from a user-gesture handler so the
+  // activation propagates to the SW via sendMessage. Awaiting the returned
+  // Promise is fine; awaiting anything before invoking this is not.
+  const checkChromeCapturePermissionsSW = useCallback(() => {
+    const { isLoggedIn, isSubscribed } = contentStateRef.current || {};
     return new Promise((resolve) => {
       chrome.runtime.sendMessage(
-        {
-          type: "check-capture-permissions",
-          isLoggedIn,
-          isSubscribed,
-        },
+        { type: "check-capture-permissions", isLoggedIn, isSubscribed },
         (response) => {
-          resolve(response.status === "ok");
+          resolve(Boolean(response && response.status === "ok"));
         },
       );
     });
   }, []);
 
   const startStreaming = useCallback(async () => {
+    // Kick off synchronously so the click's user-gesture propagates through
+    // sendMessage into chrome.permissions.request in the SW. Later awaits
+    // (initStartFlowTrace, check-storage-quota for Pro) would consume it.
+    const isExtensionPage = window.location.href.includes("chrome-extension://");
+    const permissionPromise = isExtensionPage
+      ? null
+      : checkChromeCapturePermissionsSW();
+
     // Init start-flow trace for this attempt
     const attemptId = `ra-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
     await initStartFlowTrace(attemptId, {
@@ -514,10 +520,10 @@ const ContentState = (props) => {
     }
 
     // Check if in content script or extension page (Chrome)
-    if (window.location.href.includes("chrome-extension://")) {
+    if (isExtensionPage) {
       permission = await checkChromeCapturePermissions();
     } else {
-      permission = await checkChromeCapturePermissionsSW();
+      permission = await permissionPromise;
     }
 
     if (!permission) {
@@ -526,9 +532,10 @@ const ContentState = (props) => {
         chrome.i18n.getMessage("chromePermissionsModalDescription"),
         chrome.i18n.getMessage("chromePermissionsModalAction"),
         chrome.i18n.getMessage("chromePermissionsModalCancel"),
-        async () => {
-          await checkChromeCapturePermissionsSW();
-          startStreaming(); // Retry streaming
+        () => {
+          // Direct call so the click's gesture reaches startStreaming's
+          // synchronous permission check.
+          startStreaming();
         },
         () => {},
         null,
@@ -655,7 +662,14 @@ const ContentState = (props) => {
             pipEnded: false,
           }));
         },
-        () => {},
+        () => {
+          setStartFlowOutcome("cancelled", { error: "mic-muted-cancel" });
+          setContentState((prevContentState) => ({
+            ...prevContentState,
+            pendingRecording: false,
+            preparingRecording: false,
+          }));
+        },
         false,
         false,
         false,
@@ -997,7 +1011,7 @@ const ContentState = (props) => {
     fpsValue: "30",
     fastRecorderBeta: null,
     fastRecorderStatus: null,
-    useWebCodecsRecorder: false,
+    useWebCodecsRecorder: true,
     countdownActive: false,
     countdownCancelled: false,
     multiMode: false,

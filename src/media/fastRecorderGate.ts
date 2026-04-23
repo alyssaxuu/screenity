@@ -1,5 +1,8 @@
 declare const chrome: any;
 
+// @ts-ignore — mediabunny ships types but this file is loose with any
+import { Input, BlobSource, ALL_FORMATS } from "mediabunny";
+
 export type FastRecorderProbeResult = {
   ok: boolean;
   reasons: string[];
@@ -359,156 +362,46 @@ export const validateFastRecorderOutputBlob = async (
     reasons.push("unexpected-mime");
   }
 
-  let duration = 0;
-  let width = 0;
-  let height = 0;
-  let seekable: { start: number; end: number; length: number } | null = null;
-  let frameChecked = false;
-  let framePresented = false;
-  let blackFrameSuspected = false;
-
   if (opts.recordingId) {
     details.recordingId = opts.recordingId;
   }
 
-  if (typeof document !== "undefined") {
-    const timeoutMs = opts.timeoutMs ?? 4000;
-    const url = URL.createObjectURL(blob);
-    const video = document.createElement("video");
-    video.preload = "metadata";
-    video.muted = true;
-    video.playsInline = true;
-
-    try {
-      const meta = await new Promise<{ duration: number; width: number; height: number }>(
-        (resolve, reject) => {
-          const timer = setTimeout(() => {
-            reject(new Error("metadata-timeout"));
-          }, timeoutMs);
-
-          video.onloadedmetadata = () => {
-            clearTimeout(timer);
-            resolve({
-              duration: Number.isFinite(video.duration) ? video.duration : video.duration || 0,
-              width: video.videoWidth || 0,
-              height: video.videoHeight || 0,
-            });
-          };
-
-          video.onerror = () => {
-            clearTimeout(timer);
-            reject(new Error("metadata-error"));
-          };
-
-          video.src = url;
-        }
-      );
-
-      duration = meta.duration;
-      width = meta.width;
-      height = meta.height;
-      details.duration = duration;
-      details.width = width;
-      details.height = height;
-      seekable = {
-        length: video.seekable?.length || 0,
-        start: video.seekable?.length ? video.seekable.start(0) : 0,
-        end: video.seekable?.length ? video.seekable.end(0) : 0,
-      };
-      details.seekable = seekable;
-
-      const durationFinite = Number.isFinite(duration) && duration > 0;
-      const seekableOk = seekable && seekable.length > 0 && seekable.end > 0;
-
-      if (!durationFinite && !seekableOk) {
-        reasons.push("duration-unavailable");
-      }
-
-      // First frame validation (best-effort)
-      let seekTarget = 0.1;
-      if (durationFinite) {
-        seekTarget = Math.min(0.1, Math.max(0.01, duration / 10));
-      } else if (seekableOk) {
-        seekTarget = Math.min(seekable!.end - seekable!.start, 0.1) + seekable!.start;
-      }
-
-      const seekResult = await new Promise<void>((resolve, reject) => {
-        const timer = setTimeout(() => reject(new Error("seek-timeout")), timeoutMs);
-        const onSeeked = () => {
-          clearTimeout(timer);
-          resolve();
-        };
-        const onError = () => {
-          clearTimeout(timer);
-          reject(new Error("seek-error"));
-        };
-        video.onseeked = onSeeked;
-        video.onerror = onError;
-        try {
-          video.currentTime = seekTarget;
-        } catch (err) {
-          clearTimeout(timer);
-          reject(err);
-        }
-      });
-
-      void seekResult;
-
-      frameChecked = true;
-      if (typeof video.requestVideoFrameCallback === "function") {
-        await new Promise<void>((resolve) => {
-          const timer = setTimeout(() => resolve(), timeoutMs);
-          video.requestVideoFrameCallback(() => {
-            clearTimeout(timer);
-            resolve();
-          });
-        });
-        framePresented = true;
-      } else {
-        await new Promise((resolve) => setTimeout(resolve, 50));
-        framePresented = video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA;
-      }
-
-      if (framePresented && width > 0 && height > 0) {
-        try {
-          const canvas = document.createElement("canvas");
-          canvas.width = Math.min(64, width);
-          canvas.height = Math.min(64, height);
-          const ctx = canvas.getContext("2d");
-          if (ctx) {
-            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-            const sample = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
-            let bright = 0;
-            for (let i = 0; i < sample.length; i += 16) {
-              bright += sample[i] + sample[i + 1] + sample[i + 2];
-            }
-            const avg = bright / (sample.length / 16);
-            blackFrameSuspected = avg < 5;
-          }
-        } catch {
-          // ignore pixel sampling errors
-        }
-      }
-
-      details.frameChecked = frameChecked;
-      details.framePresented = framePresented;
-      details.blackFrameSuspected = blackFrameSuspected;
-
-      if (frameChecked && !framePresented) {
-        reasons.push("frame-not-presented");
-      } else if (blackFrameSuspected) {
-        reasons.push("frame-black-suspected");
-      }
-    } catch (err) {
-      details.metadataError = String(err);
-      reasons.push("metadata-unavailable");
-    } finally {
-      URL.revokeObjectURL(url);
+  // Structural validation via the mediabunny demuxer. Handles moov-at-end
+  // (fastStart: false) efficiently, unlike the <video> element which has to
+  // scan the full file. This replaces the earlier <video>.onloadedmetadata +
+  // seek + requestVideoFrameCallback + black-frame pixel sample pipeline —
+  // those were designed around paranoia when we had no other structural check,
+  // and they stacked to ~3-4s of sequential timeouts against fastStart-false
+  // MP4s.
+  try {
+    const demuxInput: any = new Input({
+      formats: ALL_FORMATS,
+      source: new BlobSource(blob),
+    });
+    const demuxTimeoutMs = opts.timeoutMs ?? 2000;
+    const tracks: any[] = await Promise.race([
+      demuxInput.getTracks(),
+      new Promise<any[]>((_, reject) =>
+        setTimeout(() => reject(new Error("demuxer-timeout")), demuxTimeoutMs),
+      ),
+    ]);
+    const videoTracks = tracks.filter((t: any) => t?.type === "video");
+    const audioTracks = tracks.filter((t: any) => t?.type === "audio");
+    details.demuxerVideoTrackCount = videoTracks.length;
+    details.demuxerAudioTrackCount = audioTracks.length;
+    details.demuxerVideoCodec = videoTracks[0]?.codec || null;
+    details.demuxerAudioCodec = audioTracks[0]?.codec || null;
+    const firstVideo = videoTracks[0];
+    if (firstVideo?.isVideoTrack?.()) {
+      details.codedWidth = firstVideo.codedWidth ?? null;
+      details.codedHeight = firstVideo.codedHeight ?? null;
     }
-  }
-
-  if (Number.isFinite(duration) && duration <= 0) {
-    reasons.push("duration-zero");
+    if (videoTracks.length === 0) {
+      reasons.push("demuxer-no-video-track");
+    }
+  } catch (err: any) {
+    details.demuxerError = String(err?.message || err);
+    reasons.push("demuxer-error");
   }
 
   const videoCodec = opts.videoCodec || "avc1.42E01E";
@@ -516,26 +409,18 @@ export const validateFastRecorderOutputBlob = async (
     opts.audioCodec === undefined ? "mp4a.40.2" : opts.audioCodec;
   const codecSuffix = audioCodec ? `, ${audioCodec}` : "";
   const mp4Mime = `video/mp4; codecs="${videoCodec}${codecSuffix}"`;
-  const canPlay = safeCanPlayType(mp4Mime);
-  const mseSupported = safeMseSupport(mp4Mime);
-  details.canPlayType = canPlay;
-  details.mediaSourceSupported = mseSupported;
   details.expectedVideoCodec = videoCodec;
   details.expectedAudioCodec = audioCodec;
-
-  const metadataFailed =
-    reasons.includes("metadata-unavailable") ||
-    reasons.includes("duration-unavailable");
+  details.canPlayType = safeCanPlayType(mp4Mime);
+  details.mediaSourceSupported = safeMseSupport(mp4Mime);
 
   const hardFail =
     reasons.includes("no-blob") ||
     reasons.includes("blob-too-small") ||
     reasons.includes("unexpected-mime") ||
-    // When fastStart is false, metadata can be flaky in some contexts.
-    // Only hard-fail metadata issues if the browser also can't play the codec.
-    (metadataFailed && !canPlay);
+    reasons.includes("demuxer-no-video-track");
 
-  const ok = reasons.length === 0 || (!hardFail && Boolean(canPlay));
+  const ok = reasons.length === 0;
 
   debugLog("validation result", { ok, hardFail, reasons, details });
 

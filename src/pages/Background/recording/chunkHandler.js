@@ -9,6 +9,15 @@ localforage.config({
   version: 1,
 });
 
+// In-memory lock for handleChunks. The previous storage-based `sendingChunks`
+// flag was check-then-set via async chrome.storage calls — two concurrent
+// handleChunks triggers (one from the recorder's stop flow, one from the
+// sandbox's send-chunks-to-sandbox request) could both pass the check before
+// either wrote the flag. That caused duplicate batches to interleave at the
+// sandbox and scramble chunk order. An in-process promise chain is atomic in
+// the SW event loop and strictly serializes handleChunks calls.
+let _sendChain = Promise.resolve();
+
 export const chunksStore = localforage.createInstance({ name: "chunks" });
 export const localDirectoryStore = localforage.createInstance({
   name: "localDirectory",
@@ -24,12 +33,30 @@ export const clearAllRecordings = async () => {
 };
 
 export const handleChunks = async (chunks, override = false, target = null) => {
-  const { sendingChunks, sandboxTab, bannerSupport } =
-    await chrome.storage.local.get([
-      "sendingChunks",
-      "sandboxTab",
-      "bannerSupport",
-    ]);
+  // Serialize via in-memory promise chain. Atomic in the SW event loop, so
+  // two concurrent triggers (e.g. the automatic send on stop and the
+  // sandbox's `send-chunks-to-sandbox` request) run back-to-back instead of
+  // overlapping. Prevents duplicate batches from interleaving at the sandbox
+  // and scrambling chunk order. The old storage-based `sendingChunks` flag
+  // is racy — async read + async write leaves a gap where both callers pass.
+  const priorChain = _sendChain;
+  let releaseChain;
+  _sendChain = new Promise((resolve) => {
+    releaseChain = resolve;
+  });
+  try {
+    await priorChain;
+  } catch {}
+
+  // From here down, any early return or throw must still release the lock.
+  // The inner try/finally below covers the main body; this wrapper catches
+  // anything before it (e.g. a failing storage read).
+  let mainCompleted = false;
+  try {
+  const { sandboxTab, bannerSupport } = await chrome.storage.local.get([
+    "sandboxTab",
+    "bannerSupport",
+  ]);
 
   if (DEBUG_POSTSTOP)
     console.debug("[Screenity][BG] handleChunks called", {
@@ -38,8 +65,7 @@ export const handleChunks = async (chunks, override = false, target = null) => {
       override,
     });
 
-  if (sendingChunks) return;
-
+  // Keep the legacy storage flag in sync for anything still reading it.
   await chrome.storage.local.set({ sendingChunks: true });
 
   try {
@@ -206,6 +232,13 @@ export const handleChunks = async (chunks, override = false, target = null) => {
     }
   } finally {
     await chrome.storage.local.set({ sendingChunks: false });
+    mainCompleted = true;
+  }
+  } finally {
+    // Release the in-memory lock so queued callers can proceed, regardless of
+    // whether the inner body completed normally.
+    void mainCompleted;
+    if (releaseChain) releaseChain();
   }
 };
 

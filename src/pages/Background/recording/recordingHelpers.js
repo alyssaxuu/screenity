@@ -20,23 +20,13 @@ export const checkCapturePermissions = async ({ isLoggedIn, isSubscribed }) => {
     permissions.push("clipboardWrite");
   }
 
-  // API objects are exposed before optional_permission is granted - ask the permissions API directly.
-  const alreadyGranted = await new Promise((resolve) => {
-    chrome.permissions.contains({ permissions }, resolve);
-  });
-
-  console.log("[Screenity][PermCheck] requested:", permissions, "alreadyGranted:", alreadyGranted);
-
-  if (alreadyGranted) {
-    addAlarmListener();
-    return { status: "ok" };
-  }
-
+  // Must be the first await. Any preceding await consumes the user-gesture
+  // context propagated from the content-script click, and Chrome rejects
+  // request() with "must be called during a user gesture" even when all
+  // perms are already granted.
   const granted = await new Promise((resolve) => {
     chrome.permissions.request({ permissions }, resolve);
   });
-
-  console.log("[Screenity][PermCheck] request returned granted:", granted, "lastError:", chrome.runtime.lastError?.message);
 
   if (granted) {
     addAlarmListener();

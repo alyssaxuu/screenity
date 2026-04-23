@@ -495,6 +495,10 @@
     "message": "Pengeditan dan ekspor ke format MP4 tidak tersedia",
     "description": "Deskripsi batas lebih dari 5 menit dalam editor"
   },
+  "overLimitLabelDescriptionFastPath": {
+    "message": "Fitur pengeditan tidak tersedia",
+    "description": "Over limit description when the recording is a native MP4 (fast recorder / WebCodecs) so MP4 export still works"
+  },
   "videoProcessingLabelTitle": {
     "message": "Video sedang diproses...",
     "description": "Label Proses video di editor"
@@ -890,6 +894,10 @@
   "overLimitModalDescription": {
     "message": "Karena Screenity sepenuhnya privat dan berjalan secara lokal, ia dibatasi oleh perangkat keras perangkat Anda. Memproses video sepanjang ini akan memakan waktu terlalu lama dan sangat intensif dalam penggunaan sumber daya. Jangan khawatir, Anda masih dapat mengunduh file WEBM atau rekaman mentah, tetapi pengeditan dan ekspor ke MP4 tidak tersedia. Namun demikian, Anda masih dapat mencoba memproses video ini jika Anda memahami risikonya.",
     "description": "Deskripsi modal batas lebih dari 5 menit"
+  },
+  "overLimitModalDescriptionFastPath": {
+    "message": "Karena Screenity sepenuhnya privat dan berjalan secara lokal, ia dibatasi oleh perangkat keras perangkat Anda. Memproses video sepanjang ini akan memakan waktu terlalu lama dan sangat intensif dalam penggunaan sumber daya. MP4 Anda sudah siap untuk diunduh, tetapi pengeditan di browser tidak tersedia untuk klip sepanjang ini. Namun demikian, Anda masih dapat mencoba memproses video ini jika Anda memahami risikonya.",
+    "description": "Over 5 minutes limit modal description when the recording is a native MP4 (fast recorder / WebCodecs)"
   },
   "overLimitModalButton": {
     "message": "Saya mengerti risikonya, coba saja",
@@ -1390,7 +1398,7 @@
     "description": "Tombol aksi di modal sambutan Pro"
   },
   "webcodecsToggleLabel": {
-    "message": "Fast MP4 (beta)",
+    "message": "Fast MP4",
     "description": "WebCodecs recorder toggle label"
   },
   "webcodecsFailedOffToast": {

@@ -16,6 +16,54 @@ import {
 
 export { FIRST_CHUNK_WATCHDOG_ALARM, RECORDER_KEEPALIVE_ALARM };
 
+// Best-effort attempt to salvage a recording whose tab missed the watchdog.
+// Sends stop-recording-tab and waits for `video-ready` (the signal that the
+// recorder's normal stop/flush/finalize pipeline succeeded). If the tab is
+// only partially hung (e.g. main thread briefly pinned, background-throttled
+// then resumed), this can recover an otherwise-lost recording. If the tab is
+// truly dead, the timeout fires and the caller proceeds with the error path.
+//
+// For WebCodecs specifically this matters a lot: the muxer only finalizes
+// inside the recorder tab, so without this path the MP4's moov box is never
+// written and chunks on disk are unplayable. For MediaRecorder it still helps
+// by draining any pending in-memory samples that hadn't yet reached IDB.
+const STALL_RECOVERY_TIMEOUT_MS = 5000;
+const attemptStallRecovery = (recordingTabId) => {
+  return new Promise((resolve) => {
+    if (!recordingTabId) {
+      resolve(false);
+      return;
+    }
+    let settled = false;
+    const onMsg = (message) => {
+      if (settled) return;
+      if (message?.type === "video-ready") {
+        settled = true;
+        chrome.runtime.onMessage.removeListener(onMsg);
+        resolve(true);
+      }
+    };
+    chrome.runtime.onMessage.addListener(onMsg);
+    try {
+      chrome.tabs.sendMessage(
+        recordingTabId,
+        { type: "stop-recording-tab", reason: "stall-recovery" },
+        () => {
+          // Swallow lastError — the tab may be unresponsive; the timeout
+          // below is the authoritative signal.
+          void chrome.runtime.lastError;
+        },
+      );
+    } catch {}
+    setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      chrome.runtime.onMessage.removeListener(onMsg);
+      resolve(false);
+    }, STALL_RECOVERY_TIMEOUT_MS);
+  });
+};
+
 // Utility to handle tab messaging logic.
 // `tab` is an optional Chrome Tab object used as a fallback when the stored
 // activeTab is no longer valid (e.g. when called from an action-button click).
@@ -98,24 +146,7 @@ export const handleAlarm = async (alarm) => {
       return;
     }
 
-    if (stallLevel === 1) {
-      diagEvent("recording-stall-escalated", {
-        ageMs: age,
-        tabId: snap.recordingTab,
-      });
-      void emitRecordingTelemetry("recording_stall_escalated", {
-        ageMs: age,
-        tabId: snap.recordingTab,
-      });
-      // Force-focus causes a brief tab flash but reliably unfreezes hard-throttled tabs.
-      try {
-        await chrome.tabs.update(snap.recordingTab, { active: true });
-      } catch {}
-      await chrome.storage.local.set({ recordingStallLevel: 2 });
-      return;
-    }
-
-    if (stallLevel === 2) {
+    if (stallLevel >= 1) {
       diagEvent("recording-stall-unrecoverable", {
         ageMs: age,
         tabId: snap.recordingTab,
@@ -124,6 +155,26 @@ export const handleAlarm = async (alarm) => {
         ageMs: age,
         tabId: snap.recordingTab,
       });
+
+      // Before giving up, ask the recorder tab to run its normal stop
+      // pipeline. A tab that's only partially hung (main thread briefly
+      // pinned, background-throttled then resumed) can still process this
+      // and deliver a valid recording via `video-ready`. For WebCodecs this
+      // is especially important — the muxer only finalizes inside the
+      // recorder tab, so without this pathway the MP4's moov atom is never
+      // written and chunks on disk are unplayable.
+      const recovered = await attemptStallRecovery(snap.recordingTab);
+      if (recovered) {
+        diagEvent("recording-stall-recovered", {
+          ageMs: age,
+          tabId: snap.recordingTab,
+        });
+        try {
+          await chrome.storage.local.set({ recordingStallLevel: 0 });
+        } catch {}
+        return;
+      }
+
       void emitRecordingTelemetry("recording_outcome", {
         outcome: "unrecoverable",
         ageMs: age,

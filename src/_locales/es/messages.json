@@ -495,6 +495,10 @@
     "message": "La edición y descarga en formato MP4 no están disponibles",
     "description": "Descripción de límite de más de 5 minutos en el editor"
   },
+  "overLimitLabelDescriptionFastPath": {
+    "message": "Las funciones de edición no están disponibles",
+    "description": "Over limit description when the recording is a native MP4 (fast recorder / WebCodecs) so MP4 export still works"
+  },
   "videoProcessingLabelTitle": {
     "message": "El vídeo se está procesando...",
     "description": "Etiqueta de procesamiento de vídeo en el editor"
@@ -890,6 +894,10 @@
   "overLimitModalDescription": {
     "message": "Dado que Screenity es completamente privado y se ejecuta localmente, está limitado por el hardware de tu dispositivo. Procesar un video de esta longitud llevaría demasiado tiempo y sería muy intensivo en recursos. No te preocupes, aún puedes descargar el archivo WEBM o la grabación sin procesar, pero la edición y la exportación a MP4 no están disponibles. Dicho esto, aún puedes intentar procesar el video de todos modos si comprendes los riesgos.",
     "description": "Descripción del modal de límite de más de 5 minutos"
+  },
+  "overLimitModalDescriptionFastPath": {
+    "message": "Dado que Screenity es completamente privado y se ejecuta localmente, está limitado por el hardware de tu dispositivo. Procesar un video de esta longitud llevaría demasiado tiempo y sería muy intensivo en recursos. Tu MP4 ya está listo para descargar, pero la edición en el navegador no está disponible para clips de esta longitud. Dicho esto, aún puedes intentar procesar el video de todos modos si comprendes los riesgos.",
+    "description": "Over 5 minutes limit modal description when the recording is a native MP4 (fast recorder / WebCodecs)"
   },
   "overLimitModalButton": {
     "message": "Entiendo el riesgo, intentalo de todos modos",
@@ -1390,7 +1398,7 @@
     "description": "Botón de acción del modal de bienvenida a Pro"
   },
   "webcodecsToggleLabel": {
-    "message": "Fast MP4 (beta)",
+    "message": "Fast MP4",
     "description": "WebCodecs recorder toggle label"
   },
   "webcodecsFailedOffToast": {
@@ -1558,11 +1566,11 @@
     "description": "Toast shown when a region recording is stopped by navigation but no chunks were saved"
   },
   "fastRecorderFailedTitle": {
-    "message": "El grabador r\u00e1pido fall\u00f3",
+    "message": "El grabador rápido falló",
     "description": "Title for the modal shown when the fast MP4 recorder output could not be validated"
   },
   "fastRecorderFailedDescription": {
-    "message": "La salida del grabador r\u00e1pido no se pudo validar en este dispositivo.\nPuedes descargar el archivo de todas formas.",
+    "message": "La salida del grabador rápido no se pudo validar en este dispositivo.\nPuedes descargar el archivo de todas formas.",
     "description": "Body text for the fast recorder failure modal"
   },
   "downloadAnywayButton": {

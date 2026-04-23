@@ -495,6 +495,10 @@
     "message": "L'edició i la descàrrega en format MP4 no estan disponibles",
     "description": "Descripció de límit de més de 5 minuts a l'editor"
   },
+  "overLimitLabelDescriptionFastPath": {
+    "message": "Les funcions d'edició no estan disponibles",
+    "description": "Over limit description when the recording is a native MP4 (fast recorder / WebCodecs) so MP4 export still works"
+  },
   "videoProcessingLabelTitle": {
     "message": "El vídeo s'està processant...",
     "description": "Etiqueta de processament de vídeo a l'editor"
@@ -890,6 +894,10 @@
   "overLimitModalDescription": {
     "message": "Com que Screenity és completament privat i s'executa localment, està limitat pel maquinari del teu dispositiu. Processar un vídeo d'aquesta longitud trigarà massa temps i serà molt intensiu en recursos. No et preocupis, encara pots descarregar l'arxiu WEBM o la gravació en brut, però l'edició i l'exportació a MP4 no estan disponibles. Dicho això, encara pots intentar processar el vídeo de tota manera si entens els riscos.",
     "description": "Descripció del modal de límit superior a 5 minuts"
+  },
+  "overLimitModalDescriptionFastPath": {
+    "message": "Com que Screenity és completament privat i s'executa localment, està limitat pel maquinari del teu dispositiu. Processar un vídeo d'aquesta longitud trigarà massa temps i serà molt intensiu en recursos. El teu MP4 ja està llest per descarregar, però l'edició al navegador no està disponible per a clips tan llargs. Dicho això, encara pots intentar processar el vídeo de tota manera si entens els riscos.",
+    "description": "Over 5 minutes limit modal description when the recording is a native MP4 (fast recorder / WebCodecs)"
   },
   "overLimitModalButton": {
     "message": "Entenc el risc, intenta-ho igualment",
@@ -1390,7 +1398,7 @@
     "description": "Botó d’acció del modal de benvinguda a Pro"
   },
   "webcodecsToggleLabel": {
-    "message": "Fast MP4 (beta)",
+    "message": "Fast MP4",
     "description": "WebCodecs recorder toggle label"
   },
   "webcodecsFailedOffToast": {
@@ -1570,7 +1578,7 @@
     "description": "Button to download the recording file despite validation failure"
   },
   "cancelButton": {
-    "message": "Cancel\u00b7la",
+    "message": "Cancel·la",
     "description": "Generic cancel button label"
   }
 }

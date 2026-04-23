@@ -495,6 +495,10 @@
     "message": "Editing and MP4 export are unavailable",
     "description": "Over 5 minutes limit description in editor"
   },
+  "overLimitLabelDescriptionFastPath": {
+    "message": "Editing features are unavailable",
+    "description": "Over limit description when the recording is a native MP4 (fast recorder / WebCodecs) so MP4 export still works"
+  },
   "videoProcessingLabelTitle": {
     "message": "The video is processing locally...",
     "description": "Video processing label in editor"
@@ -922,6 +926,10 @@
   "overLimitModalDescription": {
     "message": "Since Screenity is completely private and runs locally, it's limited by your device's hardware. Processing a video of this length would take too long, and be very resource intensive. Don't worry, you can still download the WEBM file or the raw recording, but editing and MP4 export are not available. That said, you can still try to process the video anyway, if you understand the risks.",
     "description": "Over 5 minutes limit modal description"
+  },
+  "overLimitModalDescriptionFastPath": {
+    "message": "Since Screenity is completely private and runs locally, it's limited by your device's hardware. Processing a video of this length would take too long, and be very resource intensive. Your MP4 is ready to download as-is, but in-browser editing isn't available for clips this long. You can still try to process the video anyway, if you understand the risks.",
+    "description": "Over 5 minutes limit modal description when the recording is a native MP4 (fast recorder / WebCodecs)"
   },
   "overLimitModalButton": {
     "message": "I understand the risk, try anyway",
@@ -1438,7 +1446,7 @@
     "description": "Welcome to Pro modal action button"
   },
   "webcodecsToggleLabel": {
-    "message": "Fast MP4 (beta)",
+    "message": "Fast MP4",
     "description": "WebCodecs recorder toggle label"
   },
   "webcodecsFailedOffToast": {

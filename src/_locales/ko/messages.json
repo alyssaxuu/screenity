@@ -495,6 +495,10 @@
     "message": "편집 및 MP4 형식으로 내보내기를 사용할 수 없어요",
     "description": "편집기 내에서 5분 이상 제한 설명"
   },
+  "overLimitLabelDescriptionFastPath": {
+    "message": "편집 기능을 사용할 수 없어요",
+    "description": "Over limit description when the recording is a native MP4 (fast recorder / WebCodecs) so MP4 export still works"
+  },
   "videoProcessingLabelTitle": {
     "message": "비디오 처리 중...",
     "description": "Video processing label in editor"
@@ -890,6 +894,10 @@
   "overLimitModalDescription": {
     "message": "Screenity는 완전히 개인적이며 로컬에서 실행되므로 디바이스의 하드웨어에 제한됩니다. 이 길이의 비디오를 처리하는 데 시간이 오래 걸리고 많은 리소스를 필요로 할 것입니다. 걱정하지 마세요. 여전히 WEBM 파일이나 원시 녹화를 다운로드할 수 있지만 편집 및 MP4 내보내기는 사용할 수 없습니다. 그럼에도 불구하고, 이 비디오를 처리해 보려고 할 수 있습니다. 단, 위험을 이해하는 경우에만 시도하십시오.",
     "description": "5분 이상 제한 모달 설명"
+  },
+  "overLimitModalDescriptionFastPath": {
+    "message": "Screenity는 완전히 개인적이며 로컬에서 실행되므로 디바이스의 하드웨어에 제한됩니다. 이 길이의 비디오를 처리하는 데 시간이 오래 걸리고 많은 리소스를 필요로 할 것입니다. MP4 파일은 바로 다운로드할 수 있지만, 이 정도 길이의 클립은 브라우저 내 편집이 지원되지 않습니다. 그럼에도 불구하고, 위험을 이해하는 경우에만 이 비디오를 처리해 볼 수 있습니다.",
+    "description": "Over 5 minutes limit modal description when the recording is a native MP4 (fast recorder / WebCodecs)"
   },
   "overLimitModalButton": {
     "message": "위험을 이해하고 시도해 보겠습니다",
@@ -1390,7 +1398,7 @@
     "description": "Pro 환영 모달 확인 버튼"
   },
   "webcodecsToggleLabel": {
-    "message": "Fast MP4 (beta)",
+    "message": "Fast MP4",
     "description": "WebCodecs recorder toggle label"
   },
   "webcodecsFailedOffToast": {

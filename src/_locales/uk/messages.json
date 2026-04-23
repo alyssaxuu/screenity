@@ -495,6 +495,10 @@
     "message": "Редагування та експорт у форматі MP4 недоступні",
     "description": "Опис обмеження понад 5 хвилин у редакторі"
   },
+  "overLimitLabelDescriptionFastPath": {
+    "message": "Функції редагування недоступні",
+    "description": "Over limit description when the recording is a native MP4 (fast recorder / WebCodecs) so MP4 export still works"
+  },
   "videoProcessingLabelTitle": {
     "message": "Відео обробляється...",
     "description": "Video processing label in editor"
@@ -890,6 +894,10 @@
   "overLimitModalDescription": {
     "message": "Оскільки Screenity цілком приватний і працює локально, він обмежений апаратним забезпеченням вашого пристрою. Обробка відео цієї довжини займе дуже багато часу та буде вимагати значних ресурсів. Однак ви все ще можете завантажити файл WEBM або необроблену запису, але можливості редагування та експорту в MP4 недоступні. Так чи інакше, ви можете спробувати обробити відео, якщо розумієте ризики.",
     "description": "Опис модального вікна обмеження понад 5 хвилин"
+  },
+  "overLimitModalDescriptionFastPath": {
+    "message": "Оскільки Screenity цілком приватний і працює локально, він обмежений апаратним забезпеченням вашого пристрою. Обробка відео цієї довжини займе дуже багато часу та буде вимагати значних ресурсів. Ваш файл MP4 готовий до завантаження, але редагування в браузері недоступне для записів такої довжини. Так чи інакше, ви можете спробувати обробити відео, якщо розумієте ризики.",
+    "description": "Over 5 minutes limit modal description when the recording is a native MP4 (fast recorder / WebCodecs)"
   },
   "overLimitModalButton": {
     "message": "Я розумію ризики, все одно спробувати",
@@ -1382,7 +1390,7 @@
     "description": "Кнопка дії у вікні привітання Pro"
   },
   "webcodecsToggleLabel": {
-    "message": "Fast MP4 (beta)",
+    "message": "Fast MP4",
     "description": "WebCodecs recorder toggle label"
   },
   "webcodecsFailedOffToast": {

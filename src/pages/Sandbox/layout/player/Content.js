@@ -19,7 +19,7 @@ const Content = () => {
         {contentState.mode === "player" && <VideoPlayer />}
         {contentState.mode === "crop" && <CropperWrap />}
       </div>
-      <HelpButton />
+      {contentState.mode === "crop" && <HelpButton />}
       {contentState.bannerSupport && <ProBanner />}
     </div>
   );

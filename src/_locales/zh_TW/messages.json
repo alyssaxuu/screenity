@@ -495,6 +495,10 @@
     "message": "編輯功能與 MP4 匯出無法使用",
     "description": "Over 5 minutes limit description in editor"
   },
+  "overLimitLabelDescriptionFastPath": {
+    "message": "編輯功能無法使用",
+    "description": "Over limit description when the recording is a native MP4 (fast recorder / WebCodecs) so MP4 export still works"
+  },
   "videoProcessingLabelTitle": {
     "message": "影片正在於本機處理中...",
     "description": "Video processing label in editor"
@@ -890,6 +894,10 @@
   "overLimitModalDescription": {
     "message": "由於 Screenity 完全在本機執行來保護隱私，它也受您的裝置硬體限制。處理這個長度的影片會需要太久，並需要大量電腦資源。不用擔心，您還是可以下載 WEBM 檔案或是原始錄影，只是編輯功能與 MP4 匯出會無法使用。雖然是這樣說，如果您瞭解風險您還是可以決定嘗試處理影片。",
     "description": "Over 5 minutes limit modal description"
+  },
+  "overLimitModalDescriptionFastPath": {
+    "message": "由於 Screenity 完全在本機執行來保護隱私，它也受您的裝置硬體限制。處理這個長度的影片會需要太久，並需要大量電腦資源。您的 MP4 已準備好可以直接下載，但這麼長的片段無法在瀏覽器中編輯。雖然是這樣說，如果您瞭解風險您還是可以決定嘗試處理影片。",
+    "description": "Over 5 minutes limit modal description when the recording is a native MP4 (fast recorder / WebCodecs)"
   },
   "overLimitModalButton": {
     "message": "我瞭解風險，仍要嘗試",
@@ -1390,7 +1398,7 @@
     "description": "Pro 歡迎視窗確認按鈕"
   },
   "webcodecsToggleLabel": {
-    "message": "快速 MP4（beta）",
+    "message": "快速 MP4",
     "description": "WebCodecs recorder toggle label"
   },
   "webcodecsFailedOffToast": {

@@ -495,6 +495,10 @@
     "message": "संपादन और MP4 निर्यात उपलब्ध नहीं है",
     "description": "संपादक में 5 मिनट से अधिक सीमा का विवरण"
   },
+  "overLimitLabelDescriptionFastPath": {
+    "message": "संपादन सुविधाएँ उपलब्ध नहीं हैं",
+    "description": "Over limit description when the recording is a native MP4 (fast recorder / WebCodecs) so MP4 export still works"
+  },
   "videoProcessingLabelTitle": {
     "message": "वीडियो प्रसंस्करण हो रहा है...",
     "description": "संपादक में वीडियो प्रसंस्करण लेबल"
@@ -890,6 +894,10 @@
   "overLimitModalDescription": {
     "message": "क्योंकि Screenity पूरी तरह से निजी है और स्थानीय रूप से चलता है, यह आपके डिवाइस के हार्डवेयर द्वारा सीमित होता है। इस लम्बाई के वीडियो को प्रोसेस करना बहुत समय लगेगा और बहुत अधिक संसाधनों की आवश्यकता होगी। फिकर न करें, आप फिर भी WEBM फ़ाइल या रॉ रिकॉर्डिंग डाउनलोड कर सकते हैं, लेकिन संपादन और MP4 निर्यात उपलब्ध नहीं हैं। इसके बावजूद, आप फिर भी कोशिश कर सकते हैं कि वीडियो को प्रोसेस करने का प्रयास करें, अगर आप खतरों को समझते हैं।",
     "description": "5 मिनट सीमा मॉडल विवरण"
+  },
+  "overLimitModalDescriptionFastPath": {
+    "message": "क्योंकि Screenity पूरी तरह से निजी है और स्थानीय रूप से चलता है, यह आपके डिवाइस के हार्डवेयर द्वारा सीमित होता है। इस लम्बाई के वीडियो को प्रोसेस करना बहुत समय लगेगा और बहुत अधिक संसाधनों की आवश्यकता होगी। आपका MP4 डाउनलोड करने के लिए तैयार है, लेकिन इतनी लंबी क्लिप के लिए ब्राउज़र में संपादन उपलब्ध नहीं है। इसके बावजूद, आप फिर भी कोशिश कर सकते हैं कि वीडियो को प्रोसेस करने का प्रयास करें, अगर आप खतरों को समझते हैं।",
+    "description": "Over 5 minutes limit modal description when the recording is a native MP4 (fast recorder / WebCodecs)"
   },
   "overLimitModalButton": {
     "message": "मैं खतरा समझता हूँ, फिर भी कोशिश करें",
@@ -1390,7 +1398,7 @@
     "description": "Pro वेलकम मोडल का एक्शन बटन"
   },
   "webcodecsToggleLabel": {
-    "message": "Fast MP4 (beta)",
+    "message": "Fast MP4",
     "description": "WebCodecs recorder toggle label"
   },
   "webcodecsFailedOffToast": {

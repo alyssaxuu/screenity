@@ -16,6 +16,11 @@ const FAST_RECORDER_KEYS = [
   "fastRecorderValidation",
   "fastRecorderValidationFailed",
   "fastRecorderInUse",
+  "fastRecorderSelectedEncoder",
+  "useWebCodecsRecorder",
+  "lastWebCodecsFailureAt",
+  "lastWebCodecsFailureCode",
+  "lastFailedValidation",
 ];
 
 export const buildDiagnosticZip = async ({

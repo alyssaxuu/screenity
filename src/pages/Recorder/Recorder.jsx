@@ -460,11 +460,27 @@ const Recorder = () => {
    */
   const startSessionHeartbeat = () => {
     if (sessionHeartbeat.current) clearInterval(sessionHeartbeat.current);
-    sessionHeartbeat.current = setInterval(() => {
-      if (isRecording.current) {
-        persistSessionState("recording");
+    // For WebCodecs: the muxer only emits a single chunk at finalize, so
+    // handleChunk can't drive the recording-stall watchdog heartbeat during
+    // the recording. Drive it from here instead — writes lastChunkAt every
+    // 10s, plus firstChunkAt on the first tick (also overwrites any stale
+    // values left from a prior session that hadn't been cleaned up yet).
+    let firstHeartbeat = true;
+    const tick = () => {
+      if (!isRecording.current) return;
+      persistSessionState("recording");
+      if (useWebCodecs.current) {
+        const now = Date.now();
+        const update = { lastChunkAt: now };
+        if (firstHeartbeat) {
+          update.firstChunkAt = now;
+          firstHeartbeat = false;
+        }
+        chrome.storage.local.set(update).catch(() => {});
       }
-    }, 10000); // Every 10 seconds
+    };
+    tick(); // fire immediately so first heartbeat lands before the 30s stall window
+    sessionHeartbeat.current = setInterval(tick, 10000);
   };
 
   /**
@@ -937,7 +953,8 @@ const Recorder = () => {
     const { useWebCodecsRecorder } = await chrome.storage.local.get([
       "useWebCodecsRecorder",
     ]);
-    const userSetting = useWebCodecsRecorder === true ? true : false;
+    // Default-on as of 4.3.7: treat undefined as enabled; only explicit `false` opts out.
+    const userSetting = useWebCodecsRecorder === false ? false : true;
     const stickyState = await getFastRecorderStickyState();
     const probeResult = await probeFastRecorderSupport();
     const shouldUseFast = shouldUseFastRecorder(
@@ -1032,6 +1049,13 @@ const Recorder = () => {
     isRestarting.current = false;
     index.current = 0;
 
+    // Tracks in-flight WebCodecs IDB writes. onChunk fires handleChunk
+    // fire-and-forget, and waitForDrain only covers the MediaRecorder
+    // pending queue — so onFinalized could race ahead of slicing and
+    // rebuild from a partially-written chunksStore. Chain every handleChunk
+    // call here and await this chain in onFinalized.
+    let webcodecsWriteChain = Promise.resolve();
+
     const handleChunk = async (data, timestampMs) => {
       if (runGeneration !== recordingGeneration.current) {
         return;
@@ -1041,24 +1065,58 @@ const Recorder = () => {
           data instanceof Blob ? data : new Blob([data], { type: "video/mp4" });
 
         const ts = timestampMs ?? 0;
-        const i = index.current;
+
+        // The WebCodecs Mp4 muxer emits the ENTIRE MP4 as a single chunk at
+        // finalize(). For long recordings that can be 50+ MB. Two problems if
+        // we store it as one IDB entry:
+        //   1. chrome.runtime.sendMessage (used to relay chunks base64-encoded
+        //      to the sandbox) has a ~64MB serialization limit. base64 adds
+        //      33% overhead, so a 50MB raw chunk becomes ~67MB base64 → fails.
+        //   2. Encoding a huge blob to base64 via FileReader in the SW is
+        //      slow and memory-heavy.
+        // Split into smaller slices at IDB write time. Downstream paths
+        // (rebuildBlobFromChunks + BG sendChunks + sandbox handleBatch)
+        // all concatenate parts, so slicing is transparent to them.
+        const SLICE_SIZE = 2 * 1024 * 1024;
 
         try {
-          await chunksStore.setItem(`chunk_${i}`, {
-            index: i,
-            chunk: blob,
-            timestamp: ts,
-          });
-          index.current = i + 1;
-          if (!hasChunks.current) {
-            // Cancel first-chunk watchdog
-            chrome.runtime
-              .sendMessage({ type: "cancel-first-chunk-watchdog" })
-              .catch(() => {});
+          let offset = 0;
+          let isFirstSlice = true;
+          while (offset < blob.size || (offset === 0 && blob.size === 0)) {
+            const i = index.current;
+            const end = Math.min(offset + SLICE_SIZE, blob.size);
+            const slice =
+              blob.size <= SLICE_SIZE && offset === 0
+                ? blob
+                : blob.slice(offset, end, blob.type || "video/mp4");
+            await chunksStore.setItem(`chunk_${i}`, {
+              index: i,
+              chunk: slice,
+              timestamp: ts,
+            });
+            if (isFirstSlice) {
+              // Update watchdog heartbeat. Without this, the recording-stall
+              // detector in handleAlarm.js sees lastChunkAt as null, computes
+              // a huge age, and fires stall-unrecoverable at ~30s — killing
+              // every WebCodecs recording silently.
+              const heartbeatUpdate = { lastChunkAt: Date.now() };
+              if (i === 0) heartbeatUpdate.firstChunkAt = Date.now();
+              chrome.storage.local.set(heartbeatUpdate).catch(() => {});
+              if (!hasChunks.current) {
+                chrome.runtime
+                  .sendMessage({ type: "cancel-first-chunk-watchdog" })
+                  .catch(() => {});
+              }
+              hasChunks.current = true;
+              isFirstSlice = false;
+            }
+            index.current = i + 1;
+            savedCount.current += 1;
+            if (blob.size === 0) break;
+            offset = end;
           }
-          hasChunks.current = true;
-          savedCount.current += 1;
 
+          const i = index.current - 1;
           if (DEBUG_RECORDER) {
             debug("WebCodecs chunk saved", {
               i,
@@ -1178,6 +1236,9 @@ const Recorder = () => {
           onFinalized: async () => {
             debug("WebCodecsRecorder onFinalized()");
             await waitForDrain();
+            try {
+              await webcodecsWriteChain;
+            } catch {}
             await updateFreeFinalizeStatus("chunks_ready", 95);
             let validation = null;
             try {
@@ -1207,6 +1268,14 @@ const Recorder = () => {
                 useWebCodecsRecorder: false,
                 lastWebCodecsFailureAt: Date.now(),
                 lastWebCodecsFailureCode: "validation-failed",
+                // Persistent record survives subsequent recording starts
+                // (which clear fastRecorderValidation), so we can always
+                // inspect why sticky-disable was triggered.
+                lastFailedValidation: {
+                  at: Date.now(),
+                  recordingId,
+                  validation,
+                },
               });
               const hardFail = Boolean(validation.hardFail);
               await chrome.storage.local.set({
@@ -1259,7 +1328,9 @@ const Recorder = () => {
                 timestampMs,
               });
             }
-            handleChunk(blob, timestampMs);
+            webcodecsWriteChain = webcodecsWriteChain
+              .catch(() => {})
+              .then(() => handleChunk(blob, timestampMs));
           },
           onError: (err) => {
             debugError("WebCodecsRecorder error", err);
@@ -1367,8 +1438,8 @@ const Recorder = () => {
             }
           }
 
-          recorder.current.start(1000);
-          debug("MediaRecorder.start(1000) called");
+          recorder.current.start(5000);
+          debug("MediaRecorder.start(5000) called");
 
           // Start first-chunk watchdog (8s, via chrome.alarms)
           chrome.runtime
@@ -1634,7 +1705,14 @@ const Recorder = () => {
     const items = [];
     await chunksStore.ready();
     await chunksStore.iterate((value) => (items.push(value), undefined));
-    items.sort((a, b) => (a.timestamp ?? 0) - (b.timestamp ?? 0));
+    // Primary sort by timestamp, tiebreak by index. Necessary since the
+    // WebCodecs slicing path writes multiple slices with the same timestamp
+    // (they all belong to the single muxer-emitted chunk).
+    items.sort((a, b) => {
+      const dt = (a.timestamp ?? 0) - (b.timestamp ?? 0);
+      if (dt !== 0) return dt;
+      return (a.index ?? 0) - (b.index ?? 0);
+    });
     const parts = items.map((c) =>
       c.chunk instanceof Blob ? c.chunk : new Blob([c.chunk]),
     );
