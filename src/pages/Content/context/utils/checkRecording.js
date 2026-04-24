@@ -1,19 +1,6 @@
-import { setContentState } from "../ContentState";
-
-export const checkRecording = async (id) => {
-  const { recording } = await chrome.storage.local.get("recording");
-  const { tabRecordedID } = await chrome.storage.local.get("tabRecordedID");
-  if (id == null && tabRecordedID) {
-    setContentState((prevContentState) => ({
-      ...prevContentState,
-      recording: false,
-    }));
-  } else if (recording && tabRecordedID) {
-    if (id != tabRecordedID) {
-      setContentState((prevContentState) => ({
-        ...prevContentState,
-        recording: false,
-      }));
-    }
-  }
-};
+// Intentionally a no-op. Local recording state is managed by the background
+// via explicit messages (`recording-check force:true` on the recorded tab,
+// `hide-popup-recording` on other tabs). An earlier version of this function
+// force-cleared local `recording` whenever `tabRecordedID` was set, which
+// clobbered `recording-check` after a same-tab navigation.
+export const checkRecording = async () => {};

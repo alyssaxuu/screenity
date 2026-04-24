@@ -79,6 +79,43 @@ setupHandlers();
 // can dispatch any queued events to this worker.
 clearStaleLocks();
 
+// One-time migration for users upgrading from 4.3.7. The finalize-hang bug on
+// abrupt stream end caused sticky-disable to fire for many WebCodecs users;
+// the underlying cause is fixed in this release (fragmented MP4 + streaming),
+// so the sticky flags are no longer warranted and should be cleared once so
+// affected users get WebCodecs again on their next recording. The user's
+// explicit opt-out (useWebCodecsRecorder === false) is preserved.
+const CURRENT_MIGRATION_VERSION = "4.3.8";
+const runUpgradeMigrations = async () => {
+  try {
+    const { screenityMigratedForVersion } = await chrome.storage.local.get([
+      "screenityMigratedForVersion",
+    ]);
+    if (screenityMigratedForVersion === CURRENT_MIGRATION_VERSION) return;
+
+    await chrome.storage.local.remove([
+      "fastRecorderDisabledForDevice",
+      "fastRecorderDisabledReason",
+      "fastRecorderDisabledAt",
+      "fastRecorderDisabledDetails",
+      "fastRecorderValidationFailed",
+      "fastRecorderValidation",
+      "lastWebCodecsFailureAt",
+      "lastWebCodecsFailureCode",
+      "lastFailedValidation",
+    ]);
+    await chrome.storage.local.set({
+      screenityMigratedForVersion: CURRENT_MIGRATION_VERSION,
+    });
+    console.info(
+      "[Screenity][BG] Cleared stale 4.3.7 sticky-disable flags on upgrade",
+    );
+  } catch (err) {
+    console.error("[Screenity][BG] Upgrade migration failed:", err);
+  }
+};
+runUpgradeMigrations();
+
 // Hydrate the diagnostic log from storage and record that the SW (re)started.
 hydrateDiagnosticLog().then(() => {
   diagEvent("sw-init", { ts: Date.now() });

@@ -661,6 +661,7 @@ export const setupHandlers = () => {
       ...prev,
       showPopup: false,
       showExtension: false,
+      recording: false,
     }));
   });
 

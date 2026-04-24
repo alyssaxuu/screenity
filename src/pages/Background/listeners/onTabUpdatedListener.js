@@ -1,73 +1,8 @@
 import { sendMessageTab } from "../tabManagement";
 import { diagEvent } from "../../utils/diagnosticLog";
-import { videoReady } from "../recording/recordingHelpers";
-import { chunksStore } from "../recording/chunkHandler";
 
 export const handleTabUpdate = async (tabId, changeInfo, tab) => {
   try {
-    // React to URL changes EARLY (fires at navigation start, before the new
-    // page loads) so we can clear recording state before the new content
-    // script re-injects the region UI.
-    if (changeInfo.url) {
-      const {
-        recording,
-        tabRecordedID,
-        recorderSession,
-        customRegion,
-        recordingType,
-        restarting,
-      } = await chrome.storage.local.get([
-        "recording",
-        "tabRecordedID",
-        "recorderSession",
-        "customRegion",
-        "recordingType",
-        "restarting",
-      ]);
-
-      const isActivelyRecording =
-        recording ||
-        (recorderSession && recorderSession.status === "recording");
-      const isRegionRecording = customRegion || recordingType === "region";
-
-      if (
-        !restarting &&
-        isActivelyRecording &&
-        isRegionRecording &&
-        tabRecordedID &&
-        tabRecordedID === tabId
-      ) {
-        diagEvent("region-nav-stop", { tabId });
-        // Clear ALL recording state IMMEDIATELY so the new page's content
-        // script won't see an active recording, and so the status=complete
-        // handler won't send a recording-check that re-enables the UI.
-        // Also clear recordingTab so stopRecording() opens the editor
-        // instead of thinking it was already handled.
-        await chrome.storage.local.set({
-          recording: false,
-          customRegion: false,
-          recordingTab: null,
-          postStopEditorOpening: false,
-          postStopEditorOpened: false,
-          recorderSession: recorderSession
-            ? { ...recorderSession, status: "stopped" }
-            : null,
-        });
-        const chunkCount = await chunksStore.length().catch(() => 0);
-        if (chunkCount === 0) {
-          diagEvent("region-nav-no-chunks");
-          sendMessageTab(tabId, {
-            type: "show-toast",
-            message: chrome.i18n.getMessage("recordingTooShortToast"),
-            timeout: 5000,
-          }).catch(() => {});
-          return;
-        }
-        await videoReady();
-        return; // Skip the status=complete handler for this event
-      }
-    }
-
     if (changeInfo.status === "complete") {
       const {
         recording,
@@ -107,8 +42,6 @@ export const handleTabUpdate = async (tabId, changeInfo, tab) => {
       } else if (isActivelyRecording) {
         if (tabRecordedID && tabRecordedID === tabId) {
           diagEvent("recorded-tab-navigated");
-
-          // For non-region recordings, send a check to the content script
           sendMessageTab(tabId, {
             type: "recording-check",
             force: true,

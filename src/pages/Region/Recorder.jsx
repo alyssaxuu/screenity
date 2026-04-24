@@ -629,7 +629,7 @@ const Recorder = () => {
       const { useWebCodecsRecorder } = await chrome.storage.local.get([
         "useWebCodecsRecorder",
       ]);
-      // Default-on as of 4.3.7: treat undefined as enabled; only explicit `false` opts out.
+      // Default-on: treat undefined as enabled; only explicit `false` opts out.
       const userSetting = useWebCodecsRecorder === false ? false : true;
       const stickyState = await getFastRecorderStickyState();
       const probeResult = await probeFastRecorderSupport();

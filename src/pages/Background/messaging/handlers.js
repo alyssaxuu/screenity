@@ -805,18 +805,21 @@ export const setupHandlers = () => {
   // Fired by Region/Recorder.jsx pagehide — the iframe is being torn down
   // because the user navigated away from the recorded tab.
   registerMessage("region-iframe-destroyed", async () => {
-    const { recording, recorderSession, customRegion, recordingType } =
+    const { recording, recorderSession, customRegion } =
       await chrome.storage.local.get([
         "recording",
         "recorderSession",
         "customRegion",
-        "recordingType",
       ]);
     const isActivelyRecording =
       recording ||
       (recorderSession && recorderSession.status === "recording");
-    const isRegionRecording = customRegion || recordingType === "region";
-    if (!isActivelyRecording || !isRegionRecording) return;
+    if (!isActivelyRecording) return;
+    // Only treat as a real region-recording teardown when the iframe was
+    // actually hosting the MediaRecorder (customRegion flow). Plain
+    // tab-area records in the pinned recorder tab, so navigation of the
+    // recorded page must not tear it down.
+    if (!customRegion) return;
 
     diagEvent("region-iframe-destroyed");
     await chrome.storage.local.set({

@@ -7,7 +7,7 @@
 import {
   Output,
   Mp4OutputFormat,
-  BufferTarget,
+  StreamTarget,
   EncodedVideoPacketSource,
   EncodedAudioPacketSource,
   EncodedPacket,
@@ -25,9 +25,15 @@ interface Mp4MuxerWrapperOptions {
   debug?: boolean;
 }
 
+// Flush buffered stream writes to chunksStore when we hit ~1MB or 1s,
+// whichever first. Small enough that losing the last buffer on a hard crash
+// only costs ~1s of video; large enough that chunksStore writes stay cheap.
+const FLUSH_BYTES = 1 * 1024 * 1024;
+const FLUSH_INTERVAL_MS = 1000;
+
 export class Mp4MuxerWrapper {
   private output: Output;
-  private target: BufferTarget;
+  private target: StreamTarget;
 
   private videoSource: EncodedVideoPacketSource;
   private audioSource: EncodedAudioPacketSource | null = null;
@@ -44,6 +50,16 @@ export class Mp4MuxerWrapper {
 
   private _lastDecoderConfig: any = null;
 
+  // Write-buffer state: coalesces many small StreamTarget writes into
+  // fewer, larger IDB entries. Fragmented MP4 can emit dozens of tiny
+  // writes per second (per-fragment headers, sample data, trailing bytes);
+  // without this, IDB would get hammered with small puts.
+  private _writeBuffer: Uint8Array[] = [];
+  private _writeBufferBytes = 0;
+  private _writeBufferTimer: any = null;
+  private _pendingFlush: Promise<void> = Promise.resolve();
+  private _closed = false;
+
   private debug: boolean;
   private log: (...args: any[]) => void;
   private warn: (...args: any[]) => void;
@@ -59,10 +75,27 @@ export class Mp4MuxerWrapper {
     this.videoCodec = options.videoCodec || "avc";
     this.audioCodec = options.audioCodec || "aac";
 
-    this.target = new BufferTarget();
+    // Fragmented MP4 via StreamTarget. Writes stream out as fragments are
+    // produced throughout recording, so if finalize() hangs or the recorder
+    // crashes, chunksStore already holds the vast majority of the file as
+    // self-contained fMP4 fragments (moov at start, moof+mdat pairs after).
+    // Playable directly in <video> and re-muxable to standard MP4 on
+    // download for universal compatibility.
+    const writable = new WritableStream<{ data: Uint8Array; position: number; type: string }>({
+      write: (chunk) => {
+        // With an append-only fragmented output, writes arrive in byte-order
+        // and position is monotonic, so we ignore position and just append.
+        this.bufferWrite(chunk.data);
+      },
+    });
+    this.target = new StreamTarget(writable);
     this.output = new Output({
       format: new Mp4OutputFormat({
-        fastStart: false, // metadata at end, more compatible
+        fastStart: "fragmented",
+        // Align fragment boundaries with our keyframe interval (~2s at 30fps).
+        // Larger fragments = fewer moof headers overhead; smaller = finer-
+        // grained recovery on crash. 1s is a good middle ground.
+        minimumFragmentDuration: 1,
       }),
       target: this.target,
     });
@@ -71,6 +104,52 @@ export class Mp4MuxerWrapper {
     this.output.addVideoTrack(this.videoSource, {
       frameRate: this.options.fps,
     });
+  }
+
+  private bufferWrite(data: Uint8Array) {
+    if (this._closed) return;
+    // StreamTarget reuses its internal buffer across writes, so we must
+    // copy here. Storing the reference would leave us with stale bytes
+    // by the time the flush runs.
+    const copy = new Uint8Array(data.byteLength);
+    copy.set(data);
+    this._writeBuffer.push(copy);
+    this._writeBufferBytes += copy.byteLength;
+
+    if (this._writeBufferBytes >= FLUSH_BYTES) {
+      this.flushWriteBuffer();
+    } else if (!this._writeBufferTimer) {
+      this._writeBufferTimer = setTimeout(
+        () => this.flushWriteBuffer(),
+        FLUSH_INTERVAL_MS,
+      );
+    }
+  }
+
+  private flushWriteBuffer() {
+    if (this._writeBufferTimer) {
+      clearTimeout(this._writeBufferTimer);
+      this._writeBufferTimer = null;
+    }
+    if (this._writeBuffer.length === 0) return;
+
+    const parts = this._writeBuffer;
+    const total = this._writeBufferBytes;
+    this._writeBuffer = [];
+    this._writeBufferBytes = 0;
+
+    const merged = new Uint8Array(total);
+    let offset = 0;
+    for (const p of parts) {
+      merged.set(p, offset);
+      offset += p.byteLength;
+    }
+
+    // Serialize emits via a promise chain so chunksStore sees writes in the
+    // order they were produced (critical for file byte-order integrity).
+    this._pendingFlush = this._pendingFlush
+      .catch(() => {})
+      .then(() => this.emitChunk(merged, null));
   }
 
   enableAudio() {
@@ -112,13 +191,27 @@ export class Mp4MuxerWrapper {
 
   async finalize() {
     this.log("[MUXER] finalize");
-    await this.output.finalize();
-
-    const data = this.target.buffer;
-    if (data?.byteLength) {
-      this.log("[MUXER] emitting final file", data.byteLength, "bytes");
-      this.emitChunk(new Uint8Array(data), null);
+    try {
+      await this.output.finalize();
+    } finally {
+      // Whatever finalize did (or didn't) write, flush the coalescing
+      // buffer and mark closed so late writes are dropped rather than
+      // leaking into a future recording.
+      this.flushWriteBuffer();
+      this._closed = true;
+      // Let any in-flight emitChunk calls settle before returning. The
+      // caller's onFinalized depends on chunksStore being consistent.
+      await this._pendingFlush;
     }
+  }
+
+  // Force-flush pending writes without running output.finalize(). Called
+  // when the muxer hangs, to preserve whatever fragments have already
+  // streamed out so the recording is still recoverable.
+  async flushPending() {
+    this.flushWriteBuffer();
+    this._closed = true;
+    await this._pendingFlush;
   }
 
   // No-op: WebCodecsRecorder already subtracts paused time from timestamps,

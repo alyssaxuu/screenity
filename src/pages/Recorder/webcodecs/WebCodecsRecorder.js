@@ -409,16 +409,46 @@ export class WebCodecsRecorder {
       }
     }
 
-    try {
-      if (this.muxer) {
-        await this.muxer.finalize();
-        if (this.options.onFinalized) {
-          await this.options.onFinalized();
-        }
+    // Finalize the muxer with a hard timeout. On abrupt stream end (e.g. user
+    // clicks Chrome's "Stop sharing" bar and the video track is torn down
+    // mid-pipeline), output.finalize() can hang. With fragmented MP4 +
+    // StreamTarget the vast majority of the file has already been streamed
+    // to chunksStore throughout the recording, so a hung finalize at most
+    // costs us the last fragment (~1s). flushPending() drops the muxer into
+    // a closed state and flushes any buffered writes, preserving what we have.
+    let muxerFinalizeOk = false;
+    if (this.muxer) {
+      try {
+        await Promise.race([
+          this.muxer.finalize().then(() => {
+            muxerFinalizeOk = true;
+          }),
+          new Promise((_, reject) =>
+            setTimeout(
+              () => reject(new Error("muxer-finalize-timeout")),
+              5000,
+            ),
+          ),
+        ]);
+      } catch (err) {
+        this.err("[WCR] muxer.finalize:", err);
+        this.options.onError?.(err);
+        try {
+          await this.muxer.flushPending();
+        } catch {}
       }
-    } catch (err) {
-      this.err("[WCR] muxer.finalize:", err);
-      this.options.onError?.(err);
+    }
+
+    // Always invoke onFinalized so the Recorder layer can decide what to do
+    // next (validate whatever chunks landed, mark the recording as failed,
+    // send video-ready to unblock the editor). Skipping this on finalize
+    // failure is what caused the stuck-at-90% bug on stream-end.
+    if (this.options.onFinalized) {
+      try {
+        await this.options.onFinalized({ muxerFinalizeOk });
+      } catch (err) {
+        this.err("[WCR] onFinalized threw:", err);
+      }
     }
 
     this.cleanup();

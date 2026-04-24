@@ -22,6 +22,15 @@ import {
   isRecordingDebugEnabled,
 } from "../../utils/recordingDebug";
 import { diagForward } from "../../utils/diagForward";
+import {
+  Input,
+  Output,
+  BlobSource,
+  BufferTarget,
+  Mp4OutputFormat,
+  ALL_FORMATS,
+  Conversion,
+} from "mediabunny";
 
 localforage.config({
   driver: localforage.INDEXEDDB,
@@ -2139,6 +2148,42 @@ const ContentState = (props) => {
     });
   };
 
+  // Re-mux a fragmented MP4 blob to a standard (non-fragmented) MP4 blob
+  // via container copy (no re-decode, no re-encode). The recorder writes
+  // fMP4 for crash safety, but users expect a standard MP4 on download
+  // for universal compatibility (QuickTime seeking, editors, etc.).
+  // Typical cost: ~1-3 seconds for a 10-min recording.
+  //
+  // Uses BufferTarget despite the memory cost. fastStart: false is NOT a
+  // pure append-only write: mediabunny writes an mdat header placeholder
+  // up front, then samples, then patches the mdat size at the end via a
+  // positioned write. A naive stream-to-blob pipe drops those positioned
+  // patches, producing a file with an empty mdat and orphan samples that
+  // no player can open. A positioned StreamTarget would need a random-
+  // access backing store (a buffer), so BufferTarget is the right tool.
+  const remuxFragmentedToStandardMp4 = async (fragmentedBlob, onProgress) => {
+    const input = new Input({
+      formats: ALL_FORMATS,
+      source: new BlobSource(fragmentedBlob),
+    });
+    const target = new BufferTarget();
+    const output = new Output({
+      target,
+      format: new Mp4OutputFormat({ fastStart: false }),
+    });
+    const conversion = await Conversion.init({
+      input,
+      output,
+      video: { forceTranscode: false },
+      audio: { forceTranscode: false },
+    });
+    if (typeof onProgress === "function") {
+      conversion.onProgress = (p) => onProgress(p);
+    }
+    await conversion.execute();
+    return new Blob([target.buffer], { type: "video/mp4" });
+  };
+
   const download = async () => {
     if (contentState.isFfmpegRunning || contentState.downloading) return;
 
@@ -2146,19 +2191,45 @@ const ContentState = (props) => {
       ...prev,
       downloading: true,
       isFfmpegRunning: true,
+      processingProgress: 0,
     }));
 
     try {
-      const url = URL.createObjectURL(contentState.blob);
+      // Re-mux fragmented MP4 → standard MP4 for universal compatibility.
+      // Editor plays fMP4 directly (Chrome handles it), but downloaded
+      // files need the standard layout so they seek cleanly in QuickTime,
+      // DaVinci, Premiere, etc. Container-only operation, no re-encode.
+      const remuxedBlob = await remuxFragmentedToStandardMp4(
+        contentState.blob,
+        (p) =>
+          setContentState((prev) => ({
+            ...prev,
+            processingProgress: Math.round(p * 100),
+          })),
+      );
+      const url = URL.createObjectURL(remuxedBlob);
       await requestDownload(url, ".mp4");
+      URL.revokeObjectURL(url);
       setContentState((prev) => ({ ...prev, saved: true }));
     } catch (err) {
       console.error("MP4 download failed:", err);
+      // Fallback: serve the fMP4 as-is so the user doesn't lose the
+      // recording if re-mux fails. Chrome/VLC/most modern players read it
+      // fine; older tools may struggle with seeking.
+      try {
+        const url = URL.createObjectURL(contentState.blob);
+        await requestDownload(url, ".mp4");
+        URL.revokeObjectURL(url);
+        setContentState((prev) => ({ ...prev, saved: true }));
+      } catch (fallbackErr) {
+        console.error("MP4 fallback download failed:", fallbackErr);
+      }
     } finally {
       setContentState((prev) => ({
         ...prev,
         downloading: false,
         isFfmpegRunning: false,
+        processingProgress: 0,
       }));
     }
   };

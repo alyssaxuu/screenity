@@ -953,7 +953,7 @@ const Recorder = () => {
     const { useWebCodecsRecorder } = await chrome.storage.local.get([
       "useWebCodecsRecorder",
     ]);
-    // Default-on as of 4.3.7: treat undefined as enabled; only explicit `false` opts out.
+    // Default-on: treat undefined as enabled; only explicit `false` opts out.
     const userSetting = useWebCodecsRecorder === false ? false : true;
     const stickyState = await getFastRecorderStickyState();
     const probeResult = await probeFastRecorderSupport();
@@ -1061,64 +1061,72 @@ const Recorder = () => {
         return;
       }
       if (useWebCodecs.current) {
+        if (lowStorageAbort.current) return;
+
+        // Fragmented MP4 + StreamTarget: chunks stream in throughout the
+        // recording as the muxer writes fragments (~1MB each, coalesced
+        // upstream). Each chunk is already file-byte-order; concatenating
+        // them reconstructs a valid fMP4, which plays directly in <video>
+        // and is re-muxed to standard MP4 at download time.
         const blob =
           data instanceof Blob ? data : new Blob([data], { type: "video/mp4" });
 
         const ts = timestampMs ?? 0;
 
-        // The WebCodecs Mp4 muxer emits the ENTIRE MP4 as a single chunk at
-        // finalize(). For long recordings that can be 50+ MB. Two problems if
-        // we store it as one IDB entry:
-        //   1. chrome.runtime.sendMessage (used to relay chunks base64-encoded
-        //      to the sandbox) has a ~64MB serialization limit. base64 adds
-        //      33% overhead, so a 50MB raw chunk becomes ~67MB base64 → fails.
-        //   2. Encoding a huge blob to base64 via FileReader in the SW is
-        //      slow and memory-heavy.
-        // Split into smaller slices at IDB write time. Downstream paths
-        // (rebuildBlobFromChunks + BG sendChunks + sandbox handleBatch)
-        // all concatenate parts, so slicing is transparent to them.
-        const SLICE_SIZE = 2 * 1024 * 1024;
+        // Pre-flight the IDB write: if the device is running out of storage
+        // quota, abort cleanly so the user gets a toast + the already-saved
+        // fragments are preserved. Without this, setItem would throw
+        // QuotaExceededError mid-recording and the fragments after that point
+        // would silently vanish.
+        if (!(await canFitChunk(blob.size))) {
+          if (!lowStorageAbort.current) {
+            chrome.runtime.sendMessage({
+              type: "show-toast",
+              message: chrome.i18n.getMessage("toastStorageCritical"),
+              timeout: 8000,
+            });
+          }
+          lowStorageAbort.current = true;
+          chrome.storage.local.set({
+            recording: false,
+            restarting: false,
+            tabRecordedID: null,
+            memoryError: true,
+            lowStorageAbortAt: Date.now(),
+            lowStorageAbortChunks: index.current,
+          });
+          requestStop("low-storage", {
+            memoryError: true,
+            savedChunks: savedCount.current,
+          });
+          return;
+        }
 
         try {
-          let offset = 0;
-          let isFirstSlice = true;
-          while (offset < blob.size || (offset === 0 && blob.size === 0)) {
-            const i = index.current;
-            const end = Math.min(offset + SLICE_SIZE, blob.size);
-            const slice =
-              blob.size <= SLICE_SIZE && offset === 0
-                ? blob
-                : blob.slice(offset, end, blob.type || "video/mp4");
-            await chunksStore.setItem(`chunk_${i}`, {
-              index: i,
-              chunk: slice,
-              timestamp: ts,
-            });
-            if (isFirstSlice) {
-              // Update watchdog heartbeat. Without this, the recording-stall
-              // detector in handleAlarm.js sees lastChunkAt as null, computes
-              // a huge age, and fires stall-unrecoverable at ~30s — killing
-              // every WebCodecs recording silently.
-              const heartbeatUpdate = { lastChunkAt: Date.now() };
-              if (i === 0) heartbeatUpdate.firstChunkAt = Date.now();
-              chrome.storage.local.set(heartbeatUpdate).catch(() => {});
-              if (!hasChunks.current) {
-                chrome.runtime
-                  .sendMessage({ type: "cancel-first-chunk-watchdog" })
-                  .catch(() => {});
-              }
-              hasChunks.current = true;
-              isFirstSlice = false;
-            }
-            index.current = i + 1;
-            savedCount.current += 1;
-            if (blob.size === 0) break;
-            offset = end;
+          const i = index.current;
+          await chunksStore.setItem(`chunk_${i}`, {
+            index: i,
+            chunk: blob,
+            timestamp: ts,
+          });
+
+          // Heartbeat + first-chunk watchdog fire on the first fragment
+          // only, so the SW's stall detector doesn't kill us early.
+          const heartbeatUpdate = { lastChunkAt: Date.now() };
+          if (i === 0) heartbeatUpdate.firstChunkAt = Date.now();
+          chrome.storage.local.set(heartbeatUpdate).catch(() => {});
+          if (!hasChunks.current) {
+            chrome.runtime
+              .sendMessage({ type: "cancel-first-chunk-watchdog" })
+              .catch(() => {});
+            hasChunks.current = true;
           }
 
-          const i = index.current - 1;
+          index.current = i + 1;
+          savedCount.current += 1;
+
           if (DEBUG_RECORDER) {
-            debug("WebCodecs chunk saved", {
+            debug("WebCodecs fragment saved", {
               i,
               ts,
               size: blob.size,
@@ -1131,6 +1139,36 @@ const Recorder = () => {
           }
         } catch (err) {
           debugError("Failed to save WebCodecs chunk", err);
+          // Quota check above is a best-effort pre-flight; the actual write
+          // can still fail (QuotaExceededError, IDB transaction aborted,
+          // disk full). Handle it the same way as a canFitChunk miss so the
+          // user gets a clear toast and already-saved fragments are kept.
+          const name = err?.name || "";
+          const msg = String(err?.message || err || "").toLowerCase();
+          const looksLikeQuotaError =
+            name === "QuotaExceededError" ||
+            msg.includes("quota") ||
+            msg.includes("disk");
+          if (looksLikeQuotaError && !lowStorageAbort.current) {
+            chrome.runtime.sendMessage({
+              type: "show-toast",
+              message: chrome.i18n.getMessage("toastStorageCritical"),
+              timeout: 8000,
+            });
+            lowStorageAbort.current = true;
+            chrome.storage.local.set({
+              recording: false,
+              restarting: false,
+              tabRecordedID: null,
+              memoryError: true,
+              lowStorageAbortAt: Date.now(),
+              lowStorageAbortChunks: index.current,
+            });
+            requestStop("low-storage", {
+              memoryError: true,
+              savedChunks: savedCount.current,
+            });
+          }
         }
 
         return;
