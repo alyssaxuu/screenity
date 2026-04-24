@@ -55,6 +55,14 @@
     "message": "Verwerfen",
     "description": "Schaltfläche 'Verwerfen' im Modal für Kamera- / Mikrofonberechtigungen"
   },
+  "sitePermissionsBlockedTitle": {
+    "message": "Diese Seite erlaubt keinen Zugriff auf Kamera oder Mikrofon",
+    "description": "Modal title shown when the current page's Permissions-Policy header blocks browser extensions from using camera or microphone"
+  },
+  "sitePermissionsBlockedDescription": {
+    "message": "Die Sicherheitseinstellungen dieser Website verhindern, dass Browser-Erweiterungen auf dieser Seite deine Kamera oder dein Mikrofon verwenden. Um mit ihnen aufzunehmen, starte die Aufnahme in einem anderen Tab und wechsle zurück hierher, sobald sie begonnen hat.",
+    "description": "Modal description shown when the current page's Permissions-Policy header blocks browser extensions from using camera or microphone"
+  },
   "allowCameraAccessButton": {
     "message": "Kamerazugriff zulassen",
     "description": "Schaltfläche 'Kamerazugriff zulassen'"

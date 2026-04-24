@@ -55,6 +55,14 @@
     "message": "Dismiss",
     "description": "Camera / microphone permissions warning modal dismiss button"
   },
+  "sitePermissionsBlockedTitle": {
+    "message": "This site doesn't allow camera or microphone access",
+    "description": "Modal title shown when the current page's Permissions-Policy header blocks browser extensions from using camera or microphone"
+  },
+  "sitePermissionsBlockedDescription": {
+    "message": "Looks like this website's security settings prevent browser extensions from using your camera or microphone on this page. To record with them, start a recording from another tab and switch back here once it begins.",
+    "description": "Modal description shown when the current page's Permissions-Policy header blocks browser extensions from using camera or microphone"
+  },
   "allowCameraAccessButton": {
     "message": "Allow camera access",
     "description": "Allow camera access button"

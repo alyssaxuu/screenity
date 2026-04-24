@@ -55,6 +55,14 @@
     "message": "Rejeter",
     "description": "Bouton de rejet de la fenêtre modale d'avertissement des autorisations de la caméra/du microphone"
   },
+  "sitePermissionsBlockedTitle": {
+    "message": "Ce site ne permet pas l'accès à la caméra ou au microphone",
+    "description": "Modal title shown when the current page's Permissions-Policy header blocks browser extensions from using camera or microphone"
+  },
+  "sitePermissionsBlockedDescription": {
+    "message": "Il semble que les paramètres de sécurité de ce site empêchent les extensions de navigateur d'utiliser votre caméra ou votre microphone sur cette page. Pour enregistrer avec eux, démarrez un enregistrement depuis un autre onglet et revenez ici une fois qu'il a commencé.",
+    "description": "Modal description shown when the current page's Permissions-Policy header blocks browser extensions from using camera or microphone"
+  },
   "allowCameraAccessButton": {
     "message": "Autoriser l'accès à la caméra",
     "description": "Bouton d'autorisation d'accès à la caméra"

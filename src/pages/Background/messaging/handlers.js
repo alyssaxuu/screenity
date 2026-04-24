@@ -22,6 +22,7 @@ import { sendMessageRecord } from "../recording/sendMessageRecord";
 import { startRecorderSession } from "../recording/openRecorderTab";
 import { acquireStreamForOffscreen } from "../offscreen/acquireStream";
 import { registerProxyStorageHandlers } from "../offscreen/proxyStorageHandlers";
+import { ensureRemuxOffscreen } from "../offscreen/ensureRemuxOffscreen";
 import { forceProcessing } from "../recording/forceProcessing";
 import {
   restartActiveTab,
@@ -800,6 +801,42 @@ export const setupHandlers = () => {
   registerMessage("video-ready", async (message) => {
     await videoReady(message);
     await clearRecordingSessionSafe("video-ready");
+  });
+
+  // Download-path remux request from the sandbox. Ensures the remux
+  // offscreen document is open, forwards the request, and returns the
+  // response. On any SW-side failure the caller falls back to the
+  // in-sandbox BufferTarget remux.
+  registerMessage("remux-request", async (message) => {
+    if (
+      !message?.requestId ||
+      !message?.inputFileName ||
+      !message?.outputFileName
+    ) {
+      return { ok: false, error: "invalid-remux-request-payload" };
+    }
+    try {
+      await ensureRemuxOffscreen();
+    } catch (err) {
+      return {
+        ok: false,
+        error: String(err?.message || err || "ensure-offscreen-failed"),
+      };
+    }
+    try {
+      const response = await chrome.runtime.sendMessage({
+        type: "remux-start",
+        requestId: message.requestId,
+        inputFileName: message.inputFileName,
+        outputFileName: message.outputFileName,
+      });
+      return response || { ok: false, error: "no-offscreen-response" };
+    } catch (err) {
+      return {
+        ok: false,
+        error: String(err?.message || err || "forward-to-offscreen-failed"),
+      };
+    }
   });
 
   // Fired by Region/Recorder.jsx pagehide — the iframe is being torn down

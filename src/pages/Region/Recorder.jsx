@@ -148,6 +148,61 @@ const Recorder = () => {
   const lowStorageAbort = useRef(false);
   const savedCount = useRef(0);
 
+  const streamingDataHandled = useRef(false);
+  const streamingDataRetryTimer = useRef(null);
+
+  // Retry get-streaming-data from the SW with backoff. The initial
+  // sendMessage can fail silently if the SW is mid-wakeup; this retry
+  // plus SW-side retry plus the handler's idempotency guard cover the
+  // handshake reliably on slow Windows cold-starts.
+  const requestStreamingDataWithRetry = (attempt = 0) => {
+    if (streamingDataHandled.current) return;
+    const backoffMs = [0, 250, 500, 1000, 2000];
+    const delay = backoffMs[Math.min(attempt, backoffMs.length - 1)];
+    if (streamingDataRetryTimer.current) {
+      clearTimeout(streamingDataRetryTimer.current);
+    }
+    streamingDataRetryTimer.current = setTimeout(() => {
+      streamingDataRetryTimer.current = null;
+      if (streamingDataHandled.current) return;
+      persistRegionStartDebug({
+        stage: "get-streaming-data-send",
+        attempt,
+      });
+      try {
+        chrome.runtime.sendMessage({ type: "get-streaming-data" }, () => {
+          const err = chrome.runtime.lastError;
+          if (err) {
+            persistRegionStartDebug({
+              stage: "get-streaming-data-send-error",
+              attempt,
+              err: String(err.message || err).slice(0, 120),
+            });
+          }
+          if (
+            err &&
+            !streamingDataHandled.current &&
+            attempt + 1 < backoffMs.length
+          ) {
+            requestStreamingDataWithRetry(attempt + 1);
+          }
+        });
+      } catch (e) {
+        persistRegionStartDebug({
+          stage: "get-streaming-data-throw",
+          attempt,
+          err: String(e?.message || e).slice(0, 120),
+        });
+        if (
+          !streamingDataHandled.current &&
+          attempt + 1 < backoffMs.length
+        ) {
+          requestStreamingDataWithRetry(attempt + 1);
+        }
+      }
+    }, delay);
+  };
+
   const lastEstimateAt = useRef(0);
   const ESTIMATE_INTERVAL_MS = 5000;
   const MIN_HEADROOM = 25 * 1024 * 1024;
@@ -1821,10 +1876,12 @@ const Recorder = () => {
       if (request.type === "loaded") {
         backupRef.current = request.backup;
         if (request.region) {
-          chrome.runtime.sendMessage({ type: "get-streaming-data" });
+          requestStreamingDataWithRetry();
         }
       }
       if (request.type === "streaming-data") {
+        if (streamingDataHandled.current) return;
+        streamingDataHandled.current = true;
         if (regionRef.current) {
           startStreaming(JSON.parse(request.data));
         }

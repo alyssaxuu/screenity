@@ -55,6 +55,14 @@
     "message": "Odrzuć",
     "description": "Przycisk odrzucenia w modalnym okienku ostrzeżenia o uprawnieniach kamery / mikrofonu"
   },
+  "sitePermissionsBlockedTitle": {
+    "message": "Ta strona nie zezwala na dostęp do kamery ani mikrofonu",
+    "description": "Modal title shown when the current page's Permissions-Policy header blocks browser extensions from using camera or microphone"
+  },
+  "sitePermissionsBlockedDescription": {
+    "message": "Wygląda na to, że ustawienia bezpieczeństwa tej witryny uniemożliwiają rozszerzeniom przeglądarki korzystanie z kamery i mikrofonu na tej stronie. Aby nagrywać z ich użyciem, rozpocznij nagrywanie z innej karty i wróć tutaj po jego rozpoczęciu.",
+    "description": "Modal description shown when the current page's Permissions-Policy header blocks browser extensions from using camera or microphone"
+  },
   "allowCameraAccessButton": {
     "message": "Zezwól na dostęp do kamery",
     "description": "Przycisk zezwalający na dostęp do kamery"

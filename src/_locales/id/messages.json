@@ -55,6 +55,14 @@
     "message": "Abaikan",
     "description": "Tombol abaikan modal peringatan izin kamera/mikrofon"
   },
+  "sitePermissionsBlockedTitle": {
+    "message": "Situs ini tidak mengizinkan akses kamera atau mikrofon",
+    "description": "Modal title shown when the current page's Permissions-Policy header blocks browser extensions from using camera or microphone"
+  },
+  "sitePermissionsBlockedDescription": {
+    "message": "Tampaknya pengaturan keamanan situs web ini mencegah ekstensi peramban menggunakan kamera atau mikrofon Anda di halaman ini. Untuk merekam dengan keduanya, mulai rekaman dari tab lain dan beralih kembali ke sini setelah rekaman dimulai.",
+    "description": "Modal description shown when the current page's Permissions-Policy header blocks browser extensions from using camera or microphone"
+  },
   "allowCameraAccessButton": {
     "message": "Izinkan akses kamera",
     "description": "Tombol izinkan akses kamera"

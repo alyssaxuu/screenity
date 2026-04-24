@@ -55,6 +55,14 @@
     "message": "Ignorar",
     "description": "Botão de ignorar no modal de aviso de permissões de câmara/microfone"
   },
+  "sitePermissionsBlockedTitle": {
+    "message": "Este site não permite acesso à câmara ou ao microfone",
+    "description": "Modal title shown when the current page's Permissions-Policy header blocks browser extensions from using camera or microphone"
+  },
+  "sitePermissionsBlockedDescription": {
+    "message": "Parece que as definições de segurança deste site impedem que extensões do navegador utilizem a tua câmara ou microfone nesta página. Para gravar com eles, inicia uma gravação noutro separador e volta para aqui assim que começar.",
+    "description": "Modal description shown when the current page's Permissions-Policy header blocks browser extensions from using camera or microphone"
+  },
   "allowCameraAccessButton": {
     "message": "Permitir acesso à câmara",
     "description": "Botão de permitir acesso à câmara"

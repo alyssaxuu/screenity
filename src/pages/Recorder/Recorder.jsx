@@ -219,11 +219,65 @@ const Recorder = () => {
   // Start gate: defers startRecording() until the stream is ready.
   const startRequested = useRef(false);
   const startRequestedAt = useRef(null);
-  // Null on start-gate timeout → SW→tab handoff failed (distinct error code).
+  // Null on start-gate timeout: SW-to-tab handoff failed (distinct error code).
   const streamingDataReceivedAt = useRef(null);
   // Timeout if the stream never arrives
   const startGateTimeout = useRef(null);
-  const START_GATE_TIMEOUT_MS = 8000; // max wait for stream after start request
+  // 12s accounts for cold SW wake-ups on Windows Chrome, where the SW can
+  // take several seconds to revive after suspension before it can process
+  // get-streaming-data. 8s was too tight under that workload.
+  const START_GATE_TIMEOUT_MS = 12000;
+  const streamingDataRetryTimer = useRef(null);
+
+  // Pulls streaming-data from the SW with retry. Chrome can fail the initial
+  // sendMessage if the SW is in the middle of waking up (returns lastError
+  // "Receiving end does not exist") and silently drop the request. Retry
+  // with backoff until streaming-data arrives or the start gate times out.
+  // The SW also pushes streaming-data proactively, so duplicate delivery
+  // is possible; the streaming-data handler is idempotent to cover that.
+  const requestStreamingDataWithRetry = (attempt = 0) => {
+    if (streamingDataReceivedAt.current != null) return;
+    const maxAttempts = 5;
+    const backoffMs = [0, 250, 500, 1000, 2000];
+    const delay = backoffMs[Math.min(attempt, backoffMs.length - 1)];
+    if (streamingDataRetryTimer.current) {
+      clearTimeout(streamingDataRetryTimer.current);
+    }
+    streamingDataRetryTimer.current = setTimeout(() => {
+      streamingDataRetryTimer.current = null;
+      if (streamingDataReceivedAt.current != null) return;
+      slLog("get-streaming-data-send", { attempt });
+      try {
+        chrome.runtime.sendMessage({ type: "get-streaming-data" }, () => {
+          const err = chrome.runtime.lastError;
+          if (err) {
+            slLog("get-streaming-data-send-error", {
+              attempt,
+              err: String(err.message || err).slice(0, 120),
+            });
+          }
+          if (
+            err &&
+            streamingDataReceivedAt.current == null &&
+            attempt + 1 < maxAttempts
+          ) {
+            requestStreamingDataWithRetry(attempt + 1);
+          }
+        });
+      } catch (e) {
+        slLog("get-streaming-data-throw", {
+          attempt,
+          err: String(e?.message || e).slice(0, 120),
+        });
+        if (
+          streamingDataReceivedAt.current == null &&
+          attempt + 1 < maxAttempts
+        ) {
+          requestStreamingDataWithRetry(attempt + 1);
+        }
+      }
+    }, delay);
+  };
 
   const liveStream = useRef(null);
 
@@ -772,6 +826,10 @@ const Recorder = () => {
     streamingDataReceivedAt.current = null;
     isStarting.current = false;
     clearStartGateTimeout();
+    if (streamingDataRetryTimer.current) {
+      clearTimeout(streamingDataRetryTimer.current);
+      streamingDataRetryTimer.current = null;
+    }
   }
 
   /** Request recording start — immediate if stream is ready, deferred otherwise. */
@@ -2654,8 +2712,15 @@ const Recorder = () => {
       } else {
         isTab.current = false;
       }
-      chrome.runtime.sendMessage({ type: "get-streaming-data" });
+      requestStreamingDataWithRetry();
     } else if (request.type === "streaming-data") {
+      // Guard against duplicate delivery: streaming-data may arrive more
+      // than once when the SW push and the tab pull both succeed, or when
+      // either side retries. First arrival wins; later ones are ignored.
+      if (streamingDataReceivedAt.current != null) {
+        slLog("msg-streaming-data-duplicate");
+        return;
+      }
       slLog("msg-streaming-data");
       streamingDataReceivedAt.current = Date.now();
       startStreaming(JSON.parse(request.data));

@@ -55,6 +55,14 @@
     "message": "Відхилити",
     "description": "Camera / microphone permissions warning modal dismiss button"
   },
+  "sitePermissionsBlockedTitle": {
+    "message": "Цей сайт не дозволяє доступ до камери або мікрофона",
+    "description": "Modal title shown when the current page's Permissions-Policy header blocks browser extensions from using camera or microphone"
+  },
+  "sitePermissionsBlockedDescription": {
+    "message": "Схоже, налаштування безпеки цього сайту не дозволяють розширенням браузера використовувати камеру або мікрофон на цій сторінці. Щоб записувати з ними, почніть запис в іншій вкладці та поверніться сюди після її початку.",
+    "description": "Modal description shown when the current page's Permissions-Policy header blocks browser extensions from using camera or microphone"
+  },
   "allowCameraAccessButton": {
     "message": "Дозволити доступ до камери",
     "description": "Allow camera access button"

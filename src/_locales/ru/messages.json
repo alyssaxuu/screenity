@@ -55,6 +55,14 @@
     "message": "Отклонить",
     "description": "Кнопка закрытия модального окна предупреждения о разрешениях для камеры / микрофона"
   },
+  "sitePermissionsBlockedTitle": {
+    "message": "Этот сайт не разрешает доступ к камере или микрофону",
+    "description": "Modal title shown when the current page's Permissions-Policy header blocks browser extensions from using camera or microphone"
+  },
+  "sitePermissionsBlockedDescription": {
+    "message": "Похоже, настройки безопасности этого сайта не позволяют расширениям браузера использовать камеру или микрофон на этой странице. Чтобы записывать с их использованием, начните запись в другой вкладке и переключитесь сюда после её начала.",
+    "description": "Modal description shown when the current page's Permissions-Policy header blocks browser extensions from using camera or microphone"
+  },
   "allowCameraAccessButton": {
     "message": "Разрешить доступ к камере",
     "description": "Кнопка разрешения доступа к камере"

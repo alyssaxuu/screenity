@@ -185,7 +185,37 @@ export const handleRecordingError = async (request) => {
 
 export const handleGetStreamingData = async () => {
   const data = await getStreamingData();
-  sendMessageRecord({ type: "streaming-data", data: JSON.stringify(data) });
+  const payload = { type: "streaming-data", data: JSON.stringify(data) };
+
+  // Retry delivery. The recorder tab's message listener may not be mounted
+  // yet when the tab first loads, or the tab may be briefly throttled by
+  // Chrome. A dropped delivery here is what causes REC_START_NO_STREAM_MSG
+  // at the tab's 12s start gate. Tab-side handler is idempotent (first
+  // delivery wins), so extra retries are safe.
+  const backoffMs = [0, 300, 800];
+  for (let attempt = 0; attempt < backoffMs.length; attempt++) {
+    if (backoffMs[attempt] > 0) {
+      await new Promise((r) => setTimeout(r, backoffMs[attempt]));
+    }
+    try {
+      await sendMessageRecord(payload);
+      if (attempt > 0) {
+        diagEvent("sw-streaming-data-send-ok", { attempt });
+      }
+      return;
+    } catch (err) {
+      diagEvent("sw-streaming-data-send-fail", {
+        attempt,
+        err: String(err?.message || err).slice(0, 120),
+      });
+      if (attempt === backoffMs.length - 1) {
+        console.warn(
+          "handleGetStreamingData: all delivery attempts failed",
+          err,
+        );
+      }
+    }
+  }
 };
 
 export const videoReady = async () => {

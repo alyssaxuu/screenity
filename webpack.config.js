@@ -68,12 +68,30 @@ const entryPoints = {
     "index.jsx"
   ),
   backup: path.join(__dirname, "src", "pages", "Backup", "index.jsx"),
+  remuxoffscreen: path.join(
+    __dirname,
+    "src",
+    "pages",
+    "RemuxOffscreen",
+    "index.js"
+  ),
+  remuxworker: path.join(
+    __dirname,
+    "src",
+    "pages",
+    "RemuxOffscreen",
+    "worker.js"
+  ),
 };
 
 const htmlPlugins = Object.keys(entryPoints)
   .map((entryName) => {
-    // Skip background script as it doesn't need an HTML file
-    if (entryName === "background" || entryName === "contentScript") {
+    // Skip background script and worker bundles; they have no HTML page.
+    if (
+      entryName === "background" ||
+      entryName === "contentScript" ||
+      entryName === "remuxworker"
+    ) {
       return null;
     }
 
@@ -84,6 +102,7 @@ const htmlPlugins = Object.keys(entryPoints)
       audiooffscreen: "AudioOffscreen",
       editorwebcodecs: "EditorWebCodecs",
       editorviewer: "EditorViewer",
+      remuxoffscreen: "RemuxOffscreen",
     };
 
     const folderName =

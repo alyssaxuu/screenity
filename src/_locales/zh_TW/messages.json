@@ -55,6 +55,14 @@
     "message": "忽略",
     "description": "Camera / microphone permissions warning modal dismiss button"
   },
+  "sitePermissionsBlockedTitle": {
+    "message": "此網站不允許存取相機或麥克風",
+    "description": "Modal title shown when the current page's Permissions-Policy header blocks browser extensions from using camera or microphone"
+  },
+  "sitePermissionsBlockedDescription": {
+    "message": "此網站的安全設定禁止瀏覽器擴充功能在此頁面上使用您的相機或麥克風。若要使用它們錄製，請從另一個分頁開始錄製，並在錄製開始後切換回此處。",
+    "description": "Modal description shown when the current page's Permissions-Policy header blocks browser extensions from using camera or microphone"
+  },
   "allowCameraAccessButton": {
     "message": "允許攝影機存取",
     "description": "Allow camera access button"

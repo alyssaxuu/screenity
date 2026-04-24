@@ -149,6 +149,10 @@ const ContentState = (props) => {
   const defaultState = {
     time: 0,
     editLimit: 420,
+    // Last successful (or failed) download remux outcome. Populated at
+    // the end of download(); consumed by DevHUD in dev builds to show
+    // which tier ran and how long it took.
+    lastDownloadInfo: null,
     blob: null,
     webm: null,
     originalBlob: null,
@@ -2184,6 +2188,96 @@ const ContentState = (props) => {
     return new Blob([target.buffer], { type: "video/mp4" });
   };
 
+  // Route the remux through an offscreen document that spawns a dedicated
+  // worker and writes the output to OPFS via a sync access handle. Keeps
+  // peak RAM near zero regardless of recording length, and avoids the
+  // 2 GB ArrayBuffer ceiling that BufferTarget hits on very long clips.
+  // Falls back silently: if any hop fails, the caller tries the in-sandbox
+  // BufferTarget path instead.
+  const remuxViaOffscreenOpfs = async (fragmentedBlob, onProgress) => {
+    const requestId =
+      (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+        ? crypto.randomUUID()
+        : `${Date.now()}-${Math.random().toString(36).slice(2)}`);
+    const devLog =
+      process.env.SCREENITY_DEV_MODE === "true"
+        ? (label, data) =>
+            console.log("[remux][sandbox]", label, data || "")
+        : () => {};
+    devLog("offscreen-remux-start", {
+      requestId,
+      inputBytes: fragmentedBlob?.size,
+    });
+
+    const progressListener = (msg) => {
+      if (
+        msg?.type === "remux-progress" &&
+        msg.requestId === requestId &&
+        typeof onProgress === "function"
+      ) {
+        onProgress(msg.progress);
+      }
+    };
+    chrome.runtime.onMessage.addListener(progressListener);
+
+    // Transport via OPFS rather than passing the Blob through
+    // chrome.runtime.sendMessage. Chrome's structured clone for extension
+    // messaging is lossy for Blobs crossing the service worker: the Blob
+    // arrives as a plain object and BlobSource rejects it with
+    // "blob must be a Blob.". Writing the input to OPFS first and passing
+    // a filename (string) sidesteps the issue entirely; the worker reads
+    // back via navigator.storage.getDirectory() in its own context.
+    const inputFileName = `remux-in-${requestId}.mp4`;
+    const outputFileName = `remux-${requestId}.mp4`;
+    let opfsDir;
+    try {
+      opfsDir = await navigator.storage.getDirectory();
+    } catch (err) {
+      chrome.runtime.onMessage.removeListener(progressListener);
+      throw new Error(
+        `opfs-unavailable: ${String(err?.message || err).slice(0, 120)}`,
+      );
+    }
+
+    try {
+      // Stage the input in OPFS. createWritable is async and streams to
+      // disk without blocking the main thread for the full duration.
+      const inputHandle = await opfsDir.getFileHandle(inputFileName, {
+        create: true,
+      });
+      const writable = await inputHandle.createWritable();
+      await writable.write(fragmentedBlob);
+      await writable.close();
+      devLog("staged-input-in-opfs", { inputFileName });
+
+      const response = await chrome.runtime.sendMessage({
+        type: "remux-request",
+        requestId,
+        inputFileName,
+        outputFileName,
+      });
+      if (!response || response.ok !== true) {
+        devLog("offscreen-remux-response-bad", response);
+        throw new Error(response?.error || "offscreen-remux-failed");
+      }
+
+      const outputHandle = await opfsDir.getFileHandle(outputFileName);
+      const file = await outputHandle.getFile();
+      const outputBlob = new Blob([file], { type: "video/mp4" });
+      devLog("offscreen-remux-ok", { outputBytes: outputBlob.size });
+      return outputBlob;
+    } finally {
+      chrome.runtime.onMessage.removeListener(progressListener);
+      // Input file is no longer needed once the worker finished (or failed).
+      try {
+        await opfsDir.removeEntry(inputFileName).catch(() => {});
+      } catch {}
+      // Output file is left in place; the Blob we just returned may still
+      // be streaming to chrome.downloads. The worker's age-based sweep
+      // cleans it up on the next remux.
+    }
+  };
+
   const download = async () => {
     if (contentState.isFfmpegRunning || contentState.downloading) return;
 
@@ -2194,23 +2288,88 @@ const ContentState = (props) => {
       processingProgress: 0,
     }));
 
+    const progressHandler = (p) =>
+      setContentState((prev) => ({
+        ...prev,
+        processingProgress: Math.round(p * 100),
+      }));
+
+    const inputSize = contentState.blob?.size || 0;
+    const remuxStartedAt = Date.now();
+    let remuxedBlob = null;
+    let remuxPath = null;
+    // Tier 1: offscreen + OPFS. Flat memory, works for any recording size.
     try {
-      // Re-mux fragmented MP4 → standard MP4 for universal compatibility.
-      // Editor plays fMP4 directly (Chrome handles it), but downloaded
-      // files need the standard layout so they seek cleanly in QuickTime,
-      // DaVinci, Premiere, etc. Container-only operation, no re-encode.
-      const remuxedBlob = await remuxFragmentedToStandardMp4(
+      diagForward("remux-offscreen-start", { inputBytes: inputSize });
+      remuxedBlob = await remuxViaOffscreenOpfs(
         contentState.blob,
-        (p) =>
-          setContentState((prev) => ({
-            ...prev,
-            processingProgress: Math.round(p * 100),
-          })),
+        progressHandler,
       );
-      const url = URL.createObjectURL(remuxedBlob);
-      await requestDownload(url, ".mp4");
-      URL.revokeObjectURL(url);
-      setContentState((prev) => ({ ...prev, saved: true }));
+      remuxPath = "offscreen-opfs";
+      diagForward("remux-offscreen-ok", { inputBytes: inputSize });
+    } catch (err) {
+      console.warn("[Screenity] offscreen remux failed, falling back", err);
+      diagForward("remux-offscreen-fail", {
+        inputBytes: inputSize,
+        err: String(err?.message || err).slice(0, 200),
+      });
+    }
+
+    // Tier 2: in-sandbox BufferTarget. Costs ~recording size in RAM; hits
+    // a 2 GB ArrayBuffer ceiling on very long clips.
+    if (!remuxedBlob) {
+      try {
+        remuxedBlob = await remuxFragmentedToStandardMp4(
+          contentState.blob,
+          progressHandler,
+        );
+        remuxPath = "buffer-target";
+        diagForward("remux-buffer-target-ok", { inputBytes: inputSize });
+      } catch (err) {
+        console.warn("[Screenity] buffer-target remux failed, falling back", err);
+        diagForward("remux-buffer-target-fail", {
+          inputBytes: inputSize,
+          err: String(err?.message || err).slice(0, 200),
+        });
+      }
+    }
+
+    const remuxDurationMs = Date.now() - remuxStartedAt;
+    if (process.env.SCREENITY_DEV_MODE === "true") {
+      console.log("[remux][sandbox] summary", {
+        path: remuxPath || "fmp4-fallback",
+        durationMs: remuxDurationMs,
+        inputBytes: inputSize,
+        outputBytes: remuxedBlob?.size || 0,
+      });
+    }
+    setContentState((prev) => ({
+      ...prev,
+      lastDownloadInfo: {
+        path: remuxPath || "fmp4-fallback",
+        durationMs: remuxDurationMs,
+        inputBytes: inputSize,
+        outputBytes: remuxedBlob?.size || 0,
+        at: Date.now(),
+      },
+    }));
+
+    try {
+      if (remuxedBlob) {
+        const url = URL.createObjectURL(remuxedBlob);
+        await requestDownload(url, ".mp4");
+        URL.revokeObjectURL(url);
+        setContentState((prev) => ({ ...prev, saved: true }));
+        diagForward("remux-delivered", {
+          inputBytes: inputSize,
+          outputBytes: remuxedBlob.size || 0,
+          path: remuxPath,
+        });
+      } else {
+        // Tier 3: serve the fMP4 as-is. Plays in Chrome/VLC/most modern
+        // players; some older editors may have seeking quirks.
+        throw new Error("both-remux-paths-failed");
+      }
     } catch (err) {
       console.error("MP4 download failed:", err);
       // Fallback: serve the fMP4 as-is so the user doesn't lose the
@@ -2355,6 +2514,7 @@ const ContentState = (props) => {
         <DevHUD
           setContentState={setContentState}
           contentStateRef={contentStateRef}
+          lastDownloadInfo={contentState.lastDownloadInfo}
         />
       )}
     </ContentStateContext.Provider>

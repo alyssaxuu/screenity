@@ -4,6 +4,7 @@ import { sendMessageRecord } from "./sendMessageRecord.js";
 import { closeOffscreenDocument } from "../offscreen/closeOffscreenDocument.js";
 import { loginWithWebsite } from "../auth/loginWithWebsite.js";
 import { traceStep } from "../../utils/startFlowTrace.js";
+import { handleGetStreamingData } from "./recordingHelpers.js";
 
 const openRecorderTab = async (
   activeTab,
@@ -127,6 +128,14 @@ const openRecorderTab = async (
             }
           : {}),
       });
+      // Proactively push streaming-data shortly after "loaded". The tab
+      // also pulls it, but that pull can drop if the SW is still waking
+      // or the tab's listener is not yet mounted. This push plus the
+      // tab-side retry plus the tab's idempotency guard give the handshake
+      // multiple chances to succeed before the start gate times out.
+      setTimeout(() => {
+        handleGetStreamingData().catch(() => {});
+      }, 300);
     }
   });
 };

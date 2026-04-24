@@ -85,7 +85,7 @@ clearStaleLocks();
 // so the sticky flags are no longer warranted and should be cleared once so
 // affected users get WebCodecs again on their next recording. The user's
 // explicit opt-out (useWebCodecsRecorder === false) is preserved.
-const CURRENT_MIGRATION_VERSION = "4.3.8";
+const CURRENT_MIGRATION_VERSION = "4.3.9";
 const runUpgradeMigrations = async () => {
   try {
     const { screenityMigratedForVersion } = await chrome.storage.local.get([

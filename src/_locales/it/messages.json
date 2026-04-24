@@ -55,6 +55,14 @@
     "message": "Annulla",
     "description": "Pulsante di annullamento del modulo di avviso dei permessi per fotocamera/microfono"
   },
+  "sitePermissionsBlockedTitle": {
+    "message": "Questo sito non consente l'accesso alla fotocamera o al microfono",
+    "description": "Modal title shown when the current page's Permissions-Policy header blocks browser extensions from using camera or microphone"
+  },
+  "sitePermissionsBlockedDescription": {
+    "message": "Sembra che le impostazioni di sicurezza di questo sito impediscano alle estensioni del browser di utilizzare la fotocamera o il microfono in questa pagina. Per registrare con essi, avvia una registrazione da un'altra scheda e torna qui una volta iniziata.",
+    "description": "Modal description shown when the current page's Permissions-Policy header blocks browser extensions from using camera or microphone"
+  },
   "allowCameraAccessButton": {
     "message": "Consenti accesso alla fotocamera",
     "description": "Pulsante per consentire l'accesso alla fotocamera"

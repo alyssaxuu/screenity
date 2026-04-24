@@ -55,6 +55,14 @@
     "message": "닫기",
     "description": "Camera / microphone permissions warning modal dismiss button"
   },
+  "sitePermissionsBlockedTitle": {
+    "message": "이 사이트에서는 카메라 또는 마이크 접근이 허용되지 않아요",
+    "description": "Modal title shown when the current page's Permissions-Policy header blocks browser extensions from using camera or microphone"
+  },
+  "sitePermissionsBlockedDescription": {
+    "message": "이 웹사이트의 보안 설정이 브라우저 확장 프로그램에서 이 페이지의 카메라나 마이크를 사용하지 못하게 차단하고 있어요. 카메라와 마이크를 사용해 녹화하려면, 다른 탭에서 녹화를 시작한 뒤 녹화가 시작되면 이 탭으로 돌아오세요.",
+    "description": "Modal description shown when the current page's Permissions-Policy header blocks browser extensions from using camera or microphone"
+  },
   "allowCameraAccessButton": {
     "message": "카메라 액세스 허용",
     "description": "Allow camera access button"

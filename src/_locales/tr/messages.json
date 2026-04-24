@@ -55,6 +55,14 @@
     "message": "Kapat",
     "description": "Kamera / mikrofon izinleri uyarı modalı kapatma düğmesi"
   },
+  "sitePermissionsBlockedTitle": {
+    "message": "Bu site kamera veya mikrofon erişimine izin vermiyor",
+    "description": "Modal title shown when the current page's Permissions-Policy header blocks browser extensions from using camera or microphone"
+  },
+  "sitePermissionsBlockedDescription": {
+    "message": "Görünüşe göre bu web sitesinin güvenlik ayarları, tarayıcı uzantılarının bu sayfada kameranızı veya mikrofonunuzu kullanmasını engelliyor. Bunlarla kayıt yapmak için başka bir sekmede kayda başlayın ve kayıt başladıktan sonra buraya geri dönün.",
+    "description": "Modal description shown when the current page's Permissions-Policy header blocks browser extensions from using camera or microphone"
+  },
   "allowCameraAccessButton": {
     "message": "Kamera erişimine izin ver",
     "description": "Kamera erişimine izin verme düğmesi"

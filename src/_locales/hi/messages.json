@@ -55,6 +55,14 @@
     "message": "रद्द करें",
     "description": "कैमरा / माइक्रोफ़ोन अनुमतियों की चेतावनी मॉडल निरस्त करें बटन"
   },
+  "sitePermissionsBlockedTitle": {
+    "message": "यह साइट कैमरा या माइक्रोफोन एक्सेस की अनुमति नहीं देती",
+    "description": "Modal title shown when the current page's Permissions-Policy header blocks browser extensions from using camera or microphone"
+  },
+  "sitePermissionsBlockedDescription": {
+    "message": "ऐसा लगता है कि इस वेबसाइट की सुरक्षा सेटिंग्स ब्राउज़र एक्सटेंशन को इस पेज पर आपके कैमरा या माइक्रोफोन का उपयोग करने से रोकती हैं। इनके साथ रिकॉर्ड करने के लिए, किसी अन्य टैब से रिकॉर्डिंग शुरू करें और रिकॉर्डिंग शुरू होने के बाद यहाँ वापस आएँ।",
+    "description": "Modal description shown when the current page's Permissions-Policy header blocks browser extensions from using camera or microphone"
+  },
   "allowCameraAccessButton": {
     "message": "कैमरा अनुमति दें",
     "description": "कैमरा अनुमति दें बटन"

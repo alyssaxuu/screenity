@@ -145,6 +145,30 @@ const ContentState = (props) => {
     );
   }, []);
 
+  // Detect Permissions-Policy camera/microphone blocks on the hosting page.
+  // Some sites (banking, enterprise SaaS, admin panels) set headers like
+  // `Permissions-Policy: camera=(), microphone=()` which disable those APIs
+  // for every iframe on the page, including extension iframes. When this is
+  // set, Screenity's camera/mic iframes fail with a NotAllowedError and the
+  // generic "check your permissions" modal is misleading because the browser
+  // setting is fine, the site is the blocker.
+  useEffect(() => {
+    try {
+      const pp = document.permissionsPolicy || document.featurePolicy;
+      if (!pp || typeof pp.allowsFeature !== "function") return;
+      const cameraBlocked = !pp.allowsFeature("camera");
+      const micBlocked = !pp.allowsFeature("microphone");
+      if (cameraBlocked || micBlocked) {
+        setContentState((prev) => ({
+          ...prev,
+          sitePermissionsBlocked: true,
+        }));
+      }
+    } catch {
+      // allowsFeature can throw on detached documents; treat as not blocked.
+    }
+  }, []);
+
   useEffect(() => {
     const locale = chrome.i18n.getMessage("@@ui_locale");
     if (!locale.includes("en")) {
@@ -844,21 +868,37 @@ const ContentState = (props) => {
         microphonePermission: false,
       }));
       if (contentStateRef.current.askForPermissions) {
-        contentStateRef.current.openModal(
-          chrome.i18n.getMessage("permissionsModalTitle"),
-          chrome.i18n.getMessage("permissionsModalDescription"),
-          chrome.i18n.getMessage("permissionsModalDismiss"),
-          chrome.i18n.getMessage("permissionsModalNoShowAgain"),
-          () => {},
-          () => {
-            noMorePermissions();
-          },
-          chrome.runtime.getURL("assets/helper/permissions.webp"),
-          chrome.i18n.getMessage("learnMoreDot"),
-          URL2,
-          true,
-          false,
-        );
+        if (contentStateRef.current.sitePermissionsBlocked) {
+          contentStateRef.current.openModal(
+            chrome.i18n.getMessage("sitePermissionsBlockedTitle"),
+            chrome.i18n.getMessage("sitePermissionsBlockedDescription"),
+            null,
+            chrome.i18n.getMessage("permissionsModalDismiss"),
+            () => {},
+            () => {},
+            null,
+            chrome.i18n.getMessage("learnMoreDot"),
+            "https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Permissions-Policy",
+            true,
+            false,
+          );
+        } else {
+          contentStateRef.current.openModal(
+            chrome.i18n.getMessage("permissionsModalTitle"),
+            chrome.i18n.getMessage("permissionsModalDescription"),
+            chrome.i18n.getMessage("permissionsModalDismiss"),
+            chrome.i18n.getMessage("permissionsModalNoShowAgain"),
+            () => {},
+            () => {
+              noMorePermissions();
+            },
+            chrome.runtime.getURL("assets/helper/permissions.webp"),
+            chrome.i18n.getMessage("learnMoreDot"),
+            URL2,
+            true,
+            false,
+          );
+        }
       }
     }
   };
@@ -914,6 +954,13 @@ const ContentState = (props) => {
     setToolbarMode: null,
     openModal: null,
     openToast: null,
+    // True when the current page's Permissions-Policy header disallows
+    // camera and/or microphone. Computed once on content-script mount.
+    // Used to show a site-specific modal instead of the generic "check
+    // your permissions" one, which otherwise misleads users into
+    // clicking the camera icon in the address bar (which does nothing
+    // against a site-level Permissions-Policy block).
+    sitePermissionsBlocked: false,
     timeWarning: false,
     audioInput: [],
     videoInput: [],

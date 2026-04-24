@@ -55,6 +55,14 @@
     "message": "விலகு",
     "description": "கேமரா / மைக்ரோஃபோன் அனுமதிகள் எச்சரிக்கை செய்தியின் விளக்கம் விளக்கம்"
   },
+  "sitePermissionsBlockedTitle": {
+    "message": "இந்த தளம் கேமரா அல்லது மைக்ரோஃபோன் அணுகலை அனுமதிக்கவில்லை",
+    "description": "Modal title shown when the current page's Permissions-Policy header blocks browser extensions from using camera or microphone"
+  },
+  "sitePermissionsBlockedDescription": {
+    "message": "இந்த வலைத்தளத்தின் பாதுகாப்பு அமைப்புகள் உலாவி நீட்டிப்புகள் இந்தப் பக்கத்தில் உங்கள் கேமராவையோ அல்லது மைக்ரோஃபோனையோ பயன்படுத்துவதைத் தடுக்கின்றன. இவற்றுடன் பதிவு செய்ய, மற்றொரு தாவலில் பதிவைத் தொடங்கி, அது தொடங்கியதும் இங்கே திரும்பவும்.",
+    "description": "Modal description shown when the current page's Permissions-Policy header blocks browser extensions from using camera or microphone"
+  },
   "allowCameraAccessButton": {
     "message": "கேமரா அணுகலை அனுமதிக்கவும்",
     "description": "கேமரா அணுகலை அனுமதிக்க பொத்தான்"

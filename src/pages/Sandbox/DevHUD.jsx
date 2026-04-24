@@ -13,7 +13,7 @@ const BTN = {
 const BTN_RESET = { ...BTN, background: "rgba(200,50,50,0.7)" };
 const Z = 2147483647;
 
-const DevHUD = ({ setContentState, contentStateRef }) => {
+const DevHUD = ({ setContentState, contentStateRef, lastDownloadInfo }) => {
   const [collapsed, setCollapsed] = useState(true);
 
   if (collapsed) {
@@ -215,6 +215,33 @@ const DevHUD = ({ setContentState, contentStateRef }) => {
           x
         </span>
       </div>
+      {lastDownloadInfo && (
+        <div
+          style={{
+            color: "#0f0",
+            fontSize: "9px",
+            background: "rgba(0,40,0,0.4)",
+            padding: "4px 6px",
+            borderRadius: "3px",
+            lineHeight: 1.4,
+            whiteSpace: "normal",
+          }}
+        >
+          <div>Last download</div>
+          <div style={{ color: "#8f8" }}>{lastDownloadInfo.path}</div>
+          <div style={{ color: "#aaa" }}>
+            {Math.round(lastDownloadInfo.durationMs)}ms / in{" "}
+            {Math.round(
+              (lastDownloadInfo.inputBytes || 0) / (1024 * 1024),
+            )}
+            MB / out{" "}
+            {Math.round(
+              (lastDownloadInfo.outputBytes || 0) / (1024 * 1024),
+            )}
+            MB
+          </div>
+        </div>
+      )}
       {actions.map((a) => (
         <button key={a.label} style={BTN} onClick={a.fn}>
           {a.label}
