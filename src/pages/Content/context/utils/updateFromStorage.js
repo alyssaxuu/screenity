@@ -78,6 +78,7 @@ export const updateFromStorage = (check = true, id = null) => {
       "instantMode",
       "hasSeenInstantModeModal",
       "hasSubscribedBefore",
+      "showKeyboardPress",
     ],
     (result) => {
       const storedEffects = normalizeCursorEffects(result.cursorEffects);
@@ -327,6 +328,11 @@ export const updateFromStorage = (check = true, id = null) => {
         onboarding: result.onboarding || false,
         hasSubscribedBefore: result.hasSubscribedBefore || false,
         showProSplash: result.showProSplash || false,
+        showKeyboardPress:
+          result.showKeyboardPress !== undefined &&
+          result.showKeyboardPress !== null
+            ? result.showKeyboardPress
+            : prevContentState.showKeyboardPress,
       }));
 
       if (result.systemAudio === undefined || result.systemAudio === null) {
