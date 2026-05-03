@@ -1580,5 +1580,9 @@
   "stopAckTimeoutToast": {
     "message": "Saving is taking longer than expected. Your captured data is safe. The editor will open shortly.",
     "description": "Toast shown when the recorder does not acknowledge the stop request within a few seconds"
+  },
+  "showKeyboardPressLabel": {
+    "message": "Show keyboard press",
+    "description": "Show keyboard press toggle label under Fast MP4 option"
   }
 }

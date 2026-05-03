@@ -20,6 +20,7 @@ import styles from "!raw-loader!./styles/app.css";
 import ZoomContainer from "./utils/ZoomContainer";
 import BlurTool from "./utils/BlurTool";
 import CursorModes from "./utils/CursorModes";
+import KeyboardPressOverlay from "./utils/KeyboardPressOverlay";
 
 import { contentStateContext } from "./context/ContentState";
 
@@ -290,6 +291,7 @@ const Wrapper = () => {
             )}
           <Canvas />
           <CursorModes />
+          <KeyboardPressOverlay />
           <root.div
             className="root-container"
             id="screenity-root-container"

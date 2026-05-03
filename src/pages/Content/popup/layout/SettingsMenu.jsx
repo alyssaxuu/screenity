@@ -745,6 +745,33 @@ const SettingsMenu = (props) => {
                 </DropdownMenu.ItemIndicator>
               </DropdownMenu.CheckboxItem>
             )}
+          {!contentState.isSubscribed &&
+            !contentState.isLoggedIn &&
+            fastRecorderInfo?.probe?.ok === true &&
+            fastRecorderInfo?.probe?.details?.selectedVideoConfig && (
+              <DropdownMenu.CheckboxItem
+                className="DropdownMenuItem"
+                style={{ paddingLeft: "24px" }}
+                onSelect={(e) => {
+                  e.preventDefault();
+                }}
+                onCheckedChange={(checked) => {
+                  setContentState((prevContentState) => ({
+                    ...prevContentState,
+                    showKeyboardPress: checked,
+                  }));
+                  chrome.storage.local.set({
+                    showKeyboardPress: checked,
+                  });
+                }}
+                checked={contentState.showKeyboardPress === true}
+              >
+                {chrome.i18n.getMessage("showKeyboardPressLabel")}
+                <DropdownMenu.ItemIndicator className="ItemIndicator">
+                  <img src={CheckWhiteIcon} />
+                </DropdownMenu.ItemIndicator>
+              </DropdownMenu.CheckboxItem>
+            )}
           {!oldChrome &&
             !contentState.isSubscribed &&
             !contentState.isLoggedIn && (

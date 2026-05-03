@@ -1024,6 +1024,7 @@ const ContentState = (props) => {
     onboarding: false,
     showProSplash: false,
     hasSubscribedBefore: false,
+    showKeyboardPress: false,
     startRecordingAfterCountdown: () => {
       if (!contentStateRef.current.countdownCancelled) {
         contentStateRef.current.startRecording();
