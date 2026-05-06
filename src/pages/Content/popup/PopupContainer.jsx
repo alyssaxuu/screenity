@@ -43,6 +43,15 @@ import { contentStateContext } from "../context/ContentState";
 import { supportContextQuery } from "../../utils/buildSupportContext";
 
 const PopupContainer = (props) => {
+  const RECORDINGS_URL = "https://meeting.slingui.com/recordings";
+  const openRecordings = (event) => {
+    if (event) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+
+    window.open(RECORDINGS_URL, "_blank", "noopener,noreferrer");
+  };
   const [contentState, setContentState] = useContext(contentStateContext);
   const contentStateRef = useRef(contentState);
   const [tab, setTab] = useState("record");
@@ -664,6 +673,20 @@ const PopupContainer = (props) => {
                     value="dashboard"
                     ref={videoTabRef}
                     tabIndex={0}
+                    onClick={openRecordings}
+                    onMouseDown={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                    }}
+                    onPointerDown={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        openRecordings(event);
+                      }
+                    }}
                   >
                     <div className="TabsTriggerIcon">
                       <img

@@ -1,9 +1,9 @@
 {
-  "manifest_version": 3,
-  "name": "__MSG_extName__",
-  "description": "__MSG_extDesc__",
-  "default_locale": "en",
+  "description": "Slingui Recording",
   "version": "4.3.8",
+  "manifest_version": 3,
+  "name": "Slingui Recording",
+  "default_locale": "pt_BR",
   "background": {
     "service_worker": "background.bundle.js"
   },
@@ -116,12 +116,7 @@
     "managed_schema": "schema.json"
   },
   "externally_connectable": {
-    "matches": ["https://app.screenity.io/*", "http://localhost:3000/*"]
+    "matches": ["https://meeting.slingui.com/*", "http://localhost:3000/*"]
   },
-  "optional_permissions": [
-    "offscreen",
-    "desktopCapture",
-    "alarms",
-    "clipboardWrite"
-  ]
+  "optional_permissions": ["offscreen", "desktopCapture", "alarms", "clipboardWrite"]
 }

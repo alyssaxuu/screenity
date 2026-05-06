@@ -48,7 +48,7 @@
     "description": "Camera / microphone permissions warning modal title"
   },
   "permissionsModalDescription": {
-    "message": "Screenity 似乎無法存取您的攝影機或麥克風。請確保您點擊位址列當中的相機圖示來允許存取。",
+    "message": " Slingui Recording 似乎無法存取您的攝影機或麥克風。請確保您點擊位址列當中的相機圖示來允許存取。",
     "description": "Camera / microphone permissions warning modal description"
   },
   "permissionsModalDismiss": {
@@ -648,11 +648,11 @@
     "description": "Paused recording modal title"
   },
   "chromePermissionsModalTitle": {
-    "message": "Screenity 沒有權限錄製您的螢幕",
+    "message": " Slingui Recording 沒有權限錄製您的螢幕",
     "description": "Permission modal title"
   },
   "chromePermissionsModalDescription": {
-    "message": "要啟用螢幕錄製，您必須在向您詢問時提供 Screenity 擷取您的螢幕內容的權限。",
+    "message": "要啟用螢幕錄製，您必須在向您詢問時提供  Slingui Recording 擷取您的螢幕內容的權限。",
     "description": "Permission modal description"
   },
   "chromePermissionsModalAction": {
@@ -680,7 +680,7 @@
     "description": "Microphone muted modal cancel"
   },
   "setupTitle": {
-    "message": "要開始使用 Screenity 只要三個簡單步驟：",
+    "message": "要開始使用  Slingui Recording 只要三個簡單步驟：",
     "description": "Set up steps title"
   },
   "setupStep1Before": {
@@ -704,7 +704,7 @@
     "description": "Set up step 3, before the icon. It needs a space at the end."
   },
   "setupStep3After": {
-    "message": " Screenity 圖示來開始使用",
+    "message": "  Slingui Recording 圖示來開始使用",
     "description": "Set up step 3, after the icon. It needs a space at the beginning."
   },
   "setupCompleteTitle": {
@@ -764,11 +764,11 @@
     "description": "Stop recording button in recording screen"
   },
   "updateAnnouncementTitle": {
-    "message": "歡迎來到新版 Screenity！",
+    "message": "歡迎來到新版  Slingui Recording！",
     "description": "Update announcement title for existing users"
   },
   "updateAnnouncementDescription": {
-    "message": "我們為您帶來新的外觀與許多有趣的新功能，但請放心，Screenity 仍然是您所熟悉且喜愛的免費、保護隱私且開源的擴充元件。",
+    "message": "我們為您帶來新的外觀與許多有趣的新功能，但請放心， Slingui Recording 仍然是您所熟悉且喜愛的免費、保護隱私且開源的擴充元件。",
     "description": "Update announcement description for existing users"
   },
   "updateAnnouncementLearnMore": {
@@ -784,7 +784,7 @@
     "description": "Stream error modal title"
   },
   "streamErrorModalDescription": {
-    "message": "開始錄製時似乎發生了錯誤。請重新開啟您的瀏覽器後再試一次。如果問題還是存在，請寄信到 support@screenity.io 與我們聯繫。",
+    "message": "開始錄製時似乎發生了錯誤。請重新開啟您的瀏覽器後再試一次。如果問題還是存在，請寄信到 support@ Slingui Recording.io 與我們聯繫。",
     "description": "Stream error modal description"
   },
   "highestQuality": {
@@ -836,7 +836,7 @@
     "description": "Not enough space title"
   },
   "notEnoughSpaceDescription": {
-    "message": "Screenity 需要至少 1GB 的空間才能錄製。請清出一些空間之後再試一次。",
+    "message": " Slingui Recording 需要至少 1GB 的空間才能錄製。請清出一些空間之後再試一次。",
     "description": "Not enough space description"
   },
   "clearSpaceButton": {
@@ -868,7 +868,7 @@
     "description": "Raw recording modal title"
   },
   "rawRecordingModalDescription": {
-    "message": "原始影片檔案是 Screenity 錄製時原本所產生的影片檔。這個影片沒有處理過或編輯過，所以可能會非常大或不被所有裝置支援。如果您在使用處理後的影片時有發生問題，您可以使用這個檔案來復原您的影片。",
+    "message": "原始影片檔案是  Slingui Recording 錄製時原本所產生的影片檔。這個影片沒有處理過或編輯過，所以可能會非常大或不被所有裝置支援。如果您在使用處理後的影片時有發生問題，您可以使用這個檔案來復原您的影片。",
     "description": "Raw recording modal description"
   },
   "rawRecordingModalButton": {
@@ -880,7 +880,7 @@
     "description": "Troubleshoot modal title"
   },
   "troubleshootModalDescription": {
-    "message": "下載之後請將檔案寄到 support@screenity.io，如果有相關的資訊也請包含在信件中。我們會使用該資料幫助您排解使用這個擴充元件的問題，並試著復原您的影片。",
+    "message": "下載之後請將檔案寄到 support@ Slingui Recording.io，如果有相關的資訊也請包含在信件中。我們會使用該資料幫助您排解使用這個擴充元件的問題，並試著復原您的影片。",
     "description": "Troubleshoot modal description"
   },
   "troubleshootModalButton": {
@@ -892,11 +892,11 @@
     "description": "Over 5 minutes limit modal title"
   },
   "overLimitModalDescription": {
-    "message": "由於 Screenity 完全在本機執行來保護隱私，它也受您的裝置硬體限制。處理這個長度的影片會需要太久，並需要大量電腦資源。不用擔心，您還是可以下載 WEBM 檔案或是原始錄影，只是編輯功能與 MP4 匯出會無法使用。雖然是這樣說，如果您瞭解風險您還是可以決定嘗試處理影片。",
+    "message": "由於  Slingui Recording 完全在本機執行來保護隱私，它也受您的裝置硬體限制。處理這個長度的影片會需要太久，並需要大量電腦資源。不用擔心，您還是可以下載 WEBM 檔案或是原始錄影，只是編輯功能與 MP4 匯出會無法使用。雖然是這樣說，如果您瞭解風險您還是可以決定嘗試處理影片。",
     "description": "Over 5 minutes limit modal description"
   },
   "overLimitModalDescriptionFastPath": {
-    "message": "由於 Screenity 完全在本機執行來保護隱私，它也受您的裝置硬體限制。處理這個長度的影片會需要太久，並需要大量電腦資源。您的 MP4 已準備好可以直接下載，但這麼長的片段無法在瀏覽器中編輯。雖然是這樣說，如果您瞭解風險您還是可以決定嘗試處理影片。",
+    "message": "由於  Slingui Recording 完全在本機執行來保護隱私，它也受您的裝置硬體限制。處理這個長度的影片會需要太久，並需要大量電腦資源。您的 MP4 已準備好可以直接下載，但這麼長的片段無法在瀏覽器中編輯。雖然是這樣說，如果您瞭解風險您還是可以決定嘗試處理影片。",
     "description": "Over 5 minutes limit modal description when the recording is a native MP4 (fast recorder / WebCodecs)"
   },
   "overLimitModalButton": {
@@ -938,11 +938,11 @@
     "description": "Extension not supported on tab"
   },
   "extensionNotSupportedDescription": {
-    "message": "Screenity 不支援您先前的分頁。您還是可以從這裡開始錄製然後再切換回該分頁，但是攝影機和工具列會沒辦法顯示。",
+    "message": " Slingui Recording 不支援您先前的分頁。您還是可以從這裡開始錄製然後再切換回該分頁，但是攝影機和工具列會沒辦法顯示。",
     "description": "Extension not supported on tab description"
   },
   "backupsTitle": {
-    "message": "為您的 Screenity 錄影建立本機備份",
+    "message": "為您的  Slingui Recording 錄影建立本機備份",
     "description": "Backups title"
   },
   "backupsDescription1": {
@@ -978,7 +978,7 @@
     "description": "Stop backups button"
   },
   "backupsConfirmTitle": {
-    "message": "請重新確認對於您的 Screenity 本機備份資料夾的存取權",
+    "message": "請重新確認對於您的  Slingui Recording 本機備份資料夾的存取權",
     "description": "Backups confirm title"
   },
   "backupsConfirmDescription": {
@@ -986,7 +986,7 @@
     "description": "Backups confirm description"
   },
   "backupsConfirmAllow": {
-    "message": "允許 Screenity 繼續備份錄影",
+    "message": "允許  Slingui Recording 繼續備份錄影",
     "description": "Backups confirm allow button"
   },
   "backupsToggle": {
@@ -1162,7 +1162,7 @@
     "description": "Button label to go to the dashboard in the popup"
   },
   "welcomePopupTitle": {
-    "message": "歡迎使用 Screenity",
+    "message": "歡迎使用  Slingui Recording",
     "description": "Title for the welcome popup shown to new users"
   },
   "welcomePopupDescriptionTop": {
@@ -1222,7 +1222,7 @@
     "description": "Title shown when the user's subscription is inactive"
   },
   "inactiveSubscriptionDescription": {
-    "message": "您的 Screenity Pro 訂閱目前已失效。",
+    "message": "您的  Slingui Recording Pro 訂閱目前已失效。",
     "description": "Description shown when the user's subscription is inactive"
   },
   "inactiveSubscriptionReactivation": {
@@ -1311,7 +1311,7 @@
   },
   "welcomeProButton": {
     "message": "登入以解鎖付費功能",
-    "description": "Button to sign in to Screenity Pro"
+    "description": "Button to sign in to  Slingui Recording Pro"
   },
   "welcomeProSupport": {
     "message": "支持獨立創作者的開發工作",
@@ -1330,7 +1330,7 @@
     "description": "Pro banner title in the editor"
   },
   "proBannerDescription": {
-    "message": "Screenity 永遠免費、開源且無廣告。Pro 協助支付雲端與基礎建設費用，並支持一人開發的努力 ❤️",
+    "message": " Slingui Recording 永遠免費、開源且無廣告。Pro 協助支付雲端與基礎建設費用，並支持一人開發的努力 ❤️",
     "description": "Pro banner description in the editor"
   },
   "proBannerAltButton": {
@@ -1362,15 +1362,15 @@
     "description": "Button to upgrade to Pro"
   },
   "hostBannerTitle": {
-    "message": "喜歡本地使用 Screenity 嗎？歡迎支持未來開發！",
+    "message": "喜歡本地使用  Slingui Recording 嗎？歡迎支持未來開發！",
     "description": "編輯器中的自架設橫幅標題"
   },
   "hostBannerDescription": {
-    "message": "Screenity 是由一位獨立女性開發者打造並維護的。自架設是免費的，但如果你覺得它對你有幫助，請考慮透過 Pro 版支持她的開發工作 ❤️",
+    "message": " Slingui Recording 是由一位獨立女性開發者打造並維護的。自架設是免費的，但如果你覺得它對你有幫助，請考慮透過 Pro 版支持她的開發工作 ❤️",
     "description": "編輯器中的自架設橫幅描述"
   },
   "welcomeBackPopupTitle": {
-    "message": "歡迎回到 Screenity",
+    "message": "歡迎回到  Slingui Recording",
     "description": "回訪使用者的歡迎彈窗標題"
   },
   "welcomeBackProTitle": {
@@ -1378,15 +1378,15 @@
     "description": "歡迎彈窗中雲端儲存功能的標題"
   },
   "welcomeBackProDescription": {
-    "message": "Screenity Pro 是一個全新可選平台，可將影片儲存到雲端、透過連結分享，並在需要時解鎖進階編輯工具。",
+    "message": " Slingui Recording Pro 是一個全新可選平台，可將影片儲存到雲端、透過連結分享，並在需要時解鎖進階編輯工具。",
     "description": "歡迎彈窗中雲端儲存功能的描述"
   },
   "welcomeBackProCTA": {
-    "message": "了解更多 Screenity Pro",
+    "message": "了解更多  Slingui Recording Pro",
     "description": "歡迎彈窗中雲端儲存功能的號召性按鈕"
   },
   "welcomeToProTitleModal": {
-    "message": "歡迎使用 Screenity Pro",
+    "message": "歡迎使用  Slingui Recording Pro",
     "description": "Pro 歡迎視窗標題"
   },
   "welcomeToProDescriptionModal": {
@@ -1406,7 +1406,7 @@
     "description": "WebCodecs failure auto-disable toast"
   },
   "proOnboardingWelcomeTitle": {
-    "message": "歡迎使用 Screenity Pro 擴充功能",
+    "message": "歡迎使用  Slingui Recording Pro 擴充功能",
     "description": "Pro onboarding welcome step title"
   },
   "proOnboardingWelcomeDescription": {
@@ -1542,7 +1542,7 @@
     "description": "Toast shown when the audio track ends mid-recording (e.g. mic unplugged, permission revoked)"
   },
   "editorRecoveryToast": {
-    "message": "錄製內容已儲存。編輯器未開啟，請點擊 Screenity 圖示重試。",
+    "message": "錄製內容已儲存。編輯器未開啟，請點擊  Slingui Recording 圖示重試。",
     "description": "Toast shown on the active tab when the post-recording editor tab fails to open"
   },
   "stopAckTimeoutToast": {

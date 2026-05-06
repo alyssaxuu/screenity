@@ -316,7 +316,7 @@ const RightPanel = () => {
                   if (chrome.runtime.lastError || !id) {
                     reject(
                       chrome.runtime.lastError ||
-                        new Error("download returned no id"),
+                      new Error("download returned no id"),
                     );
                   } else {
                     resolve(id);
@@ -369,7 +369,7 @@ const RightPanel = () => {
             }
           }
         },
-        () => {}
+        () => { }
       );
     }
   };
@@ -413,7 +413,7 @@ const RightPanel = () => {
             console.error("[Screenity] Troubleshooting export failed:", err);
           }
         },
-        () => {},
+        () => { },
       );
     }
   };
@@ -480,6 +480,10 @@ const RightPanel = () => {
         xhr.onerror = () => reject(new Error('File upload failed due to a network error.'));
         xhr.send(blobToUpload);
       });
+      const { screenityMeetingState = null } = await chrome.storage.local.get([
+        'screenityMeetingState',
+      ]);
+      console.log(screenityMeetingState);
 
       // Step 3: Create the document entry
       const documentResponse = await fetch('https://api.slingui.com/classroom/documents', {
@@ -492,16 +496,17 @@ const RightPanel = () => {
           name: contentStateRef.current.title || 'Untitled Recording',
           path: 'recording',
           type: 'recording',
-          usersCanAccess: [],
+          lastMeetingState: screenityMeetingState,
+          usersCanAccess: screenityMeetingState.participants.ids,
           storageUrl: data.urlFile,
         }),
       });
-      
+
       if (!documentResponse.ok) {
         const errorData = await documentResponse.json();
         throw new Error(errorData.message || 'Failed to create document entry');
       }
-      
+
       await documentResponse.json();
 
       // Step 4: Redirect
@@ -624,8 +629,8 @@ const RightPanel = () => {
                   <div className={styles.buttonDescription}>
                     {contentState.blob?.type === "video/mp4"
                       ? chrome.i18n.getMessage(
-                          "overLimitLabelDescriptionFastPath"
-                        )
+                        "overLimitLabelDescriptionFastPath"
+                      )
                       : chrome.i18n.getMessage("overLimitLabelDescription")}
                   </div>
                 </div>
@@ -652,7 +657,7 @@ const RightPanel = () => {
                             type: "force-processing",
                           });
                         },
-                        () => {},
+                        () => { },
                         null,
                         chrome.i18n.getMessage("overLimitModalLearnMore"),
                         () => {
@@ -687,16 +692,16 @@ const RightPanel = () => {
                   </div>
                 </div>
                 {!contentState.isFfmpegRunning && (
-                <div
-                  className={styles.buttonRight}
-                  onClick={() => {
-                    chrome.runtime.sendMessage({
-                      type: "pricing",
-                    });
-                  }}
-                >
-                  {chrome.i18n.getMessage("learnMoreLabel")}
-                </div>
+                  <div
+                    className={styles.buttonRight}
+                    onClick={() => {
+                      chrome.runtime.sendMessage({
+                        type: "pricing",
+                      });
+                    }}
+                  >
+                    {chrome.i18n.getMessage("learnMoreLabel")}
+                  </div>
                 )}
               </div>
             )}
@@ -707,28 +712,28 @@ const RightPanel = () => {
               contentState.duration > contentState.editLimit &&
               !contentState.override
             ) && (
-            <div className={styles.alert}>
-              <div className={styles.buttonLeft}>
-                <ReactSVG src={URL + "editor/icons/alert.svg"} />
-              </div>
-              <div className={styles.buttonMiddle}>
-                <div className={styles.buttonTitle}>
-                  {chrome.i18n.getMessage("editTooLongTitle")}
+              <div className={styles.alert}>
+                <div className={styles.buttonLeft}>
+                  <ReactSVG src={URL + "editor/icons/alert.svg"} />
                 </div>
-                <div className={styles.buttonDescription}>
-                  {chrome.i18n.getMessage("editTooLongDescription")}
+                <div className={styles.buttonMiddle}>
+                  <div className={styles.buttonTitle}>
+                    {chrome.i18n.getMessage("editTooLongTitle")}
+                  </div>
+                  <div className={styles.buttonDescription}>
+                    {chrome.i18n.getMessage("editTooLongDescription")}
+                  </div>
+                </div>
+                <div
+                  className={styles.buttonRight}
+                  onClick={() =>
+                    setContentState((prev) => ({ ...prev, editErrorType: null }))
+                  }
+                >
+                  {chrome.i18n.getMessage("permissionsModalDismiss")}
                 </div>
               </div>
-              <div
-                className={styles.buttonRight}
-                onClick={() =>
-                  setContentState((prev) => ({ ...prev, editErrorType: null }))
-                }
-              >
-                {chrome.i18n.getMessage("permissionsModalDismiss")}
-              </div>
-            </div>
-          )}
+            )}
           {!contentState.fallback && contentState.editErrorType === "timeout" && (
             <div className={styles.alert}>
               <div className={styles.buttonLeft}>
@@ -805,10 +810,10 @@ const RightPanel = () => {
                         contentState.noffmpeg ||
                         (contentState.duration > contentState.editLimit &&
                           !contentState.override)
-                      ? getNotAvailableLabel()
-                      : contentState.mp4ready
-                      ? chrome.i18n.getMessage("editButtonDescription")
-                      : getPreparingLabel()}
+                        ? getNotAvailableLabel()
+                        : contentState.mp4ready
+                          ? chrome.i18n.getMessage("editButtonDescription")
+                          : getPreparingLabel()}
                   </div>
                 </div>
                 <div className={styles.buttonRight}>
@@ -840,10 +845,10 @@ const RightPanel = () => {
                         contentState.noffmpeg ||
                         (contentState.duration > contentState.editLimit &&
                           !contentState.override)
-                      ? getNotAvailableLabel()
-                      : contentState.mp4ready
-                      ? chrome.i18n.getMessage("cropButtonDescription")
-                      : getPreparingLabel()}
+                        ? getNotAvailableLabel()
+                        : contentState.mp4ready
+                          ? chrome.i18n.getMessage("cropButtonDescription")
+                          : getPreparingLabel()}
                   </div>
                 </div>
                 <div className={styles.buttonRight}>
@@ -875,10 +880,10 @@ const RightPanel = () => {
                         contentState.noffmpeg ||
                         (contentState.duration > contentState.editLimit &&
                           !contentState.override)
-                      ? getNotAvailableLabel()
-                      : contentState.mp4ready
-                      ? chrome.i18n.getMessage("addAudioButtonDescription")
-                      : getPreparingLabel()}
+                        ? getNotAvailableLabel()
+                        : contentState.mp4ready
+                          ? chrome.i18n.getMessage("addAudioButtonDescription")
+                          : getPreparingLabel()}
                   </div>
                 </div>
                 <div className={styles.buttonRight}>
@@ -913,54 +918,54 @@ const RightPanel = () => {
               </div>
             )}
             <div className={styles.buttonWrap}>
-            {slingUser ? (
-              <div
-                role="button"
-                className={styles.button}
-                onClick={() => handleSlinguiUpload(slingUser)}
-                disabled={isUploading || (!contentState.blob && !contentState.webm)}
-              >
-                <div className={styles.buttonMiddle} style={{paddingLeft: '24px'}}>
-                  <div className={styles.buttonTitle}>
-                    {isUploading
-                      ? `Salvando... ${uploadProgress}%`
-                      : "Salvar na Slingui"}
+              {slingUser ? (
+                <div
+                  role="button"
+                  className={styles.button}
+                  onClick={() => handleSlinguiUpload(slingUser)}
+                  disabled={isUploading || (!contentState.blob && !contentState.webm)}
+                >
+                  <div className={styles.buttonMiddle} style={{ paddingLeft: '24px' }}>
+                    <div className={styles.buttonTitle}>
+                      {isUploading
+                        ? `Salvando... ${uploadProgress}%`
+                        : "Salvar na Slingui"}
+                    </div>
+                    <div className={styles.buttonDescription}>
+                      {contentState.mp4ready
+                        ? "Salvar o vídeo MP4 na sua conta Slingui"
+                        : "Salvar o vídeo WEBM na sua conta Slingui"}
+                    </div>
                   </div>
-                  <div className={styles.buttonDescription}>
-                    {contentState.mp4ready
-                      ? "Salvar o vídeo MP4 na sua conta Slingui"
-                      : "Salvar o vídeo WEBM na sua conta Slingui"}
-                  </div>
-                </div>
-                <div className={styles.buttonRight}>
-                  <ReactSVG src={URL + "editor/icons/right-arrow.svg"} />
-                </div>
-              </div>
-            ) : (
-              <div
-                role="button"
-                className={styles.button}
-                onClick={async () => {
-                  try {
-                    const user = await login();
-                    setSlingUser(user);
-                    await handleSlinguiUpload(user);
-                  } catch (error) {
-                    console.error("Login failed:", error);
-                  }
-                }}
-              >
-                <div className={styles.buttonMiddle} style={{paddingLeft: '24px'}}>
-                  <div className={styles.buttonTitle}>Save to your account</div>
-                  <div className={styles.buttonDescription}>
-                    Save, then share it with students
+                  <div className={styles.buttonRight}>
+                    <ReactSVG src={URL + "editor/icons/right-arrow.svg"} />
                   </div>
                 </div>
-                <div className={styles.buttonRight}>
-                  <ReactSVG src={EXT_URL + "editor/icons/right-arrow.svg"} />
+              ) : (
+                <div
+                  role="button"
+                  className={styles.button}
+                  onClick={async () => {
+                    try {
+                      const user = await login();
+                      setSlingUser(user);
+                      await handleSlinguiUpload(user);
+                    } catch (error) {
+                      console.error("Login failed:", error);
+                    }
+                  }}
+                >
+                  <div className={styles.buttonMiddle} style={{ paddingLeft: '24px' }}>
+                    <div className={styles.buttonTitle}>Save to your account</div>
+                    <div className={styles.buttonDescription}>
+                      Save, then share it with students
+                    </div>
+                  </div>
+                  <div className={styles.buttonRight}>
+                    <ReactSVG src={EXT_URL + "editor/icons/right-arrow.svg"} />
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
             </div>
           </div>
           <div className={styles.section}>
@@ -1003,49 +1008,49 @@ const RightPanel = () => {
                 const mp4Disabled = isNativeMp4
                   ? contentState.isFfmpegRunning || !contentState.mp4ready
                   : contentState.isFfmpegRunning ||
-                    contentState.noffmpeg ||
-                    !contentState.mp4ready;
+                  contentState.noffmpeg ||
+                  !contentState.mp4ready;
                 const mp4ShowNotAvailable = isNativeMp4
                   ? false
                   : contentState.updateChrome ||
-                    contentState.noffmpeg ||
-                    (contentState.duration > contentState.editLimit &&
-                      !contentState.override);
+                  contentState.noffmpeg ||
+                  (contentState.duration > contentState.editLimit &&
+                    !contentState.override);
                 return (
-              <div
-                role="button"
-                className={styles.button}
-                onClick={() => {
-                  if (!contentState.mp4ready) return;
-                  contentState.download();
-                }}
-                disabled={mp4Disabled}
-              >
-                <div className={styles.buttonLeft}>
-                  <ReactSVG src={URL + "editor/icons/download.svg"} />
-                </div>
-                <div className={styles.buttonMiddle}>
-                  <div className={styles.buttonTitle}>
-                    {contentState.downloading
-                      ? chrome.i18n.getMessage("downloadingLabel")
-                      : chrome.i18n.getMessage("downloadMP4ButtonTitle")}
+                  <div
+                    role="button"
+                    className={styles.button}
+                    onClick={() => {
+                      if (!contentState.mp4ready) return;
+                      contentState.download();
+                    }}
+                    disabled={mp4Disabled}
+                  >
+                    <div className={styles.buttonLeft}>
+                      <ReactSVG src={URL + "editor/icons/download.svg"} />
+                    </div>
+                    <div className={styles.buttonMiddle}>
+                      <div className={styles.buttonTitle}>
+                        {contentState.downloading
+                          ? chrome.i18n.getMessage("downloadingLabel")
+                          : chrome.i18n.getMessage("downloadMP4ButtonTitle")}
+                      </div>
+                      <div className={styles.buttonDescription}>
+                        {contentState.offline &&
+                          !contentState.ffmpegLoaded &&
+                          !isNativeMp4
+                          ? chrome.i18n.getMessage("noConnectionLabel")
+                          : mp4ShowNotAvailable
+                            ? getNotAvailableLabel()
+                            : contentState.mp4ready && !contentState.isFfmpegRunning
+                              ? chrome.i18n.getMessage("downloadMP4ButtonDescription")
+                              : getPreparingLabel()}
+                      </div>
+                    </div>
+                    <div className={styles.buttonRight}>
+                      <ReactSVG src={URL + "editor/icons/right-arrow.svg"} />
+                    </div>
                   </div>
-                  <div className={styles.buttonDescription}>
-                    {contentState.offline &&
-                    !contentState.ffmpegLoaded &&
-                    !isNativeMp4
-                      ? chrome.i18n.getMessage("noConnectionLabel")
-                      : mp4ShowNotAvailable
-                      ? getNotAvailableLabel()
-                      : contentState.mp4ready && !contentState.isFfmpegRunning
-                      ? chrome.i18n.getMessage("downloadMP4ButtonDescription")
-                      : getPreparingLabel()}
-                  </div>
-                </div>
-                <div className={styles.buttonRight}>
-                  <ReactSVG src={URL + "editor/icons/right-arrow.svg"} />
-                </div>
-              </div>
                 );
               })()}
               {!contentState.fallback && (
@@ -1067,8 +1072,8 @@ const RightPanel = () => {
                     <div className={styles.buttonDescription}>
                       {!contentState.isFfmpegRunning
                         ? chrome.i18n.getMessage(
-                            "downloadWEBMButtonDescription"
-                          )
+                          "downloadWEBMButtonDescription"
+                        )
                         : getPreparingLabel()}
                     </div>
                   </div>
@@ -1107,10 +1112,10 @@ const RightPanel = () => {
                         contentState.noffmpeg ||
                         (contentState.duration > contentState.editLimit &&
                           !contentState.override)
-                      ? getNotAvailableLabel()
-                      : contentState.mp4ready
-                      ? chrome.i18n.getMessage("downloadGIFButtonDescription")
-                      : getPreparingLabel()}
+                        ? getNotAvailableLabel()
+                        : contentState.mp4ready
+                          ? chrome.i18n.getMessage("downloadGIFButtonDescription")
+                          : getPreparingLabel()}
                   </div>
                 </div>
                 <div className={styles.buttonRight}>

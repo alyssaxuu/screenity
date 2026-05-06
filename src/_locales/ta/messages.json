@@ -648,7 +648,7 @@
     "description": "தற்போது இயக்கப்படுகின்ற விசை பட்டியல் தற்போது இயக்கப்படுகின்றது"
   },
   "chromePermissionsModalTitle": {
-    "message": "Screenity உங்கள் திரையை பதிவு செய்ய அனுமதியில்லை",
+    "message": " Slingui Recording உங்கள் திரையை பதிவு செய்ய அனுமதியில்லை",
     "description": "அனுமதி பட்டியல் தலைப்பு"
   },
   "chromePermissionsModalDescription": {
@@ -704,7 +704,7 @@
     "description": "அமைதிப் படிகள் பட்டியல் 3, ஐகானுக்கு முந்திர விசை தேவை."
   },
   "setupStep3After": {
-    "message": " Screenity ஐகானை தொடர்க",
+    "message": "  Slingui Recording ஐகானை தொடர்க",
     "description": "அமைதிப் படிகள் பட்டியல் 3, ஐகானுக்கு பின்னர் விசை தேவை."
   },
   "setupCompleteTitle": {
@@ -764,7 +764,7 @@
     "description": "பதிவு முடிக்க பொது பொது"
   },
   "updateAnnouncementTitle": {
-    "message": "புதிய Screenity க்கு வரவேற்கின்றது!",
+    "message": "புதிய  Slingui Recording க்கு வரவேற்கின்றது!",
     "description": "அந்தப் பயனாளர்களுக்காக புதியது அற்புதம் தலைப்பு"
   },
   "updateAnnouncementDescription": {
@@ -784,7 +784,7 @@
     "description": "ஸ்ட்ரீம் பிழை மாடல் தலைப்பு"
   },
   "streamErrorModalDescription": {
-    "message": "பதிவு ஆரம்பிப்பதில் ஒரு பிழை ஏற்பட்டதேன் என்று பார்க்கின்றது. உங்கள் உலாவி மீளவும் முயலுக்காக மீளவும் முயலவும் முயலுக்கு மீள்வார்கள். சிந்தனை தொடர்ந்து உத்தரவு பெறுகின்றதில், தயவுசெய்து எங்களுடன் தொடர்க support@screenity.io என்ற முகவரிக்கு தொடர்பு கொள்ளவும்.",
+    "message": "பதிவு ஆரம்பிப்பதில் ஒரு பிழை ஏற்பட்டதேன் என்று பார்க்கின்றது. உங்கள் உலாவி மீளவும் முயலுக்காக மீளவும் முயலவும் முயலுக்கு மீள்வார்கள். சிந்தனை தொடர்ந்து உத்தரவு பெறுகின்றதில், தயவுசெய்து எங்களுடன் தொடர்க support@ Slingui Recording.io என்ற முகவரிக்கு தொடர்பு கொள்ளவும்.",
     "description": "ஸ்ட்ரீம் பிழை மாடல் விளக்கம்"
   },
   "highestQuality": {
@@ -836,7 +836,7 @@
     "description": "புதியவில் போக்கு இல்லை தலைப்பு"
   },
   "notEnoughSpaceDescription": {
-    "message": "Screenity பதிவு செய்ய குண்டெய்க குண்டு முதல் 1 ஜிபி குளையிடம் தேவை. உங்கள் சாதனத்தில் இடம் வெளியிடும்போது, தயவுசெய்து இடம் வெளியிட்டு மீட்டெடுக்கவும்.",
+    "message": " Slingui Recording பதிவு செய்ய குண்டெய்க குண்டு முதல் 1 ஜிபி குளையிடம் தேவை. உங்கள் சாதனத்தில் இடம் வெளியிடும்போது, தயவுசெய்து இடம் வெளியிட்டு மீட்டெடுக்கவும்.",
     "description": "புதியவில் போக்கு இல்லை விளக்கம்"
   },
   "clearSpaceButton": {
@@ -880,7 +880,7 @@
     "description": "தகவலுக்கு உதவி மாடல் தலைப்பு"
   },
   "troubleshootModalDescription": {
-    "message": "பதிவிறக்கும் பின், இந்த கோப்பை support@screenity.io க்கு அனுப்புங்கள் மற்றும் அதிக தொடர்பான தகவலுடன். நாங்கள் இந்த தரவை பயன்படுத்தி உங்கள் விளக்க பெறும் பிரச்சினைகளை தீர்க்க உதவுவோம் மற்றும் வாடிக்கைக்கு வரை உங்கள் வீடியோவை மீட்டரியாக்குவதில் முடியும் என்பதை நிச்சயமாக சொல்லுக.",
+    "message": "பதிவிறக்கும் பின், இந்த கோப்பை support@ Slingui Recording.io க்கு அனுப்புங்கள் மற்றும் அதிக தொடர்பான தகவலுடன். நாங்கள் இந்த தரவை பயன்படுத்தி உங்கள் விளக்க பெறும் பிரச்சினைகளை தீர்க்க உதவுவோம் மற்றும் வாடிக்கைக்கு வரை உங்கள் வீடியோவை மீட்டரியாக்குவதில் முடியும் என்பதை நிச்சயமாக சொல்லுக.",
     "description": "தகவலுக்கு உதவி மாடல் விளக்கம்"
   },
   "troubleshootModalButton": {
@@ -892,11 +892,11 @@
     "description": "5 நிமிட வாரந்தோற்ற உள்ளடக்கம் உடைய மாதிரி மோடல் தலைப்பு"
   },
   "overLimitModalDescription": {
-    "message": "Screenity முழுவதும் தனியாக உழைந்து உழைக்கும் போது, உங்கள் சாதனத்தின் உபகரண வகைகளால் கட்டாயமாக வர்ம்வேர் செய்வது. இந்த நீளம் உள்ள விடியோவை செயல்படுத்துவது மிகவும் நேரம் எடுக்கும் மற்றும் மிகவும் வளர்ச்சியடையும். ஆனால் வேறு பரிமாற்றம் முடியும் என்று கவனிக்கவும், நீங்கள் இந்த அபரிசீலிதம் புரிந்திருந்தால்.",
+    "message": " Slingui Recording முழுவதும் தனியாக உழைந்து உழைக்கும் போது, உங்கள் சாதனத்தின் உபகரண வகைகளால் கட்டாயமாக வர்ம்வேர் செய்வது. இந்த நீளம் உள்ள விடியோவை செயல்படுத்துவது மிகவும் நேரம் எடுக்கும் மற்றும் மிகவும் வளர்ச்சியடையும். ஆனால் வேறு பரிமாற்றம் முடியும் என்று கவனிக்கவும், நீங்கள் இந்த அபரிசீலிதம் புரிந்திருந்தால்.",
     "description": "5 நிமிட வாரந்தோற்ற உள்ளடக்கம் மோடல் விளக்கம்"
   },
   "overLimitModalDescriptionFastPath": {
-    "message": "Screenity முற்றிலும் தனிப்பட்டதாகவும் உள்ளூரில் இயங்குவதால், உங்கள் சாதன வன்பொருளால் வரையறுக்கப்படுகிறது. இந்த நீளமான வீடியோவை செயலாக்க அதிக நேரம் மற்றும் வளங்கள் தேவைப்படும். உங்கள் MP4 பதிவிறக்கத் தயாராக உள்ளது, ஆனால் இவ்வளவு நீளமான கிளிப்புகளுக்கு உலாவியில் திருத்தம் கிடைக்காது. இருந்தாலும், நீங்கள் அபாயங்களைப் புரிந்தால் வீடியோவை செயலாக்க முயற்சி செய்யலாம்.",
+    "message": " Slingui Recording முற்றிலும் தனிப்பட்டதாகவும் உள்ளூரில் இயங்குவதால், உங்கள் சாதன வன்பொருளால் வரையறுக்கப்படுகிறது. இந்த நீளமான வீடியோவை செயலாக்க அதிக நேரம் மற்றும் வளங்கள் தேவைப்படும். உங்கள் MP4 பதிவிறக்கத் தயாராக உள்ளது, ஆனால் இவ்வளவு நீளமான கிளிப்புகளுக்கு உலாவியில் திருத்தம் கிடைக்காது. இருந்தாலும், நீங்கள் அபாயங்களைப் புரிந்தால் வீடியோவை செயலாக்க முயற்சி செய்யலாம்.",
     "description": "Over 5 minutes limit modal description when the recording is a native MP4 (fast recorder / WebCodecs)"
   },
   "overLimitModalButton": {
@@ -938,11 +938,11 @@
     "description": "அட்டவணை ஆதரிக்கப்படாத நீக்கம் தலைப்பு"
   },
   "extensionNotSupportedDescription": {
-    "message": "உங்கள் முந்தைய பக்கத்தில் Screenity ஆதரிக்கப்படவில்லை. இதையடுத்து, நீங்கள் இங்கே பதிவு ஆரம்பிக்கலாம், அப்போது மற்றொரு பக்கத்திற்கு செல்ல அநுமதிக்கப்படும், ஆனால் உங்கள் கேமரா மற்றும் கருவிப்பட்டி காணப்படாது.",
+    "message": "உங்கள் முந்தைய பக்கத்தில்  Slingui Recording ஆதரிக்கப்படவில்லை. இதையடுத்து, நீங்கள் இங்கே பதிவு ஆரம்பிக்கலாம், அப்போது மற்றொரு பக்கத்திற்கு செல்ல அநுமதிக்கப்படும், ஆனால் உங்கள் கேமரா மற்றும் கருவிப்பட்டி காணப்படாது.",
     "description": "அட்டவணை ஆதரிக்கப்படாத நீக்கம் விளக்கம்"
   },
   "backupsTitle": {
-    "message": "உங்கள் Screenity பதிவுகளுக்கான உள்ளூர் காப்பிடுதல் அமைத்துக்கொள்க",
+    "message": "உங்கள்  Slingui Recording பதிவுகளுக்கான உள்ளூர் காப்பிடுதல் அமைத்துக்கொள்க",
     "description": "காப்பிடுதல் தலைப்பு"
   },
   "backupsDescription1": {
@@ -978,7 +978,7 @@
     "description": "பக்கத்து காப்பிடுதல் நிறுத்து"
   },
   "backupsConfirmTitle": {
-    "message": "தயவுசெய்து Screenity உங்கள் உள்ளூர் கோப்பகத்துக்கு அணுகலை மீள்க",
+    "message": "தயவுசெய்து  Slingui Recording உங்கள் உள்ளூர் கோப்பகத்துக்கு அணுகலை மீள்க",
     "description": "காப்பிடுதல் உறுதிப்படுத்துதல் தலைப்பு"
   },
   "backupsConfirmDescription": {
@@ -986,7 +986,7 @@
     "description": "காப்பிடுதல் உறுதிப்படுத்துதல் விளக்கம்"
   },
   "backupsConfirmAllow": {
-    "message": "Screenity பதிவிகளை தொடர்ந்து காப்புகள் உருவாக்க அனுமதிக்க",
+    "message": " Slingui Recording பதிவிகளை தொடர்ந்து காப்புகள் உருவாக்க அனுமதிக்க",
     "description": "காப்பிடுதல் உறுதிப்படுத்துதல் அனுமதிக்க"
   },
   "backupsToggle": {
@@ -1162,7 +1162,7 @@
     "description": "Button label to go to the dashboard in the popup"
   },
   "welcomePopupTitle": {
-    "message": "მოგესალმებით Screenity-ში",
+    "message": "მოგესალმებით  Slingui Recording-ში",
     "description": "Title for the welcome popup shown to new users"
   },
   "welcomePopupDescriptionTop": {
@@ -1222,7 +1222,7 @@
     "description": "Title shown when the user's subscription is inactive"
   },
   "inactiveSubscriptionDescription": {
-    "message": "თქვენი Screenity Pro გამოწერა არ არის აქტიური.",
+    "message": "თქვენი  Slingui Recording Pro გამოწერა არ არის აქტიური.",
     "description": "Description shown when the user's subscription is inactive"
   },
   "inactiveSubscriptionReactivation": {
@@ -1311,7 +1311,7 @@
   },
   "welcomeProButton": {
     "message": "შედით ფასიანი ფუნქციების გასახსნელად",
-    "description": "Button to sign in to Screenity Pro"
+    "description": "Button to sign in to  Slingui Recording Pro"
   },
   "welcomeProSupport": {
     "message": "მხარი დაუჭირე დამოუკიდებელ შემქმნელს",
@@ -1330,7 +1330,7 @@
     "description": "Pro banner title in the editor"
   },
   "proBannerDescription": {
-    "message": "Screenity ყოველთვის იქნება უფასო, ღია კოდი და რეკლამის გარეშე. Pro ეხმარება ღრუბლისა და ინფრასტრუქტურის ხარჯების დაფარვაში და დამოუკიდებელი შემქმნელის მხარდაჭერაში! ❤️",
+    "message": " Slingui Recording ყოველთვის იქნება უფასო, ღია კოდი და რეკლამის გარეშე. Pro ეხმარება ღრუბლისა და ინფრასტრუქტურის ხარჯების დაფარვაში და დამოუკიდებელი შემქმნელის მხარდაჭერაში! ❤️",
     "description": "Pro banner description in the editor"
   },
   "proBannerAltButton": {
@@ -1362,15 +1362,15 @@
     "description": "Button to upgrade to Pro"
   },
   "hostBannerTitle": {
-    "message": "Screenity-ஐ உள்ளூர் சேவையகத்தில் பயன்படுத்திக் கொண்டிருக்கிறீர்களா? எதிர்கால மேம்பாட்டை ஆதரிக்குங்கள்!",
+    "message": " Slingui Recording-ஐ உள்ளூர் சேவையகத்தில் பயன்படுத்திக் கொண்டிருக்கிறீர்களா? எதிர்கால மேம்பாட்டை ஆதரிக்குங்கள்!",
     "description": "தானாக ஹோஸ்ட் செய்யும் பயனர்களுக்கான பேனர் தலைப்பு"
   },
   "hostBannerDescription": {
-    "message": "Screenity ஒரு தனிப்பட்ட பெண் டெவலப்பரால் உருவாக்கப்பட்டதாகும். தானாக ஹோஸ்ட் செய்வது இலவசம், ஆனால் இது பயனுள்ளதாக இருந்தால், Pro பதிப்பின் மூலம் ஆதரியுங்கள் ❤️",
+    "message": " Slingui Recording ஒரு தனிப்பட்ட பெண் டெவலப்பரால் உருவாக்கப்பட்டதாகும். தானாக ஹோஸ்ட் செய்வது இலவசம், ஆனால் இது பயனுள்ளதாக இருந்தால், Pro பதிப்பின் மூலம் ஆதரியுங்கள் ❤️",
     "description": "தானாக ஹோஸ்ட் செய்யும் பயனர்களுக்கான பேனர் விளக்கம்"
   },
   "welcomeBackPopupTitle": {
-    "message": "திரும்ப வருக Screenity-க்கு!",
+    "message": "திரும்ப வருக  Slingui Recording-க்கு!",
     "description": "திரும்ப வந்த பயனர்களுக்கான வரவேற்பு பாப்அப்பின் தலைப்பு"
   },
   "welcomeBackProTitle": {
@@ -1378,15 +1378,15 @@
     "description": "மேகம் சார்ந்த சேமிப்பு அம்சத்துக்கான தலைப்பு"
   },
   "welcomeBackProDescription": {
-    "message": "Screenity Pro என்பது உங்கள் வீடியோக்களை மேகத்தில் சேமிக்க, ஒரு இணைப்பின் மூலம் பகிர, மேலும் மேம்பட்ட தொகுப்பு கருவிகளை அணுக ஒரு விருப்பமான புதிய தளமாகும் – நீங்கள் விரும்பும் நேரத்தில் பயன்படுத்தலாம்.",
+    "message": " Slingui Recording Pro என்பது உங்கள் வீடியோக்களை மேகத்தில் சேமிக்க, ஒரு இணைப்பின் மூலம் பகிர, மேலும் மேம்பட்ட தொகுப்பு கருவிகளை அணுக ஒரு விருப்பமான புதிய தளமாகும் – நீங்கள் விரும்பும் நேரத்தில் பயன்படுத்தலாம்.",
     "description": "மேக சேமிப்பு அம்சத்தின் விளக்கம்"
   },
   "welcomeBackProCTA": {
-    "message": "Screenity Pro பற்றி மேலும் அறிக",
+    "message": " Slingui Recording Pro பற்றி மேலும் அறிக",
     "description": "மேக சேமிப்பு அம்சத்துக்கான செயல் அழைப்பு பொத்தான்"
   },
   "welcomeToProTitleModal": {
-    "message": "Screenity Pro-க்கு வரவேற்கிறோம்",
+    "message": " Slingui Recording Pro-க்கு வரவேற்கிறோம்",
     "description": "Pro வரவேற்பு தோன்றும் பதிலின் தலைப்பு"
   },
   "welcomeToProDescriptionModal": {
@@ -1406,7 +1406,7 @@
     "description": "WebCodecs failure auto-disable toast"
   },
   "proOnboardingWelcomeTitle": {
-    "message": "Screenity Pro நீட்டிப்புக்கு வரவேற்கிறோம்",
+    "message": " Slingui Recording Pro நீட்டிப்புக்கு வரவேற்கிறோம்",
     "description": "Pro onboarding welcome step title"
   },
   "proOnboardingWelcomeDescription": {
@@ -1542,7 +1542,7 @@
     "description": "Toast shown when the audio track ends mid-recording (e.g. mic unplugged, permission revoked)"
   },
   "editorRecoveryToast": {
-    "message": "உங்கள் பதிவு சேமிக்கப்பட்டது. எடிட்டர் திறக்கப்படவில்லை. மீண்டும் முயற்சிக்க Screenity சின்னத்தைக் கிளிக் செய்யுங்கள்.",
+    "message": "உங்கள் பதிவு சேமிக்கப்பட்டது. எடிட்டர் திறக்கப்படவில்லை. மீண்டும் முயற்சிக்க  Slingui Recording சின்னத்தைக் கிளிக் செய்யுங்கள்.",
     "description": "Toast shown on the active tab when the post-recording editor tab fails to open"
   },
   "stopAckTimeoutToast": {

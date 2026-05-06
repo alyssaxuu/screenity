@@ -93,10 +93,17 @@ const Setup = () => {
           </div>
         </div>
       )}
-      <img
-        className="setupLogo"
-        src={chrome.runtime.getURL("assets/logo-text.svg")}
-      />
+      <div className="setupLogoGroup">
+        <img
+          className="setupLogo setupLogoIcon"
+          src={chrome.runtime.getURL("assets/logo.png")}
+        />
+        <span className="setupLogoLove">❤️</span>
+        <img
+          className="setupLogo setupLogoText"
+          src={chrome.runtime.getURL("assets/logo-text.svg")}
+        />
+      </div>
       <style>
         {`
 				body {
@@ -132,13 +139,35 @@ const Setup = () => {
 				}
 
 
-				.setupLogo {
+				.setupLogoGroup {
 					position: absolute;
 					bottom: 30px;
 					left: 0px;
 					right: 0px;
 					margin: auto;
-					width: 120px;
+					display: flex;
+					align-items: center;
+					justify-content: center;
+					gap: 10px;
+				}
+
+				.setupLogo {
+					display: block;
+				}
+
+				.setupLogoIcon {
+					width: 54px;
+					height: 54px;
+					object-fit: contain;
+				}
+
+				.setupLogoLove {
+					font-size: 18px;
+					line-height: 1;
+				}
+
+				.setupLogoText {
+					width: 92px;
 				}
 
 

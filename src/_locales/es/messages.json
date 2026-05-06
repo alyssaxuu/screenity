@@ -48,7 +48,7 @@
     "description": "Título del modal de advertencia de permisos de cámara/micrófono"
   },
   "permissionsModalDescription": {
-    "message": "Parece que Screenity no puede acceder a tu cámara o micrófono. Permite el acceso haciendo clic en el icono de la cámara en la barra de direcciones.",
+    "message": "Parece que  Slingui Recording no puede acceder a tu cámara o micrófono. Permite el acceso haciendo clic en el icono de la cámara en la barra de direcciones.",
     "description": "Descripción del modal de advertencia de permisos de cámara/micrófono"
   },
   "permissionsModalDismiss": {
@@ -648,11 +648,11 @@
     "description": "Título del modal de grabación en pausa"
   },
   "chromePermissionsModalTitle": {
-    "message": "Screenity no tiene permiso para grabar tu pantalla",
+    "message": " Slingui Recording no tiene permiso para grabar tu pantalla",
     "description": "Título del modal de permisos"
   },
   "chromePermissionsModalDescription": {
-    "message": "Para habilitar la grabación de pantalla, debes conceder permisos a Screenity.",
+    "message": "Para habilitar la grabación de pantalla, debes conceder permisos a  Slingui Recording.",
     "description": "Descripción del modal de permisos"
   },
   "chromePermissionsModalAction": {
@@ -680,7 +680,7 @@
     "description": "Cancelar del modal de micrófono apagado"
   },
   "setupTitle": {
-    "message": "Empieza a utilizar Screenity con tres pasos sencillos:",
+    "message": "Empieza a utilizar  Slingui Recording con tres pasos sencillos:",
     "description": "Título de los pasos de configuración"
   },
   "setupStep1Before": {
@@ -704,7 +704,7 @@
     "description": "Paso 3 de configuración, antes del icono. Necesita un espacio al final."
   },
   "setupStep3After": {
-    "message": " icono de Screenity para empezar",
+    "message": " icono de  Slingui Recording para empezar",
     "description": "Paso 3 de configuración, después del icono. Necesita un espacio al principio."
   },
   "setupCompleteTitle": {
@@ -764,7 +764,7 @@
     "description": "Stop recording button in recording screen"
   },
   "updateAnnouncementTitle": {
-    "message": "¡Bienvenido al nuevo Screenity!",
+    "message": "¡Bienvenido al nuevo  Slingui Recording!",
     "description": "Título del anuncio de actualización para usuarios existentes"
   },
   "updateAnnouncementDescription": {
@@ -784,7 +784,7 @@
     "description": "Título del modal de error de transmisión"
   },
   "streamErrorModalDescription": {
-    "message": "Hubo un error al iniciar la grabación. Reinicia tu navegador e inténtalo de nuevo. Si el problema persiste, por favor, contáctanos en support@screenity.io.",
+    "message": "Hubo un error al iniciar la grabación. Reinicia tu navegador e inténtalo de nuevo. Si el problema persiste, por favor, contáctanos en support@ Slingui Recording.io.",
     "description": "Descripción del modal de error de transmisión"
   },
   "highestQuality": {
@@ -836,7 +836,7 @@
     "description": "Título de espacio insuficiente"
   },
   "notEnoughSpaceDescription": {
-    "message": "Screenity necesita al menos 1 GB de espacio libre para grabar. Por favor, libera espacio y vuelve a intentarlo.",
+    "message": " Slingui Recording necesita al menos 1 GB de espacio libre para grabar. Por favor, libera espacio y vuelve a intentarlo.",
     "description": "Descripción de espacio insuficiente"
   },
   "clearSpaceButton": {
@@ -868,7 +868,7 @@
     "description": "Título del modal de grabación sin procesar"
   },
   "rawRecordingModalDescription": {
-    "message": "El archivo de video sin procesar es el video original grabado por Screenity. Este video no ha sido procesado ni editado, por lo que puede ser muy grande y es posible que no se pueda reproducir en todos los dispositivos. Si tienes problemas con el video procesado, puedes usar este archivo para recuperar tu video.",
+    "message": "El archivo de video sin procesar es el video original grabado por  Slingui Recording. Este video no ha sido procesado ni editado, por lo que puede ser muy grande y es posible que no se pueda reproducir en todos los dispositivos. Si tienes problemas con el video procesado, puedes usar este archivo para recuperar tu video.",
     "description": "Descripción del modal de grabación sin procesar"
   },
   "rawRecordingModalButton": {
@@ -880,7 +880,7 @@
     "description": "Título del modal de solución de problemas"
   },
   "troubleshootModalDescription": {
-    "message": "Después de descargar, envía el archivo a support@screenity.io con cualquier información relevante. Utilizaremos estos datos para ayudarte a solucionar cualquier problema que tengas con la extensión y, si es posible, recuperar tu video.",
+    "message": "Después de descargar, envía el archivo a support@ Slingui Recording.io con cualquier información relevante. Utilizaremos estos datos para ayudarte a solucionar cualquier problema que tengas con la extensión y, si es posible, recuperar tu video.",
     "description": "Descripción del modal de solución de problemas"
   },
   "troubleshootModalButton": {
@@ -892,11 +892,11 @@
     "description": "Título del modal de límite de más de 5 minutos"
   },
   "overLimitModalDescription": {
-    "message": "Dado que Screenity es completamente privado y se ejecuta localmente, está limitado por el hardware de tu dispositivo. Procesar un video de esta longitud llevaría demasiado tiempo y sería muy intensivo en recursos. No te preocupes, aún puedes descargar el archivo WEBM o la grabación sin procesar, pero la edición y la exportación a MP4 no están disponibles. Dicho esto, aún puedes intentar procesar el video de todos modos si comprendes los riesgos.",
+    "message": "Dado que  Slingui Recording es completamente privado y se ejecuta localmente, está limitado por el hardware de tu dispositivo. Procesar un video de esta longitud llevaría demasiado tiempo y sería muy intensivo en recursos. No te preocupes, aún puedes descargar el archivo WEBM o la grabación sin procesar, pero la edición y la exportación a MP4 no están disponibles. Dicho esto, aún puedes intentar procesar el video de todos modos si comprendes los riesgos.",
     "description": "Descripción del modal de límite de más de 5 minutos"
   },
   "overLimitModalDescriptionFastPath": {
-    "message": "Dado que Screenity es completamente privado y se ejecuta localmente, está limitado por el hardware de tu dispositivo. Procesar un video de esta longitud llevaría demasiado tiempo y sería muy intensivo en recursos. Tu MP4 ya está listo para descargar, pero la edición en el navegador no está disponible para clips de esta longitud. Dicho esto, aún puedes intentar procesar el video de todos modos si comprendes los riesgos.",
+    "message": "Dado que  Slingui Recording es completamente privado y se ejecuta localmente, está limitado por el hardware de tu dispositivo. Procesar un video de esta longitud llevaría demasiado tiempo y sería muy intensivo en recursos. Tu MP4 ya está listo para descargar, pero la edición en el navegador no está disponible para clips de esta longitud. Dicho esto, aún puedes intentar procesar el video de todos modos si comprendes los riesgos.",
     "description": "Over 5 minutes limit modal description when the recording is a native MP4 (fast recorder / WebCodecs)"
   },
   "overLimitModalButton": {
@@ -938,11 +938,11 @@
     "description": "Título de extensión no compatible en la pestaña"
   },
   "extensionNotSupportedDescription": {
-    "message": "Screenity no fue compatible en tu pestaña anterior. Aún así, puedes comenzar tu grabación aquí y luego cambiar a la pestaña, pero tu cámara y barra de herramientas no serán visibles.",
+    "message": " Slingui Recording no fue compatible en tu pestaña anterior. Aún así, puedes comenzar tu grabación aquí y luego cambiar a la pestaña, pero tu cámara y barra de herramientas no serán visibles.",
     "description": "Descripción de extensión no compatible en la pestaña"
   },
   "backupsTitle": {
-    "message": "Configurar una copia de seguridad local para tus grabaciones de Screenity",
+    "message": "Configurar una copia de seguridad local para tus grabaciones de  Slingui Recording",
     "description": "Título de copias de seguridad"
   },
   "backupsDescription1": {
@@ -978,7 +978,7 @@
     "description": "Botón Detener copias de seguridad"
   },
   "backupsConfirmTitle": {
-    "message": "Por favor, vuelve a confirmar el acceso a tu carpeta de copias de seguridad local de Screenity",
+    "message": "Por favor, vuelve a confirmar el acceso a tu carpeta de copias de seguridad local de  Slingui Recording",
     "description": "Título de confirmación de copias de seguridad"
   },
   "backupsConfirmDescription": {
@@ -986,7 +986,7 @@
     "description": "Descripción de confirmación de copias de seguridad"
   },
   "backupsConfirmAllow": {
-    "message": "Permitir a Screenity seguir respaldando grabaciones",
+    "message": "Permitir a  Slingui Recording seguir respaldando grabaciones",
     "description": "Botón Permitir en la confirmación de copias de seguridad"
   },
   "backupsToggle": {
@@ -1162,7 +1162,7 @@
     "description": "Button label to go to the dashboard in the popup"
   },
   "welcomePopupTitle": {
-    "message": "Bienvenida a Screenity",
+    "message": "Bienvenida a  Slingui Recording",
     "description": "Title for the welcome popup shown to new users"
   },
   "welcomePopupDescriptionTop": {
@@ -1222,7 +1222,7 @@
     "description": "Title shown when the user's subscription is inactive"
   },
   "inactiveSubscriptionDescription": {
-    "message": "Tu suscripción a Screenity Pro está inactiva.",
+    "message": "Tu suscripción a  Slingui Recording Pro está inactiva.",
     "description": "Description shown when the user's subscription is inactive"
   },
   "inactiveSubscriptionReactivation": {
@@ -1311,7 +1311,7 @@
   },
   "welcomeProButton": {
     "message": "Inicia sesión para desbloquear funciones Pro",
-    "description": "Button to sign in to Screenity Pro"
+    "description": "Button to sign in to  Slingui Recording Pro"
   },
   "welcomeProSupport": {
     "message": "¡Apoya a la desarrolladora independiente!",
@@ -1330,7 +1330,7 @@
     "description": "Pro banner title in the editor"
   },
   "proBannerDescription": {
-    "message": "Screenity siempre será gratuito, de código abierto y sin anuncios. Pro ayuda a cubrir los costes de nube e infraestructura, y apoya a una desarrolladora independiente ❤️",
+    "message": " Slingui Recording siempre será gratuito, de código abierto y sin anuncios. Pro ayuda a cubrir los costes de nube e infraestructura, y apoya a una desarrolladora independiente ❤️",
     "description": "Pro banner description in the editor"
   },
   "proBannerAltButton": {
@@ -1362,15 +1362,15 @@
     "description": "Button to upgrade to Pro"
   },
   "hostBannerTitle": {
-    "message": "¿Disfrutas de Screenity localmente? ¡Apoya su desarrollo futuro!",
+    "message": "¿Disfrutas de  Slingui Recording localmente? ¡Apoya su desarrollo futuro!",
     "description": "Título del banner de autoalojamiento en el editor"
   },
   "hostBannerDescription": {
-    "message": "Screenity está creada por una desarrolladora indie. Autoalojarlo es gratis, pero si te resulta útil, considera apoyarla con Pro ❤️",
+    "message": " Slingui Recording está creada por una desarrolladora indie. Autoalojarlo es gratis, pero si te resulta útil, considera apoyarla con Pro ❤️",
     "description": "Descripción del banner de autoalojamiento en el editor"
   },
   "welcomeBackPopupTitle": {
-    "message": "Bienvenido de nuevo a Screenity",
+    "message": "Bienvenido de nuevo a  Slingui Recording",
     "description": "Título para el popup de bienvenida mostrado a los usuarios que regresan"
   },
   "welcomeBackProTitle": {
@@ -1378,15 +1378,15 @@
     "description": "Título para la función de almacenamiento en la nube en el popup de bienvenida"
   },
   "welcomeBackProDescription": {
-    "message": "Screenity Pro es una nueva plataforma opcional para guardar videos en la nube, compartirlos con un enlace y desbloquear herramientas avanzadas de edición, si y cuando las necesites.",
+    "message": " Slingui Recording Pro es una nueva plataforma opcional para guardar videos en la nube, compartirlos con un enlace y desbloquear herramientas avanzadas de edición, si y cuando las necesites.",
     "description": "Descripción de la función de almacenamiento en la nube en el popup de bienvenida"
   },
   "welcomeBackProCTA": {
-    "message": "Conoce más sobre Screenity Pro",
+    "message": "Conoce más sobre  Slingui Recording Pro",
     "description": "Botón de llamada a la acción para la función de almacenamiento en la nube en el popup de bienvenida"
   },
   "welcomeToProTitleModal": {
-    "message": "Bienvenido a Screenity Pro",
+    "message": "Bienvenido a  Slingui Recording Pro",
     "description": "Título del modal de bienvenida a Pro"
   },
   "welcomeToProDescriptionModal": {
@@ -1406,7 +1406,7 @@
     "description": "WebCodecs failure auto-disable toast"
   },
   "proOnboardingWelcomeTitle": {
-    "message": "Bienvenido a la extensión Screenity Pro",
+    "message": "Bienvenido a la extensión  Slingui Recording Pro",
     "description": "Pro onboarding welcome step title"
   },
   "proOnboardingWelcomeDescription": {
@@ -1542,7 +1542,7 @@
     "description": "Toast shown when the audio track ends mid-recording (e.g. mic unplugged, permission revoked)"
   },
   "editorRecoveryToast": {
-    "message": "Tu grabación está guardada. El editor no se abrió. Haz clic en el ícono de Screenity para intentarlo de nuevo.",
+    "message": "Tu grabación está guardada. El editor no se abrió. Haz clic en el ícono de  Slingui Recording para intentarlo de nuevo.",
     "description": "Toast shown on the active tab when the post-recording editor tab fails to open"
   },
   "stopAckTimeoutToast": {

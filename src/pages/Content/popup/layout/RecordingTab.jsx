@@ -22,6 +22,15 @@ import TooltipWrap from "../components/TooltipWrap";
 import { contentStateContext } from "../../context/ContentState";
 
 const RecordingTab = (props) => {
+  const ACCOUNTS_URL = "https://accounts.slingui.com";
+  const openAccounts = (event) => {
+    if (event) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+
+    window.open(ACCOUNTS_URL, "_blank", "noopener,noreferrer");
+  };
   const [contentState, setContentState] = useContext(contentStateContext);
 
   const [tabRecordingDisabled, setTabRecordingDisabled] = useState(false);
@@ -222,14 +231,21 @@ const RecordingTab = (props) => {
               <div
                 className="TabsTriggerLabel"
                 style={{
-                  opacity: contentState.isLoggedIn ? 1 : 0.5,
-
-                  cursor: contentState.isLoggedIn ? "pointer" : "not-allowed",
+                  opacity: 1,
+                  cursor: "pointer",
                 }}
-                onClick={() => {
-                  // If not logged in, show the modal instead of toggling
-                  if (!contentState.isLoggedIn) {
-                    setShowModalSoon(true);
+                onClick={openAccounts}
+                onMouseDown={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                }}
+                onPointerDown={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    openAccounts(event);
                   }
                 }}
               >
@@ -238,7 +254,7 @@ const RecordingTab = (props) => {
                   style={{
                     width: "33px",
                     position: "relative", // For the badge positioning
-                    pointerEvents: contentState.isLoggedIn ? "auto" : "none",
+                    pointerEvents: "auto",
                   }}
                 >
                   {contentState.multiMode &&
@@ -294,64 +310,38 @@ const RecordingTab = (props) => {
                       </div>
                     </div>
                   ) : (
-                    <BaseSwitch
-                      label={"Multi recording"}
-                      name="multiRecording"
-                      value="multiMode"
-                      checked={contentState.multiMode}
-                      onChange={(checked) => {
-                        setContentState((prevContentState) => ({
-                          ...prevContentState,
-                          multiMode: checked,
-                        }));
-                        chrome.storage.local.set({ multiMode: checked });
-
-                        if (checked) {
-                          chrome.storage.local
-                            .get(["hasSeenMultiRecordingInfo"])
-                            .then((res) => {
-                              if (!res.hasSeenMultiRecordingInfo) {
-                                contentState.openModal(
-                                  chrome.i18n.getMessage(
-                                    "multiRecordingModeTitle"
-                                  ) || "Multi-recording mode",
-                                  chrome.i18n.getMessage(
-                                    "multiRecordingModeDescription"
-                                  ) ||
-                                    "Record multiple scenes, like your screen, camera, or both, one after another. This is great for doing multiple takes, switching views, or breaking your recording into parts. When you’re done, click Finish to open the editor with all your scenes combined in one project.",
-                                  "Got it",
-                                  chrome.i18n.getMessage(
-                                    "permissionsModalDismiss"
-                                  ) || "Dismiss",
-                                  () => {},
-                                  () => {},
-                                  null,
-                                  "",
-                                  "",
-                                  true,
-                                  false
-                                );
-
-                                // Mark as seen
-                                chrome.storage.local.set({
-                                  hasSeenMultiRecordingInfo: true,
-                                });
-                              }
-                            });
-                          chrome.storage.local.set({ instantMode: false });
-                          setContentState((prevContentState) => ({
-                            ...prevContentState,
-                            instantMode: false,
-                          }));
-                        }
+                    <button
+                      type="button"
+                      aria-label="Go to Slingui accounts"
+                      onClick={openAccounts}
+                      onMouseDown={(event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
                       }}
-                    />
+                      style={{
+                        width: "28px",
+                        height: "28px",
+                        borderRadius: "999px",
+                        border: "1px solid #D7DCE5",
+                        background: "#FFFFFF",
+                        color: "#0a3b6e",
+                        fontSize: "14px",
+                        fontWeight: 700,
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        padding: 0,
+                      }}
+                    >
+                      ↗
+                    </button>
                   )}
                 </div>
                 <span>
                   {contentState.multiMode && contentState.multiSceneCount > 0
                     ? chrome.i18n.getMessage("finishLabelMulti") || "Finish"
-                    : chrome.i18n.getMessage("multiLabel") || "Multi"}
+                    : "Slingui"}
                 </span>
               </div>
             </TooltipWrap>

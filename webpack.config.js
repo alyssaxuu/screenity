@@ -135,7 +135,16 @@ const fileExtensions = [
 ];
 
 const secretsPath = path.join(__dirname, `secrets.${env.NODE_ENV}.js`);
+const publicKeyPath = path.join(__dirname, "public.pem");
 const alias = { "react-dom": "@hot-loader/react-dom" };
+
+const extensionKey = fileSystem.existsSync(publicKeyPath)
+  ? fileSystem
+      .readFileSync(publicKeyPath, "utf8")
+      .replace(/-----BEGIN PUBLIC KEY-----/g, "")
+      .replace(/-----END PUBLIC KEY-----/g, "")
+      .replace(/\s+/g, "")
+  : undefined;
 
 if (fileSystem.existsSync(secretsPath)) {
   alias["secrets"] = secretsPath;
@@ -248,6 +257,10 @@ const config = {
               version: process.env.npm_package_version,
               ...JSON.parse(content.toString()),
             };
+
+            if (extensionKey) {
+              manifest.key = extensionKey;
+            }
 
             // Strip dev-only origins from production builds.
             if (!isDev && manifest.externally_connectable?.matches) {

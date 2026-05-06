@@ -48,7 +48,7 @@
     "description": "Judul modal peringatan izin kamera/mikrofon"
   },
   "permissionsModalDescription": {
-    "message": "Sepertinya Screenity tidak dapat mengakses kamera atau mikrofon Anda. Pastikan untuk mengizinkan akses dengan mengklik ikon kamera di bilah alamat.",
+    "message": "Sepertinya  Slingui Recording tidak dapat mengakses kamera atau mikrofon Anda. Pastikan untuk mengizinkan akses dengan mengklik ikon kamera di bilah alamat.",
     "description": "Deskripsi modal peringatan izin kamera/mikrofon"
   },
   "permissionsModalDismiss": {
@@ -648,11 +648,11 @@
     "description": "Judul modal Perekaman dijeda"
   },
   "chromePermissionsModalTitle": {
-    "message": "Screenity tidak memiliki izin untuk merekam layar Anda",
+    "message": " Slingui Recording tidak memiliki izin untuk merekam layar Anda",
     "description": "Judul modal Izin"
   },
   "chromePermissionsModalDescription": {
-    "message": "Untuk mengaktifkan perekaman layar, Anda harus memberikan izin kepada Screenity untuk menangkap layar Anda ketika diminta.",
+    "message": "Untuk mengaktifkan perekaman layar, Anda harus memberikan izin kepada  Slingui Recording untuk menangkap layar Anda ketika diminta.",
     "description": "Deskripsi modal Izin"
   },
   "chromePermissionsModalAction": {
@@ -680,7 +680,7 @@
     "description": "Batal modal Mikrofon dimatikan"
   },
   "setupTitle": {
-    "message": "Mulailah dengan Screenity dalam tiga langkah sederhana:",
+    "message": "Mulailah dengan  Slingui Recording dalam tiga langkah sederhana:",
     "description": "Judul langkah pengaturan"
   },
   "setupStep1Before": {
@@ -704,7 +704,7 @@
     "description": "Langkah pengaturan 3, sebelum ikon. Diperlukan spasi di akhir."
   },
   "setupStep3After": {
-    "message": " Screenity untuk memulai",
+    "message": "  Slingui Recording untuk memulai",
     "description": "Langkah pengaturan 3, setelah ikon. Diperlukan spasi di awal."
   },
   "setupCompleteTitle": {
@@ -764,7 +764,7 @@
     "description": "Tombol Hentikan perekaman di layar perekaman"
   },
   "updateAnnouncementTitle": {
-    "message": "Selamat datang di Screenity yang baru!",
+    "message": "Selamat datang di  Slingui Recording yang baru!",
     "description": "Judul pengumuman pembaruan untuk pengguna yang sudah ada"
   },
   "updateAnnouncementDescription": {
@@ -784,7 +784,7 @@
     "description": "Judul modal kesalahan stream"
   },
   "streamErrorModalDescription": {
-    "message": "Sepertinya ada kesalahan saat memulai perekaman. Restart browser Anda dan coba lagi. Jika masalah masih berlanjut, silakan hubungi kami di support@screenity.io.",
+    "message": "Sepertinya ada kesalahan saat memulai perekaman. Restart browser Anda dan coba lagi. Jika masalah masih berlanjut, silakan hubungi kami di support@ Slingui Recording.io.",
     "description": "Deskripsi modal kesalahan stream"
   },
   "highestQuality": {
@@ -836,7 +836,7 @@
     "description": "Judul Ruang Tidak Cukup"
   },
   "notEnoughSpaceDescription": {
-    "message": "Screenity memerlukan setidaknya 1 GB ruang kosong untuk merekam. Silakan mengosongkan beberapa ruang pada perangkat Anda dan coba lagi.",
+    "message": " Slingui Recording memerlukan setidaknya 1 GB ruang kosong untuk merekam. Silakan mengosongkan beberapa ruang pada perangkat Anda dan coba lagi.",
     "description": "Deskripsi Ruang Tidak Cukup"
   },
   "clearSpaceButton": {
@@ -868,7 +868,7 @@
     "description": "Judul modal berkas perekaman mentah"
   },
   "rawRecordingModalDescription": {
-    "message": "Berkas video mentah adalah berkas video asli yang direkam oleh Screenity. Video ini tidak diproses atau diedit, sehingga mungkin sangat besar dan mungkin tidak dapat diputar di semua perangkat. Jika Anda mengalami masalah dengan video yang diproses, Anda dapat menggunakan berkas ini untuk memulihkan video Anda.",
+    "message": "Berkas video mentah adalah berkas video asli yang direkam oleh  Slingui Recording. Video ini tidak diproses atau diedit, sehingga mungkin sangat besar dan mungkin tidak dapat diputar di semua perangkat. Jika Anda mengalami masalah dengan video yang diproses, Anda dapat menggunakan berkas ini untuk memulihkan video Anda.",
     "description": "Deskripsi modal berkas perekaman mentah"
   },
   "rawRecordingModalButton": {
@@ -880,7 +880,7 @@
     "description": "Judul modal Penyelesaian Masalah"
   },
   "troubleshootModalDescription": {
-    "message": "Setelah mengunduh, kirim berkas ini ke support@screenity.io dengan informasi relevan. Kami akan menggunakan data ini untuk membantu Anda menyelesaikan masalah dengan ekstensi dan memulihkan video Anda jika memungkinkan.",
+    "message": "Setelah mengunduh, kirim berkas ini ke support@ Slingui Recording.io dengan informasi relevan. Kami akan menggunakan data ini untuk membantu Anda menyelesaikan masalah dengan ekstensi dan memulihkan video Anda jika memungkinkan.",
     "description": "Deskripsi modal Penyelesaian Masalah"
   },
   "troubleshootModalButton": {
@@ -892,11 +892,11 @@
     "description": "Judul modal batas lebih dari 5 menit"
   },
   "overLimitModalDescription": {
-    "message": "Karena Screenity sepenuhnya privat dan berjalan secara lokal, ia dibatasi oleh perangkat keras perangkat Anda. Memproses video sepanjang ini akan memakan waktu terlalu lama dan sangat intensif dalam penggunaan sumber daya. Jangan khawatir, Anda masih dapat mengunduh file WEBM atau rekaman mentah, tetapi pengeditan dan ekspor ke MP4 tidak tersedia. Namun demikian, Anda masih dapat mencoba memproses video ini jika Anda memahami risikonya.",
+    "message": "Karena  Slingui Recording sepenuhnya privat dan berjalan secara lokal, ia dibatasi oleh perangkat keras perangkat Anda. Memproses video sepanjang ini akan memakan waktu terlalu lama dan sangat intensif dalam penggunaan sumber daya. Jangan khawatir, Anda masih dapat mengunduh file WEBM atau rekaman mentah, tetapi pengeditan dan ekspor ke MP4 tidak tersedia. Namun demikian, Anda masih dapat mencoba memproses video ini jika Anda memahami risikonya.",
     "description": "Deskripsi modal batas lebih dari 5 menit"
   },
   "overLimitModalDescriptionFastPath": {
-    "message": "Karena Screenity sepenuhnya privat dan berjalan secara lokal, ia dibatasi oleh perangkat keras perangkat Anda. Memproses video sepanjang ini akan memakan waktu terlalu lama dan sangat intensif dalam penggunaan sumber daya. MP4 Anda sudah siap untuk diunduh, tetapi pengeditan di browser tidak tersedia untuk klip sepanjang ini. Namun demikian, Anda masih dapat mencoba memproses video ini jika Anda memahami risikonya.",
+    "message": "Karena  Slingui Recording sepenuhnya privat dan berjalan secara lokal, ia dibatasi oleh perangkat keras perangkat Anda. Memproses video sepanjang ini akan memakan waktu terlalu lama dan sangat intensif dalam penggunaan sumber daya. MP4 Anda sudah siap untuk diunduh, tetapi pengeditan di browser tidak tersedia untuk klip sepanjang ini. Namun demikian, Anda masih dapat mencoba memproses video ini jika Anda memahami risikonya.",
     "description": "Over 5 minutes limit modal description when the recording is a native MP4 (fast recorder / WebCodecs)"
   },
   "overLimitModalButton": {
@@ -938,11 +938,11 @@
     "description": "Judul Ekstensi Tidak Didukung di Tab"
   },
   "extensionNotSupportedDescription": {
-    "message": "Screenity tidak mendukung di tab sebelumnya Anda. Meskipun begitu, Anda masih bisa memulai perekaman di sini dan kemudian beralih ke tab lain, tetapi kamera dan toolbar Anda tidak akan terlihat.",
+    "message": " Slingui Recording tidak mendukung di tab sebelumnya Anda. Meskipun begitu, Anda masih bisa memulai perekaman di sini dan kemudian beralih ke tab lain, tetapi kamera dan toolbar Anda tidak akan terlihat.",
     "description": "Deskripsi Ekstensi Tidak Didukung di Tab"
   },
   "backupsTitle": {
-    "message": "Konfigurasi Cadangan Lokal untuk Rekaman Screenity Anda",
+    "message": "Konfigurasi Cadangan Lokal untuk Rekaman  Slingui Recording Anda",
     "description": "Judul Cadangan"
   },
   "backupsDescription1": {
@@ -978,7 +978,7 @@
     "description": "Tombol Hentikan Cadangan"
   },
   "backupsConfirmTitle": {
-    "message": "Mohon Konfirmasi Kembali Akses ke Folder Cadangan Lokal Screenity Anda",
+    "message": "Mohon Konfirmasi Kembali Akses ke Folder Cadangan Lokal  Slingui Recording Anda",
     "description": "Judul Konfirmasi Cadangan"
   },
   "backupsConfirmDescription": {
@@ -986,7 +986,7 @@
     "description": "Deskripsi Konfirmasi Cadangan"
   },
   "backupsConfirmAllow": {
-    "message": "Izinkan Screenity untuk Terus Membuat Cadangan Rekaman",
+    "message": "Izinkan  Slingui Recording untuk Terus Membuat Cadangan Rekaman",
     "description": "Tombol Izinkan dalam Konfirmasi Cadangan"
   },
   "backupsToggle": {
@@ -1162,7 +1162,7 @@
     "description": "Button label to go to the dashboard in the popup"
   },
   "welcomePopupTitle": {
-    "message": "Selamat datang di Screenity",
+    "message": "Selamat datang di  Slingui Recording",
     "description": "Title for the welcome popup shown to new users"
   },
   "welcomePopupDescriptionTop": {
@@ -1222,7 +1222,7 @@
     "description": "Title shown when the user's subscription is inactive"
   },
   "inactiveSubscriptionDescription": {
-    "message": "Langganan Screenity Pro kamu tidak aktif.",
+    "message": "Langganan  Slingui Recording Pro kamu tidak aktif.",
     "description": "Description shown when the user's subscription is inactive"
   },
   "inactiveSubscriptionReactivation": {
@@ -1311,7 +1311,7 @@
   },
   "welcomeProButton": {
     "message": "Masuk untuk membuka fitur berbayar",
-    "description": "Button to sign in to Screenity Pro"
+    "description": "Button to sign in to  Slingui Recording Pro"
   },
   "welcomeProSupport": {
     "message": "Dukung pengembangan oleh pembuat indie tunggal",
@@ -1330,7 +1330,7 @@
     "description": "Pro banner title in the editor"
   },
   "proBannerDescription": {
-    "message": "Screenity akan selalu gratis, open-source, dan tanpa iklan. Pro membantu menutupi biaya cloud & infrastruktur, serta mendukung pengembangan oleh developer indie tunggal! ❤️",
+    "message": " Slingui Recording akan selalu gratis, open-source, dan tanpa iklan. Pro membantu menutupi biaya cloud & infrastruktur, serta mendukung pengembangan oleh developer indie tunggal! ❤️",
     "description": "Pro banner description in the editor"
   },
   "proBannerAltButton": {
@@ -1362,15 +1362,15 @@
     "description": "Button to upgrade to Pro"
   },
   "hostBannerTitle": {
-    "message": "Menikmati Screenity secara lokal? Bantu dukung pengembangannya!",
+    "message": "Menikmati  Slingui Recording secara lokal? Bantu dukung pengembangannya!",
     "description": "Judul banner self-host di editor"
   },
   "hostBannerDescription": {
-    "message": "Screenity dibuat oleh seorang pengembang indie perempuan. Hosting sendiri gratis, tapi jika kamu merasa terbantu, pertimbangkan untuk mendukung lewat Pro ❤️",
+    "message": " Slingui Recording dibuat oleh seorang pengembang indie perempuan. Hosting sendiri gratis, tapi jika kamu merasa terbantu, pertimbangkan untuk mendukung lewat Pro ❤️",
     "description": "Deskripsi banner self-host di editor"
   },
   "welcomeBackPopupTitle": {
-    "message": "Selamat datang kembali di Screenity",
+    "message": "Selamat datang kembali di  Slingui Recording",
     "description": "Judul pop-up sambutan yang ditampilkan untuk pengguna yang kembali"
   },
   "welcomeBackProTitle": {
@@ -1378,15 +1378,15 @@
     "description": "Judul fitur penyimpanan cloud di pop-up sambutan"
   },
   "welcomeBackProDescription": {
-    "message": "Screenity Pro adalah platform opsional baru untuk menyimpan video ke cloud, membagikannya lewat tautan, dan membuka alat pengeditan lanjutan — jika dan saat kamu membutuhkannya.",
+    "message": " Slingui Recording Pro adalah platform opsional baru untuk menyimpan video ke cloud, membagikannya lewat tautan, dan membuka alat pengeditan lanjutan — jika dan saat kamu membutuhkannya.",
     "description": "Deskripsi fitur penyimpanan cloud di pop-up sambutan"
   },
   "welcomeBackProCTA": {
-    "message": "Pelajari lebih lanjut tentang Screenity Pro",
+    "message": "Pelajari lebih lanjut tentang  Slingui Recording Pro",
     "description": "Tombol ajakan bertindak untuk fitur penyimpanan cloud di pop-up sambutan"
   },
   "welcomeToProTitleModal": {
-    "message": "Selamat datang di Screenity Pro",
+    "message": "Selamat datang di  Slingui Recording Pro",
     "description": "Judul modal sambutan Pro"
   },
   "welcomeToProDescriptionModal": {
@@ -1406,7 +1406,7 @@
     "description": "WebCodecs failure auto-disable toast"
   },
   "proOnboardingWelcomeTitle": {
-    "message": "Selamat datang di ekstensi Screenity Pro",
+    "message": "Selamat datang di ekstensi  Slingui Recording Pro",
     "description": "Pro onboarding welcome step title"
   },
   "proOnboardingWelcomeDescription": {
@@ -1542,7 +1542,7 @@
     "description": "Toast shown when the audio track ends mid-recording (e.g. mic unplugged, permission revoked)"
   },
   "editorRecoveryToast": {
-    "message": "Rekaman Anda tersimpan. Editor tidak terbuka. Klik ikon Screenity untuk mencoba lagi.",
+    "message": "Rekaman Anda tersimpan. Editor tidak terbuka. Klik ikon  Slingui Recording untuk mencoba lagi.",
     "description": "Toast shown on the active tab when the post-recording editor tab fails to open"
   },
   "stopAckTimeoutToast": {

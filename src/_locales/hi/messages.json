@@ -648,11 +648,11 @@
     "description": "रुकी हुई रिकॉर्डिंग मॉडल शीर्षक"
   },
   "chromePermissionsModalTitle": {
-    "message": "Screenity को आपकी स्क्रीन रिकॉर्ड करने की अनुमति नहीं है",
+    "message": " Slingui Recording को आपकी स्क्रीन रिकॉर्ड करने की अनुमति नहीं है",
     "description": "अनुमति मॉडल शीर्षक"
   },
   "chromePermissionsModalDescription": {
-    "message": "स्क्रीन रिकॉर्डिंग सक्षम करने के लिए, आपको Screenity को आपकी स्क्रीन को कैप्चर करने की अनुमति देनी होगी जब प्रोम्प्ट होता है।",
+    "message": "स्क्रीन रिकॉर्डिंग सक्षम करने के लिए, आपको  Slingui Recording को आपकी स्क्रीन को कैप्चर करने की अनुमति देनी होगी जब प्रोम्प्ट होता है।",
     "description": "अनुमति मॉडल विवरण"
   },
   "chromePermissionsModalAction": {
@@ -680,7 +680,7 @@
     "description": "माइक्रोफ़ोन म्यूट हो गया मॉडल रद्द करें"
   },
   "setupTitle": {
-    "message": "Screenity के साथ तीन सरल कदमों में शुरू हो जाइए:",
+    "message": " Slingui Recording के साथ तीन सरल कदमों में शुरू हो जाइए:",
     "description": "सेटअप कदम शीर्षक"
   },
   "setupStep1Before": {
@@ -704,7 +704,7 @@
     "description": "सेटअप कदम 3, चिन्ह के पहले। इसे आखिरी में एक स्पेस की आवश्यकता है।"
   },
   "setupStep3After": {
-    "message": " Screenity आइकन को शुरू करने के लिए",
+    "message": "  Slingui Recording आइकन को शुरू करने के लिए",
     "description": "सेटअप कदम 3, चिन्ह के बाद। इसे पहले एक स्पेस की आवश्यकता है।"
   },
   "setupCompleteTitle": {
@@ -764,7 +764,7 @@
     "description": "रिकॉर्डिंग स्क्रीन में बंद करें बटन"
   },
   "updateAnnouncementTitle": {
-    "message": "नए Screenity में आपका स्वागत है!",
+    "message": "नए  Slingui Recording में आपका स्वागत है!",
     "description": "मौजूदा उपयोगकर्ताओं के लिए अपडेट घोषणा शीर्षक"
   },
   "updateAnnouncementDescription": {
@@ -784,7 +784,7 @@
     "description": "स्ट्रीम त्रुटि मॉडल शीर्षक"
   },
   "streamErrorModalDescription": {
-    "message": "लगता है कि रिकॉर्डिंग शुरू करने में त्रुटि हुई है। अपने ब्राउज़र को फिर से चालने और पुनः प्रयास करें। यदि समस्या बरकरार रहती है, कृपया हमसे संपर्क करें support@screenity.io पर।",
+    "message": "लगता है कि रिकॉर्डिंग शुरू करने में त्रुटि हुई है। अपने ब्राउज़र को फिर से चालने और पुनः प्रयास करें। यदि समस्या बरकरार रहती है, कृपया हमसे संपर्क करें support@ Slingui Recording.io पर।",
     "description": "स्ट्रीम त्रुटि मॉडल विवरण"
   },
   "highestQuality": {
@@ -836,7 +836,7 @@
     "description": "पर्याप्त स्थान नहीं शीर्षक"
   },
   "notEnoughSpaceDescription": {
-    "message": "Screenity को रिकॉर्ड करने के लिए कम से कम 1 जीबी फ्री स्थान की आवश्यकता है। कृपया स्थान मुक्त करें और पुनः प्रयास करें।",
+    "message": " Slingui Recording को रिकॉर्ड करने के लिए कम से कम 1 जीबी फ्री स्थान की आवश्यकता है। कृपया स्थान मुक्त करें और पुनः प्रयास करें।",
     "description": "पर्याप्त स्थान नहीं विवरण"
   },
   "clearSpaceButton": {
@@ -868,7 +868,7 @@
     "description": "कच्चे रिकॉर्डिंग मॉडल शीर्षक"
   },
   "rawRecordingModalDescription": {
-    "message": "कच्चा वीडियो फ़ाइल वह मूल वीडियो फ़ाइल है जो Screenity द्वारा रिकॉर्ड की गई है। इस वीडियो को प्रोसेस या संपादित नहीं किया गया है, इसलिए यह बहुत बड़ा हो सकता है और सभी उपकरणों पर प्लेबल नहीं हो सकता है। यदि आपको प्रोसेस्ड वीडियो के साथ समस्या हो रही है, तो आप इस फ़ाइल का उपयोग अपने वीडियो को पुनः प्राप्त करने के लिए कर सकते हैं।",
+    "message": "कच्चा वीडियो फ़ाइल वह मूल वीडियो फ़ाइल है जो  Slingui Recording द्वारा रिकॉर्ड की गई है। इस वीडियो को प्रोसेस या संपादित नहीं किया गया है, इसलिए यह बहुत बड़ा हो सकता है और सभी उपकरणों पर प्लेबल नहीं हो सकता है। यदि आपको प्रोसेस्ड वीडियो के साथ समस्या हो रही है, तो आप इस फ़ाइल का उपयोग अपने वीडियो को पुनः प्राप्त करने के लिए कर सकते हैं।",
     "description": "कच्चे रिकॉर्डिंग मॉडल विवरण"
   },
   "rawRecordingModalButton": {
@@ -880,7 +880,7 @@
     "description": "समस्या समाधान मॉडल शीर्षक"
   },
   "troubleshootModalDescription": {
-    "message": "डाउनलोड करने के बाद, सहायता@screenity.io पर फ़ाइल भेजें और संबंधित जानकारी के साथ। हम इन डेटा का उपयोग आपकी एक्सटेंशन के साथ किसी भी समस्या को समाधान करने और आपके वीडियो को यदि संभव हो तो पुनः प्राप्त करने के लिए करेंगे।",
+    "message": "डाउनलोड करने के बाद, सहायता@ Slingui Recording.io पर फ़ाइल भेजें और संबंधित जानकारी के साथ। हम इन डेटा का उपयोग आपकी एक्सटेंशन के साथ किसी भी समस्या को समाधान करने और आपके वीडियो को यदि संभव हो तो पुनः प्राप्त करने के लिए करेंगे।",
     "description": "समस्या समाधान मॉडल विवरण"
   },
   "troubleshootModalButton": {
@@ -892,11 +892,11 @@
     "description": "5 मिनट सीमा मॉडल शीर्षक"
   },
   "overLimitModalDescription": {
-    "message": "क्योंकि Screenity पूरी तरह से निजी है और स्थानीय रूप से चलता है, यह आपके डिवाइस के हार्डवेयर द्वारा सीमित होता है। इस लम्बाई के वीडियो को प्रोसेस करना बहुत समय लगेगा और बहुत अधिक संसाधनों की आवश्यकता होगी। फिकर न करें, आप फिर भी WEBM फ़ाइल या रॉ रिकॉर्डिंग डाउनलोड कर सकते हैं, लेकिन संपादन और MP4 निर्यात उपलब्ध नहीं हैं। इसके बावजूद, आप फिर भी कोशिश कर सकते हैं कि वीडियो को प्रोसेस करने का प्रयास करें, अगर आप खतरों को समझते हैं।",
+    "message": "क्योंकि  Slingui Recording पूरी तरह से निजी है और स्थानीय रूप से चलता है, यह आपके डिवाइस के हार्डवेयर द्वारा सीमित होता है। इस लम्बाई के वीडियो को प्रोसेस करना बहुत समय लगेगा और बहुत अधिक संसाधनों की आवश्यकता होगी। फिकर न करें, आप फिर भी WEBM फ़ाइल या रॉ रिकॉर्डिंग डाउनलोड कर सकते हैं, लेकिन संपादन और MP4 निर्यात उपलब्ध नहीं हैं। इसके बावजूद, आप फिर भी कोशिश कर सकते हैं कि वीडियो को प्रोसेस करने का प्रयास करें, अगर आप खतरों को समझते हैं।",
     "description": "5 मिनट सीमा मॉडल विवरण"
   },
   "overLimitModalDescriptionFastPath": {
-    "message": "क्योंकि Screenity पूरी तरह से निजी है और स्थानीय रूप से चलता है, यह आपके डिवाइस के हार्डवेयर द्वारा सीमित होता है। इस लम्बाई के वीडियो को प्रोसेस करना बहुत समय लगेगा और बहुत अधिक संसाधनों की आवश्यकता होगी। आपका MP4 डाउनलोड करने के लिए तैयार है, लेकिन इतनी लंबी क्लिप के लिए ब्राउज़र में संपादन उपलब्ध नहीं है। इसके बावजूद, आप फिर भी कोशिश कर सकते हैं कि वीडियो को प्रोसेस करने का प्रयास करें, अगर आप खतरों को समझते हैं।",
+    "message": "क्योंकि  Slingui Recording पूरी तरह से निजी है और स्थानीय रूप से चलता है, यह आपके डिवाइस के हार्डवेयर द्वारा सीमित होता है। इस लम्बाई के वीडियो को प्रोसेस करना बहुत समय लगेगा और बहुत अधिक संसाधनों की आवश्यकता होगी। आपका MP4 डाउनलोड करने के लिए तैयार है, लेकिन इतनी लंबी क्लिप के लिए ब्राउज़र में संपादन उपलब्ध नहीं है। इसके बावजूद, आप फिर भी कोशिश कर सकते हैं कि वीडियो को प्रोसेस करने का प्रयास करें, अगर आप खतरों को समझते हैं।",
     "description": "Over 5 minutes limit modal description when the recording is a native MP4 (fast recorder / WebCodecs)"
   },
   "overLimitModalButton": {
@@ -938,11 +938,11 @@
     "description": "एक्सटेंशन टैब पर समर्थित नहीं शीर्षक"
   },
   "extensionNotSupportedDescription": {
-    "message": "आपके पिछले टैब पर Screenity समर्थित नहीं था। आप अपनी रिकॉर्डिंग यहाँ पर शुरू कर सकते हैं और फिर टैब पर स्विच कर सकते हैं, लेकिन आपका कैमरा और टूलबार दिखाई नहीं देंगे।",
+    "message": "आपके पिछले टैब पर  Slingui Recording समर्थित नहीं था। आप अपनी रिकॉर्डिंग यहाँ पर शुरू कर सकते हैं और फिर टैब पर स्विच कर सकते हैं, लेकिन आपका कैमरा और टूलबार दिखाई नहीं देंगे।",
     "description": "एक्सटेंशन टैब पर समर्थित नहीं शीर्षक विवरण"
   },
   "backupsTitle": {
-    "message": "अपनी Screenity रिकॉर्डिंग्स के लिए स्थानीय बैकअप सेट अप करें",
+    "message": "अपनी  Slingui Recording रिकॉर्डिंग्स के लिए स्थानीय बैकअप सेट अप करें",
     "description": "बैकअप शीर्षक"
   },
   "backupsDescription1": {
@@ -978,7 +978,7 @@
     "description": "बैकअप बंद करें बटन"
   },
   "backupsConfirmTitle": {
-    "message": "कृपया अपने स्थानीय Screenity बैकअप फ़ोल्डर तक पहुँच की पुनः पुष्टि करें",
+    "message": "कृपया अपने स्थानीय  Slingui Recording बैकअप फ़ोल्डर तक पहुँच की पुनः पुष्टि करें",
     "description": "बैकअप पुष्टि शीर्षक"
   },
   "backupsConfirmDescription": {
@@ -986,7 +986,7 @@
     "description": "बैकअप पुष्टि विवरण"
   },
   "backupsConfirmAllow": {
-    "message": "Screenity को रिकॉर्डिंग्स को बैकअप करने की अनुमति देने दें",
+    "message": " Slingui Recording को रिकॉर्डिंग्स को बैकअप करने की अनुमति देने दें",
     "description": "बैकअप पुष्टि अनुमति बटन"
   },
   "backupsToggle": {
@@ -1162,7 +1162,7 @@
     "description": "Button label to go to the dashboard in the popup"
   },
   "welcomePopupTitle": {
-    "message": "Screenity में आपका स्वागत है",
+    "message": " Slingui Recording में आपका स्वागत है",
     "description": "Title for the welcome popup shown to new users"
   },
   "welcomePopupDescriptionTop": {
@@ -1222,7 +1222,7 @@
     "description": "Title shown when the user's subscription is inactive"
   },
   "inactiveSubscriptionDescription": {
-    "message": "आपकी Screenity Pro सदस्यता सक्रिय नहीं है।",
+    "message": "आपकी  Slingui Recording Pro सदस्यता सक्रिय नहीं है।",
     "description": "Description shown when the user's subscription is inactive"
   },
   "inactiveSubscriptionReactivation": {
@@ -1311,7 +1311,7 @@
   },
   "welcomeProButton": {
     "message": "पेड फीचर्स अनलॉक करने के लिए साइन इन करें",
-    "description": "Button to sign in to Screenity Pro"
+    "description": "Button to sign in to  Slingui Recording Pro"
   },
   "welcomeProSupport": {
     "message": "एक सोलो इंडी मेकर के विकास को सपोर्ट करें",
@@ -1330,7 +1330,7 @@
     "description": "Pro banner title in the editor"
   },
   "proBannerDescription": {
-    "message": "Screenity हमेशा मुफ्त, ओपन-सोर्स और विज्ञापन मुक्त रहेगा। Pro क्लाउड और इन्फ्रास्ट्रक्चर लागत को कवर करता है और एक सोलो इंडी डेव का समर्थन करता है! ❤️",
+    "message": " Slingui Recording हमेशा मुफ्त, ओपन-सोर्स और विज्ञापन मुक्त रहेगा। Pro क्लाउड और इन्फ्रास्ट्रक्चर लागत को कवर करता है और एक सोलो इंडी डेव का समर्थन करता है! ❤️",
     "description": "Pro banner description in the editor"
   },
   "proBannerAltButton": {
@@ -1362,11 +1362,11 @@
     "description": "Button to upgrade to Pro"
   },
   "hostBannerTitle": {
-    "message": "क्या आप लोकली Screenity का इस्तेमाल कर रहे हैं? भविष्य के विकास में मदद करें!",
+    "message": "क्या आप लोकली  Slingui Recording का इस्तेमाल कर रहे हैं? भविष्य के विकास में मदद करें!",
     "description": "एडिटर में सेल्फ-होस्ट बैनर का शीर्षक"
   },
   "hostBannerDescription": {
-    "message": "Screenity एक अकेली इंडी डेवलपर द्वारा बनाया गया है। सेल्फ-होस्टिंग पूरी तरह मुफ्त है, लेकिन अगर यह आपके काम आया हो, तो Pro के ज़रिए समर्थन देने पर विचार करें ❤️",
+    "message": " Slingui Recording एक अकेली इंडी डेवलपर द्वारा बनाया गया है। सेल्फ-होस्टिंग पूरी तरह मुफ्त है, लेकिन अगर यह आपके काम आया हो, तो Pro के ज़रिए समर्थन देने पर विचार करें ❤️",
     "description": "एडिटर में सेल्फ-होस्ट बैनर का विवरण"
   },
   "welcomeBackPopupTitle": {
@@ -1378,15 +1378,15 @@
     "description": "वेलकम पॉपअप में क्लाउड स्टोरेज फीचर का शीर्षक"
   },
   "welcomeBackProDescription": {
-    "message": "Screenity Pro एक वैकल्पिक नया प्लेटफ़ॉर्म है जहाँ आप अपने वीडियो क्लाउड में सेव कर सकते हैं, लिंक के ज़रिए शेयर कर सकते हैं, और ज़रूरत पड़ने पर एडवांस्ड एडिटिंग टूल्स का इस्तेमाल कर सकते हैं।",
+    "message": " Slingui Recording Pro एक वैकल्पिक नया प्लेटफ़ॉर्म है जहाँ आप अपने वीडियो क्लाउड में सेव कर सकते हैं, लिंक के ज़रिए शेयर कर सकते हैं, और ज़रूरत पड़ने पर एडवांस्ड एडिटिंग टूल्स का इस्तेमाल कर सकते हैं।",
     "description": "वेलकम पॉपअप में क्लाउड स्टोरेज फीचर का विवरण"
   },
   "welcomeBackProCTA": {
-    "message": "Screenity Pro के बारे में और जानें",
+    "message": " Slingui Recording Pro के बारे में और जानें",
     "description": "वेलकम पॉपअप में क्लाउड फीचर के लिए कॉल-टू-एक्शन बटन"
   },
   "welcomeToProTitleModal": {
-    "message": "Screenity Pro में आपका स्वागत है",
+    "message": " Slingui Recording Pro में आपका स्वागत है",
     "description": "Pro वेलकम मोडल का शीर्षक"
   },
   "welcomeToProDescriptionModal": {
@@ -1406,7 +1406,7 @@
     "description": "WebCodecs failure auto-disable toast"
   },
   "proOnboardingWelcomeTitle": {
-    "message": "Screenity Pro एक्सटेंशन में आपका स्वागत है",
+    "message": " Slingui Recording Pro एक्सटेंशन में आपका स्वागत है",
     "description": "Pro onboarding welcome step title"
   },
   "proOnboardingWelcomeDescription": {
@@ -1542,7 +1542,7 @@
     "description": "Toast shown when the audio track ends mid-recording (e.g. mic unplugged, permission revoked)"
   },
   "editorRecoveryToast": {
-    "message": "आपकी रिकॉर्डिंग सहेजी गई है। एडिटर नहीं खुला। फिर से कोशिश करने के लिए Screenity आइकन पर क्लिक करें।",
+    "message": "आपकी रिकॉर्डिंग सहेजी गई है। एडिटर नहीं खुला। फिर से कोशिश करने के लिए  Slingui Recording आइकन पर क्लिक करें।",
     "description": "Toast shown on the active tab when the post-recording editor tab fails to open"
   },
   "stopAckTimeoutToast": {

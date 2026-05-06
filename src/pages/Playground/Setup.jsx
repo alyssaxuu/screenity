@@ -24,10 +24,17 @@ const Setup = () => {
 
   return (
     <div className="setupBackground">
-      <img
-        src={chrome.runtime.getURL("assets/logo-text.svg")}
-        className="setupLogo"
-      />
+      <div className="setupLogoGroup">
+        <img
+          src={chrome.runtime.getURL("assets/logo.png")}
+          className="setupLogo setupLogoIcon"
+        />
+        <span className="setupLogoLove">❤️</span>
+        <img
+          src={chrome.runtime.getURL("assets/logo-text.svg")}
+          className="setupLogo setupLogoText"
+        />
+      </div>
       <div className="setupBackgroundSVG"></div>
       <style>
         {`
@@ -67,13 +74,35 @@ const Setup = () => {
 				}
 
 
-				.setupLogo {
+				.setupLogoGroup {
 					position: absolute;
 					bottom: 30px;
 					left: 0px;
 					right: 0px;
 					margin: auto;
-					width: 120px;
+					display: flex;
+					align-items: center;
+					justify-content: center;
+					gap: 10px;
+				}
+
+				.setupLogo {
+					display: block;
+				}
+
+				.setupLogoIcon {
+					width: 54px;
+					height: 54px;
+					object-fit: contain;
+				}
+
+				.setupLogoLove {
+					font-size: 18px;
+					line-height: 1;
+				}
+
+				.setupLogoText {
+					width: 92px;
 				}
 
 

@@ -3873,6 +3873,7 @@ const CloudRecorder = () => {
     const sceneId = uploadMeta.sceneId;
     const meetingContext =
       recordingMeta?.meetingContext || screenityMeetingState || null;
+      console.log(recordingMeta);
     const localParticipant = meetingContext?.localUser || null;
 
     console.info("[CloudRecorder][SceneParticipants] Resolving meeting participants", {

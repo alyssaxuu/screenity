@@ -48,7 +48,7 @@
     "description": "Kamera / mikrofon izinleri uyarı modalı başlığı"
   },
   "permissionsModalDescription": {
-    "message": "Screenity'nin kamera veya mikrofonunuza erişemiyor gibi görünüyor. Kameranın simgesine tıklayarak erişime izin verdiğinizden emin olun.",
+    "message": " Slingui Recording'nin kamera veya mikrofonunuza erişemiyor gibi görünüyor. Kameranın simgesine tıklayarak erişime izin verdiğinizden emin olun.",
     "description": "Kamera / mikrofon izinleri uyarı modalı açıklaması"
   },
   "permissionsModalDismiss": {
@@ -648,11 +648,11 @@
     "description": "Durdurulan kayıt modal başlığı"
   },
   "chromePermissionsModalTitle": {
-    "message": "Screenity ekranınızı kaydetme iznine sahip değil",
+    "message": " Slingui Recording ekranınızı kaydetme iznine sahip değil",
     "description": "İzin modal başlığı"
   },
   "chromePermissionsModalDescription": {
-    "message": "Ekran kaydını etkinleştirmek için, Screenity'nin ekranınızı yakalamasına izin vermelisiniz.",
+    "message": "Ekran kaydını etkinleştirmek için,  Slingui Recording'nin ekranınızı yakalamasına izin vermelisiniz.",
     "description": "İzin modal açıklaması"
   },
   "chromePermissionsModalAction": {
@@ -680,7 +680,7 @@
     "description": "Mikrofon kapalı modal iptal"
   },
   "setupTitle": {
-    "message": "Screenity ile üç basit adımda başlayın:",
+    "message": " Slingui Recording ile üç basit adımda başlayın:",
     "description": "Kurulum adımları başlığı"
   },
   "setupStep1Before": {
@@ -704,7 +704,7 @@
     "description": "Kurulum adımı 3, ikonun önünde. Sonunda bir boşluk olmalı."
   },
   "setupStep3After": {
-    "message": " Screenity ikonuna tıklayarak başlayın",
+    "message": "  Slingui Recording ikonuna tıklayarak başlayın",
     "description": "Kurulum adımı 3, ikonun sonunda. Başında bir boşluk olmalı."
   },
   "setupCompleteTitle": {
@@ -764,7 +764,7 @@
     "description": "Kaydı Durdur düğmesi"
   },
   "updateAnnouncementTitle": {
-    "message": "Yeni Screenity'ye Hoş Geldiniz!",
+    "message": "Yeni  Slingui Recording'ye Hoş Geldiniz!",
     "description": "Mevcut kullanıcılar için güncelleme duyurusu başlığı"
   },
   "updateAnnouncementDescription": {
@@ -784,7 +784,7 @@
     "description": "Akış hatası modal başlığı"
   },
   "streamErrorModalDescription": {
-    "message": "Kaydın başlatılmasında bir hata oluştu gibi görünüyor. Tarayıcınızı yeniden başlatın ve tekrar deneyin. Sorun devam ederse, lütfen support@screenity.io adresinden bize ulaşın.",
+    "message": "Kaydın başlatılmasında bir hata oluştu gibi görünüyor. Tarayıcınızı yeniden başlatın ve tekrar deneyin. Sorun devam ederse, lütfen support@ Slingui Recording.io adresinden bize ulaşın.",
     "description": "Akış hatası modal açıklaması"
   },
   "highestQuality": {
@@ -836,7 +836,7 @@
     "description": "Yetersiz Alan Başlık"
   },
   "notEnoughSpaceDescription": {
-    "message": "Screenity, kayıt için en az 1 GB boş alan gerektirir. Lütfen cihazınızda alan açın ve yeniden deneyin.",
+    "message": " Slingui Recording, kayıt için en az 1 GB boş alan gerektirir. Lütfen cihazınızda alan açın ve yeniden deneyin.",
     "description": "Yetersiz Alan Açıklama"
   },
   "clearSpaceButton": {
@@ -868,7 +868,7 @@
     "description": "Ham kayıt modal başlığı"
   },
   "rawRecordingModalDescription": {
-    "message": "Ham video dosyası, Screenity tarafından kaydedilen orijinal video dosyasıdır. Bu video işlenmemiş veya düzenlenmemiş olduğundan çok büyük olabilir ve tüm cihazlarda oynatılamayabilir. İşlenmiş video ile sorun yaşıyorsanız, bu dosyayı videoyu kurtarmak için kullanabilirsiniz.",
+    "message": "Ham video dosyası,  Slingui Recording tarafından kaydedilen orijinal video dosyasıdır. Bu video işlenmemiş veya düzenlenmemiş olduğundan çok büyük olabilir ve tüm cihazlarda oynatılamayabilir. İşlenmiş video ile sorun yaşıyorsanız, bu dosyayı videoyu kurtarmak için kullanabilirsiniz.",
     "description": "Ham kayıt modal açıklaması"
   },
   "rawRecordingModalButton": {
@@ -880,7 +880,7 @@
     "description": "Sorun giderme modal başlığı"
   },
   "troubleshootModalDescription": {
-    "message": "İndirdikten sonra dosyayı support@screenity.io adresine gönderin ve ilgili bilgileri ekleyin. Bu verileri, uzantı ile ilgili yaşadığınız sorunları çözmek ve mümkünse videonuzu kurtarmak için kullanacağız.",
+    "message": "İndirdikten sonra dosyayı support@ Slingui Recording.io adresine gönderin ve ilgili bilgileri ekleyin. Bu verileri, uzantı ile ilgili yaşadığınız sorunları çözmek ve mümkünse videonuzu kurtarmak için kullanacağız.",
     "description": "Sorun giderme modal açıklaması"
   },
   "troubleshootModalButton": {
@@ -892,11 +892,11 @@
     "description": "5 dakika sınırlı modal başlığı"
   },
   "overLimitModalDescription": {
-    "message": "Screenity tamamen özel ve yerel olarak çalıştığı için cihazınızın donanımıyla sınırlıdır. Bu uzunluktaki bir videoyu işlemek çok uzun sürer ve çok fazla kaynak kullanır. Ancak, hala WEBM dosyasını veya ham kaydı indirebilirsiniz, ancak düzenleme ve MP4 dışa aktarma seçenekleri mevcut değildir. Yine de riskleri anlıyorsanız, videoyu işlemeyi deneyebilirsiniz.",
+    "message": " Slingui Recording tamamen özel ve yerel olarak çalıştığı için cihazınızın donanımıyla sınırlıdır. Bu uzunluktaki bir videoyu işlemek çok uzun sürer ve çok fazla kaynak kullanır. Ancak, hala WEBM dosyasını veya ham kaydı indirebilirsiniz, ancak düzenleme ve MP4 dışa aktarma seçenekleri mevcut değildir. Yine de riskleri anlıyorsanız, videoyu işlemeyi deneyebilirsiniz.",
     "description": "5 dakika sınırlı modal açıklaması"
   },
   "overLimitModalDescriptionFastPath": {
-    "message": "Screenity tamamen özel ve yerel olarak çalıştığı için cihazınızın donanımıyla sınırlıdır. Bu uzunluktaki bir videoyu işlemek çok uzun sürer ve çok fazla kaynak kullanır. MP4 dosyanız indirilmeye hazır, ancak bu uzunluktaki klipler için tarayıcıda düzenleme yapılamaz. Yine de riskleri anlıyorsanız, videoyu işlemeyi deneyebilirsiniz.",
+    "message": " Slingui Recording tamamen özel ve yerel olarak çalıştığı için cihazınızın donanımıyla sınırlıdır. Bu uzunluktaki bir videoyu işlemek çok uzun sürer ve çok fazla kaynak kullanır. MP4 dosyanız indirilmeye hazır, ancak bu uzunluktaki klipler için tarayıcıda düzenleme yapılamaz. Yine de riskleri anlıyorsanız, videoyu işlemeyi deneyebilirsiniz.",
     "description": "Over 5 minutes limit modal description when the recording is a native MP4 (fast recorder / WebCodecs)"
   },
   "overLimitModalButton": {
@@ -938,11 +938,11 @@
     "description": "Sekme Üzerinde Desteklenmeyen Uzantı Başlığı"
   },
   "extensionNotSupportedDescription": {
-    "message": "Screenity önceki sekmenizde desteklenmiyordu. Yine de burada kaydı başlatabilir ve ardından sekmeye geçebilirsiniz, ancak kamera ve araç çubuğunuz görünür olmayacaktır.",
+    "message": " Slingui Recording önceki sekmenizde desteklenmiyordu. Yine de burada kaydı başlatabilir ve ardından sekmeye geçebilirsiniz, ancak kamera ve araç çubuğunuz görünür olmayacaktır.",
     "description": "Sekme Üzerinde Desteklenmeyen Uzantı Açıklaması"
   },
   "backupsTitle": {
-    "message": "Screenity Kayıtlarınız için Yerel Yedekleme Ayarları",
+    "message": " Slingui Recording Kayıtlarınız için Yerel Yedekleme Ayarları",
     "description": "Yedeklemeler Başlığı"
   },
   "backupsDescription1": {
@@ -978,7 +978,7 @@
     "description": "Yedeklemeleri Durdur Düğmesi"
   },
   "backupsConfirmTitle": {
-    "message": "Lütfen Screenity'in Yerel Yedekleme Klasörüne Erişimini Tekrar Onaylayın",
+    "message": "Lütfen  Slingui Recording'in Yerel Yedekleme Klasörüne Erişimini Tekrar Onaylayın",
     "description": "Yedeklemeler Onay Başlığı"
   },
   "backupsConfirmDescription": {
@@ -986,7 +986,7 @@
     "description": "Yedeklemeler Onay Açıklaması"
   },
   "backupsConfirmAllow": {
-    "message": "Screenity'e Kayıtların Yedeklemesine Devam Etme İzni Ver",
+    "message": " Slingui Recording'e Kayıtların Yedeklemesine Devam Etme İzni Ver",
     "description": "Yedeklemeler Onayında İzin Ver Düğmesi"
   },
   "backupsToggle": {
@@ -1162,7 +1162,7 @@
     "description": "Button label to go to the dashboard in the popup"
   },
   "welcomePopupTitle": {
-    "message": "Screenity'e hoş geldin",
+    "message": " Slingui Recording'e hoş geldin",
     "description": "Title for the welcome popup shown to new users"
   },
   "welcomePopupDescriptionTop": {
@@ -1222,7 +1222,7 @@
     "description": "Title shown when the user's subscription is inactive"
   },
   "inactiveSubscriptionDescription": {
-    "message": "Screenity Pro aboneliğiniz aktif değil.",
+    "message": " Slingui Recording Pro aboneliğiniz aktif değil.",
     "description": "Description shown when the user's subscription is inactive"
   },
   "inactiveSubscriptionReactivation": {
@@ -1311,7 +1311,7 @@
   },
   "welcomeProButton": {
     "message": "Ücretli özelliklerin kilidini açmak için giriş yap",
-    "description": "Button to sign in to Screenity Pro"
+    "description": "Button to sign in to  Slingui Recording Pro"
   },
   "welcomeProSupport": {
     "message": "Bağımsız bir geliştiriciyi destekle",
@@ -1330,7 +1330,7 @@
     "description": "Pro banner title in the editor"
   },
   "proBannerDescription": {
-    "message": "Screenity her zaman ücretsiz, açık kaynak ve reklamsız olacak. Pro, bulut & altyapı maliyetlerini karşılar ve bağımsız bir geliştiriciyi destekler! ❤️",
+    "message": " Slingui Recording her zaman ücretsiz, açık kaynak ve reklamsız olacak. Pro, bulut & altyapı maliyetlerini karşılar ve bağımsız bir geliştiriciyi destekler! ❤️",
     "description": "Pro banner description in the editor"
   },
   "proBannerAltButton": {
@@ -1362,15 +1362,15 @@
     "description": "Button to upgrade to Pro"
   },
   "hostBannerTitle": {
-    "message": "Screenity’yi yerel olarak mı kullanıyorsunuz? Gelecekteki geliştirmelere destek olun!",
+    "message": " Slingui Recording’yi yerel olarak mı kullanıyorsunuz? Gelecekteki geliştirmelere destek olun!",
     "description": "Kendi sunucusunda barındıran kullanıcılar için banner başlığı"
   },
   "hostBannerDescription": {
-    "message": "Screenity, bağımsız bir kadın geliştirici tarafından oluşturuldu. Kendi sunucunuzda kullanmak ücretsizdir, ancak faydalı buluyorsanız, Pro ile desteklemeyi düşünebilirsiniz ❤️",
+    "message": " Slingui Recording, bağımsız bir kadın geliştirici tarafından oluşturuldu. Kendi sunucunuzda kullanmak ücretsizdir, ancak faydalı buluyorsanız, Pro ile desteklemeyi düşünebilirsiniz ❤️",
     "description": "Kendi sunucusunda barındıran kullanıcılar için banner açıklaması"
   },
   "welcomeBackPopupTitle": {
-    "message": "Screenity’e tekrar hoş geldiniz",
+    "message": " Slingui Recording’e tekrar hoş geldiniz",
     "description": "Geri dönen kullanıcılar için karşılama açılır penceresi başlığı"
   },
   "welcomeBackProTitle": {
@@ -1378,15 +1378,15 @@
     "description": "Karşılama açılır penceresinde bulut depolama özelliği başlığı"
   },
   "welcomeBackProDescription": {
-    "message": "Screenity Pro, videolarınızı bulutta saklamak, bağlantıyla paylaşmak ve gelişmiş düzenleme araçlarının kilidini açmak için isteğe bağlı yeni bir platformdur – ihtiyacınız olduğunda kullanabilirsiniz.",
+    "message": " Slingui Recording Pro, videolarınızı bulutta saklamak, bağlantıyla paylaşmak ve gelişmiş düzenleme araçlarının kilidini açmak için isteğe bağlı yeni bir platformdur – ihtiyacınız olduğunda kullanabilirsiniz.",
     "description": "Karşılama açılır penceresinde bulut depolama özelliğinin açıklaması"
   },
   "welcomeBackProCTA": {
-    "message": "Screenity Pro hakkında daha fazla bilgi edinin",
+    "message": " Slingui Recording Pro hakkında daha fazla bilgi edinin",
     "description": "Karşılama açılır penceresinde bulut depolama özelliği için harekete geçirici buton"
   },
   "welcomeToProTitleModal": {
-    "message": "Screenity Pro'ya Hoş Geldiniz",
+    "message": " Slingui Recording Pro'ya Hoş Geldiniz",
     "description": "Pro karşılama modali başlığı"
   },
   "welcomeToProDescriptionModal": {
@@ -1406,7 +1406,7 @@
     "description": "WebCodecs failure auto-disable toast"
   },
   "proOnboardingWelcomeTitle": {
-    "message": "Screenity Pro uzantısına hoş geldin",
+    "message": " Slingui Recording Pro uzantısına hoş geldin",
     "description": "Pro onboarding welcome step title"
   },
   "proOnboardingWelcomeDescription": {
@@ -1542,7 +1542,7 @@
     "description": "Toast shown when the audio track ends mid-recording (e.g. mic unplugged, permission revoked)"
   },
   "editorRecoveryToast": {
-    "message": "Kaydınız kaydedildi. Düzenleyici açılmadı. Tekrar denemek için Screenity simgesine tıklayın.",
+    "message": "Kaydınız kaydedildi. Düzenleyici açılmadı. Tekrar denemek için  Slingui Recording simgesine tıklayın.",
     "description": "Toast shown on the active tab when the post-recording editor tab fails to open"
   },
   "stopAckTimeoutToast": {
