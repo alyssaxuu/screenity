@@ -5,7 +5,9 @@ import { buildDiagnosticZip } from "../../../utils/buildDiagnosticZip";
 
 import { ReactSVG } from "react-svg";
 
-const URL =
+import { login, logout, getUser } from "../../../../utils/slingui-auth";
+
+const EXT_URL =
   "chrome-extension://" + chrome.i18n.getMessage("@@extension_id") + "/assets/";
 
 // Components
@@ -17,6 +19,9 @@ import { ContentStateContext } from "../../context/ContentState"; // Import the 
 
 const RightPanel = () => {
   const [contentState, setContentState] = useContext(ContentStateContext); // Access the ContentState context
+  const [slingUser, setSlingUser] = useState(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const contentStateRef = useRef(contentState);
   const consoleErrorRef = useRef([]);
 
@@ -24,6 +29,17 @@ const RightPanel = () => {
     console.error = (error) => {
       consoleErrorRef.current.push(error);
     };
+
+    const checkUser = async () => {
+      const user = await getUser();
+      if (user && !user.expired) {
+        setSlingUser(user);
+      }
+    };
+    checkUser();
+
+
+
   }, []);
 
   useEffect(() => {
@@ -402,6 +418,104 @@ const RightPanel = () => {
     }
   };
 
+  const handleSlinguiUpload = async (user) => {
+    let currentUser = user;
+    if (currentUser.expired) {
+      try {
+        currentUser = await login();
+        setSlingUser(currentUser);
+      } catch (error) {
+        console.error("Re-authentication failed", error);
+        return;
+      }
+    }
+
+    const blobToUpload = (contentStateRef.current.mp4ready && contentStateRef.current.blob) ? contentStateRef.current.blob : contentStateRef.current.webm;
+    if (!blobToUpload) {
+      console.error("No blob available to upload");
+      return;
+    }
+
+    setIsUploading(true);
+    setUploadProgress(0);
+
+    try {
+      // Step 1: Get the signed URL
+      const response = await fetch('https://api.slingui.com/storage/upload', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: 'Bearer ' + currentUser.access_token,
+        },
+        body: JSON.stringify({
+          contentType: blobToUpload.type.split('/')[1].split(';')[0],
+          strategy: 'recording',
+        }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.message || 'Failed to get upload URL');
+      }
+      const uploadURL = data.uploadURL;
+
+      // Step 2: Upload the file using XMLHttpRequest
+      await new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('PUT', uploadURL, true);
+        xhr.setRequestHeader('Content-Type', blobToUpload.type);
+        xhr.upload.onprogress = (event) => {
+          if (!event.lengthComputable) return;
+          const progress = Math.round((event.loaded / event.total) * 100);
+          setUploadProgress(progress);
+        };
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            setUploadProgress(100);
+            resolve(xhr.response);
+          } else {
+            reject(new Error('File upload failed with status: ' + xhr.status));
+          }
+        };
+        xhr.onerror = () => reject(new Error('File upload failed due to a network error.'));
+        xhr.send(blobToUpload);
+      });
+
+      // Step 3: Create the document entry
+      const documentResponse = await fetch('https://api.slingui.com/classroom/documents', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: 'Bearer ' + currentUser.access_token,
+        },
+        body: JSON.stringify({
+          name: contentStateRef.current.title || 'Untitled Recording',
+          path: 'recording',
+          type: 'recording',
+          usersCanAccess: [],
+          storageUrl: data.urlFile,
+        }),
+      });
+      
+      if (!documentResponse.ok) {
+        const errorData = await documentResponse.json();
+        throw new Error(errorData.message || 'Failed to create document entry');
+      }
+      
+      await documentResponse.json();
+
+      // Step 4: Redirect
+      chrome.tabs.create({ url: 'https://meeting.slingui.com/recordings' });
+
+    } catch (error) {
+      console.error("Upload failed", error);
+      alert("Falha ao salvar na Slingui: " + error.message);
+    } finally {
+      setIsUploading(false);
+      setUploadProgress(0);
+    }
+  };
+
   return (
     <div className={styles.panel}>
       {contentState.mode === "audio" && <AudioUI />}
@@ -777,6 +891,17 @@ const RightPanel = () => {
             <div className={styles.sectionTitle}>
               {chrome.i18n.getMessage("sandboxSaveTitle")}
             </div>
+            {slingUser ? (
+              <div
+                className={styles.buttonLogout}
+                onClick={async () => {
+                  await logout();
+                  setSlingUser(null);
+                }}
+              >
+                Sair da Slingui
+              </div>
+            ) : null}
             {contentState.driveEnabled && (
               <div
                 className={styles.buttonLogout}
@@ -788,35 +913,54 @@ const RightPanel = () => {
               </div>
             )}
             <div className={styles.buttonWrap}>
+            {slingUser ? (
               <div
                 role="button"
                 className={styles.button}
-                onClick={saveToDrive}
-                disabled={contentState.saveDrive}
+                onClick={() => handleSlinguiUpload(slingUser)}
+                disabled={isUploading || (!contentState.blob && !contentState.webm)}
               >
-                <div className={styles.buttonLeft}>
-                  <ReactSVG src={URL + "editor/icons/drive.svg"} />
-                </div>
-                <div className={styles.buttonMiddle}>
+                <div className={styles.buttonMiddle} style={{paddingLeft: '24px'}}>
                   <div className={styles.buttonTitle}>
-                    {contentState.saveDrive
-                      ? chrome.i18n.getMessage("savingDriveLabel")
-                      : contentState.driveEnabled
-                      ? chrome.i18n.getMessage("saveDriveButtonTitle")
-                      : chrome.i18n.getMessage("signInDriveLabel")}
+                    {isUploading
+                      ? `Salvando... ${uploadProgress}%`
+                      : "Salvar na Slingui"}
                   </div>
                   <div className={styles.buttonDescription}>
-                    {contentState.offline
-                      ? chrome.i18n.getMessage("noConnectionLabel")
-                      : contentState.updateChrome
-                      ? chrome.i18n.getMessage("notAvailableLabel")
-                      : chrome.i18n.getMessage("saveDriveButtonDescription")}
+                    {contentState.mp4ready
+                      ? "Salvar o vídeo MP4 na sua conta Slingui"
+                      : "Salvar o vídeo WEBM na sua conta Slingui"}
                   </div>
                 </div>
                 <div className={styles.buttonRight}>
                   <ReactSVG src={URL + "editor/icons/right-arrow.svg"} />
                 </div>
               </div>
+            ) : (
+              <div
+                role="button"
+                className={styles.button}
+                onClick={async () => {
+                  try {
+                    const user = await login();
+                    setSlingUser(user);
+                    await handleSlinguiUpload(user);
+                  } catch (error) {
+                    console.error("Login failed:", error);
+                  }
+                }}
+              >
+                <div className={styles.buttonMiddle} style={{paddingLeft: '24px'}}>
+                  <div className={styles.buttonTitle}>Save to your account</div>
+                  <div className={styles.buttonDescription}>
+                    Save, then share it with students
+                  </div>
+                </div>
+                <div className={styles.buttonRight}>
+                  <ReactSVG src={EXT_URL + "editor/icons/right-arrow.svg"} />
+                </div>
+              </div>
+            )}
             </div>
           </div>
           <div className={styles.section}>

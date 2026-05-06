@@ -3832,6 +3832,8 @@ const CloudRecorder = () => {
       recordingToScene = false,
       recordedTabDomain = null,
       recordingType = null,
+      recordingMeta = null,
+      screenityMeetingState = null,
     } = await chrome.storage.local.get([
       "projectId",
       "clickEvents",
@@ -3843,6 +3845,8 @@ const CloudRecorder = () => {
       "recordingToScene",
       "recordedTabDomain",
       "recordingType",
+      "recordingMeta",
+      "screenityMeetingState",
     ]);
 
     // Check if cameraFlipped is set in storage, then pass it in payload
@@ -3867,6 +3871,164 @@ const CloudRecorder = () => {
     }
 
     const sceneId = uploadMeta.sceneId;
+    const meetingContext =
+      recordingMeta?.meetingContext || screenityMeetingState || null;
+    const localParticipant = meetingContext?.localUser || null;
+
+    console.info("[CloudRecorder][SceneParticipants] Resolving meeting participants", {
+      sceneId,
+      hasRecordingMetaMeetingContext: Boolean(recordingMeta?.meetingContext),
+      hasScreenityMeetingState: Boolean(screenityMeetingState),
+      meetingContext,
+      localParticipant,
+      participantsType: Array.isArray(meetingContext?.participants)
+        ? "array"
+        : Array.isArray(meetingContext?.participants?.items)
+          ? "items"
+          : Array.isArray(meetingContext?.participants?.attendees)
+            ? "attendees"
+            : meetingContext?.participants &&
+                typeof meetingContext.participants === "object"
+              ? "object-values"
+              : "empty",
+      participantsSource: meetingContext?.participants || null,
+    });
+
+    const rawParticipants = Array.isArray(meetingContext?.participants)
+      ? meetingContext.participants
+      : Array.isArray(meetingContext?.participants?.items)
+        ? meetingContext.participants.items
+        : Array.isArray(meetingContext?.participants?.attendees)
+          ? meetingContext.participants.attendees
+          : meetingContext?.participants &&
+              typeof meetingContext.participants === "object"
+            ? Object.values(meetingContext.participants)
+            : [];
+
+    console.info("[CloudRecorder][SceneParticipants] Raw participants extracted", {
+      sceneId,
+      count: rawParticipants.length,
+      rawParticipants,
+    });
+
+    const normalizedParticipants = rawParticipants
+      .map((participant, index) => {
+        if (!participant || typeof participant !== "object") {
+          console.warn(
+            "[CloudRecorder][SceneParticipants] Dropping invalid participant before normalization",
+            {
+              sceneId,
+              index,
+              participant,
+            },
+          );
+          return null;
+        }
+
+        const participantId =
+          participant.userId ||
+          participant.id ||
+          participant.attendeeId ||
+          participant.externalUserId ||
+          participant.customerId ||
+          null;
+        const participantEmail =
+          participant.email || participant.mail || participant.userEmail || null;
+        const participantName =
+          participant.name ||
+          participant.displayName ||
+          participant.fullName ||
+          participant.externalUserId ||
+          participantEmail ||
+          participantId ||
+          null;
+
+        if (!participantId && !participantEmail && !participantName) {
+          console.warn(
+            "[CloudRecorder][SceneParticipants] Dropping participant with no usable identity",
+            {
+              sceneId,
+              index,
+              participant,
+            },
+          );
+          return null;
+        }
+
+        const normalizedParticipant = {
+          id: participantId,
+          email: participantEmail,
+          name: participantName,
+          role: participant.role || participant.userRole || null,
+          avatarUrl: participant.avatarUrl || participant.avatar || null,
+          externalUserId: participant.externalUserId || null,
+          attendeeId: participant.attendeeId || null,
+        };
+
+        console.info(
+          "[CloudRecorder][SceneParticipants] Normalized participant",
+          {
+            sceneId,
+            index,
+            original: participant,
+            normalized: normalizedParticipant,
+          },
+        );
+
+        return normalizedParticipant;
+      })
+      .filter(Boolean)
+      .filter((participant, index, list) => {
+        const sameAsLocal =
+          (localParticipant?.userId && participant.id === localParticipant.userId) ||
+          (localParticipant?.id && participant.id === localParticipant.id) ||
+          (localParticipant?.email && participant.email === localParticipant.email);
+
+        if (sameAsLocal) {
+          console.info(
+            "[CloudRecorder][SceneParticipants] Filtering participant because it matches local user",
+            {
+              sceneId,
+              index,
+              participant,
+              localParticipant,
+            },
+          );
+          return false;
+        }
+
+        const firstMatchingIndex = list.findIndex((candidate) => {
+          if (participant.id && candidate.id) {
+            return candidate.id === participant.id;
+          }
+          if (participant.email && candidate.email) {
+            return candidate.email === participant.email;
+          }
+          return candidate.name === participant.name;
+        });
+
+        const isUnique = index === firstMatchingIndex;
+
+        if (!isUnique) {
+          console.info(
+            "[CloudRecorder][SceneParticipants] Filtering duplicated participant",
+            {
+              sceneId,
+              index,
+              firstMatchingIndex,
+              participant,
+            },
+          );
+        }
+
+        return isUnique;
+      });
+
+    console.info("[CloudRecorder][SceneParticipants] Final normalized participants", {
+      sceneId,
+      normalizedParticipants,
+      total: normalizedParticipants.length,
+    });
     const existingStatus = await getSceneCreateStatus(sceneId);
     let sceneOutcome = null;
     let shouldIncrementMultiSceneCount = false;
@@ -3939,6 +4101,7 @@ const CloudRecorder = () => {
         insertAfterSceneId,
         isTab: isTab.current && !regionRef.current,
         domain: recordedTabDomain || null,
+        participants: normalizedParticipants,
       };
 
       const res = await fetch(`${API_BASE}/videos/${projectId}/scenes`, {

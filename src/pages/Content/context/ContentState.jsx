@@ -25,8 +25,11 @@ import {
 //create a context, with createContext api
 export const contentStateContext = createContext();
 export const contentStateRef = { current: null };
-export let setContentState = () => {};
-export let setTimer = () => {};
+export let setContentState = () => { };
+export let setTimer = () => { };
+
+const SCREENITY_MEETING_STATE_MESSAGE = "screenity-meeting-state";
+const SCREENITY_MEETING_ENDED_MESSAGE = "screenity-meeting-ended";
 
 const CURSOR_EFFECTS = ["target", "highlight", "spotlight"];
 
@@ -48,10 +51,10 @@ const ContentState = (props) => {
     process.env.SCREENITY_ENABLE_CLOUD_FEATURES === "true";
   setTimer = setTimerInternal;
   const [URL, setURL] = useState(
-    "https://help.screenity.io/getting-started/77KizPC8MHVGfpKpqdux9D/why-does-screenity-ask-for-permissions/9AAE8zJ6iiUtCAtjn4SUT1",
+    "https://docs.slingui.com/recording-help/getting-started/77KizPC8MHVGfpKpqdux9D/why-does-screenity-ask-for-permissions/9AAE8zJ6iiUtCAtjn4SUT1"
   );
   const [URL2, setURL2] = useState(
-    "https://help.screenity.io/troubleshooting/9Jy5RGjNrBB42hqUdREQ7W/how-to-grant-screenity-permission-to-record-your-camera-and-microphone/x6U69TnrbMjy5CQ96Er2E9",
+    "https://docs.slingui.com/recording-help/troubleshooting/9Jy5RGjNrBB42hqUdREQ7W/how-to-grant-screenity-permission-to-record-your-camera-and-microphone/x6U69TnrbMjy5CQ96Er2E9"
   );
   const startBeepRef = useRef(null);
   const stopBeepRef = useRef(null);
@@ -150,13 +153,13 @@ const ContentState = (props) => {
     if (!locale.includes("en")) {
       setURL(
         "https://translate.google.com/translate?sl=en&tl=" +
-          locale +
-          "&u=https://help.screenity.io/getting-started/77KizPC8MHVGfpKpqdux9D/why-does-screenity-ask-for-permissions/9AAE8zJ6iiUtCAtjn4SUT1",
+        locale +
+        "&u=https://help.screenity.io/getting-started/77KizPC8MHVGfpKpqdux9D/why-does-screenity-ask-for-permissions/9AAE8zJ6iiUtCAtjn4SUT1",
       );
       setURL2(
         "https://translate.google.com/translate?sl=en&tl=" +
-          locale +
-          "&u=https://help.screenity.io/troubleshooting/9Jy5RGjNrBB42hqUdREQ7W/how-to-grant-screenity-permission-to-record-your-camera-and-microphone/x6U69TnrbMjy5CQ96Er2E9",
+        locale +
+        "&u=https://help.screenity.io/troubleshooting/9Jy5RGjNrBB42hqUdREQ7W/how-to-grant-screenity-permission-to-record-your-camera-and-microphone/x6U69TnrbMjy5CQ96Er2E9",
       );
     }
   }, []);
@@ -204,6 +207,8 @@ const ContentState = (props) => {
 
     // This cannot be triggered from here because the user might not have the page focused
     //chrome.runtime.sendMessage({ type: "start-recording" });
+    window.postMessage({ type: "recording-started" }, "*");
+
   }, []);
 
   const restartRecording = useCallback(() => {
@@ -241,7 +246,7 @@ const ContentState = (props) => {
             height: 16,
           });
           realSupport = support.supported;
-        } catch {}
+        } catch { }
       }
 
       chrome.storage.local.set({ realWebCodecsSupport: realSupport });
@@ -285,18 +290,24 @@ const ContentState = (props) => {
       element.classList.remove("screenity-blur");
     });
     setTimer(0);
+
     chrome.runtime.sendMessage(
       { type: "stop-recording-tab", reason: "content-toolbar-stop" },
       (res) => {
-      if (!res || res.ok !== true) {
-        console.warn("Stop command not acknowledged, retrying…");
-        setTimeout(() => {
-          chrome.runtime.sendMessage({
-            type: "stop-recording-tab",
-            reason: "content-toolbar-stop-retry",
-          });
-        }, 200);
-      }
+        if (!res || res.ok !== true) {
+          // Play beep sound at 50% volume
+          const audio = new Audio(chrome.runtime.getURL("/assets/sounds/beep.mp3"));
+          audio.volume = 0.5;
+          audio.play();
+          window.postMessage({ type: "recording-stopped" }, "*");
+          console.warn("Stop command not acknowledged, retrying…");
+          setTimeout(() => {
+            chrome.runtime.sendMessage({
+              type: "stop-recording-tab",
+              reason: "content-toolbar-stop-retry",
+            });
+          }, 200);
+        }
       },
     );
   });
@@ -313,7 +324,7 @@ const ContentState = (props) => {
       if (!dismiss) {
         contentStateRef.current.openToast(
           chrome.i18n.getMessage("pausedRecordingToast"),
-          function () {},
+          function () { },
         );
       }
     }, 100);
@@ -468,7 +479,7 @@ const ContentState = (props) => {
           () => {
             window.open(process.env.SCREENITY_APP_BASE, "_blank");
           },
-          () => {},
+          () => { },
         );
       } else if (!success) {
         const isSubError = error === "Subscription inactive";
@@ -502,7 +513,7 @@ const ContentState = (props) => {
           async () => {
             window.location.reload(); // or retry logic
           },
-          () => {},
+          () => { },
         );
       }
 
@@ -537,7 +548,7 @@ const ContentState = (props) => {
           // synchronous permission check.
           startStreaming();
         },
-        () => {},
+        () => { },
         null,
         chrome.i18n.getMessage("learnMoreDot"),
         URL,
@@ -561,7 +572,7 @@ const ContentState = (props) => {
     ) {
       if (typeof contentStateRef.current.openModal === "function") {
         let clear = null;
-        let clearAction = () => {};
+        let clearAction = () => { };
         const locale = chrome.i18n.getMessage("@@ui_locale");
         let helpURL =
           "https://help.screenity.io/troubleshooting/9Jy5RGjNrBB42hqUdREQ7W/what-does-%E2%80%9Cmemory-limit-reached%E2%80%9D-mean-when-recording/8WkwHbt3puuXunYqQnyPcb";
@@ -589,7 +600,7 @@ const ContentState = (props) => {
           clear,
           chrome.i18n.getMessage("permissionsModalDismiss"),
           clearAction,
-          () => {},
+          () => { },
           null,
           chrome.i18n.getMessage("learnMoreDot"),
           helpURL,
@@ -761,13 +772,13 @@ const ContentState = (props) => {
 
       const audioInputById = Array.isArray(audioInput)
         ? Object.fromEntries(
-            audioInput.map((device) => [device.deviceId, device.label]),
-          )
+          audioInput.map((device) => [device.deviceId, device.label]),
+        )
         : {};
       const videoInputById = Array.isArray(videoInput)
         ? Object.fromEntries(
-            videoInput.map((device) => [device.deviceId, device.label]),
-          )
+          videoInput.map((device) => [device.deviceId, device.label]),
+        )
         : {};
 
       const defaultAudioInputLabel =
@@ -849,7 +860,7 @@ const ContentState = (props) => {
           chrome.i18n.getMessage("permissionsModalDescription"),
           chrome.i18n.getMessage("permissionsModalDismiss"),
           chrome.i18n.getMessage("permissionsModalNoShowAgain"),
-          () => {},
+          () => { },
           () => {
             noMorePermissions();
           },
@@ -871,24 +882,6 @@ const ContentState = (props) => {
     chrome.storage.local.set({ askForPermissions: false });
   });
 
-  useEffect(() => {
-    const handleMessage = (event) => {
-      if (event.data.type === "screenity-permissions") {
-        handleDevicePermissions(event.data);
-      } else if (event.data.type === "screenity-permissions-loaded") {
-        setContentState((prevContentState) => ({
-          ...prevContentState,
-          permissionsLoaded: true,
-        }));
-      }
-    };
-
-    window.addEventListener("message", handleMessage);
-
-    return () => {
-      window.removeEventListener("message", handleMessage);
-    };
-  }, []);
 
   // These settings are available throughout the Content
   const [contentState, setContentStateInternal] = useState({
@@ -955,7 +948,7 @@ const ContentState = (props) => {
     showExtension: false,
     showPopup: false,
     blurMode: false,
-    recordingType: "screen",
+    recordingType: "region",
     customRegion: false,
     regionWidth: 800,
     surface: "default",
@@ -1039,7 +1032,7 @@ const ContentState = (props) => {
         recording: false,
         restarting: false,
       });
-      chrome.runtime.sendMessage({ type: "diag-countdown-cancelled" }).catch(() => {});
+      chrome.runtime.sendMessage({ type: "diag-countdown-cancelled" }).catch(() => { });
       setContentState((prev) => ({
         ...prev,
         countdownActive: false,
@@ -1067,6 +1060,75 @@ const ContentState = (props) => {
   });
   contentStateRef.current = contentState;
 
+  useEffect(() => {
+    window.postMessage({ type: "screenity-pong" }, "*");
+
+
+    const handleMessage = (event) => {
+      if (event.data.type === "screenity-permissions") {
+        handleDevicePermissions(event.data);
+      } else if (event.data.type === "screenity-permissions-loaded") {
+        setContentState((prevContentState) => ({
+          ...prevContentState,
+          permissionsLoaded: true,
+        }));
+      } else if (event.data.type === "ping-screenity") {
+        window.postMessage({ type: "screenity-pong" }, "*");
+      } else if (event.data.type === "open-screenity-popup") {
+        setContentState((prevContentState) => ({
+          ...prevContentState,
+          showExtension: !prevContentState.showExtension,
+          hasOpenedBefore: true,
+          micActive: true,
+          cameraActive: false,
+          showPopup: true,
+        }));
+      } else if (event.data.type === "mute-microphone") {
+        setContentState((prevContentState) => ({
+          ...prevContentState,
+          micActive: false,
+        }));
+        chrome.storage.local.set({ micActive: false });
+        chrome.runtime.sendMessage({
+          type: "set-mic-active-tab",
+          active: false,
+          defaultAudioInput: contentState.defaultAudioInput,
+        });
+      } else if (event.data.type === "unmute-microphone") {
+        setContentState((prevContentState) => ({
+          ...prevContentState,
+          micActive: true,
+        }));
+        chrome.storage.local.set({ micActive: true });
+        chrome.runtime.sendMessage({
+          type: "set-mic-active-tab",
+          active: true,
+          defaultAudioInput: contentState.defaultAudioInput,
+        });
+      } else if (event.data.type === SCREENITY_MEETING_STATE_MESSAGE) {
+        chrome.storage.local.set({
+          screenityMeetingState: {
+            ...event.data,
+            capturedAt: Date.now(),
+            pageUrl: window.location.href,
+          },
+          screenityMeetingEndedAt: null,
+        });
+      } else if (event.data.type === SCREENITY_MEETING_ENDED_MESSAGE) {
+        chrome.storage.local.set({
+          screenityMeetingEndedAt:
+            event.data.timestamp || new Date().toISOString(),
+        });
+      }
+    };
+
+    window.addEventListener("message", handleMessage);
+
+    return () => {
+      window.removeEventListener("message", handleMessage);
+    };
+  }, [contentState]);
+
   setContentState = (updater) => {
     if (typeof updater === "function") {
       setContentStateInternal((prevState) => {
@@ -1088,7 +1150,7 @@ const ContentState = (props) => {
     audio.volume = 0.5;
     try {
       audio.currentTime = 0;
-    } catch {}
+    } catch { }
     const playPromise = audio.play();
     if (playPromise?.catch) {
       playPromise.catch((error) => {
@@ -1457,9 +1519,9 @@ const ContentState = (props) => {
           recording: isRecording,
           ...(shouldHideCountdown
             ? {
-                countdownActive: false,
-                isCountdownVisible: false,
-              }
+              countdownActive: false,
+              isCountdownVisible: false,
+            }
             : {}),
         }));
         shouldUpdateTimer = true;
@@ -1691,6 +1753,14 @@ const ContentState = (props) => {
   useEffect(() => {
     updateFromStorage();
   }, []);
+
+  useEffect(() => {
+    if (contentState?.micActive) {
+      window.postMessage({ type: "microphone-unmuted" }, "*");
+    } else {
+      window.postMessage({ type: "microphone-muted" }, "*");
+    }
+  }, [contentState?.micActive]);
 
   // (No storage fallback listener here; use direct messaging flow)
 

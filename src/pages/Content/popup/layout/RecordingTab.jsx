@@ -261,7 +261,7 @@ const RecordingTab = (props) => {
                         cursor: "pointer",
                         width: "28px",
                         height: "28px",
-                        background: "#3080F8",
+                        background: "#0a3b6e",
                         borderRadius: "50%",
                         display: "flex",
                         alignItems: "center",

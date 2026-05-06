@@ -17,7 +17,7 @@ export const onInstalledListener = () => {
 
       // Set uninstall URL based on locale
       const installQs = await supportContextQuery({ source: "uninstall" });
-      const installUrl = `https://tally.so/r/w8Zro5?${installQs}`;
+      const installUrl = `https://slingui.com/?extension=unistalled&${installQs}`;
       chrome.runtime.setUninstallURL(
         locale.includes("en")
           ? installUrl
@@ -55,7 +55,7 @@ export const onInstalledListener = () => {
       }
 
       const updateQs = await supportContextQuery({ source: "uninstall" });
-      const updateUrl = `https://tally.so/r/3Ex6kX?${updateQs}`;
+      const updateUrl = `https://slingui.com/?extension=unistalled&${updateQs}`;
       chrome.runtime.setUninstallURL(
         locale.includes("en")
           ? updateUrl

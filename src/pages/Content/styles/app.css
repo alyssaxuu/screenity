@@ -105,7 +105,7 @@ iframe.screenity-iframe {
   box-sizing: border-box;
   width: 100%;
   height: 100%;
-  border: 10px solid #3080f8;
+  border: 10px solid #0a3b6e;
   pointer-events: none;
   transform: scale(1.2);
   opacity: 0;
@@ -429,7 +429,7 @@ iframe.screenity-iframe {
   background: rgba(56, 126, 247, 0.1);
 }
 .ToolbarModeItem[data-state=on] svg {
-  color: #3080f8;
+  color: #0a3b6e;
 }
 .ToolbarModeItem[data-state=on]::before {
   transform: translateY(0px) scale(1) !important;
@@ -562,7 +562,7 @@ body.driver-active .OnboardingArrow {
 .driver-popover.ScreenityOnboardingPopover .driver-popover-description a,
 .ScreenityOnboardingPopover .driver-popover-description a,
 .onboarding-popover .driver-popover-description a {
-  color: #3080f8 !important;
+  color: #0a3b6e !important;
   font-family: "Satoshi-Bold", sans-serif !important;
   text-decoration: none !important;
   cursor: pointer !important;
@@ -664,7 +664,7 @@ body.driver-active .OnboardingArrow {
 .onboarding-popover .driver-popover-footer .driver-popover-navigation-btns .driver-popover-next-btn,
 .onboarding-popover .driver-popover-footer .driver-popover-navigation-btns .driver-popover-prev-btn,
 .onboarding-popover .driver-popover-footer .driver-popover-navigation-btns .driver-popover-close-btn {
-  background-color: #3080f8 !important;
+  background-color: #0a3b6e !important;
   color: white !important;
   border: none !important;
   padding: 10px 14px !important;
@@ -999,7 +999,7 @@ body.driver-active .OnboardingArrow {
 }
 
 .eye-active {
-  background-color: #3080f8 !important;
+  background-color: #0a3b6e !important;
 }
 .eye-active svg {
   color: #FFF !important;
@@ -1411,7 +1411,7 @@ body.driver-active .OnboardingArrow {
   display: block;
 }
 .stroke-width-item div[data-state=on] {
-  background: #3080f8 !important;
+  background: #0a3b6e !important;
 }
 .stroke-width-item div[data-state=on] svg {
   color: #FFF !important;
@@ -1719,7 +1719,7 @@ body.driver-active .OnboardingArrow {
   margin-bottom: 8px;
 }
 .popup-warning .popup-warning-right {
-  color: #3080f8;
+  color: #0a3b6e;
   font-family: "Satoshi-Medium", sans-serif;
   width: 90px;
 }
@@ -1735,7 +1735,7 @@ body.driver-active .OnboardingArrow {
 }
 .popup-warning-left svg,
 .popup-warning-right svg {
-  color: #3080f8;
+  color: #0a3b6e;
 }
 
 .popup-warning-right {
@@ -1758,7 +1758,7 @@ body.driver-active .OnboardingArrow {
 .permission-button {
   background: rgba(48, 128, 248, 0.1);
   border-radius: 30px;
-  color: #3080f8;
+  color: #0a3b6e;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1779,7 +1779,7 @@ body.driver-active .OnboardingArrow {
   cursor: pointer;
 }
 .permission-button svg {
-  color: #3080f8;
+  color: #0a3b6e;
 }
 
 .HelpSection {
@@ -2012,7 +2012,7 @@ body.driver-active .OnboardingArrow {
 }
 .announcement-description a {
   text-decoration: none !important;
-  color: #3080f8 !important;
+  color: #0a3b6e !important;
   cursor: pointer !important;
 }
 
@@ -2073,7 +2073,7 @@ body.driver-active .OnboardingArrow {
 }
 .welcome-description a {
   text-decoration: none !important;
-  color: #3080f8 !important;
+  color: #0a3b6e !important;
   cursor: pointer !important;
 }
 
@@ -2219,7 +2219,7 @@ body.driver-active .OnboardingArrow {
   right: 12px;
   width: 18px;
   height: 18px;
-  background: #3080f8;
+  background: #0a3b6e;
   border-radius: 50%;
   display: inline-flex;
   align-items: center;
@@ -2503,7 +2503,7 @@ button {
   right: 12px;
   width: 24px;
   height: 24px;
-  background: #3080f8;
+  background: #0a3b6e;
   border-radius: 50%;
   display: inline-flex;
   align-items: center;
@@ -2759,7 +2759,7 @@ input {
   margin: auto;
   height: 2px;
   border-radius: 30px;
-  background: #3080f8;
+  background: #0a3b6e;
 }
 .recording-ui .TabsTrigger[data-state=active] > .TabsTriggerLabel {
   color: #29292f !important;
@@ -2846,7 +2846,7 @@ input {
   margin: auto;
   height: 2px;
   border-radius: 30px;
-  background: #3080f8;
+  background: #0a3b6e;
 }
 .video-ui .TabsTrigger[data-state=active] > .TabsTriggerLabel {
   color: #29292f !important;
@@ -2994,7 +2994,7 @@ button {
 }
 
 .SwitchRoot[data-state=checked] {
-  background-color: #3080f8;
+  background-color: #0a3b6e;
 }
 
 .SwitchRoot:hover {
@@ -3031,7 +3031,7 @@ button {
 .ExperimentalLabel {
   color: #fff;
   font-size: 12px;
-  background-color: #3080f8;
+  background-color: #0a3b6e;
   border-radius: 15px;
   padding: 2px 8px;
   display: inline-block !important;
@@ -3411,7 +3411,7 @@ button {
   width: 46px;
   height: 46px;
   position: absolute;
-  border: 2px solid #3080f8;
+  border: 2px solid #0a3b6e;
   box-sizing: border-box;
 }
 .background-effect img {
@@ -3432,7 +3432,7 @@ button {
   width: 46px;
   height: 46px;
   position: absolute;
-  border: 2px solid #3080f8;
+  border: 2px solid #0a3b6e;
   opacity: 0.5;
   box-sizing: border-box;
 }
@@ -3983,7 +3983,7 @@ button {
   line-height: 1.5;
 }
 .AlertDialogDescription a {
-  color: #3080f8 !important;
+  color: #0a3b6e !important;
   font-weight: 600 !important;
   text-decoration: none !important;
   display: inline-block;
@@ -4004,7 +4004,7 @@ button {
 
 .Button.blue {
   background-color: rgba(48, 128, 248, 0.1);
-  color: #3080f8;
+  color: #0a3b6e;
 }
 .Button.blue:hover {
   background-color: rgba(48, 128, 248, 0.15);
@@ -4374,7 +4374,7 @@ button {
   right: 12px;
   width: 18px;
   height: 18px;
-  background: #3080f8;
+  background: #0a3b6e;
   border-radius: 50%;
   display: inline-flex;
   align-items: center;
@@ -4540,7 +4540,7 @@ button {
 .onboarding-popover .driver-popover-footer .driver-popover-navigation-btns .driver-popover-next-btn,
 .onboarding-popover .driver-popover-footer .driver-popover-navigation-btns .driver-popover-prev-btn,
 .onboarding-popover .driver-popover-footer .driver-popover-navigation-btns .driver-popover-close-btn {
-  background-color: #3080f8 !important;
+  background-color: #0a3b6e !important;
   color: white !important;
   border: none !important;
   padding: 10px 14px !important;

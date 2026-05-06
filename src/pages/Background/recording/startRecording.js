@@ -25,6 +25,11 @@ export const startRecording = async () => {
   const { customRegion } = await chrome.storage.local.get(["customRegion"]);
 
   const { recordingType } = await chrome.storage.local.get(["recordingType"]);
+  const { screenityMeetingState, screenityMeetingEndedAt } =
+    await chrome.storage.local.get([
+      "screenityMeetingState",
+      "screenityMeetingEndedAt",
+    ]);
 
   if (recordingType === "region" || recordingType === "tab") {
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
@@ -38,6 +43,8 @@ export const startRecording = async () => {
             title,
             url,
             startedAt: Date.now(),
+            meetingContext: screenityMeetingState || null,
+            meetingEndedAt: screenityMeetingEndedAt || null,
           },
         });
       }
@@ -58,7 +65,14 @@ export const startRecording = async () => {
       }
     });
   } else {
-    chrome.storage.local.remove(["recordingMeta"]);
+    chrome.storage.local.set({
+      recordingMeta: {
+        type: recordingType || "screen",
+        startedAt: Date.now(),
+        meetingContext: screenityMeetingState || null,
+        meetingEndedAt: screenityMeetingEndedAt || null,
+      },
+    });
   }
 
   chrome.storage.local.set({ lastRecordingType: recordingType || "screen" });
