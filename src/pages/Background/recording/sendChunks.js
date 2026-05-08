@@ -5,7 +5,6 @@ import { diagEvent } from "../../utils/diagnosticLog";
 export const sendChunks = async (override = false, target = null) => {
   const startedAt = Date.now();
   try {
-    // Wait briefly for chunks to be flushed to IndexedDB
     const maxAttempts = 50;
     const delayMs = 200;
     let chunkCount = 0;
@@ -40,7 +39,13 @@ export const sendChunks = async (override = false, target = null) => {
             targetTabId: target?.tabId ?? null,
           },
         });
-      } catch {}
+      } catch (writeErr) {
+        // diag-write failure means storage itself is broken (quota/corruption)
+        diagEvent("storage-write-failed", {
+          key: "lastChunkSendFailure",
+          err: String(writeErr?.message || writeErr).slice(0, 200),
+        });
+      }
       diagEvent("chunks-fail", { why: "no-chunks-after-wait" });
       return { status: "empty", chunkCount: 0 };
     }
@@ -52,7 +57,6 @@ export const sendChunks = async (override = false, target = null) => {
     console.debug("[Screenity][BG] sendChunks: collected chunks", {
       count: chunks.length,
     });
-    // Await handleChunks to ensure messaging completes before returning
     await handleChunks(chunks, override, target);
     diagEvent("chunks-sent", { count: chunks.length });
     diagEvent("sw-sendchunks-done", {
@@ -65,7 +69,11 @@ export const sendChunks = async (override = false, target = null) => {
       error: String(error?.message || error).slice(0, 200),
       elapsedMs: Date.now() - startedAt,
     });
-    console.error("Failed to send chunks. Reloading extension.", error);
-    chrome.runtime.reload();
+    // never runtime.reload() here; caller retries on error status
+    console.error("Failed to send chunks", error);
+    return {
+      status: "error",
+      error: String(error?.message || error).slice(0, 200),
+    };
   }
 };

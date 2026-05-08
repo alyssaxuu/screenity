@@ -6,17 +6,17 @@ async function addAudioToVideo(
   audioVolume = 1.0,
   replaceAudio = false
 ) {
+  if (audioBlob.size > 50_000_000) {
+    throw new Error("background-audio-too-large");
+  }
   const videoData = new Uint8Array(await videoBlob.arrayBuffer());
   const audioData = new Uint8Array(await audioBlob.arrayBuffer());
 
-  // Set the input video and audio file names
   ffmpeg.FS("writeFile", "input-video.mp4", videoData);
   ffmpeg.FS("writeFile", "input-audio.mp3", audioData);
 
-  // Set the output video file name
   const outputFileName = "output-with-audio.mp4";
 
-  // Build FFmpeg command for merging video and audio with volume adjustment
   let ffmpegCommand = [
     "-i",
     "input-video.mp4",
@@ -25,9 +25,9 @@ async function addAudioToVideo(
     "-filter_complex",
     `[0:a]volume=1[a];[1:a]volume=${audioVolume}[b];[a][b]amix=inputs=2:duration=first:dropout_transition=2[v]`,
     "-map",
-    "0:v", // Map the original video stream
+    "0:v",
     "-map",
-    "[v]", // Map the merged audio
+    "[v]",
     "-c:v",
     "copy",
     "-c:a",
@@ -39,7 +39,6 @@ async function addAudioToVideo(
   ];
 
   if (replaceAudio) {
-    // Remove the original audio stream and replace it with the audio from the audio blob
     ffmpegCommand = [
       "-i",
       "input-video.mp4",
@@ -48,9 +47,9 @@ async function addAudioToVideo(
       "-filter_complex",
       "[0:a]volume=0[a];[1:a]volume=1[b];[a][b]amix=inputs=2:duration=first:dropout_transition=2[v]",
       "-map",
-      "0:v", // Map the original video stream
+      "0:v",
       "-map",
-      "[v]", // Map the merged audio
+      "[v]",
       "-c:v",
       "copy",
       "-c:a",
@@ -62,16 +61,12 @@ async function addAudioToVideo(
     ];
   }
 
-  // Run FFmpeg to merge video and audio with volume adjustment
   await ffmpeg.run(...ffmpegCommand);
 
-  // Get the merged video data
   const data = ffmpeg.FS("readFile", outputFileName);
 
-  // Create a Blob from the merged video data
   const videoWithAudioBlob = new Blob([data.buffer], { type: "video/mp4" });
 
-  // Return the video with merged audio Blob
   return videoWithAudioBlob;
 }
 

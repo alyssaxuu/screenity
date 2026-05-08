@@ -5,6 +5,41 @@
 import JSZip from "jszip";
 import { getStartFlowTrace } from "./startFlowTrace";
 
+// Last line of defense before the diag zip leaves the user's machine:
+// strip user-home paths and URL query strings/fragments (recording IDs,
+// signed-URL tokens, OAuth tokens).
+const PII_REPLACEMENTS = [
+  [/\/Users\/[^/\s"]+/g, "/Users/[redacted]"],
+  [/\/home\/[^/\s"]+/g, "/home/[redacted]"],
+  [/[A-Z]:\\Users\\[^\\\s"]+/g, "C:\\Users\\[redacted]"],
+  [/(https?:\/\/[^\s?#"'<>]+)\?[^\s#"'<>]*/g, "$1?[query-redacted]"],
+  [/(https?:\/\/[^\s#"'<>]+)#[^\s"'<>]*/g, "$1#[fragment-redacted]"],
+  [/(chrome-extension:\/\/[^\s?#"'<>]+)\?[^\s#"'<>]*/g, "$1?[query-redacted]"],
+  [/(chrome-extension:\/\/[^\s#"'<>]+)#[^\s"'<>]*/g, "$1#[fragment-redacted]"],
+];
+
+const redactString = (s) => {
+  let out = s;
+  for (const [pat, repl] of PII_REPLACEMENTS) {
+    out = out.replace(pat, repl);
+  }
+  return out;
+};
+
+const redactPii = (value, depth = 0) => {
+  if (depth > 12) return value;
+  if (typeof value === "string") return redactString(value);
+  if (Array.isArray(value)) return value.map((v) => redactPii(v, depth + 1));
+  if (value && typeof value === "object") {
+    const out = {};
+    for (const [k, v] of Object.entries(value)) {
+      out[k] = redactPii(v, depth + 1);
+    }
+    return out;
+  }
+  return value;
+};
+
 const FAST_RECORDER_KEYS = [
   "fastRecorderBeta",
   "fastRecorderDecision",
@@ -21,6 +56,12 @@ const FAST_RECORDER_KEYS = [
   "lastWebCodecsFailureAt",
   "lastWebCodecsFailureCode",
   "lastFailedValidation",
+  "webcodecsConstructSnapshot",
+  "recorderStartTimings",
+  "countdownFinishedAt",
+  "lastStartRecordingCaller",
+  "lastCountdownFinishedDecision",
+  "lastStartAfterCountdown",
 ];
 
 export const buildDiagnosticZip = async ({
@@ -29,14 +70,50 @@ export const buildDiagnosticZip = async ({
 } = {}) => {
   const userAgent = navigator.userAgent;
 
-  // Parallel fetches from background
-  const [platformInfo, diagData, fastRecorderData] = await Promise.all([
-    chrome.runtime.sendMessage({ type: "get-platform-info" }),
-    chrome.runtime.sendMessage({ type: "get-diagnostic-log" }),
-    new Promise((resolve) =>
-      chrome.storage.local.get(FAST_RECORDER_KEYS, resolve),
-    ),
-  ]);
+  const [
+    platformInfo,
+    diagData,
+    fastRecorderData,
+    lifecycleData,
+    perfTimeline,
+    uploadTelemetry,
+  ] = await Promise.all([
+      chrome.runtime.sendMessage({ type: "get-platform-info" }),
+      chrome.runtime.sendMessage({ type: "get-diagnostic-log" }),
+      new Promise((resolve) =>
+        chrome.storage.local.get(FAST_RECORDER_KEYS, resolve),
+      ),
+      new Promise((resolve) =>
+        chrome.storage.local.get(["lifecycleLog"], (r) =>
+          resolve(Array.isArray(r?.lifecycleLog) ? r.lifecycleLog : []),
+        ),
+      ),
+      new Promise((resolve) =>
+        // perfMarks writes per-context (perfTimeline.BG, etc) to avoid
+        // write races; read all and merge by timestamp.
+        chrome.storage.local.get(null, (all) => {
+          const merged = [];
+          for (const k of Object.keys(all || {})) {
+            if (k === "perfTimeline" || k.startsWith("perfTimeline.")) {
+              const arr = all[k];
+              if (Array.isArray(arr)) merged.push(...arr);
+            }
+          }
+          merged.sort((a, b) => (a.t ?? 0) - (b.t ?? 0));
+          resolve(merged);
+        }),
+      ),
+      new Promise((resolve) =>
+        // CloudRecorder writes locally before posting; captures state when offline.
+        chrome.storage.local.get(["cloudUploadTelemetryEvents"], (r) =>
+          resolve(
+            Array.isArray(r?.cloudUploadTelemetryEvents)
+              ? r.cloudUploadTelemetryEvents
+              : [],
+          ),
+        ),
+      ),
+    ]);
 
   const manifestVersion = chrome.runtime.getManifest().version;
   const now = new Date();
@@ -44,7 +121,6 @@ export const buildDiagnosticZip = async ({
 
   const zip = new JSZip();
 
-  // manifest.json — export metadata
   zip.file(
     "manifest.json",
     JSON.stringify({
@@ -56,7 +132,6 @@ export const buildDiagnosticZip = async ({
     }),
   );
 
-  // environment.json
   zip.file(
     "environment.json",
     JSON.stringify({
@@ -71,7 +146,6 @@ export const buildDiagnosticZip = async ({
     }),
   );
 
-  // config.json — recording settings + caller-specific extras
   zip.file(
     "config.json",
     JSON.stringify({
@@ -80,9 +154,12 @@ export const buildDiagnosticZip = async ({
     }),
   );
 
-  // sessions.json — diagnostic session timeline with derived hints
   if (diagData?.log) {
-    const annotated = JSON.parse(JSON.stringify(diagData.log));
+    // structuredClone avoids the stringification round-trip on large logs.
+    const annotated =
+      typeof structuredClone === "function"
+        ? structuredClone(diagData.log)
+        : JSON.parse(JSON.stringify(diagData.log));
     if (annotated.sessions) {
       for (const session of annotated.sessions) {
         if (!session.events?.length) continue;
@@ -99,27 +176,37 @@ export const buildDiagnosticZip = async ({
         if (hints.length > 0) session.hints = hints;
       }
     }
-    zip.file("sessions.json", JSON.stringify(annotated));
+    zip.file("sessions.json", JSON.stringify(redactPii(annotated)));
   }
 
-  // errors.json — consolidated error-state keys
   if (diagData?.errors) {
-    zip.file("errors.json", JSON.stringify(diagData.errors));
+    zip.file("errors.json", JSON.stringify(redactPii(diagData.errors)));
   }
 
-  // storage-flags.json — current boolean/numeric state flags
   if (diagData?.flags) {
-    zip.file("storage-flags.json", JSON.stringify(diagData.flags));
+    zip.file("storage-flags.json", JSON.stringify(redactPii(diagData.flags)));
   }
 
-  // start-flow-trace.json
   try {
     const trace = await getStartFlowTrace();
     if (trace) {
       zip.file("start-flow-trace.json", JSON.stringify(trace));
     }
-  } catch {
-    // best effort
+  } catch {}
+
+  if (Array.isArray(lifecycleData) && lifecycleData.length > 0) {
+    zip.file("lifecycle-log.json", JSON.stringify(lifecycleData));
+  }
+
+  if (Array.isArray(perfTimeline) && perfTimeline.length > 0) {
+    zip.file("perf-timeline.json", JSON.stringify(perfTimeline));
+  }
+
+  if (Array.isArray(uploadTelemetry) && uploadTelemetry.length > 0) {
+    zip.file(
+      "upload-telemetry.json",
+      JSON.stringify(redactPii(uploadTelemetry)),
+    );
   }
 
   const blob = await zip.generateAsync({ type: "blob" });

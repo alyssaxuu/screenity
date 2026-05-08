@@ -1,7 +1,9 @@
 import { stopRecording } from "../recording/stopRecording.js";
 import { sendMessageTab } from "../tabManagement";
 import { sendMessageRecord } from "../recording/sendMessageRecord.js";
+import { handleRecordingError } from "../recording/recordingHelpers.js";
 import { diagEvent } from "../../utils/diagnosticLog";
+import { lifecycle } from "../../utils/lifecycleLog";
 import { chunksStore } from "../recording/chunkHandler";
 import { emitRecordingTelemetry } from "../recording/emitRecordingTelemetry";
 import {
@@ -16,17 +18,8 @@ import {
 
 export { FIRST_CHUNK_WATCHDOG_ALARM, RECORDER_KEEPALIVE_ALARM };
 
-// Best-effort attempt to salvage a recording whose tab missed the watchdog.
-// Sends stop-recording-tab and waits for `video-ready` (the signal that the
-// recorder's normal stop/flush/finalize pipeline succeeded). If the tab is
-// only partially hung (e.g. main thread briefly pinned, background-throttled
-// then resumed), this can recover an otherwise-lost recording. If the tab is
-// truly dead, the timeout fires and the caller proceeds with the error path.
-//
-// For WebCodecs specifically this matters a lot: the muxer only finalizes
-// inside the recorder tab, so without this path the MP4's moov box is never
-// written and chunks on disk are unplayable. For MediaRecorder it still helps
-// by draining any pending in-memory samples that hadn't yet reached IDB.
+// WebCodecs muxer only finalizes inside the recorder tab; without this salvage
+// step the MP4 moov never gets written and chunks on disk are unplayable.
 const STALL_RECOVERY_TIMEOUT_MS = 5000;
 const attemptStallRecovery = (recordingTabId) => {
   return new Promise((resolve) => {
@@ -49,8 +42,7 @@ const attemptStallRecovery = (recordingTabId) => {
         recordingTabId,
         { type: "stop-recording-tab", reason: "stall-recovery" },
         () => {
-          // Swallow lastError — the tab may be unresponsive; the timeout
-          // below is the authoritative signal.
+          // timeout below is authoritative; swallow lastError
           void chrome.runtime.lastError;
         },
       );
@@ -64,11 +56,8 @@ const attemptStallRecovery = (recordingTabId) => {
   });
 };
 
-// Utility to handle tab messaging logic.
-// `tab` is an optional Chrome Tab object used as a fallback when the stored
-// activeTab is no longer valid (e.g. when called from an action-button click).
-// When called from an alarm — where there is no current tab — pass null;
-// the function will skip the fallback branch gracefully.
+// `tab` fallback used when stored activeTab is stale (e.g. action-button click).
+// Alarms pass null since no current tab is available.
 const handleTabMessaging = async (tab) => {
   const { activeTab } = await chrome.storage.local.get(["activeTab"]);
 
@@ -78,7 +67,6 @@ const handleTabMessaging = async (tab) => {
     if (targetTab) {
       sendMessageTab(activeTab, { type: "stop-recording-tab" });
     } else if (tab?.id) {
-      // Only reachable when a real tab object was provided (not from alarms).
       sendMessageTab(tab.id, { type: "stop-recording-tab" });
       chrome.storage.local.set({ activeTab: tab.id });
     }
@@ -87,8 +75,18 @@ const handleTabMessaging = async (tab) => {
   }
 };
 
+// Coalesce stacked post-wake alarm ticks to one per 30s.
+let _lastKeepaliveTickAt = 0;
+
 export const handleAlarm = async (alarm) => {
   if (alarm.name === RECORDER_KEEPALIVE_ALARM) {
+    const now = Date.now();
+    if (now - _lastKeepaliveTickAt < 30_000) {
+      // stacked post-wake tick; real alarms fire every 60s
+      return;
+    }
+    _lastKeepaliveTickAt = now;
+
     const snap = await chrome.storage.local.get([
       "recordingTab",
       "recording",
@@ -117,7 +115,6 @@ export const handleAlarm = async (alarm) => {
     const WATCHDOG_STALE_MS = 90_000; // chunks arrive every 2s; 45x headroom
     const notReady = !snap.firstChunkAt;
     const pausedNow = !!snap.paused;
-    const now = Date.now();
     const age = now - (snap.lastChunkAt || 0);
     const stallLevel = snap.recordingStallLevel || 0;
 
@@ -156,13 +153,7 @@ export const handleAlarm = async (alarm) => {
         tabId: snap.recordingTab,
       });
 
-      // Before giving up, ask the recorder tab to run its normal stop
-      // pipeline. A tab that's only partially hung (main thread briefly
-      // pinned, background-throttled then resumed) can still process this
-      // and deliver a valid recording via `video-ready`. For WebCodecs this
-      // is especially important — the muxer only finalizes inside the
-      // recorder tab, so without this pathway the MP4's moov atom is never
-      // written and chunks on disk are unplayable.
+      // partially hung tabs can still deliver via `video-ready`
       const recovered = await attemptStallRecovery(snap.recordingTab);
       if (recovered) {
         diagEvent("recording-stall-recovered", {
@@ -192,14 +183,15 @@ export const handleAlarm = async (alarm) => {
           lastChunkAt: null,
         });
       } catch {}
-      chrome.runtime
-        .sendMessage({
-          type: "recording-error",
+      try {
+        await handleRecordingError({
           error: "stream-error",
           why: "Recording stopped: the recorder tab became unresponsive.",
           errorCode: "recording-stall-unrecoverable",
-        })
-        .catch(() => {});
+        });
+      } catch (err) {
+        console.warn("[Screenity][BG] stall-unrecoverable handler failed", err);
+      }
       return;
     }
     return;
@@ -212,9 +204,6 @@ export const handleAlarm = async (alarm) => {
       diagEvent("alarm-fired");
       stopRecording();
       sendMessageRecord({ type: "stop-recording-tab" });
-      // Pass null: alarms fire without a user-initiated tab context.
-      // handleTabMessaging will use the stored activeTab and skip the
-      // tab-object fallback branch when null is provided.
       await handleTabMessaging(null);
     }
 
@@ -223,16 +212,45 @@ export const handleAlarm = async (alarm) => {
   }
 
   if (alarm.name === FIRST_CHUNK_WATCHDOG_ALARM) {
-    // No data received from MediaRecorder within the timeout
     const { recording } = await chrome.storage.local.get(["recording"]);
     if (recording) {
       diagEvent("error", { note: "first-chunk-watchdog-fired" });
-      sendMessageRecord({
-        type: "recording-error",
-        error: "stream-error",
-        why: "Recording failed — no video data received within 8 seconds. The tab may have been throttled. Please try again.",
-        errorCode: "no-first-chunk",
-      }).catch(() => {});
+      // 1500ms cap so a wedged tab can't delay the user-facing error
+      let snapshot = null;
+      let snapshotError = null;
+      try {
+        snapshot = await Promise.race([
+          sendMessageRecord({ type: "recorder-state-snapshot" }),
+          new Promise((_, reject) =>
+            setTimeout(() => reject(new Error("snapshot-timeout")), 1500),
+          ),
+        ]);
+      } catch (err) {
+        snapshotError = err?.message || String(err);
+      }
+      lifecycle("BG.watchdog", "first-chunk-fired", {
+        snapshot: snapshot || null,
+        snapshotError,
+      });
+      try {
+        await chrome.storage.local.set({
+          lastFirstChunkWatchdog: {
+            ts: Date.now(),
+            snapshot: snapshot || null,
+            snapshotError,
+          },
+        });
+      } catch {}
+      // handleRecordingError (not sendMessageRecord) so the editor gets notified
+      try {
+        await handleRecordingError({
+          error: "stream-error",
+          why: "Recording failed: no video data received within 8 seconds. The tab may have been throttled. Please try again.",
+          errorCode: "no-first-chunk",
+        });
+      } catch (err) {
+        console.warn("[Screenity][BG] first-chunk watchdog handler failed", err);
+      }
     }
     await chrome.alarms.clear(FIRST_CHUNK_WATCHDOG_ALARM);
     return;
@@ -258,7 +276,7 @@ export const handleAlarm = async (alarm) => {
 
     const hasActiveRecording = Boolean(recording || pendingRecording || restarting);
     if (hasActiveRecording) {
-      // Never clear local chunks while a new recording is active; retry soon.
+      // never clear chunks during an active recording
       const retryAt = Date.now() + 5 * 60 * 1000;
       await chrome.alarms
         .create(CLOUD_LOCAL_PLAYBACK_ALARM, { when: retryAt })

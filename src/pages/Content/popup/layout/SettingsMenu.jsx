@@ -23,12 +23,12 @@ import { runProPopupOnboardingIfNeeded } from "../onboarding/proOnboarding";
 
 const CLOUD_FEATURES_ENABLED =
   process.env.SCREENITY_ENABLE_CLOUD_FEATURES === "true";
+const DEV_MODE = process.env.SCREENITY_DEV_MODE === "true";
 
 const SettingsMenu = (props) => {
   const [contentState, setContentState] = useContext(contentStateContext);
   const [restore, setRestore] = useState(false);
   const [cloudRestore, setCloudRestore] = useState(false);
-  const [oldChrome, setOldChrome] = useState(false);
   const [openQuality, setOpenQuality] = useState(false);
   const [openResize, setOpenResize] = useState(false);
   const [openFPS, setOpenFPS] = useState(false);
@@ -44,16 +44,6 @@ const SettingsMenu = (props) => {
     disabledDetails: null,
     disabledAt: null,
   });
-
-  useEffect(() => {
-    // Check chrome version
-    const chromeVersion = navigator.userAgent.match(/Chrom(e|ium)\/([0-9]+)\./);
-    const MIN_CHROME_VERSION = 110;
-
-    if (chromeVersion && parseInt(chromeVersion[2], 10) < MIN_CHROME_VERSION) {
-      setOldChrome(true);
-    }
-  }, []);
 
   const handleTroubleshooting = () => {
     if (typeof contentState.openModal === "function") {
@@ -745,36 +735,6 @@ const SettingsMenu = (props) => {
                 </DropdownMenu.ItemIndicator>
               </DropdownMenu.CheckboxItem>
             )}
-          {!oldChrome &&
-            !contentState.isSubscribed &&
-            !contentState.isLoggedIn && (
-              <DropdownMenu.CheckboxItem
-                className="DropdownMenuItem"
-                onSelect={(e) => {
-                  e.preventDefault();
-                }}
-                onCheckedChange={(checked) => {
-                  if (!checked) {
-                    chrome.runtime.sendMessage({ type: "close-backup-tab" });
-                  }
-                  setContentState((prevContentState) => ({
-                    ...prevContentState,
-                    backup: checked,
-                    backupSetup: false,
-                  }));
-                  chrome.storage.local.set({
-                    backup: checked,
-                    backupSetup: false,
-                  });
-                }}
-                checked={contentState.backup}
-              >
-                {chrome.i18n.getMessage("backupsToggle")}
-                <DropdownMenu.ItemIndicator className="ItemIndicator">
-                  <img src={CheckWhiteIcon} />
-                </DropdownMenu.ItemIndicator>
-              </DropdownMenu.CheckboxItem>
-            )}
           {!contentState.isSubscribed && !contentState.isLoggedIn && (
             <DropdownMenu.Item
               className="DropdownMenuItem"
@@ -787,17 +747,15 @@ const SettingsMenu = (props) => {
               {chrome.i18n.getMessage("restoreRecording")}
             </DropdownMenu.Item>
           )}
-          {!contentState.isSubscribed && !contentState.isLoggedIn && (
-            <DropdownMenu.Item
-              className="DropdownMenuItem"
-              onSelect={(e) => {
-                e.preventDefault();
-                handleTroubleshooting();
-              }}
-            >
-              {chrome.i18n.getMessage("downloadForTroubleshootingOption")}
-            </DropdownMenu.Item>
-          )}
+          <DropdownMenu.Item
+            className="DropdownMenuItem"
+            onSelect={(e) => {
+              e.preventDefault();
+              handleTroubleshooting();
+            }}
+          >
+            {chrome.i18n.getMessage("downloadForTroubleshootingOption")}
+          </DropdownMenu.Item>
 
           {contentState.isLoggedIn && !CLOUD_FEATURES_ENABLED && (
             <DropdownMenu.Item

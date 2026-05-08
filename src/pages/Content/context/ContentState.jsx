@@ -3,16 +3,17 @@ import React, {
   useState,
   useEffect,
   useCallback,
+  useMemo,
   useRef,
 } from "react";
 
 import { updateFromStorage } from "./utils/updateFromStorage";
+import { lifecycle } from "../../utils/lifecycleLog";
+import { perfMark, perfReset } from "../../utils/perfMarks";
 
-// Shortcuts
 import Shortcuts from "../shortcuts/Shortcuts";
 import DevHUD from "../DevHUD";
 
-// import { initializeContentMessageListener } from "./messaging/messageListener";
 import { setupHandlers } from "./messaging/handlers";
 
 import { checkAuthStatus } from "./utils/checkAuthStatus";
@@ -22,7 +23,6 @@ import {
   setStartFlowOutcome,
 } from "../../utils/startFlowTrace";
 
-//create a context, with createContext api
 export const contentStateContext = createContext();
 export const contentStateRef = { current: null };
 export let setContentState = () => {};
@@ -87,7 +87,6 @@ const ContentState = (props) => {
     return true;
   }, []);
 
-  // Check if the user is logged in
   const verifyUser = useCallback(async () => {
     if (!CLOUD_FEATURES_ENABLED) return;
     const result = await checkAuthStatus();
@@ -103,7 +102,7 @@ const ContentState = (props) => {
     }));
 
     if (result.authenticated) {
-      // Client-side zoom is not available for authenticated users.
+      // Client-side zoom is unavailable for authenticated users.
       setContentState((prev) => ({
         ...prev,
         zoomEnabled: false,
@@ -145,13 +144,9 @@ const ContentState = (props) => {
     );
   }, []);
 
-  // Detect Permissions-Policy camera/microphone blocks on the hosting page.
-  // Some sites (banking, enterprise SaaS, admin panels) set headers like
-  // `Permissions-Policy: camera=(), microphone=()` which disable those APIs
-  // for every iframe on the page, including extension iframes. When this is
-  // set, Screenity's camera/mic iframes fail with a NotAllowedError and the
-  // generic "check your permissions" modal is misleading because the browser
-  // setting is fine, the site is the blocker.
+  // Permissions-Policy: camera=(), microphone=() on the host page disables
+  // those APIs in every iframe including ours, surfacing as NotAllowedError;
+  // distinguish from a real permission issue.
   useEffect(() => {
     try {
       const pp = document.permissionsPolicy || document.featurePolicy;
@@ -164,9 +159,7 @@ const ContentState = (props) => {
           sitePermissionsBlocked: true,
         }));
       }
-    } catch {
-      // allowsFeature can throw on detached documents; treat as not blocked.
-    }
+    } catch {}
   }, []);
 
   useEffect(() => {
@@ -225,14 +218,10 @@ const ContentState = (props) => {
     chrome.storage.local.set({ restarting: false });
     traceStep("recordingStarted");
     setStartFlowOutcome("ok");
-
-    // This cannot be triggered from here because the user might not have the page focused
-    //chrome.runtime.sendMessage({ type: "start-recording" });
   }, []);
 
   const restartRecording = useCallback(() => {
-    // Restart transitions recording true -> false briefly; suppress the normal
-    // "stop" beep because this is not a final stop/save action.
+    // Suppress the stop beep: restart transitions recording true→false briefly.
     suppressStopBeepRef.current = true;
     const sourceTabId = tabIdRef.current ?? activeTabRef.current ?? null;
     chrome.storage.local.set({ restarting: true });
@@ -303,12 +292,12 @@ const ContentState = (props) => {
       cursorMode: "none",
       cursorEffects: [],
     }));
-    // Remove blur from all elements
     const elements = document.querySelectorAll(".screenity-blur");
     elements.forEach((element) => {
       element.classList.remove("screenity-blur");
     });
     setTimer(0);
+    perfMark("Content stop-click", { reason: "content-toolbar-stop" });
     chrome.runtime.sendMessage(
       { type: "stop-recording-tab", reason: "content-toolbar-stop" },
       (res) => {
@@ -356,7 +345,15 @@ const ContentState = (props) => {
   const dismissRecording = useCallback(() => {
     setStartFlowOutcome("cancelled");
     suppressStopBeepRef.current = true;
-    chrome.storage.local.set({ restarting: false });
+    chrome.runtime.sendMessage({ type: "clear-recording-alarm" });
+    chrome.storage.local.set({
+      restarting: false,
+      tabRecordedID: null,
+      drawingMode: false,
+      blurMode: false,
+      cursorMode: "none",
+      cursorEffects: [],
+    });
     chrome.runtime.sendMessage({ type: "dismiss-recording-tab" });
     setContentState((prevContentState) => ({
       ...prevContentState,
@@ -373,8 +370,11 @@ const ContentState = (props) => {
       pipEnded: false,
       blurMode: false,
       drawingMode: false,
+      // Mirror the storage write to avoid a frame where the cursor overlay
+      // renders on top of a "dismissed" UI while onChanged propagates.
+      cursorMode: "none",
+      cursorEffects: [],
     }));
-    // Remove blur from all elements
     const elements = document.querySelectorAll(".screenity-blur");
     elements.forEach((element) => {
       element.classList.remove("screenity-blur");
@@ -385,7 +385,6 @@ const ContentState = (props) => {
   const checkChromeCapturePermissions = useCallback(async () => {
     const permissions = ["desktopCapture", "alarms", "offscreen"];
 
-    // Only request clipboardWrite if the user is logged in and subscribed
     if (
       contentStateRef.current?.isLoggedIn &&
       contentStateRef.current?.isSubscribed
@@ -421,9 +420,9 @@ const ContentState = (props) => {
     }
   }, []);
 
-  // Must be called synchronously from a user-gesture handler so the
-  // activation propagates to the SW via sendMessage. Awaiting the returned
-  // Promise is fine; awaiting anything before invoking this is not.
+  // Must be invoked synchronously from a user-gesture handler so the
+  // activation propagates through sendMessage. Awaiting the returned Promise
+  // is fine; awaiting anything before invoking is not.
   const checkChromeCapturePermissionsSW = useCallback(() => {
     const { isLoggedIn, isSubscribed } = contentStateRef.current || {};
     return new Promise((resolve) => {
@@ -437,15 +436,24 @@ const ContentState = (props) => {
   }, []);
 
   const startStreaming = useCallback(async () => {
-    // Kick off synchronously so the click's user-gesture propagates through
-    // sendMessage into chrome.permissions.request in the SW. Later awaits
-    // (initStartFlowTrace, check-storage-quota for Pro) would consume it.
+    // Double-click guard: a previous start may still be in flight.
+    const snap = await chrome.storage.local.get([
+      "pendingRecording",
+      "recording",
+      "restarting",
+    ]);
+    if (snap.pendingRecording || snap.recording || snap.restarting) {
+      return;
+    }
+
+    // Kick off synchronously: later awaits (initStartFlowTrace, Pro storage
+    // quota) would consume the click's user-gesture before it reaches
+    // chrome.permissions.request in the SW.
     const isExtensionPage = window.location.href.includes("chrome-extension://");
     const permissionPromise = isExtensionPage
       ? null
       : checkChromeCapturePermissionsSW();
 
-    // Init start-flow trace for this attempt
     const attemptId = `ra-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
     await initStartFlowTrace(attemptId, {
       recordingType: contentStateRef.current.recordingType,
@@ -457,12 +465,14 @@ const ContentState = (props) => {
       countdown: Boolean(contentStateRef.current.countdown),
     });
     traceStep("startStreaming");
+    perfReset();
+    perfMark("Content startStreaming.click", {
+      recordingType: contentStateRef.current.recordingType,
+    });
 
-    // Overlay becomes non-blocking while pending. Popup stays open until the
-    // recorder tab takes focus. Also clear countdownCancelled so a stale
-    // cancellation from a previous attempt can't block this one.
-    // Write to storage immediately (not via useEffect) so the tab activation
-    // listener sees pendingRecording=true before the recorder tab opens.
+    // Overlay non-blocking while pending; popup stays open until recorder tab
+    // takes focus. Clear countdownCancelled to avoid stale block. Storage
+    // write must precede recorder-tab open so the activation listener sees it.
     chrome.storage.local.set({ pendingRecording: true });
     setContentState((prev) => ({
       ...prev,
@@ -498,7 +508,6 @@ const ContentState = (props) => {
         const isSubError = error === "Subscription inactive";
         const isAuthError = error === "Not authenticated";
 
-        // Update content state if subscription is inactive
         if (isSubError) {
           contentStateRef.current.setContentState((prev) => ({
             ...prev,
@@ -524,7 +533,7 @@ const ContentState = (props) => {
           chrome.i18n.getMessage("retryButtonLabel"),
           chrome.i18n.getMessage("closeModalLabel"),
           async () => {
-            window.location.reload(); // or retry logic
+            window.location.reload();
           },
           () => {},
         );
@@ -539,11 +548,10 @@ const ContentState = (props) => {
           pendingRecording: false,
           preparingRecording: false,
         }));
-        return; // Stop recording setup
+        return;
       }
     }
 
-    // Check if in content script or extension page (Chrome)
     if (isExtensionPage) {
       permission = await checkChromeCapturePermissions();
     } else {
@@ -557,8 +565,7 @@ const ContentState = (props) => {
         chrome.i18n.getMessage("chromePermissionsModalAction"),
         chrome.i18n.getMessage("chromePermissionsModalCancel"),
         () => {
-          // Direct call so the click's gesture reaches startStreaming's
-          // synchronous permission check.
+          // Direct call so the click's gesture reaches the sync permission check.
           startStreaming();
         },
         () => {},
@@ -617,7 +624,7 @@ const ContentState = (props) => {
           null,
           chrome.i18n.getMessage("learnMoreDot"),
           helpURL,
-          false, // colorSafe
+          false,
           chrome.i18n.getMessage("getHelpButton"),
           () => {
             chrome.runtime.sendMessage({
@@ -708,6 +715,7 @@ const ContentState = (props) => {
         },
       );
     } else {
+      perfMark("Content desktop-capture.sent");
       chrome.runtime.sendMessage({
         type: "desktop-capture",
         region:
@@ -769,7 +777,6 @@ const ContentState = (props) => {
 
   const handleDevicePermissions = (data) => {
     if (data && data != undefined && data.success) {
-      // I need to convert to a regular array of objects
       const audioInput = data.audioinput;
       const videoInput = data.videoinput;
       const cameraPermission = data.cameraPermission;
@@ -821,10 +828,7 @@ const ContentState = (props) => {
         id: contentStateRef.current.defaultVideoInput,
       });
 
-      // Check if first time setting devices
       if (!contentStateRef.current.setDevices) {
-        // Set default devices
-        // Check if audio devices exist
         if (audioInput.length > 0) {
           setContentState((prevContentState) => ({
             ...prevContentState,
@@ -930,7 +934,6 @@ const ContentState = (props) => {
     };
   }, []);
 
-  // These settings are available throughout the Content
   const [contentState, setContentStateInternal] = useState({
     color: "#4597F7",
     strokeWidth: 2,
@@ -954,12 +957,8 @@ const ContentState = (props) => {
     setToolbarMode: null,
     openModal: null,
     openToast: null,
-    // True when the current page's Permissions-Policy header disallows
-    // camera and/or microphone. Computed once on content-script mount.
-    // Used to show a site-specific modal instead of the generic "check
-    // your permissions" one, which otherwise misleads users into
-    // clicking the camera icon in the address bar (which does nothing
-    // against a site-level Permissions-Policy block).
+    // Page-level Permissions-Policy disallows camera/mic. Lets us show a
+    // site-specific modal instead of the misleading "check your permissions" one.
     sitePermissionsBlocked: false,
     timeWarning: false,
     audioInput: [],
@@ -1078,9 +1077,8 @@ const ContentState = (props) => {
     },
     cancelCountdown: () => {
       setStartFlowOutcome("cancelled");
-      // Eagerly clear recording flags in storage so the action button never
-      // sees a stale isRecordingActive state between now and when the
-      // background processes dismiss-recording-tab.
+      // Eagerly clear flags so the action button doesn't see stale
+      // isRecordingActive before BG processes dismiss-recording-tab.
       chrome.storage.local.set({
         pendingRecording: false,
         recording: false,
@@ -1096,7 +1094,6 @@ const ContentState = (props) => {
         showPopup: true,
         showExtension: true,
       }));
-      // Call dismissRecording to ensure everything is properly cleaned up
       contentStateRef.current.dismissRecording();
     },
     resetCountdown: () => {
@@ -1106,8 +1103,17 @@ const ContentState = (props) => {
       }));
     },
     onCountdownFinished: () => {
-      if (!contentStateRef.current?.countdownCancelled && isTargetTab()) {
+      const isTarget = isTargetTab();
+      const cancelled = Boolean(contentStateRef.current?.countdownCancelled);
+      lifecycle("Content.ContentState", "onCountdownFinished", {
+        isTarget,
+        cancelled,
+      });
+      if (!cancelled && isTarget) {
         suppressStartBeepRef.current = true;
+        lifecycle("Content.ContentState", "beep-play-attempt", {
+          beep: "start",
+        });
         playBeep(startBeepRef, "assets/sounds/beep2.mp3");
       }
     },
@@ -1128,6 +1134,8 @@ const ContentState = (props) => {
   };
 
   const playBeep = (ref, filename) => {
+    const calledAt = Date.now();
+    const wasPreloaded = !!ref.current;
     if (!ref.current) {
       ref.current = new Audio(chrome.runtime.getURL(filename));
     }
@@ -1137,10 +1145,23 @@ const ContentState = (props) => {
       audio.currentTime = 0;
     } catch {}
     const playPromise = audio.play();
-    if (playPromise?.catch) {
-      playPromise.catch((error) => {
-        console.warn("Beep playback failed:", error);
-      });
+    if (playPromise?.then) {
+      playPromise
+        .then(() => {
+          lifecycle("Content.ContentState", "beep-play-ok", {
+            filename,
+            wasPreloaded,
+            elapsedMs: Date.now() - calledAt,
+          });
+        })
+        .catch((error) => {
+          console.warn("Beep playback failed:", error);
+          lifecycle("Content.ContentState", "beep-play-fail", {
+            filename,
+            err: String(error?.message || error).slice(0, 120),
+            elapsedMs: Date.now() - calledAt,
+          });
+        });
     }
   };
 
@@ -1195,13 +1216,10 @@ const ContentState = (props) => {
 
     chrome.storage.onChanged.addListener(onChanged);
 
+    // Seed once; subsequent updates arrive via onChanged.
     (async () => {
       const status = await getStatus();
       applyStatus(status);
-      pollTimer = setInterval(async () => {
-        const s = await getStatus();
-        applyStatus(s);
-      }, 500);
     })();
 
     return () => {
@@ -1211,13 +1229,12 @@ const ContentState = (props) => {
     };
   }, [contentState.preparingRecording]);
 
-  // Stuck-state detector (diagnostics only).
-  // Writes to startFlowTrace if pending/preparing stays active too long.
+  // Stuck-state diagnostics: writes to startFlowTrace when pending/preparing lingers.
   useEffect(() => {
     const PENDING_TIMEOUT_MS = 30000;
     const PREPARING_TIMEOUT_MS = 45000;
 
-    if (contentState.recording) return; // not stuck if recording started
+    if (contentState.recording) return;
 
     let timer = null;
     let fired = false;
@@ -1284,6 +1301,13 @@ const ContentState = (props) => {
         prevRecordingRef.current = isRecording;
         return;
       }
+      // Countdown plays its own start beep.
+      if (
+        contentStateRef.current?.countdownActive ||
+        contentStateRef.current?.isCountdownVisible
+      ) {
+        return;
+      }
       const startTime = recordingStartTimeRef.current;
       const hasStartTime = Number.isFinite(startTime) && startTime > 0;
       const sessionMarker = hasStartTime ? startTime : Date.now();
@@ -1309,7 +1333,6 @@ const ContentState = (props) => {
     prevRecordingRef.current = isRecording;
   }, [contentState.recording, isTargetTab]);
 
-  // Check Chrome version
   useEffect(() => {
     const version = navigator.userAgent.match(/Chrom(e|ium)\/([0-9]+)\./);
 
@@ -1354,7 +1377,6 @@ const ContentState = (props) => {
           "AudioIcon",
           10000,
         );
-        // Check if url contains "playground.html" and "chrome-extension://"
       } else if (
         window.location.href.includes("playground.html") &&
         window.location.href.includes("chrome-extension://") &&
@@ -1422,7 +1444,9 @@ const ContentState = (props) => {
 
   useEffect(() => {
     updateTimerFromStorage();
+    // This runs in every open tab; skip reads on hidden ones.
     const interval = setInterval(() => {
+      if (document.hidden) return;
       updateTimerFromStorage();
     }, 1000);
     const handleVisibility = () => {
@@ -1470,9 +1494,8 @@ const ContentState = (props) => {
         changes.lastAuthCheck ||
         changes.isLoggedIn
       ) {
-        // Debounce: multiple auth-related storage keys change in quick
-        // succession (e.g. loginWithWebsite writes isLoggedIn + isSubscribed
-        // + lastAuthCheck). Coalesce into one verify call.
+        // Coalesce: loginWithWebsite writes isLoggedIn + isSubscribed +
+        // lastAuthCheck in quick succession.
         clearTimeout(verifyDebounceRef.current);
         verifyDebounceRef.current = setTimeout(verifyUser, 2000);
       }
@@ -1486,13 +1509,57 @@ const ContentState = (props) => {
         }));
         shouldUpdateTimer = true;
       }
+      if (changes.cameraActive && isTargetTab()) {
+        // CameraWrap renders off contentState.cameraActive; without this listener
+        // a storage toggle (from another tab's popup, automation seed) never reaches React.
+        setContentState((prev) => ({
+          ...prev,
+          cameraActive: Boolean(changes.cameraActive.newValue),
+        }));
+      }
       if (changes.recording) {
         const isRecording = Boolean(changes.recording.newValue);
+        // Read recordingType from this batch; the React ref may lag.
+        const recordingTypeFromChange =
+          changes.recordingType?.newValue ?? null;
+        lifecycle("Content.ContentState", "recording-flag-observed", {
+          isRecording,
+          isTargetTab: isTargetTab(),
+          recordingType:
+            recordingTypeFromChange ??
+            contentStateRef.current?.recordingType ??
+            null,
+        });
         if (isRecording && !isTargetTab()) {
-          setContentState((prev) => ({
-            ...prev,
-            recording: false,
-          }));
+          // Tab/region recordings: clear UI flags that preparing-recording set on non-target tabs.
+          const recordingType =
+            recordingTypeFromChange ??
+            contentStateRef.current?.recordingType;
+          const isTabBound =
+            recordingType === "tab" || recordingType === "region";
+          if (isTabBound) {
+            setContentState((prev) => ({
+              ...prev,
+              recording: false,
+              showExtension: false,
+              showPopup: false,
+              preparingRecording: false,
+              countdownActive: false,
+              isCountdownVisible: false,
+              drawingMode: false,
+              blurMode: false,
+              cursorMode: "none",
+              cursorEffects: [],
+              // Camera bubble belongs to the captured tab; the cameraActive
+              // listener is isTargetTab-gated so stale-true would stick here.
+              cameraActive: false,
+            }));
+          } else {
+            setContentState((prev) => ({
+              ...prev,
+              recording: false,
+            }));
+          }
           return;
         }
         const shouldHideCountdown =
@@ -1565,7 +1632,6 @@ const ContentState = (props) => {
     }
   }, [contentState.customRegion]);
 
-  // Check when hiding the toolbar
   useEffect(() => {
     if (contentState.hideToolbar && contentState.hideUI) {
       setContentState((prevContentState) => ({
@@ -1588,10 +1654,9 @@ const ContentState = (props) => {
     });
   }, [contentState.pendingRecording]);
 
-  // Check if user has enough RAM to record for each quality option
   useEffect(() => {
     if (!contentState.qualityValue) {
-      const suggested = "1080p"; // safe and high enough quality
+      const suggested = "1080p";
       setContentState((prev) => ({ ...prev, qualityValue: suggested }));
       chrome.storage.local.set({ qualityValue: suggested });
     }
@@ -1633,11 +1698,9 @@ const ContentState = (props) => {
     }
   }, [contentState.backgroundEffect, contentState.backgroundEffectsActive]);
 
-  // Programmatically add custom scrollbars
   useEffect(() => {
     if (!contentState.parentRef) return;
 
-    // Check if on mac
     const isMac = navigator.platform.toUpperCase().indexOf("MAC") >= 0;
     if (isMac) return;
 
@@ -1739,13 +1802,14 @@ const ContentState = (props) => {
     updateFromStorage();
   }, []);
 
-  // (No storage fallback listener here; use direct messaging flow)
+  // Memoize: a fresh array literal would re-render every consumer per parent update.
+  const providerValue = useMemo(
+    () => [contentState, setContentState, timer, setTimer],
+    [contentState, timer],
+  );
 
   return (
-    // this is the provider providing state
-    <contentStateContext.Provider
-      value={[contentState, setContentState, timer, setTimer]}
-    >
+    <contentStateContext.Provider value={providerValue}>
       {props.children}
       <Shortcuts shortcuts={contentState.shortcuts} />
       {process.env.SCREENITY_DEV_MODE === "true" && (

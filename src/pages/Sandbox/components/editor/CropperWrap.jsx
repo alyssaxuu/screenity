@@ -2,24 +2,28 @@ import React, { useState, useEffect, useContext, useRef } from "react";
 import { CropperRef, Cropper } from "react-advanced-cropper";
 import "react-advanced-cropper/dist/style.css";
 
-// Context
-import { ContentStateContext } from "../../context/ContentState"; // Import the ContentState context
+import { ContentStateContext } from "../../context/ContentState";
 
 const CropperWrap = () => {
-  const [contentState, setContentState] = useContext(ContentStateContext); // Access the ContentState context
+  const [contentState, setContentState] = useContext(ContentStateContext);
   const [image, setImage] = useState(null);
   const cropperRef = useRef(null);
+  // Guards against onChange firing during setCoordinates push: stale cropper
+  // coords would otherwise overwrite state and revert CropUI inputs.
+  const pushingToCropperRef = useRef(false);
 
   useEffect(() => {
     if (!cropperRef.current) return;
     if (!cropperRef.current.getCoordinates()) return;
     if (contentState.fromCropper) return;
+    pushingToCropperRef.current = true;
     cropperRef.current.setCoordinates({
       top: contentState.top,
       left: contentState.left,
       width: contentState.width,
       height: contentState.height,
     });
+    pushingToCropperRef.current = false;
     if (contentState.top != cropperRef.current.getCoordinates().top) {
       setContentState((prevState) => ({
         ...prevState,
@@ -53,6 +57,7 @@ const CropperWrap = () => {
 
   const onChange = (cropper) => {
     if (!cropper) return;
+    if (pushingToCropperRef.current) return;
     setContentState((prevState) => ({
       ...prevState,
       top: cropper.getCoordinates().top,

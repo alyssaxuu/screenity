@@ -63,6 +63,42 @@
     "message": "Looks like this website's security settings prevent browser extensions from using your camera or microphone on this page. To record with them, start a recording from another tab and switch back here once it begins.",
     "description": "Modal description shown when the current page's Permissions-Policy header blocks browser extensions from using camera or microphone"
   },
+  "opfsLoadErrorTitle": {
+    "message": "Can't load your recording",
+    "description": "Modal title shown when the editor cannot read the recording file from the device's storage"
+  },
+  "opfsLoadErrorDescription": {
+    "message": "Looks like Screenity couldn't load the recording from your device's storage. It may have been cleared or moved. If this keeps happening, please contact us at support@screenity.io.",
+    "description": "Modal description shown when the editor cannot read the recording file from the device's storage"
+  },
+  "editorStuckTitle": {
+    "message": "Still preparing your recording…",
+    "description": "Modal title shown when the editor has been waiting on the post-stop pipeline for too long"
+  },
+  "editorStuckDescription": {
+    "message": "Screenity is taking longer than usual to load your recording. Your data may still be on this device. Try recovering it, or get in touch if it doesn't come back.",
+    "description": "Modal description for the editor-stuck modal, offering recovery and help"
+  },
+  "editorStuckTryRecover": {
+    "message": "Try to recover",
+    "description": "Primary button on the editor-stuck modal — runs the restore-recording flow"
+  },
+  "editorStuckGetHelp": {
+    "message": "Get help",
+    "description": "Secondary button on the editor-stuck modal — opens the support form"
+  },
+  "editorRecoveryFailedTitle": {
+    "message": "Couldn't open your recording",
+    "description": "Modal title shown when the post-stop editor pipeline failed (tab load timeout, message delivery failure)"
+  },
+  "editorRecoveryFailedDescription": {
+    "message": "Something went wrong while loading your recording into the editor. Your recording may still be saved on your device. You can try to recover it now.",
+    "description": "Modal description shown when the post-stop editor pipeline failed; offers recovery"
+  },
+  "recordingWriterFailedToast": {
+    "message": "Recording stopped due to a storage issue. Your partial recording was saved.",
+    "description": "Toast shown when the recording chunk writer fails mid-recording and the partial file is preserved"
+  },
   "allowCameraAccessButton": {
     "message": "Allow camera access",
     "description": "Allow camera access button"
@@ -359,6 +395,18 @@
     "message": "Keep this tab open. It will update with your recording when it's ready.",
     "description": "Description in sandbox page while recording / saving"
   },
+  "sandboxFinalizingRecording": {
+    "message": "Finalizing recording...",
+    "description": "Shown over the player when the editor is waiting for the recorder to finish flushing the recording to disk"
+  },
+  "sandboxToastReverted": {
+    "message": "Reverted to original",
+    "description": "Toast confirmation shown when the user reverts edits to the original recording"
+  },
+  "sandboxToastSaved": {
+    "message": "Changes saved",
+    "description": "Toast confirmation shown when the user saves an edit operation"
+  },
   "sandboxEditorMainTitle": {
     "message": "Editor",
     "description": "Title in navigation of the sandbox editor page"
@@ -610,6 +658,18 @@
   "downloadGIFButtonDescription": {
     "message": "Export a GIF (max 30 seconds)",
     "description": "Download GIF label"
+  },
+  "downloadGIFTooLongToast": {
+    "message": "GIF export is capped at 30 seconds. Trim your clip and try again.",
+    "description": "Toast shown when the user clicks Download as GIF on a clip longer than 30s — explains the silent gate that previously did nothing"
+  },
+  "audioSilentToast": {
+    "message": "No audio detected. Check your mic, mute switch, or audio device.",
+    "description": "Toast shown when the recorder has detected 30s of complete silence on the captured audio track. The recording continues — it's a heads-up, not an error."
+  },
+  "restartFailedToast": {
+    "message": "Couldn't restart your recording. Try stopping and starting again.",
+    "description": "Toast shown when the user clicks Restart but the BG handler couldn't reach or replace the recorder tab — previously left the popup stuck on 'restarting' silently."
   },
   "shareModalSandboxTitle": {
     "message": "Ready to level up your recordings?",
@@ -1525,6 +1585,14 @@
     "message": "Low disk space. Saving your recording now. Everything captured so far is safe.",
     "description": "Toast when disk space drops below critical threshold during recording"
   },
+  "recordingFailedModalTitle": {
+    "message": "Recording couldn't start",
+    "description": "Title of the modal shown when recording fails to start"
+  },
+  "recordingFailedModalDescription": {
+    "message": "Something prevented the recording from starting. Please try again. If this keeps happening, contact us at support@screenity.io.",
+    "description": "Description of the modal shown when recording fails to start"
+  },
   "toastStorageLow": {
     "message": "Storage is running low. Upload reliability may degrade for long recordings.",
     "description": "Toast shown when available storage drops below the warning threshold during recording"
@@ -1573,6 +1641,14 @@
     "message": "Something went wrong during processing. Your original recording is safe. You can try again or download as-is.",
     "description": "Alert body for edit failure"
   },
+  "editAudioTooLargeTitle": {
+    "message": "Audio file is too large",
+    "description": "Alert title when the audio file uploaded for Add Audio is too large to process in-browser"
+  },
+  "editAudioTooLargeDescription": {
+    "message": "Try a shorter audio clip. Large files can't be processed in-browser. Your original recording is safe.",
+    "description": "Alert body for audio-too-large error during Add Audio"
+  },
   "videoTrackEndedToast": {
     "message": "Screen sharing stopped. Saving your recording now. Everything captured so far is safe.",
     "description": "Toast shown when the video track ends mid-recording (e.g. monitor disconnected, screen share revoked)"
@@ -1588,5 +1664,25 @@
   "stopAckTimeoutToast": {
     "message": "Saving is taking longer than expected. Your captured data is safe. The editor will open shortly.",
     "description": "Toast shown when the recorder does not acknowledge the stop request within a few seconds"
+  },
+  "restoreEmptyToast": {
+    "message": "No recoverable recording found. The data may have been cleared.",
+    "description": "Toast shown when restoreRecording finds no OPFS file and no IDB chunks"
+  },
+  "restoreTimeoutToast": {
+    "message": "Recovery is taking too long. Your recording is safe. Try clicking Recover again in a moment.",
+    "description": "Toast shown when the recovery editor tab fails to load within 30 seconds"
+  },
+  "cameraUnavailableToast": {
+    "message": "Camera disconnected. Still recording your screen.",
+    "description": "Toast shown when the camera bubble fails during an active recording but the screen recording continues"
+  },
+  "downloadInterruptedLargeToast": {
+    "message": "Download interrupted. The recording is too large to retry automatically. Try saving again from the editor.",
+    "description": "Toast shown when a download is interrupted and the file is too large for the in-process base64 retry path"
+  },
+  "recordingCorruptToast": {
+    "message": "This recording can't be played back. The file may be incomplete or corrupted. Try downloading the raw file from the Save menu.",
+    "description": "Toast shown when the editor's video element fails to decode the recording (corrupt or zero-byte file)"
   }
 }

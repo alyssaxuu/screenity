@@ -63,6 +63,18 @@
     "message": "Die Sicherheitseinstellungen dieser Website verhindern, dass Browser-Erweiterungen auf dieser Seite deine Kamera oder dein Mikrofon verwenden. Um mit ihnen aufzunehmen, starte die Aufnahme in einem anderen Tab und wechsle zurück hierher, sobald sie begonnen hat.",
     "description": "Modal description shown when the current page's Permissions-Policy header blocks browser extensions from using camera or microphone"
   },
+  "opfsLoadErrorTitle": {
+    "message": "Aufnahme kann nicht geladen werden",
+    "description": "Modal title shown when the editor cannot read the recording file from the device's storage"
+  },
+  "opfsLoadErrorDescription": {
+    "message": "Screenity konnte die Aufnahme aus dem Speicher deines Geräts nicht laden. Sie wurde möglicherweise gelöscht oder verschoben. Falls dies weiterhin geschieht, kontaktiere uns unter support@screenity.io.",
+    "description": "Modal description shown when the editor cannot read the recording file from the device's storage"
+  },
+  "recordingWriterFailedToast": {
+    "message": "Aufnahme wegen eines Speicherproblems gestoppt. Deine Teilaufnahme wurde gespeichert.",
+    "description": "Toast shown when the recording chunk writer fails mid-recording and the partial file is preserved"
+  },
   "allowCameraAccessButton": {
     "message": "Kamerazugriff zulassen",
     "description": "Schaltfläche 'Kamerazugriff zulassen'"
@@ -358,6 +370,18 @@
   "sandboxProgressDescription": {
     "message": "Halten Sie diesen Tab geöffnet. Er wird sich aktualisieren, wenn Ihre Aufnahme fertig ist.",
     "description": "Beschreibung auf der Sandbox-Seite während der Aufnahme / Speicherung"
+  },
+  "sandboxFinalizingRecording": {
+    "message": "Aufnahme wird abgeschlossen...",
+    "description": "Shown over the player when the editor is waiting for the recorder to finish flushing the recording to disk"
+  },
+  "sandboxToastReverted": {
+    "message": "Auf Original zurückgesetzt",
+    "description": "Toast confirmation shown when the user reverts edits to the original recording"
+  },
+  "sandboxToastSaved": {
+    "message": "Änderungen gespeichert",
+    "description": "Toast confirmation shown when the user saves an edit operation"
   },
   "sandboxEditorMainTitle": {
     "message": "Editor",
@@ -1588,5 +1612,59 @@
   "cancelButton": {
     "message": "Abbrechen",
     "description": "Generic cancel button label"
+  },
+  "editorStuckTitle": {
+    "message": "Ihre Aufnahme wird noch vorbereitet…"
+  },
+  "editorStuckDescription": {
+    "message": "Screenity benötigt länger als gewöhnlich, um Ihre Aufnahme zu laden. Ihre Daten befinden sich möglicherweise noch auf diesem Gerät. Versuchen Sie, sie wiederherzustellen, oder melden Sie sich, falls sie nicht zurückkommt."
+  },
+  "editorStuckTryRecover": {
+    "message": "Wiederherstellen"
+  },
+  "editorStuckGetHelp": {
+    "message": "Hilfe erhalten"
+  },
+  "editorRecoveryFailedTitle": {
+    "message": "Aufnahme konnte nicht geöffnet werden"
+  },
+  "editorRecoveryFailedDescription": {
+    "message": "Beim Laden Ihrer Aufnahme in den Editor ist ein Fehler aufgetreten. Ihre Aufnahme ist möglicherweise noch auf Ihrem Gerät gespeichert. Sie können jetzt versuchen, sie wiederherzustellen."
+  },
+  "downloadGIFTooLongToast": {
+    "message": "Der GIF-Export ist auf 30 Sekunden begrenzt. Kürzen Sie Ihren Clip und versuchen Sie es erneut."
+  },
+  "audioSilentToast": {
+    "message": "Kein Audio erkannt. Überprüfen Sie Ihr Mikrofon, den Stummschalter oder Ihr Audiogerät."
+  },
+  "restartFailedToast": {
+    "message": "Ihre Aufnahme konnte nicht neu gestartet werden. Stoppen Sie sie und starten Sie sie erneut."
+  },
+  "recordingFailedModalTitle": {
+    "message": "Aufnahme konnte nicht gestartet werden"
+  },
+  "recordingFailedModalDescription": {
+    "message": "Etwas hat den Start der Aufnahme verhindert. Bitte versuchen Sie es erneut. Wenn das Problem weiterhin besteht, kontaktieren Sie uns unter support@screenity.io."
+  },
+  "editAudioTooLargeTitle": {
+    "message": "Audiodatei ist zu groß"
+  },
+  "editAudioTooLargeDescription": {
+    "message": "Versuchen Sie es mit einem kürzeren Audioclip. Große Dateien können nicht im Browser verarbeitet werden. Ihre Originalaufnahme bleibt erhalten."
+  },
+  "restoreEmptyToast": {
+    "message": "Keine wiederherstellbare Aufnahme gefunden. Die Daten wurden möglicherweise gelöscht."
+  },
+  "restoreTimeoutToast": {
+    "message": "Die Wiederherstellung dauert zu lange. Ihre Aufnahme ist sicher. Klicken Sie in einem Moment erneut auf Wiederherstellen."
+  },
+  "cameraUnavailableToast": {
+    "message": "Kamera getrennt. Bildschirmaufnahme läuft weiter."
+  },
+  "downloadInterruptedLargeToast": {
+    "message": "Download unterbrochen. Die Aufnahme ist zu groß, um automatisch erneut zu starten. Versuchen Sie, sie erneut über den Editor zu speichern."
+  },
+  "recordingCorruptToast": {
+    "message": "Diese Aufnahme kann nicht abgespielt werden. Die Datei ist möglicherweise unvollständig oder beschädigt. Versuchen Sie, die Rohdatei über das Speichern-Menü herunterzuladen."
   }
 }

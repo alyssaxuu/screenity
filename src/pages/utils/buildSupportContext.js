@@ -1,6 +1,6 @@
 /**
  * Builds a URL-safe support-context object for Tally form prefills.
- * No URLs, tokens, page content, or blobs — only sanitized technical metadata.
+ * No URLs, tokens, page content, or blobs, only sanitized technical metadata.
  */
 
 const MAX_ERR_LEN = 120;
@@ -14,6 +14,11 @@ const sanitizeError = (err) => {
   return str
     .replace(/https?:\/\/[^\s)]+/gi, "[url]")
     .replace(/chrome-extension:\/\/[^\s)]+/gi, "[ext]")
+    // strip user-home paths from stack traces so support payloads don't
+    // leak the OS account name
+    .replace(/\/Users\/[^/\s)]+/g, "/Users/[redacted]")
+    .replace(/\/home\/[^/\s)]+/g, "/home/[redacted]")
+    .replace(/[A-Z]:\\Users\\[^\\\s)]+/g, "C:\\Users\\[redacted]")
     .slice(0, MAX_ERR_LEN);
 };
 
@@ -30,19 +35,17 @@ const shortBrowser = () => {
 export const buildSupportContext = async (opts = {}) => {
   const ctx = {};
 
-  // ---- always included ----
   ctx.v = chrome.runtime.getManifest().version;
   ctx.lang = chrome.i18n.getMessage("@@ui_locale") || "unknown";
   ctx.br = shortBrowser();
 
   try {
     const info = await chrome.runtime.getPlatformInfo();
-    ctx.os = info.os; // "mac", "win", "linux", "cros", etc.
+    ctx.os = info.os;
   } catch {
     ctx.os = "unknown";
   }
 
-  // Human-readable platform for Tally choice prefill
   const platformMap = { mac: "macOS", win: "Windows", linux: "Linux", cros: "ChromeOS" };
   ctx.platform = platformMap[ctx.os] || "Other";
 
@@ -53,7 +56,6 @@ export const buildSupportContext = async (opts = {}) => {
     ctx.src = opts.source;
   }
 
-  // ---- recording / error state (opt-in) ----
   if (opts.includeRecordingState) {
     try {
       const keys = [
@@ -86,14 +88,12 @@ export const buildSupportContext = async (opts = {}) => {
       if (store.recordingAttemptId)
         ctx.attemptId = store.recordingAttemptId;
 
-      // Last diagnostic session outcome (compact — just the outcome string)
       if (store.diagnosticLog?.sessions?.length) {
         const last =
           store.diagnosticLog.sessions[
             store.diagnosticLog.sessions.length - 1
           ];
         if (last?.outcome) ctx.lastOutcome = last.outcome;
-        // Detect incomplete editor handoff (editor opened but never loaded)
         if (last?.events?.length) {
           const hasEditorOpen = last.events.some(
             (ev) => ev.e === "editor-open" && ev.d?.type === "editorwebcodecs",
@@ -104,23 +104,18 @@ export const buildSupportContext = async (opts = {}) => {
           if (hasEditorOpen && !hasEditorReady) ctx.editorHandoff = "incomplete";
         }
       }
-    } catch {
-      // storage read failed — continue without recording state
-    }
+    } catch {}
   }
 
-  // ---- explicit error overrides (from error modal "Get help" button) ----
   if (opts.errorCode) ctx.errCode = opts.errorCode;
   if (opts.errorWhy) ctx.lastErr = sanitizeError(opts.errorWhy);
 
-  // ---- support code (short human-readable reference) ----
   if (ctx.attemptId) {
     const hash = ctx.attemptId.replace(/[^a-z0-9]/gi, "").slice(-4).toUpperCase();
     const date = new Date().toISOString().slice(0, 10).replace(/-/g, "");
     ctx.supportCode = `SCR-${hash}-${date}`;
   }
 
-  // ---- user info (only when explicitly provided) ----
   if (opts.user) {
     if (opts.user.name) ctx.name = opts.user.name;
     if (opts.user.email) ctx.email = opts.user.email;

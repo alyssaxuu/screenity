@@ -20,7 +20,7 @@ async function toGIF(ffmpeg, videoBlob, onProgress = () => {}) {
         canvas.height = height;
 
         const gif = new GIF({
-          workers: 2,
+          workers: Math.max(2, Math.min(4, navigator.hardwareConcurrency || 2)),
           quality,
           width,
           height,

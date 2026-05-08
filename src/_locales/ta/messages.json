@@ -63,6 +63,18 @@
     "message": "இந்த வலைத்தளத்தின் பாதுகாப்பு அமைப்புகள் உலாவி நீட்டிப்புகள் இந்தப் பக்கத்தில் உங்கள் கேமராவையோ அல்லது மைக்ரோஃபோனையோ பயன்படுத்துவதைத் தடுக்கின்றன. இவற்றுடன் பதிவு செய்ய, மற்றொரு தாவலில் பதிவைத் தொடங்கி, அது தொடங்கியதும் இங்கே திரும்பவும்.",
     "description": "Modal description shown when the current page's Permissions-Policy header blocks browser extensions from using camera or microphone"
   },
+  "opfsLoadErrorTitle": {
+    "message": "உங்கள் பதிவை ஏற்ற முடியவில்லை",
+    "description": "Modal title shown when the editor cannot read the recording file from the device's storage"
+  },
+  "opfsLoadErrorDescription": {
+    "message": "Screenity உங்கள் சாதனத்தின் சேமிப்பகத்திலிருந்து பதிவை ஏற்ற முடியவில்லை. அது அழிக்கப்பட்டிருக்கலாம் அல்லது நகர்த்தப்பட்டிருக்கலாம். இது தொடர்ந்து நடந்தால், support@screenity.io இல் எங்களை தொடர்பு கொள்ளவும்.",
+    "description": "Modal description shown when the editor cannot read the recording file from the device's storage"
+  },
+  "recordingWriterFailedToast": {
+    "message": "சேமிப்பக சிக்கல் காரணமாக பதிவு நிறுத்தப்பட்டது. உங்கள் பகுதி பதிவு சேமிக்கப்பட்டது.",
+    "description": "Toast shown when the recording chunk writer fails mid-recording and the partial file is preserved"
+  },
   "allowCameraAccessButton": {
     "message": "கேமரா அணுகலை அனுமதிக்கவும்",
     "description": "கேமரா அணுகலை அனுமதிக்க பொத்தான்"
@@ -358,6 +370,18 @@
   "sandboxProgressDescription": {
     "message": "இந்த உதவியை மூட வேண்டும். அது உங்கள் பதிவு சேமிக்கப்பட்ட பிறகு அப்டேட் செய்யும்.",
     "description": "பதிவு பக்கத்தில் விளக்கம்"
+  },
+  "sandboxFinalizingRecording": {
+    "message": "பதிவு முடிக்கப்படுகிறது...",
+    "description": "Shown over the player when the editor is waiting for the recorder to finish flushing the recording to disk"
+  },
+  "sandboxToastReverted": {
+    "message": "மூலத்திற்கு மீட்டமைக்கப்பட்டது",
+    "description": "Toast confirmation shown when the user reverts edits to the original recording"
+  },
+  "sandboxToastSaved": {
+    "message": "மாற்றங்கள் சேமிக்கப்பட்டன",
+    "description": "Toast confirmation shown when the user saves an edit operation"
   },
   "sandboxEditorMainTitle": {
     "message": "எடிட்டர்",
@@ -1588,5 +1612,59 @@
   "cancelButton": {
     "message": "ரத்துசெய்",
     "description": "Generic cancel button label"
+  },
+  "editorStuckTitle": {
+    "message": "உங்கள் பதிவு இன்னும் தயாராகிறது…"
+  },
+  "editorStuckDescription": {
+    "message": "Screenity உங்கள் பதிவை ஏற்ற வழக்கத்தை விட அதிக நேரம் எடுக்கிறது. உங்கள் தரவு இந்தச் சாதனத்தில் இருக்கக்கூடும். மீட்க முயற்சிக்கவும், அது திரும்ப வரவில்லை எனில் எங்களைத் தொடர்பு கொள்ளவும்."
+  },
+  "editorStuckTryRecover": {
+    "message": "மீட்க முயற்சிக்கவும்"
+  },
+  "editorStuckGetHelp": {
+    "message": "உதவி பெறவும்"
+  },
+  "editorRecoveryFailedTitle": {
+    "message": "உங்கள் பதிவைத் திறக்க முடியவில்லை"
+  },
+  "editorRecoveryFailedDescription": {
+    "message": "பதிவை எடிட்டரில் ஏற்றும் போது சிக்கல் ஏற்பட்டது. உங்கள் பதிவு இன்னும் உங்கள் சாதனத்தில் சேமிக்கப்பட்டிருக்கலாம். இப்போது அதை மீட்க முயற்சிக்கலாம்."
+  },
+  "downloadGIFTooLongToast": {
+    "message": "GIF ஏற்றுமதி அதிகபட்சம் 30 வினாடிகள். உங்கள் கிளிப்பை குறைத்து மீண்டும் முயற்சிக்கவும்."
+  },
+  "audioSilentToast": {
+    "message": "ஆடியோ எதுவும் கண்டறியப்படவில்லை. உங்கள் மைக், முடக்கு சுவிட்ச் அல்லது ஆடியோ சாதனத்தை சரிபார்க்கவும்."
+  },
+  "restartFailedToast": {
+    "message": "உங்கள் பதிவை மீண்டும் தொடங்க முடியவில்லை. நிறுத்திவிட்டு மீண்டும் தொடங்க முயற்சிக்கவும்."
+  },
+  "recordingFailedModalTitle": {
+    "message": "பதிவு தொடங்க முடியவில்லை"
+  },
+  "recordingFailedModalDescription": {
+    "message": "பதிவு தொடங்குவதில் சிக்கல் ஏற்பட்டது. மீண்டும் முயற்சிக்கவும். இது தொடர்ந்து நடந்தால், support@screenity.io மூலம் எங்களைத் தொடர்பு கொள்ளவும்."
+  },
+  "editAudioTooLargeTitle": {
+    "message": "ஆடியோ கோப்பு மிகப் பெரியது"
+  },
+  "editAudioTooLargeDescription": {
+    "message": "குறுகிய ஆடியோ கிளிப்பை முயற்சிக்கவும். பெரிய கோப்புகளை உலாவியில் செயலாக்க முடியாது. உங்கள் அசல் பதிவு பாதுகாப்பாக உள்ளது."
+  },
+  "restoreEmptyToast": {
+    "message": "மீட்க முடியக்கூடிய பதிவு எதுவும் கிடைக்கவில்லை. தரவு அழிக்கப்பட்டிருக்கலாம்."
+  },
+  "restoreTimeoutToast": {
+    "message": "மீட்பு அதிக நேரம் எடுக்கிறது. உங்கள் பதிவு பாதுகாப்பாக உள்ளது. சிறிது நேரத்தில் மீட்பு பொத்தானை மீண்டும் கிளிக் செய்யவும்."
+  },
+  "cameraUnavailableToast": {
+    "message": "கேமரா துண்டிக்கப்பட்டது. திரைப் பதிவு தொடர்கிறது."
+  },
+  "downloadInterruptedLargeToast": {
+    "message": "பதிவிறக்கம் தடைப்பட்டது. கோப்பு மிகப் பெரியதாக இருப்பதால் தானாக மீண்டும் முயற்சிக்க முடியாது. எடிட்டரில் இருந்து மீண்டும் சேமிக்க முயற்சிக்கவும்."
+  },
+  "recordingCorruptToast": {
+    "message": "இந்தப் பதிவை இயக்க முடியாது. கோப்பு முழுமையடையாமல் அல்லது சேதமடைந்திருக்கலாம். சேமி மெனுவில் இருந்து மூலக் கோப்பைப் பதிவிறக்க முயற்சிக்கவும்."
   }
 }

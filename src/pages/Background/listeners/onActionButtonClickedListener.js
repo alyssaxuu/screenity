@@ -11,7 +11,6 @@ import { tryResumePendingUploads } from "../recording/resumePendingUploads";
 const CLOUD_FEATURES_ENABLED =
   process.env.SCREENITY_ENABLE_CLOUD_FEATURES === "true";
 
-// Utility to handle tab messaging logic
 const handleTabMessaging = async (tab) => {
   const { activeTab, recordingUiTabId, offscreen } =
     await chrome.storage.local.get([
@@ -56,7 +55,6 @@ const handleTabMessaging = async (tab) => {
   }
 };
 
-// Utility to open Playground or inject popup
 const openPlaygroundOrPopup = async (tab) => {
   const editorUrlPattern =
     /https:\/\/app\.screenity\.io\/editor\/([^\/]+)(\/edit)?\/?/;
@@ -118,11 +116,13 @@ const openPlaygroundOrPopup = async (tab) => {
     "stackoverflow.com/",
   ];
 
-  const isForbidden = forbiddenURLs.some((url) => tab.url.startsWith(url));
+  const tabUrl = String(tab?.url || "");
+  const isForbidden = forbiddenURLs.some((url) => tabUrl.startsWith(url));
   const isPlaygroundOrSetup =
-    tab.url.includes("/playground.html") || tab.url.includes("/setup.html");
+    tabUrl.includes("/playground.html") || tabUrl.includes("/setup.html");
 
-  if ((!isForbidden || isPlaygroundOrSetup) && navigator.onLine) {
+  // never gate on navigator.onLine; that caused duplicate playground tabs
+  if (!isForbidden || isPlaygroundOrSetup) {
     sendMessageTab(tab.id, { type: "toggle-popup" })
       .then(() => console.log("[Screenity][ActionClick] toggle-popup delivered to tab", tab.id))
       .catch((err) => console.error("[Screenity][ActionClick] toggle-popup FAILED to tab", tab.id, String(err).slice(0, 120)));
@@ -146,7 +146,6 @@ const openPlaygroundOrPopup = async (tab) => {
   }
 };
 
-/** Check whether a tab ID refers to a tab that actually exists. */
 const doesTabExist = async (tabId) => {
   if (!Number.isInteger(tabId)) return false;
   try {
@@ -157,7 +156,6 @@ const doesTabExist = async (tabId) => {
   }
 };
 
-/** Check whether an offscreen document is actually running. */
 const isOffscreenAlive = async () => {
   try {
     const contexts = await chrome.runtime.getContexts({});
@@ -167,7 +165,6 @@ const isOffscreenAlive = async () => {
   }
 };
 
-// Main action button listener
 export const onActionButtonClickedListener = () => {
   chrome.action.onClicked.addListener(async (tab) => {
     tryResumePendingUploads({ trigger: "actionClick" }).catch(() => {});
@@ -258,7 +255,6 @@ export const onActionButtonClickedListener = () => {
         }
       } else {
         console.log("[Screenity][ActionClick] branch: normal-popup");
-        // Reset storage keys before opening the popup
         await chrome.storage.local.set({
           recordingToScene: false,
           projectId: null,

@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef, useContext } from "react";
 
-// Context
 import { contentStateContext } from "../context/ContentState";
 
 const ZoomContainer = () => {
@@ -37,9 +36,8 @@ const ZoomContainer = () => {
   }, [contentState]);
 
   const handleKeyDown = (e) => {
-    // Alt / Option + Shift + Z
+    // Alt/Option + Shift + Z
     if (e.code === "KeyE" && e.altKey && e.shiftKey) {
-      //if (!contentStateRef.current.recording) return;
       if (!contentStateRef.current.zoomEnabled) return;
       if (isKeyDownRef.current) return;
       isKeyDownRef.current = true;
@@ -48,6 +46,8 @@ const ZoomContainer = () => {
   };
 
   const handleKeyUp = (e) => {
+    // Skip when we didn't zoom in; avoids re-render on plain shift/alt keyup.
+    if (!isKeyDownRef.current) return;
     if (e.code === "KeyE" || e.altKey || e.shiftKey) {
       isKeyDownRef.current = false;
       isKeyUpRef.current = true;
@@ -63,13 +63,11 @@ const ZoomContainer = () => {
   };
 
   const handleMouseMove = (e) => {
-    //if (!contentStateRef.current.recording) return;
     if (!contentStateRef.current.zoomEnabled) return;
 
-    const { top, left } = document.documentElement.getBoundingClientRect();
-
-    cursorXRef.current = e.clientX - left;
-    cursorYRef.current = e.clientY - top;
+    // pageX/pageY avoid the getBoundingClientRect reflow.
+    cursorXRef.current = e.pageX;
+    cursorYRef.current = e.pageY;
     applyTransform();
   };
 
@@ -85,13 +83,20 @@ const ZoomContainer = () => {
     translateXRef.current = 0;
     translateYRef.current = 0;
     setZoomLevel(scaleRef.current);
-    //applyTransformWithTransition();
-    //enableScrolling();
+  };
+
+  // applyTransform runs every mousemove.
+  const canvasWrapperCache = useRef(null);
+  const getCanvasWrapper = () => {
+    const cached = canvasWrapperCache.current;
+    if (cached && cached.isConnected) return cached;
+    const node = document.querySelector("#canvas-wrapper-screenity");
+    canvasWrapperCache.current = node;
+    return node;
   };
 
   const applyTransform = () => {
     if (!zoomSelector.current) return;
-    //if (!contentStateRef.current.recording) return;
     const { current: scale } = scaleRef;
     const { current: translateX } = translateXRef;
     const { current: translateY } = translateYRef;
@@ -102,50 +107,28 @@ const ZoomContainer = () => {
     zoomSelector.current.style.transform = `scale(${scale}) translate(${translateX}px, ${translateY}px)`;
     zoomSelector.current.style.transformOrigin = `${originX}px ${originY}px`;
 
-    // I also need to apply the transform to the #canvas-wrapper, if it exists
-    const canvasWrapper = document.querySelector("#canvas-wrapper-screenity");
+    const canvasWrapper = getCanvasWrapper();
 
-    // Substract scroll position
     const fixedOriginX = originX - window.scrollX;
     const fixedOriginY = originY - window.scrollY;
     if (canvasWrapper) {
       canvasWrapper.style.transform = `scale(${scale}) translate(${translateX}px, ${translateY}px)`;
       canvasWrapper.style.transformOrigin = `${fixedOriginX}px ${fixedOriginY}px`;
     }
-
-    // Also to #mockup-wrapper
-    //const mockupWrapper = document.querySelector("#mockup-wrapper");
-    //if (mockupWrapper) {
-    //  mockupWrapper.style.transform = `scale(${scale}) translate(${translateX}px, ${translateY}px)`;
-    //  mockupWrapper.style.transformOrigin = `${originX}px ${originY}px`;
-    //}
   };
 
   const applyTransformWithTransition = () => {
     if (!zoomSelector.current) return;
 
     zoomSelector.current.style.transition = "transform 0.5s";
-    if (document.querySelector("#canvas-wrapper-screenity")) {
-      document.querySelector("#canvas-wrapper-screenity").style.transition =
-        "transform 0.5s";
+    const canvasWrapper = getCanvasWrapper();
+    if (canvasWrapper) {
+      canvasWrapper.style.transition = "transform 0.5s";
     }
-    //if (document.querySelector("#mockup-wrapper")) {
-    //  document.querySelector("#mockup-wrapper").style.transition =
-    //    "transform 0.5s";
-    //}
     applyTransform();
   };
 
-  const preventScrolling = () => {
-    /*
-    zoomSelector.current.style.position = "fixed";
-    zoomSelector.current.style.top = "0";
-    zoomSelector.current.style.left = "0";
-    zoomSelector.current.style.overflow = "hidden";
-    zoomSelector.current.style.width = "100vw";
-    zoomSelector.current.style.height = "100vh";
-		*/
-  };
+  const preventScrolling = () => {};
 
   const enableScrolling = () => {
     if (!zoomSelector.current) return;
@@ -174,14 +157,12 @@ const ZoomContainer = () => {
     if (!contentState.showPopup) return;
 
     setTimeout(() => {
-      //if (!contentState.recording) return;
       if (document.querySelector("#screenity-zoom-wrap")) return;
       const div = document.createElement("div");
       div.id = "screenity-zoom-wrap";
       div.style.width = "100vw";
       div.style.height = "100vh";
 
-      // Move the body's children into this wrapper
       while (
         document.body.firstChild &&
         document.body.firstChild.id !== "screenity-ui"
@@ -191,7 +172,6 @@ const ZoomContainer = () => {
         }
       }
 
-      // Append the wrapper to the body
       document.body.prepend(div);
 
       document.body.appendChild(document.getElementById("screenity-ui"));
@@ -203,7 +183,6 @@ const ZoomContainer = () => {
             if (mutation.addedNodes.length > 0) {
               const screenityUi = document.querySelector("#screenity-ui");
               if (screenityUi) {
-                // Disconnect the observer
                 observer.current.disconnect();
               }
             }
@@ -232,7 +211,6 @@ const ZoomContainer = () => {
             document.body.removeChild(zoomWrap);
           }
         }
-        // reset
         scaleRef.current = 1;
         translateXRef.current = 0;
         translateYRef.current = 0;
@@ -254,7 +232,6 @@ const ZoomContainer = () => {
             document.body.removeChild(zoomWrap);
           }
         }
-        // reset
         scaleRef.current = 1;
         translateXRef.current = 0;
         translateYRef.current = 0;
@@ -265,10 +242,8 @@ const ZoomContainer = () => {
 
   useEffect(() => {
     if (!zoomSelector.current) return;
-    //if (!contentStateRef.current.recording) return;
     if (!contentStateRef.current.zoomEnabled) return;
     if (isKeyDownRef.current || isKeyUpRef.current) {
-      //preventScrolling();
       applyTransform();
     }
   }, [zoomLevel]);

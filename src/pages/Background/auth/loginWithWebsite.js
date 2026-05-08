@@ -4,13 +4,33 @@ const API_BASE = process.env.SCREENITY_API_BASE_URL;
 const CLOUD_FEATURES_ENABLED =
   process.env.SCREENITY_ENABLE_CLOUD_FEATURES === "true";
 
-export const loginWithWebsite = async () => {
+const MAX_REFRESH_DEPTH = 2;
+
+// MV3 SW fetch has no default timeout; cap so hung connections fall through to cached auth.
+const AUTH_FETCH_TIMEOUT_MS = 15000;
+const fetchWithTimeout = (url, opts = {}) => {
+  // reject as AbortError so timeout-path callers handle this identically
+  if (typeof navigator !== "undefined" && navigator.onLine === false) {
+    const err = new Error("auth-fetch-offline");
+    err.name = "AbortError";
+    return Promise.reject(err);
+  }
+  const controller = new AbortController();
+  const timer = setTimeout(
+    () => controller.abort("auth-fetch-timeout"),
+    AUTH_FETCH_TIMEOUT_MS,
+  );
+  return fetch(url, { ...opts, signal: controller.signal }).finally(() =>
+    clearTimeout(timer),
+  );
+};
+
+export const loginWithWebsite = async (_depth = 0) => {
   if (!CLOUD_FEATURES_ENABLED) {
     return { authenticated: false, instantMode: false };
   }
 
-  // User explicitly chose to stay logged out — respect that until they
-  // initiate a login themselves (handle-login clears this flag).
+  // cleared by handle-login when user re-initiates login
   const { stayLoggedOut } = await chrome.storage.local.get(["stayLoggedOut"]);
   if (stayLoggedOut) {
     return { authenticated: false, instantMode: false };
@@ -29,7 +49,7 @@ export const loginWithWebsite = async () => {
   }
 
   const now = Date.now();
-  const FRESH_FOR = 1000 * 60 * 60 * 4; // 4 hours
+  const FRESH_FOR = 1000 * 60 * 60 * 4;
   let isTokenInvalid = false;
 
   if (lastAuthCheck && now - lastAuthCheck < FRESH_FOR) {
@@ -46,7 +66,7 @@ export const loginWithWebsite = async () => {
     ]);
 
     if (screenityUser) {
-      // Single storage write to avoid multiple onChanged events
+      // single write to avoid multiple onChanged events
       await chrome.storage.local.set({
         onboarding: false,
         isLoggedIn: true,
@@ -71,12 +91,12 @@ export const loginWithWebsite = async () => {
       };
     }
 
-    // Cache is marked fresh but user payload is missing; force a verify call.
+    // fresh marker but missing user payload; force a verify call
     await chrome.storage.local.set({ lastAuthCheck: 0 });
   }
 
   try {
-    const response = await fetch(`${API_BASE}/auth/verify`, {
+    const response = await fetchWithTimeout(`${API_BASE}/auth/verify`, {
       headers: {
         Authorization: `Bearer ${screenityToken}`,
       },
@@ -114,7 +134,6 @@ export const loginWithWebsite = async () => {
     const { originalTabId } = await chrome.storage.local.get("originalTabId");
 
     if (originalTabId) {
-      // Clear immediately so subsequent cached calls don't re-fire.
       await chrome.storage.local.remove("originalTabId");
 
       chrome.tabs.update(originalTabId, { active: true });
@@ -137,21 +156,28 @@ export const loginWithWebsite = async () => {
     };
   } catch (err) {
     if (isTokenInvalid) {
-      try {
-        const refreshRes = await fetch(`${API_BASE}/auth/refresh`, {
-          credentials: "include",
-        });
-        if (refreshRes.ok) {
-          const { token: newToken } = await refreshRes.json();
-          await chrome.storage.local.set({ screenityToken: newToken });
+      if (_depth >= MAX_REFRESH_DEPTH) {
+        console.warn(
+          "[Auth] verify-after-refresh still failing; forcing logout to break loop",
+        );
+      } else {
+        try {
+          const refreshRes = await fetchWithTimeout(
+            `${API_BASE}/auth/refresh`,
+            { credentials: "include" },
+          );
+          if (refreshRes.ok) {
+            const { token: newToken } = await refreshRes.json();
+            await chrome.storage.local.set({ screenityToken: newToken });
 
-          return await loginWithWebsite();
+            return await loginWithWebsite(_depth + 1);
+          }
+        } catch (refreshErr) {
+          console.error("❌ Refresh failed:", refreshErr.message);
         }
-      } catch (refreshErr) {
-        console.error("❌ Refresh failed:", refreshErr.message);
       }
 
-      // Token is invalid and refresh failed: perform full logout.
+      // refresh failed; full logout
       await chrome.storage.local.remove([
         "screenityToken",
         "screenityUser",
@@ -163,7 +189,7 @@ export const loginWithWebsite = async () => {
       return { authenticated: false, instantMode: false };
     }
 
-    // Network/transient error: keep existing auth state instead of forcing logout.
+    // transient error: keep existing auth state
     const {
       screenityUser,
       isSubscribed,

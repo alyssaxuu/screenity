@@ -12,5 +12,10 @@ node_modules/
 .env.production
 .env.*.local
 build/
+*.zip
+.cws-credentials.json
 docs/
-tools/
+tests/
+test-results/
+playwright-report/
+tools/diagnostics-viewer/

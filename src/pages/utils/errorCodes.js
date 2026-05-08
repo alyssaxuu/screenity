@@ -1,43 +1,31 @@
-/**
- * Error codes for recording flows.
- *
- * Codes are stored in `lastRecordingError.code` and flow through diagnostics
- * and support context. They never contain URLs, page content, or user data.
- */
+// recording-flow error codes. land in lastRecordingError.code and the
+// diagnostic / support payloads. never carry URLs or user data.
 
-// -- Recording Start --
-export const REC_START_PERM = "REC_START_PERM"; // permission denied
-export const REC_START_STREAM = "REC_START_STREAM"; // getUserMedia / getDisplayMedia failed
-export const REC_START_CODEC = "REC_START_CODEC"; // MediaRecorder or WebCodecs init failed
-export const REC_START_REGION = "REC_START_REGION"; // region/crop target setup failed
-export const REC_START_TAB = "REC_START_TAB"; // tab capture or message routing failed
-export const REC_START_TIMEOUT = "REC_START_TIMEOUT"; // start flow timed out
-export const REC_START_CANCEL = "REC_START_CANCEL"; // user cancelled the capture picker
-export const REC_START_NOT_READY = "REC_START_NOT_READY"; // recorder tab not ready (likely discarded)
-export const REC_START_NO_STREAM_MSG = "REC_START_NO_STREAM_MSG"; // start requested but streaming-data message never arrived from SW
+export const REC_START_PERM = "REC_START_PERM";
+export const REC_START_STREAM = "REC_START_STREAM";
+export const REC_START_CODEC = "REC_START_CODEC";
+export const REC_START_REGION = "REC_START_REGION";
+export const REC_START_TAB = "REC_START_TAB";
+export const REC_START_TIMEOUT = "REC_START_TIMEOUT";
+export const REC_START_CANCEL = "REC_START_CANCEL";
+export const REC_START_NOT_READY = "REC_START_NOT_READY";
+export const REC_START_NO_STREAM_MSG = "REC_START_NO_STREAM_MSG";
 
-// -- Recording Runtime --
-export const REC_RUN_STREAM_END = "REC_RUN_STREAM_END"; // stream ended unexpectedly
-export const REC_RUN_MEMORY = "REC_RUN_MEMORY"; // memory/quota pressure
+export const REC_RUN_STREAM_END = "REC_RUN_STREAM_END";
+export const REC_RUN_MEMORY = "REC_RUN_MEMORY";
 
-// -- Recording Stop --
-export const REC_STOP_CHUNKS = "REC_STOP_CHUNKS"; // chunk delivery failed
-export const REC_STOP_EDITOR = "REC_STOP_EDITOR"; // editor tab open failed
+export const REC_STOP_CHUNKS = "REC_STOP_CHUNKS";
+export const REC_STOP_EDITOR = "REC_STOP_EDITOR";
 
-// -- Drive --
-export const DRV_AUTH = "DRV_AUTH"; // auth failed
-export const DRV_FOLDER = "DRV_FOLDER"; // folder operation failed
-export const DRV_UPLOAD = "DRV_UPLOAD"; // file upload failed
+export const DRV_AUTH = "DRV_AUTH";
+export const DRV_FOLDER = "DRV_FOLDER";
+export const DRV_UPLOAD = "DRV_UPLOAD";
 
-// -- Fallback --
 export const UNKNOWN = "UNKNOWN";
 
-// -- Classifier --
-
-// Patterns that strongly indicate the user explicitly cancelled the picker.
-// Note: "aborterror" is intentionally NOT here — Chrome throws AbortError for
-// picker dismissal but also for unrelated abort scenarios.  We only classify
-// AbortError as cancel when the caller passes the "cancel-modal" hint.
+// "aborterror" is intentionally NOT here: Chrome throws AbortError for
+// picker dismissal AND unrelated abort scenarios. AbortError is only a
+// cancel when the caller passes the "cancel-modal" hint.
 const CANCEL_PATTERNS = [
   "cancelled",
   "canceled",
@@ -113,17 +101,16 @@ const REGION_PATTERNS = [
 /**
  * Classify an error string into an error code.
  *
- * @param {string} errorStr  — raw error message
- * @param {string} [errorType] — optional hint ("stream-error", "cancel-modal", etc.)
+ * @param {string} errorStr , raw error message
+ * @param {string} [errorType], optional hint ("stream-error", "cancel-modal", etc.)
  * @returns {string} one of the exported error code constants
  */
 export const classifyError = (errorStr = "", errorType = "") => {
   const lower = String(errorStr).toLowerCase();
   const typeLower = String(errorType).toLowerCase();
 
-  // Explicit cancel — either the caller flagged it or the message clearly says so.
-  // AbortError only counts as cancel when the caller confirms via "cancel-modal",
-  // since Chrome reuses AbortError for non-cancel scenarios too.
+  // AbortError only counts as cancel via the "cancel-modal" hint; Chrome
+  // reuses AbortError for non-cancel scenarios.
   if (typeLower === "cancel-modal") {
     return REC_START_CANCEL;
   }
@@ -131,7 +118,6 @@ export const classifyError = (errorStr = "", errorType = "") => {
     return REC_START_CANCEL;
   }
 
-  // Permission denied
   if (PERM_PATTERNS.some((p) => lower.includes(p))) {
     return REC_START_PERM;
   }
@@ -140,42 +126,35 @@ export const classifyError = (errorStr = "", errorType = "") => {
     return REC_START_NO_STREAM_MSG;
   }
 
-  // Recorder not ready (stream ref missing, likely tab discarded during countdown)
+  // Recorder tab discarded during countdown.
   if (lower.includes("recording not ready") || lower.includes("screen stream is missing")) {
     return REC_START_NOT_READY;
   }
 
-  // Stream acquisition
   if (STREAM_PATTERNS.some((p) => lower.includes(p))) {
     return REC_START_STREAM;
   }
 
-  // Codec / recorder init
   if (CODEC_PATTERNS.some((p) => lower.includes(p))) {
     return REC_START_CODEC;
   }
 
-  // Timeout
   if (TIMEOUT_PATTERNS.some((p) => lower.includes(p))) {
     return REC_START_TIMEOUT;
   }
 
-  // Region / crop
   if (REGION_PATTERNS.some((p) => lower.includes(p))) {
     return REC_START_REGION;
   }
 
-  // Stream ended (runtime, not start)
   if (typeLower === "stream-ended" || lower.includes("stream ended")) {
     return REC_RUN_STREAM_END;
   }
 
-  // Tab routing
   if (TAB_PATTERNS.some((p) => lower.includes(p))) {
     return REC_START_TAB;
   }
 
-  // Memory / storage
   if (
     lower.includes("memory") ||
     lower.includes("quota") ||
@@ -186,8 +165,8 @@ export const classifyError = (errorStr = "", errorType = "") => {
     return REC_RUN_MEMORY;
   }
 
-  // Bare AbortError without a cancel-modal hint — this is ambiguous, so treat
-  // it as a stream-level failure rather than assuming user intent.
+  // Bare AbortError without cancel-modal hint is ambiguous; treat as
+  // stream-level failure rather than assuming user intent.
   if (lower.includes("aborterror")) {
     return REC_START_STREAM;
   }
@@ -195,9 +174,6 @@ export const classifyError = (errorStr = "", errorType = "") => {
   return UNKNOWN;
 };
 
-// -- Helpers --
-
-/** Short ID for a recording attempt (no crypto dependency). */
 export const makeRecordingAttemptId = () => {
   const ts = Date.now().toString(36);
   const rand = Math.random().toString(36).slice(2, 8);

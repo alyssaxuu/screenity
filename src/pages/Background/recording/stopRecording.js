@@ -4,6 +4,53 @@ import { sendMessageRecord } from "./sendMessageRecord";
 import { sendChunks } from "./sendChunks";
 import { waitForContentScript } from "../utils/waitForContentScript";
 import { diagEvent, endDiagSession } from "../../utils/diagnosticLog";
+import { perfMark, perfSpan } from "../../utils/perfMarks";
+
+// resolves via onReady, onTimeout (30s), or onClosed
+const onTabLoaded = (tabId, onReady, onTimeout = null, onClosed = null) => {
+  let cleared = false;
+  const cleanup = () => {
+    if (cleared) return;
+    cleared = true;
+    chrome.tabs.onUpdated.removeListener(updateListener);
+    chrome.tabs.onRemoved.removeListener(removeListener);
+    if (safetyTimer) clearTimeout(safetyTimer);
+  };
+  const updateListener = (changedTabId, changeInfo) => {
+    if (changedTabId === tabId && changeInfo.status === "complete") {
+      cleanup();
+      onReady();
+    }
+  };
+  const removeListener = (removedTabId) => {
+    if (removedTabId === tabId) {
+      cleanup();
+      if (typeof onClosed === "function") onClosed();
+    }
+  };
+  const safetyTimer = setTimeout(() => {
+    cleanup();
+    if (typeof onTimeout === "function") onTimeout();
+  }, 30000);
+  chrome.tabs.onUpdated.addListener(updateListener);
+  chrome.tabs.onRemoved.addListener(removeListener);
+};
+
+// persistent flag so an editor mounting AFTER the failure still picks it up
+const markEditorStartFailed = async (tabId, errorCode, why) => {
+  diagEvent("editor-start-failed", { tabId, errorCode, why });
+  try {
+    await chrome.storage.local.set({
+      editorRecordingError: {
+        ts: Date.now(),
+        sandboxTab: Number.isInteger(tabId) ? tabId : null,
+        error: "editor-start-failed",
+        why: why || null,
+        errorCode,
+      },
+    });
+  } catch {}
+};
 
 const acquirePostStopEditorLock = async (recordingId = null) => {
   const { postStopEditorOpening } = await chrome.storage.local.get([
@@ -19,16 +66,13 @@ const acquirePostStopEditorLock = async (recordingId = null) => {
 };
 
 const releasePostStopEditorLock = async (overrides = {}) => {
-  // Only clear the "in-progress" flag. Keep postStopEditorOpened=true so
-  // stopRecording() (which runs later) still knows an editor was opened and
-  // won't open a duplicate. stopRecording() clears postStopEditorOpened itself.
+  // keep postStopEditorOpened=true so later stopRecording() can detect the duplicate
   await chrome.storage.local.set({
     postStopEditorOpening: false,
     ...overrides,
   });
 };
 
-/** Store a recovery URL and toast the user when the editor tab fails to open. */
 const handleEditorOpenFailed = async (editorUrl, lastError) => {
   diagEvent("editor-open-failed", {
     editorUrl,
@@ -38,7 +82,6 @@ const handleEditorOpenFailed = async (editorUrl, lastError) => {
     editorRecoveryUrl: editorUrl,
     editorRecoveryAt: Date.now(),
   });
-  // Toast the active tab
   try {
     const { activeTab } = await chrome.storage.local.get(["activeTab"]);
     if (activeTab) {
@@ -48,14 +91,13 @@ const handleEditorOpenFailed = async (editorUrl, lastError) => {
         timeout: 12000,
       }).catch(() => {});
     }
-  } catch (_) {
-    // Recovery URL is still in storage either way
-  }
+  } catch (_) {}
 };
 
 export const stopRecording = async () => {
   chrome.action.setIcon({ path: "assets/icon-34.png" });
-  chrome.storage.local.set({ restarting: false });
+  // await the clear so a quick subsequent restart can't race startRecording's gate
+  await chrome.storage.local.set({ restarting: false });
   const { recordingStartTime, isSubscribed, paused, pausedAt, totalPausedMs, recordingDuration: storedDuration } =
     await chrome.storage.local.get([
       "recordingStartTime",
@@ -80,9 +122,8 @@ export const stopRecording = async () => {
       ? Math.max(0, now - startTime - basePaused - extraPaused)
       : 0;
 
-  // Recorder clears recordingStartTime before stopRecording() runs via
-  // videoReady(), so the computed duration can be 0 for valid recordings.
-  // Fall back to the previously stored recordingDuration if available.
+  // recorder clears recordingStartTime before stopRecording runs via videoReady;
+  // computed duration can be 0 for valid recordings, fall back to stored
   if (duration === 0 && Number(storedDuration) > 0) {
     duration = Number(storedDuration);
   }
@@ -90,16 +131,18 @@ export const stopRecording = async () => {
 
   diagEvent("stop", { duration, isSubscribed: Boolean(isSubscribed) });
 
-  chrome.storage.local.set({
+  // single batched write; splitting risks partial cleanup on storage failure
+  await chrome.storage.local.set({
     recording: false,
     recordingDuration: duration,
     tabRecordedID: null,
     offscreen: false,
+    region: false,
+    customRegion: false,
+    recordingUiTabId: null,
+    pipForceClose: Date.now(),
+    recordingStartTime: 0,
   });
-  chrome.storage.local.set({ recordingUiTabId: null });
-  chrome.storage.local.set({ pipForceClose: Date.now() });
-
-  chrome.storage.local.set({ recordingStartTime: 0 });
 
   const {
     fastRecorderInUse,
@@ -118,7 +161,6 @@ export const stopRecording = async () => {
     validation?.details?.recordingId &&
     validation.details.recordingId === fastRecorderActiveRecordingId;
   const hardFailForCurrent = Boolean(validationMatches && validation?.hardFail);
-  //const hasWebCodecs = supportsWebCodecs();
   const hasWebCodecs = Boolean(fastRecorderInUse) && !hardFailForCurrent;
 
   const {
@@ -135,16 +177,19 @@ export const stopRecording = async () => {
     "recordingTab",
   ]);
 
+  // snapshot for handleRecordingComplete; live recordingTab may belong to a new session by then
+  if (recordingTab) {
+    chrome.storage.local.set({ completingRecordingTab: recordingTab });
+  }
+
   if (isSubscribed) {
     chrome.alarms.clear("recording-alarm");
     discardOffscreenDocuments();
     chrome.storage.local.remove(["recordingMeta"]);
   } else if (postStopEditorOpening || postStopEditorOpened) {
-    // Editor already opened by stop-recording-tab flow; avoid opening a second tab.
-    // That flow will trigger processing when the tab finishes loading.
+    // editor already opened by stop-recording-tab flow; avoid duplicate
   } else if (hasWebCodecs) {
     diagEvent("editor-open", { type: "editorwebcodecs" });
-    // Use Mediabunny (editorwebcodecs.html) when WebCodecs is supported
     const query = postStopRecordingId
       ? `?mode=postStop&recordingId=${encodeURIComponent(postStopRecordingId)}`
       : "?mode=postStop";
@@ -156,24 +201,39 @@ export const stopRecording = async () => {
           handleEditorOpenFailed(wcUrl, chrome.runtime.lastError?.message);
           return;
         }
-        chrome.tabs.onUpdated.addListener(function _(
-          tabId,
-          changeInfo,
-          updatedTab,
-        ) {
-          if (tabId === tab.id && changeInfo.status === "complete") {
-            chrome.tabs.onUpdated.removeListener(_);
+        onTabLoaded(
+          tab.id,
+          async () => {
             chrome.storage.local.set({ sandboxTab: tab.id });
-            (async () => {
-              try {
-                await waitForContentScript(tab.id);
-                await sendMessageTab(tab.id, { type: "fallback-recording" });
-              } catch (err) {
-                console.error("❌ Failed to wait/send to content script:", err);
-              }
-            })();
-          }
-        });
+            try {
+              await waitForContentScript(tab.id);
+            } catch (err) {
+              console.error("❌ waitForContentScript timed out:", err);
+              await markEditorStartFailed(
+                tab.id,
+                "EDITOR_CONTENT_SCRIPT_TIMEOUT",
+                String(err?.message || err).slice(0, 200),
+              );
+              return;
+            }
+            try {
+              await sendMessageTab(tab.id, { type: "fallback-recording" });
+            } catch (err) {
+              console.error("❌ Failed to send fallback-recording:", err);
+              await markEditorStartFailed(
+                tab.id,
+                "EDITOR_MESSAGE_DELIVERY_FAILED",
+                String(err?.message || err).slice(0, 200),
+              );
+            }
+          },
+          () =>
+            markEditorStartFailed(
+              tab.id,
+              "EDITOR_TAB_LOAD_TIMEOUT",
+              "editor tab never reached status=complete within 30s",
+            ),
+        );
       },
     );
 
@@ -193,31 +253,45 @@ export const stopRecording = async () => {
           handleEditorOpenFailed(viewerUrl, chrome.runtime.lastError?.message);
           return;
         }
-        chrome.tabs.onUpdated.addListener(function _(
-          tabId,
-          changeInfo,
-          updatedTab,
-        ) {
-          if (tabId === tab.id && changeInfo.status === "complete") {
-            chrome.tabs.onUpdated.removeListener(_);
+        onTabLoaded(
+          tab.id,
+          async () => {
             chrome.storage.local.set({ sandboxTab: tab.id });
-            (async () => {
-              try {
-                await waitForContentScript(tab.id);
-                await sendMessageTab(tab.id, { type: "viewer-recording" });
-              } catch (err) {
-                console.error("❌ Failed to wait/send to content script:", err);
-              }
-            })();
-          }
-        });
+            try {
+              await waitForContentScript(tab.id);
+            } catch (err) {
+              console.error("❌ waitForContentScript timed out:", err);
+              await markEditorStartFailed(
+                tab.id,
+                "EDITOR_CONTENT_SCRIPT_TIMEOUT",
+                String(err?.message || err).slice(0, 200),
+              );
+              return;
+            }
+            try {
+              await sendMessageTab(tab.id, { type: "viewer-recording" });
+            } catch (err) {
+              console.error("❌ Failed to send viewer-recording:", err);
+              await markEditorStartFailed(
+                tab.id,
+                "EDITOR_MESSAGE_DELIVERY_FAILED",
+                String(err?.message || err).slice(0, 200),
+              );
+            }
+          },
+          () =>
+            markEditorStartFailed(
+              tab.id,
+              "EDITOR_TAB_LOAD_TIMEOUT",
+              "editor tab never reached status=complete within 30s",
+            ),
+        );
       },
     );
 
     chrome.runtime.sendMessage({ type: "turn-off-pip" });
   } else {
     diagEvent("editor-open", { type: "editor-ffmpeg" });
-    // Use FFmpeg (editor.html) for browsers without WebCodecs
     const query = postStopRecordingId
       ? `?mode=postStop&recordingId=${encodeURIComponent(postStopRecordingId)}`
       : "?mode=postStop";
@@ -227,40 +301,46 @@ export const stopRecording = async () => {
         handleEditorOpenFailed(ffmpegUrl, chrome.runtime.lastError?.message);
         return;
       }
-      chrome.tabs.onUpdated.addListener(function _(
-        tabId,
-        changeInfo,
-        updatedTab,
-      ) {
-        if (tabId === tab.id && changeInfo.status === "complete") {
-          chrome.tabs.onUpdated.removeListener(_);
+      onTabLoaded(
+        tab.id,
+        async () => {
           chrome.storage.local.set({ sandboxTab: tab.id });
-          (async () => {
-            try {
-              await waitForContentScript(tab.id);
-              await sendMessageTab(tab.id, { type: "fallback-recording" });
-            } catch (err) {
-              console.error("❌ Failed to wait/send to content script:", err);
-            }
-          })();
-        }
-      });
+          try {
+            await waitForContentScript(tab.id);
+          } catch (err) {
+            console.error("❌ waitForContentScript timed out:", err);
+            await markEditorStartFailed(
+              tab.id,
+              "EDITOR_CONTENT_SCRIPT_TIMEOUT",
+              String(err?.message || err).slice(0, 200),
+            );
+            return;
+          }
+          try {
+            await sendMessageTab(tab.id, { type: "fallback-recording" });
+          } catch (err) {
+            console.error("❌ Failed to send fallback-recording:", err);
+            await markEditorStartFailed(
+              tab.id,
+              "EDITOR_MESSAGE_DELIVERY_FAILED",
+              String(err?.message || err).slice(0, 200),
+            );
+          }
+        },
+        () =>
+          markEditorStartFailed(
+            tab.id,
+            "EDITOR_TAB_LOAD_TIMEOUT",
+            "editor tab never reached status=complete within 30s",
+          ),
+      );
     });
 
     chrome.runtime.sendMessage({ type: "turn-off-pip" });
   }
 
-  // NOTE: Do NOT clear recordingTab here. The pinned recorder tab may still
-  // be alive and is cleaned up by:
-  //  - handleRecordingComplete() when the editor finishes processing
-  //  - onTabRemoved when the user closes the editor (which closes the recorder tab)
-  //  - openRecorderTab() as a safety net before creating a new recorder tab
-  // Clearing the reference here would orphan the tab because later cleanup
-  // relies on the reference to find and close it.
-
-  // End the diagnostic session for all paths (subscriber, free webcodecs,
-  // free viewer, free ffmpeg, and already-opened-editor).  Error/crash paths
-  // end the session separately via their own endDiagSession calls.
+  // never clear recordingTab here; cleanup runs in handleRecordingComplete /
+  // onTabRemoved / openRecorderTab safety net
   endDiagSession("ok");
 
   const { wasRegion } = await chrome.storage.local.get(["wasRegion"]);
@@ -268,9 +348,7 @@ export const stopRecording = async () => {
     chrome.storage.local.set({ wasRegion: false, region: true });
   }
 
-  // Clear the "editor was opened" flag so it doesn't bleed into the next
-  // recording session. handleStopRecordingTab sets this; releasePostStopEditorLock
-  // intentionally preserves it so we can detect duplicates above.
+  // releasePostStopEditorLock preserves this for duplicate detection; clear here
   chrome.storage.local.set({ postStopEditorOpened: false });
 
   chrome.alarms.clear("recording-alarm");
@@ -278,6 +356,10 @@ export const stopRecording = async () => {
 };
 
 export const handleStopRecordingTab = async (request) => {
+  perfMark("BG.stopRecording handleStopRecordingTab.enter", {
+    reason: request?.reason || null,
+    memoryError: Boolean(request?.memoryError),
+  });
   chrome.action.setIcon({ path: "assets/icon-34.png" });
   if (request.memoryError) {
     diagEvent("error", {
@@ -293,6 +375,8 @@ export const handleStopRecordingTab = async (request) => {
     });
   }
 
+  // batched: each unbatched get adds ~1s when storage queue backs up during stop
+  const endStorageGet1 = perfSpan("BG.stopRecording storage-get-batch");
   const {
     isSubscribed,
     recordingStartTime,
@@ -300,6 +384,7 @@ export const handleStopRecordingTab = async (request) => {
     pausedAt,
     totalPausedMs,
     fastRecorderInUse,
+    fastRecorderActiveRecordingId,
   } = await chrome.storage.local.get([
     "isSubscribed",
     "recordingStartTime",
@@ -307,7 +392,9 @@ export const handleStopRecordingTab = async (request) => {
     "pausedAt",
     "totalPausedMs",
     "fastRecorderInUse",
+    "fastRecorderActiveRecordingId",
   ]);
+  endStorageGet1();
   const stopTabNow = Date.now();
   const stopTabStartTime = Number(recordingStartTime);
   const stopTabBasePaused = Number(totalPausedMs) || 0;
@@ -326,10 +413,8 @@ export const handleStopRecordingTab = async (request) => {
     chrome.storage.local.set({ recordingDuration: stopTabDuration });
   }
 
+  perfMark("BG.stopRecording pre-isSubscribed-branch", { isSubscribed: Boolean(isSubscribed) });
   if (!isSubscribed) {
-    const { fastRecorderActiveRecordingId } = await chrome.storage.local.get([
-      "fastRecorderActiveRecordingId",
-    ]);
     const recordingId =
       fastRecorderActiveRecordingId ||
       `${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
@@ -346,7 +431,9 @@ export const handleStopRecordingTab = async (request) => {
         ? Math.max(0, now - startTime - basePaused - extraPaused)
         : 0;
     const maxDuration = 7 * 60 * 1000;
+    const endLock = perfSpan("BG.stopRecording acquireLock");
     const lockAcquired = await acquirePostStopEditorLock(recordingId);
+    endLock({ lockAcquired });
     if (!lockAcquired) {
       console.warn(
         "[Screenity][BG] Duplicate stop-recording-tab suppressed (editor opening)",
@@ -382,6 +469,11 @@ export const handleStopRecordingTab = async (request) => {
               console.warn("[Screenity][BG] Editor tab load timed out — releasing lock");
               diagEvent("editor-open-timeout", { tabId: tab.id, type: "editorwebcodecs" });
               releasePostStopEditorLock();
+              markEditorStartFailed(
+                tab.id,
+                "EDITOR_TAB_LOAD_TIMEOUT",
+                "editor tab never reached status=complete within 15s",
+              );
             }
           }, 15000);
           chrome.tabs.onUpdated.addListener(function _(
@@ -402,6 +494,11 @@ export const handleStopRecordingTab = async (request) => {
                     "❌ Failed to send message:",
                     err?.message || err,
                   );
+                  markEditorStartFailed(
+                    tab.id,
+                    "EDITOR_MESSAGE_DELIVERY_FAILED",
+                    String(err?.message || err).slice(0, 200),
+                  );
                 },
               );
             }
@@ -412,15 +509,18 @@ export const handleStopRecordingTab = async (request) => {
       const editorUrl =
         duration > maxDuration ? "editorviewer.html" : "editor.html";
       diagEvent("editor-open", { type: editorUrl.replace(".html", ""), via: "stop-tab", duration });
-      // MediaRecorder/FFmpeg path: open editor normally (no postStop gating)
+      perfMark("BG.stopRecording editor-tab-create.start", { editorUrl });
+      const endTabLoad = perfSpan("BG.stopRecording editor-tab-load");
       chrome.tabs.create({ url: editorUrl, active: true }, (tab) => {
         if (chrome.runtime.lastError || !tab?.id) {
           const errMsg = chrome.runtime.lastError?.message || "tab-create-failed";
           console.error("❌ Failed to open post-stop editor:", errMsg);
+          endTabLoad({ result: "create-failed" });
           releasePostStopEditorLock({ postStopRecordingId: null });
           handleEditorOpenFailed(editorUrl, errMsg);
           return;
         }
+        perfMark("BG.stopRecording editor-tab-create.done", { tabId: tab.id });
         let settled = false;
         const safetyTimer = setTimeout(() => {
           if (!settled) {
@@ -428,6 +528,11 @@ export const handleStopRecordingTab = async (request) => {
             console.warn("[Screenity][BG] Editor tab load timed out — releasing lock");
             diagEvent("editor-open-timeout", { tabId: tab.id, type: editorUrl });
             releasePostStopEditorLock({ postStopRecordingId: null });
+            markEditorStartFailed(
+              tab.id,
+              "EDITOR_TAB_LOAD_TIMEOUT",
+              "editor tab never reached status=complete within 15s",
+            );
           }
         }, 15000);
         chrome.tabs.onUpdated.addListener(function _(
@@ -440,6 +545,7 @@ export const handleStopRecordingTab = async (request) => {
             if (settled) return;
             settled = true;
             clearTimeout(safetyTimer);
+            endTabLoad({ result: "loaded" });
             chrome.storage.local.set({
               sandboxTab: tab.id,
               postStopRecordingId: null,
@@ -452,25 +558,72 @@ export const handleStopRecordingTab = async (request) => {
                     "❌ Failed to send message:",
                     err?.message || err,
                   );
+                  markEditorStartFailed(
+                    tab.id,
+                    "EDITOR_MESSAGE_DELIVERY_FAILED",
+                    String(err?.message || err).slice(0, 200),
+                  );
                 },
               );
             } else {
               (async () => {
+                // OPFS: sandbox reads the file directly; skip chunk relay
+                const storage = await chrome.storage.local.get([
+                  "lastRecordingBackendRef",
+                ]);
+                if (storage.lastRecordingBackendRef?.backend === "opfs") {
+                  perfMark("BG.stopRecording opfs-direct-make-video-tab");
+                  sendMessageTab(tab.id, { type: "make-video-tab" }).catch(
+                    (err) => {
+                      console.warn(
+                        "[Screenity][BG] make-video-tab direct send failed",
+                        err,
+                      );
+                    },
+                  );
+                  return;
+                }
+                const endChunkLoop = perfSpan("BG.stopRecording sendChunks-loop");
+                // hard cap; covers 6 attempts × ~1s but bails on a wedged sendChunks
+                const SEND_CHUNKS_LOOP_TIMEOUT_MS = 15000;
+                const loopStartedAt = Date.now();
                 let sent = false;
+                let timedOut = false;
                 for (let i = 0; i < 6; i += 1) {
+                  if (Date.now() - loopStartedAt > SEND_CHUNKS_LOOP_TIMEOUT_MS) {
+                    timedOut = true;
+                    break;
+                  }
+                  perfMark("BG.stopRecording sendChunks.attempt", { attempt: i + 1 });
                   // eslint-disable-next-line no-await-in-loop
-                  const result = await sendChunks();
+                  const result = await Promise.race([
+                    sendChunks(),
+                    new Promise((resolve) =>
+                      setTimeout(
+                        () => resolve({ status: "timeout" }),
+                        SEND_CHUNKS_LOOP_TIMEOUT_MS -
+                          (Date.now() - loopStartedAt),
+                      ),
+                    ),
+                  ]);
                   if (result?.status === "ok") {
                     sent = true;
+                    perfMark("BG.stopRecording sendChunks.success", { attempt: i + 1 });
+                    break;
+                  }
+                  if (result?.status === "timeout") {
+                    timedOut = true;
                     break;
                   }
                   // eslint-disable-next-line no-await-in-loop
                   await new Promise((resolve) => setTimeout(resolve, 1000));
                 }
+                endChunkLoop({ sent, timedOut });
                 if (!sent) {
                   console.warn(
                     "[Screenity][BG] editor opened but chunks are still unavailable",
                   );
+                  // editor watches editorRecordingError via storage.onChanged
                   try {
                     await chrome.storage.local.set({
                       lastChunkSendFailure: {
@@ -478,8 +631,20 @@ export const handleStopRecordingTab = async (request) => {
                         why: "editor-opened-no-chunks",
                         targetTabId: tab.id,
                       },
+                      editorRecordingError: {
+                        ts: Date.now(),
+                        sandboxTab: tab.id,
+                        error: "chunks-unavailable",
+                        why: chrome.i18n.getMessage("opfsLoadErrorDescription"),
+                        errorCode: "REC_STOP_NO_CHUNKS",
+                      },
                     });
-                  } catch {}
+                  } catch (writeErr) {
+                    console.error(
+                      "[Screenity][BG] failed to write editorRecordingError",
+                      writeErr,
+                    );
+                  }
                 }
               })();
             }
@@ -489,9 +654,9 @@ export const handleStopRecordingTab = async (request) => {
     }
   }
 
-  // Send stop to recorder; toast if the recorder tab doesn't ack.
   (async () => {
     const STOP_ACK_TIMEOUT_MS = 3000;
+    const endAck = perfSpan("BG.stopRecording stop-ack-wait");
     try {
       const ack = await Promise.race([
         sendMessageRecord({ type: "stop-recording-tab" }),
@@ -500,7 +665,9 @@ export const handleStopRecordingTab = async (request) => {
         ),
       ]);
       if (!ack || ack.ok !== true) throw new Error("stop-no-ack");
+      endAck({ result: "acked" });
     } catch (err) {
+      endAck({ result: String(err?.message || err).slice(0, 60) });
       diagEvent("stop-ack-failed", { error: String(err).slice(0, 120) });
       try {
         const { activeTab } = await chrome.storage.local.get(["activeTab"]);
@@ -508,22 +675,38 @@ export const handleStopRecordingTab = async (request) => {
           sendMessageTab(activeTab, {
             type: "show-toast",
             message: chrome.i18n.getMessage("stopAckTimeoutToast"),
-            timeout: 8000,
-          }).catch(() => {});
+            // 12s matches editorRecoveryToast; text asks about data safety
+            timeout: 12000,
+          }).catch((sendErr) => {
+            diagEvent("warning", {
+              note: "stop-ack-toast undelivered",
+              tabId: activeTab,
+              err: String(sendErr).slice(0, 120),
+            });
+          });
+        } else {
+          diagEvent("warning", {
+            note: "stop-ack-toast skipped: no activeTab in storage",
+          });
         }
-      } catch (_) {
-        // Toast failed — non-fatal
+      } catch (storeErr) {
+        diagEvent("warning", {
+          note: "stop-ack-toast skipped: storage.get threw",
+          err: String(storeErr).slice(0, 120),
+        });
       }
     }
   })();
 };
 
 export const handleStopRecordingTabBackup = async (request) => {
+  // gated: unconditional flag would fire the modal on a clean backup-tab close
+  const isMemoryError = Boolean(request?.memoryError);
   chrome.storage.local.set({
     recording: false,
     restarting: false,
     tabRecordedID: null,
-    memoryError: true,
+    ...(isMemoryError ? { memoryError: true } : {}),
   });
   sendMessageRecord({ type: "stop-recording-tab" });
 

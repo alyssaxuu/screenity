@@ -25,9 +25,8 @@ interface Mp4MuxerWrapperOptions {
   debug?: boolean;
 }
 
-// Flush buffered stream writes to chunksStore when we hit ~1MB or 1s,
-// whichever first. Small enough that losing the last buffer on a hard crash
-// only costs ~1s of video; large enough that chunksStore writes stay cheap.
+// Flush buffered stream writes at ~1MB or 1s. Bounds last-buffer loss on
+// hard crash to ~1s of video while keeping chunksStore writes cheap.
 const FLUSH_BYTES = 1 * 1024 * 1024;
 const FLUSH_INTERVAL_MS = 1000;
 
@@ -50,10 +49,8 @@ export class Mp4MuxerWrapper {
 
   private _lastDecoderConfig: any = null;
 
-  // Write-buffer state: coalesces many small StreamTarget writes into
-  // fewer, larger IDB entries. Fragmented MP4 can emit dozens of tiny
-  // writes per second (per-fragment headers, sample data, trailing bytes);
-  // without this, IDB would get hammered with small puts.
+  // Coalesces small StreamTarget writes (per-fragment headers, sample data,
+  // trailing bytes) into fewer larger IDB puts.
   private _writeBuffer: Uint8Array[] = [];
   private _writeBufferBytes = 0;
   private _writeBufferTimer: any = null;
@@ -75,16 +72,12 @@ export class Mp4MuxerWrapper {
     this.videoCodec = options.videoCodec || "avc";
     this.audioCodec = options.audioCodec || "aac";
 
-    // Fragmented MP4 via StreamTarget. Writes stream out as fragments are
-    // produced throughout recording, so if finalize() hangs or the recorder
-    // crashes, chunksStore already holds the vast majority of the file as
-    // self-contained fMP4 fragments (moov at start, moof+mdat pairs after).
-    // Playable directly in <video> and re-muxable to standard MP4 on
-    // download for universal compatibility.
+    // Fragmented MP4: if finalize() hangs or the recorder crashes,
+    // chunksStore already holds self-contained fMP4 fragments
+    // (moov at start, moof+mdat pairs after) playable in <video>.
     const writable = new WritableStream<{ data: Uint8Array; position: number; type: string }>({
       write: (chunk) => {
-        // With an append-only fragmented output, writes arrive in byte-order
-        // and position is monotonic, so we ignore position and just append.
+        // Append-only fragmented output: position is monotonic, ignore it.
         this.bufferWrite(chunk.data);
       },
     });
@@ -92,9 +85,7 @@ export class Mp4MuxerWrapper {
     this.output = new Output({
       format: new Mp4OutputFormat({
         fastStart: "fragmented",
-        // Align fragment boundaries with our keyframe interval (~2s at 30fps).
-        // Larger fragments = fewer moof headers overhead; smaller = finer-
-        // grained recovery on crash. 1s is a good middle ground.
+        // 1s balances moof overhead vs crash-recovery granularity.
         minimumFragmentDuration: 1,
       }),
       target: this.target,
@@ -108,9 +99,7 @@ export class Mp4MuxerWrapper {
 
   private bufferWrite(data: Uint8Array) {
     if (this._closed) return;
-    // StreamTarget reuses its internal buffer across writes, so we must
-    // copy here. Storing the reference would leave us with stale bytes
-    // by the time the flush runs.
+    // StreamTarget reuses its internal buffer across writes; must copy.
     const copy = new Uint8Array(data.byteLength);
     copy.set(data);
     this._writeBuffer.push(copy);
@@ -145,8 +134,8 @@ export class Mp4MuxerWrapper {
       offset += p.byteLength;
     }
 
-    // Serialize emits via a promise chain so chunksStore sees writes in the
-    // order they were produced (critical for file byte-order integrity).
+    // Serialize emits so chunksStore sees writes in produced order
+    // (critical for file byte-order integrity).
     this._pendingFlush = this._pendingFlush
       .catch(() => {})
       .then(() => this.emitChunk(merged, null));
@@ -165,7 +154,7 @@ export class Mp4MuxerWrapper {
       this._lastDecoderConfig = meta.decoderConfig;
     }
 
-    // Meta is read-only — supply cached decoderConfig when the chunk lacks one.
+    // Supply cached decoderConfig when chunk lacks one.
     const effectiveMeta =
       !meta?.decoderConfig && this._lastDecoderConfig
         ? { ...meta, decoderConfig: this._lastDecoderConfig }
@@ -194,28 +183,26 @@ export class Mp4MuxerWrapper {
     try {
       await this.output.finalize();
     } finally {
-      // Whatever finalize did (or didn't) write, flush the coalescing
-      // buffer and mark closed so late writes are dropped rather than
-      // leaking into a future recording.
+      // Flush coalescing buffer and close so late writes don't leak
+      // into a future recording.
       this.flushWriteBuffer();
       this._closed = true;
-      // Let any in-flight emitChunk calls settle before returning. The
-      // caller's onFinalized depends on chunksStore being consistent.
+      // Let in-flight emitChunk calls settle; caller's onFinalized
+      // depends on chunksStore being consistent.
       await this._pendingFlush;
     }
   }
 
-  // Force-flush pending writes without running output.finalize(). Called
-  // when the muxer hangs, to preserve whatever fragments have already
-  // streamed out so the recording is still recoverable.
+  // Force-flush without finalize(). Used when the muxer hangs to preserve
+  // already-streamed fragments for recovery.
   async flushPending() {
     this.flushWriteBuffer();
     this._closed = true;
     await this._pendingFlush;
   }
 
-  // No-op: WebCodecsRecorder already subtracts paused time from timestamps,
-  // so a second subtraction here would break monotonicity. Kept for API compat.
+  // No-op: WebCodecsRecorder already subtracts paused time; double-subtract
+  // would break monotonicity. Kept for API compat.
   setPausedOffset(_offsetUs: number) {}
 
   setAudioOffset(offsetUs: number) {
@@ -256,8 +243,7 @@ export class Mp4MuxerWrapper {
     const last = (this as any)[key] ?? 0;
 
     if (type === "audio") {
-      // Audio ts is already monotonic from WebCodecsRecorder's sample counter.
-      // Just accumulate for logging.
+      // Audio ts is monotonic from WebCodecsRecorder's sample counter.
       const next = last + durationUs;
       (this as any)[key] = next;
       this.log(`[MUX] audio ts +${durationUs} => ${next}`);
@@ -271,9 +257,8 @@ export class Mp4MuxerWrapper {
       return fallback;
     }
 
-    // Pin offset to the first frame so output starts at 0.
-    // Don't subtract pausedOffsetUs — WebCodecsRecorder already excludes
-    // paused time, and double-subtracting breaks monotonicity.
+    // Pin offset to first frame so output starts at 0. Don't subtract
+    // pausedOffsetUs: WebCodecsRecorder already excludes paused time.
     if (this.videoTimestampOffsetUs == null) {
       this.videoTimestampOffsetUs = timestampUs;
     }

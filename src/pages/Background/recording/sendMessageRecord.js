@@ -34,21 +34,26 @@ export const sendMessageRecord = (message, responseCallback = null) => {
             reject(err);
           });
       } else {
-        // No recordingTab set - check if there's an active recorderSession
-        // This can happen if the service worker restarted and lost in-memory state
+        // SW restart can lose recordingTab, fall back to recorderSession
+        // but only if it's still live. completed/crashed/stopped sessions
+        // point at a dead tab and would surface a misleading "No tab with
+        // id" error instead of the real "no recorder tab" one.
         chrome.storage.local.get(["recorderSession"], (sessionResult) => {
+          const session = sessionResult.recorderSession;
           const recorderTabId =
-            sessionResult.recorderSession?.recorderTabId ||
-            sessionResult.recorderSession?.tabId ||
-            null;
-          if (sessionResult.recorderSession && recorderTabId) {
-            // Try the tab from the persisted session
+            session?.recorderTabId || session?.tabId || null;
+          const sessionLive =
+            session?.status === "recording" || session?.status === "starting";
+          if (sessionLive && recorderTabId) {
             sendMessageTab(recorderTabId, message, responseCallback)
               .then(resolve)
               .catch(reject);
           } else {
             console.warn(
-              "sendMessageRecord: no recordingTab or recorderSession available"
+              "sendMessageRecord: no recording tab available",
+              session
+                ? { sessionStatus: session.status, recorderTabId }
+                : { session: null }
             );
             reject(new Error("No recording tab available"));
           }

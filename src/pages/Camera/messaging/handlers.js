@@ -39,7 +39,10 @@ export const setupHandlers = ({ setLoading }) => {
   registerMessage("switch-camera", (message) => {
     if (message.id !== "none") {
       clearTimeout(cameraSwitchTimeout);
-      stopCameraStream();
+      // stopCameraStream requires (streamRef, videoRef); a no-arg call
+      // warns and returns, leaking the prior MediaStream.
+      const refs = getContextRefs();
+      stopCameraStream(refs.streamRef, refs.videoRef);
 
       cameraSwitchTimeout = setTimeout(() => {
         const {
@@ -101,7 +104,7 @@ export const setupHandlers = ({ setLoading }) => {
 
   messageRouter();
 
-  // Fallback: if a runtime message is missed, close PiP when storage flag flips.
+  // Fallback when a runtime message is missed: close PiP on storage flag flip.
   chrome.storage.local.get(["pipForceClose"], (res) => {
     if (res.pipForceClose && document.pictureInPictureElement) {
       document.exitPictureInPicture().catch(() => {});
@@ -125,6 +128,15 @@ const handleStopRecording = async (request) => {
     document.exitPictureInPicture();
     setPipMode(false);
     chrome.runtime.sendMessage({ type: "pip-ended" });
+  }
+  // Stop tracks so the webcam light goes off; otherwise the iframe holds
+  // the stream until the page is torn down (may be much later or never if
+  // the user navigates away from the recorded tab).
+  try {
+    const { streamRef, videoRef } = getContextRefs();
+    stopCameraStream(streamRef, videoRef);
+  } catch (err) {
+    console.warn("Failed to stop camera stream on recording end:", err);
   }
 };
 

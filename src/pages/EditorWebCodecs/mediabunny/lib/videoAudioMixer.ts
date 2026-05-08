@@ -7,6 +7,7 @@ import {
   Mp4OutputFormat,
   VideoSampleSource,
   AudioSampleSource,
+  AudioSampleSink,
   VideoSampleSink,
   AudioSample,
   ALL_FORMATS,
@@ -50,19 +51,9 @@ export class VideoAudioMixer {
 
     const videoDuration = await this._getDuration(videoBlob);
 
-    // Mixing decodes the full audio track + allocates a mixBuffer — cap at
-    // 15 min to avoid OOM in the renderer process.
-    if (videoDuration > 900) {
-      throw new Error(
-        `Video is too long for in-browser audio mixing (${Math.round(videoDuration / 60)} min). ` +
-          `Maximum supported length is 15 minutes.`
-      );
-    }
-
-    const hasVideoAudio = await input
-      .getPrimaryAudioTrack()
-      .then((t) => !!t)
-      .catch(() => false);
+    const videoAudioTrack = await input.getPrimaryAudioTrack().catch(() => null);
+    const hasVideoAudio =
+      !!videoAudioTrack && (await videoAudioTrack.canDecode().catch(() => false));
 
     const audioSource = new AudioSampleSource({
       codec: "aac",
@@ -70,17 +61,40 @@ export class VideoAudioMixer {
     });
     output.addAudioTrack(audioSource);
 
+    if (audioBlob.size > 50_000_000) {
+      throw new Error("background-audio-too-large");
+    }
     let bgArrayBuffer = await audioBlob.arrayBuffer();
     const audioCtx = new AudioContext();
     let decodedAudio;
     try {
       decodedAudio = await audioCtx.decodeAudioData(bgArrayBuffer);
-      bgArrayBuffer = null; // release compressed audio bytes; PCM is now in decodedAudio
+      bgArrayBuffer = null;
     } finally {
       audioCtx.close().catch(() => {});
     }
-    const sr = decodedAudio.sampleRate;
-    const audioDur = decodedAudio.duration;
+    const bgSr = decodedAudio.sampleRate;
+    const bgDur = decodedAudio.duration;
+    const bgData = decodedAudio.getChannelData(0);
+    const bgLen = bgData.length;
+
+    const bgSampleAt = (tSec) => {
+      // Zero-duration BG would NaN through the modulo below.
+      if (!(bgDur > 0)) return 0;
+      let t = tSec;
+      if (loop) {
+        t = ((t % bgDur) + bgDur) % bgDur;
+      } else if (t < 0 || t >= bgDur) {
+        return 0;
+      }
+      const idx = t * bgSr;
+      const i0 = Math.floor(idx);
+      if (i0 < 0 || i0 >= bgLen) return 0;
+      const frac = idx - i0;
+      const s0 = bgData[i0];
+      const s1 = i0 + 1 < bgLen ? bgData[i0 + 1] : s0;
+      return s0 + (s1 - s0) * frac;
+    };
 
     await output.start();
 
@@ -88,58 +102,108 @@ export class VideoAudioMixer {
       await videoSource.add(frame);
       frame.close();
       if (onProgress && videoDuration > 0)
-        onProgress(frame.timestamp / videoDuration);
+        onProgress((frame.timestamp / videoDuration) * 0.8);
     }
-
-    const mixBuffer = new Float32Array(Math.ceil(sr * videoDuration));
-    const writeMix = (data, offset, vol) => {
-      for (let i = 0; i < data.length && offset + i < mixBuffer.length; i++) {
-        mixBuffer[offset + i] += data[i] * vol;
-      }
-    };
 
     if (hasVideoAudio && mode === "mix") {
-      const videoAudioCtx = new AudioContext();
-      try {
-        const videoArrayBuffer = await videoBlob.arrayBuffer();
-        const decodedVideoAudio = await videoAudioCtx.decodeAudioData(
-          videoArrayBuffer
-        );
-        const videoSamples = decodedVideoAudio.getChannelData(0);
-        writeMix(videoSamples, 0, videoVolume);
-      } catch {
-      } finally {
-        videoAudioCtx.close().catch(() => {});
+      const audioSink = new AudioSampleSink(videoAudioTrack);
+      let lastSr = bgSr;
+      let lastNumCh = 1;
+      let lastEnd = 0;
+      for await (const sample of audioSink.samples()) {
+        const numCh = sample.numberOfChannels;
+        const sr = sample.sampleRate;
+        const N = sample.numberOfFrames;
+        const ts = sample.timestamp;
+        lastSr = sr;
+        lastNumCh = numCh;
+
+        const mixed = new Float32Array(N * numCh);
+        for (let ch = 0; ch < numCh; ch++) {
+          const plane = mixed.subarray(ch * N, (ch + 1) * N);
+          sample.copyTo(plane, { format: "f32-planar", planeIndex: ch });
+        }
+        for (let ch = 0; ch < numCh; ch++) {
+          const offset = ch * N;
+          for (let f = 0; f < N; f++) {
+            const t = ts + f / sr;
+            mixed[offset + f] =
+              mixed[offset + f] * videoVolume + bgSampleAt(t) * audioVolume;
+          }
+        }
+
+        const out = new AudioSample({
+          data: mixed,
+          format: "f32-planar",
+          numberOfChannels: numCh,
+          sampleRate: sr,
+          timestamp: ts,
+          duration: N / sr,
+        });
+        await audioSource.add(out);
+        out.close();
+        sample.close();
+        lastEnd = ts + N / sr;
+        if (onProgress && videoDuration > 0)
+          onProgress(0.8 + Math.min(1, ts / videoDuration) * 0.2);
       }
-    }
 
-    const loopCount = loop
-      ? Math.ceil(videoDuration / audioDur)
-      : Math.min(1, Math.ceil(videoDuration / audioDur));
-
-    for (let i = 0; i < loopCount; i++) {
-      const offset = Math.floor(i * audioDur * sr);
-      writeMix(decodedAudio.getChannelData(0), offset, audioVolume);
-    }
-
-    const totalSamples = Math.floor(videoDuration * sr);
-    const chunkSize = sr * 2;
-    let written = 0;
-
-    while (written < totalSamples) {
-      const slice = mixBuffer.slice(written, written + chunkSize);
-      const dur = slice.length / sr;
-      const sample = new AudioSample({
-        data: slice,
-        format: "f32-planar",
-        numberOfChannels: 1,
-        sampleRate: sr,
-        timestamp: written / sr,
-        duration: dur,
-      });
-      await audioSource.add(sample);
-      sample.close();
-      written += chunkSize;
+      // Source audio shorter than video: fill remainder with BG only.
+      if (lastEnd < videoDuration - 0.01) {
+        const sr = lastSr;
+        const numCh = lastNumCh;
+        const totalFrames = Math.floor((videoDuration - lastEnd) * sr);
+        const chunkFrames = sr * 2;
+        let frame = 0;
+        while (frame < totalFrames) {
+          const n = Math.min(chunkFrames, totalFrames - frame);
+          const chunk = new Float32Array(n * numCh);
+          for (let ch = 0; ch < numCh; ch++) {
+            const offset = ch * n;
+            for (let f = 0; f < n; f++) {
+              const t = lastEnd + (frame + f) / sr;
+              chunk[offset + f] = bgSampleAt(t) * audioVolume;
+            }
+          }
+          const out = new AudioSample({
+            data: chunk,
+            format: "f32-planar",
+            numberOfChannels: numCh,
+            sampleRate: sr,
+            timestamp: lastEnd + frame / sr,
+            duration: n / sr,
+          });
+          await audioSource.add(out);
+          out.close();
+          frame += n;
+        }
+      }
+    } else {
+      const sr = bgSr;
+      const totalFrames = Math.floor(videoDuration * sr);
+      const chunkFrames = sr * 2;
+      let frame = 0;
+      while (frame < totalFrames) {
+        const n = Math.min(chunkFrames, totalFrames - frame);
+        const chunk = new Float32Array(n);
+        for (let f = 0; f < n; f++) {
+          const t = (frame + f) / sr;
+          chunk[f] = bgSampleAt(t) * audioVolume;
+        }
+        const out = new AudioSample({
+          data: chunk,
+          format: "f32-planar",
+          numberOfChannels: 1,
+          sampleRate: sr,
+          timestamp: frame / sr,
+          duration: n / sr,
+        });
+        await audioSource.add(out);
+        out.close();
+        frame += n;
+        if (onProgress && totalFrames > 0)
+          onProgress(0.8 + (frame / totalFrames) * 0.2);
+      }
     }
 
     await output.finalize();
@@ -149,12 +213,16 @@ export class VideoAudioMixer {
   async _getDuration(blob) {
     return new Promise((resolve, reject) => {
       const v = document.createElement("video");
-      v.src = URL.createObjectURL(blob);
+      const url = URL.createObjectURL(blob);
+      v.src = url;
       v.onloadedmetadata = () => {
+        URL.revokeObjectURL(url);
         resolve(v.duration);
-        URL.revokeObjectURL(v.src);
       };
-      v.onerror = reject;
+      v.onerror = (e) => {
+        URL.revokeObjectURL(url);
+        reject(e);
+      };
     });
   }
 }

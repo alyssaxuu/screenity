@@ -9,21 +9,17 @@ import * as Toolbar from "@radix-ui/react-toolbar";
 
 import { Rnd } from "react-rnd";
 
-// Layout
 import DrawingToolbar from "./DrawingToolbar";
 import CursorToolbar from "./CursorToolbar";
 import BlurToolbar from "./BlurToolbar";
 
-// Components
 import ToolTrigger from "../components/ToolTrigger";
 import Toast from "../components/Toast";
 
 import { CloseIconPopup } from "../components/SVG";
 
-// Context
 import { contentStateContext } from "../../context/ContentState";
 
-// Icons
 import {
   GrabIcon,
   StopIcon,
@@ -83,14 +79,12 @@ const ToolbarWrap = () => {
     }
   }, [contentState.toolbarHover, contentState.hideUI]);
 
-  // If mouse is down and toolbarHover is true, set forceTransparent
   useEffect(() => {
     if (!contentState.toolbarHover) return;
     if (!contentState.shadowRef) return;
     if (!contentState.hideUI) return;
     const handleMouseDown = (e) => {
       if (contentState.toolbarHover && contentState.hideUI) {
-        // check if mouse is over toolbar
         if (ToolbarRef.current && ToolbarRef.current.contains(e.target)) return;
         if (
           contentState.shadowRef &&
@@ -120,12 +114,11 @@ const ToolbarWrap = () => {
   useEffect(() => {
     if (!isNaN(t)) {
       setTimer(t);
-      const clampedT = Math.max(0, t); // prevent negative values
+      const clampedT = Math.max(0, t);
       const hours = Math.floor(clampedT / 3600);
       const minutes = Math.floor((clampedT % 3600) / 60);
       const seconds = clampedT % 60;
 
-      // Determine the timestamp format based on the total duration (t)
       let newTimestamp =
         hours > 0
           ? `${hours.toString().padStart(2, "0")}:${minutes
@@ -135,13 +128,10 @@ const ToolbarWrap = () => {
               .toString()
               .padStart(2, "0")}`;
 
-      // Adjust the width of the time display based on the duration
       if (hours > 0) {
-        // Adjust for HH:MM:SS format when hours are present
-        timeRef.current.style.width = "58px"; // You might need to adjust this value based on your actual UI
+        timeRef.current.style.width = "58px";
       } else {
-        // Adjust for MM:SS format when there are no hours
-        timeRef.current.style.width = "42px"; // Adjust this value as needed
+        timeRef.current.style.width = "42px";
       }
 
       setTimestamp(newTimestamp);
@@ -153,11 +143,11 @@ const ToolbarWrap = () => {
       let xpos = DragRef.current.getDraggablePosition().x;
       let ypos = DragRef.current.getDraggablePosition().y;
 
-      // Width and height of toolbar
-      const width = ToolbarRef.current.getBoundingClientRect().width;
-      const height = ToolbarRef.current.getBoundingClientRect().height;
+      const rect = ToolbarRef.current.getBoundingClientRect();
+      const width = rect.width;
+      const height = rect.height;
 
-      // Keep toolbar positioned relative to the bottom and right of the screen, proportionally
+      // Keep toolbar proportional to bottom-right.
       if (xpos + width + 30 > window.innerWidth) {
         xpos = window.innerWidth - width - 30;
       }
@@ -181,9 +171,10 @@ const ToolbarWrap = () => {
   };
 
   const handleDrag = (e, d) => {
-    // Width and height
-    const width = ToolbarRef.current.getBoundingClientRect().width;
-    const height = ToolbarRef.current.getBoundingClientRect().height;
+    // Drag fires ~60Hz; cache rect.
+    const rect = ToolbarRef.current.getBoundingClientRect();
+    const width = rect.width;
+    const height = rect.height;
 
     if (d.y < 130) {
       setSide("ToolbarBottom");
@@ -209,11 +200,10 @@ const ToolbarWrap = () => {
     let xpos = d.x;
     let ypos = d.y;
 
-    // Width and height
-    const width = ToolbarRef.current.getBoundingClientRect().width;
-    const height = ToolbarRef.current.getBoundingClientRect().height;
+    const rect = ToolbarRef.current.getBoundingClientRect();
+    const width = rect.width;
+    const height = rect.height;
 
-    // Check if toolbar is off screen
     if (d.x < -10) {
       setElastic("ToolbarElastic");
       xpos = -10;
@@ -253,8 +243,6 @@ const ToolbarWrap = () => {
         bottom: ypos < window.innerHeight / 2 ? false : true,
       },
     }));
-
-    // Is it on the left or right, also top or bottom
 
     let left = xpos < window.innerWidth / 2 ? true : false;
     let right = xpos < window.innerWidth / 2 ? false : true;
@@ -307,6 +295,16 @@ const ToolbarWrap = () => {
       x = window.innerWidth - contentState.toolbarPosition.offsetX;
     }
 
+    // Clamp into viewport: saved positions from a larger display can land
+    // off-screen (external monitor saved, restored on built-in).
+    const rect = ToolbarRef.current?.getBoundingClientRect();
+    const tbWidth = rect?.width || 0;
+    const tbHeight = rect?.height || 0;
+    if (x + tbWidth > window.innerWidth) x = window.innerWidth - tbWidth;
+    if (y + tbHeight > window.innerHeight) y = window.innerHeight - tbHeight;
+    if (x < 0) x = 0;
+    if (y < 0) y = 0;
+
     DragRef.current.updatePosition({ x: x, y: y });
 
     handleDrop(null, { x: x, y: y });
@@ -326,23 +324,7 @@ const ToolbarWrap = () => {
     }
   }, [contentState.drawingMode, contentState.blurMode, contentState.openToast]);
 
-  // useEffect(() => {
-  //   let nextMode = modeRef.current;
-  //   if (contentState.drawingMode) {
-  //     nextMode = "draw";
-  //   } else if (contentState.blurMode) {
-  //     nextMode = "blur";
-  //   } else if (modeRef.current === "draw" || modeRef.current === "blur") {
-  //     nextMode = "";
-  //   }
-
-  //   if (nextMode !== modeRef.current) {
-  //     setMode(nextMode);
-  //   }
-  // }, [contentState.drawingMode, contentState.blurMode]);
-
   useEffect(() => {
-    // one-time init
     if (contentState.drawingMode) setMode("draw");
     else if (contentState.blurMode) setMode("blur");
     else setMode("");
@@ -446,7 +428,6 @@ const ToolbarWrap = () => {
                 hovering ? "open" : ""
               }`}
               onClick={() => {
-                // Show the toast first
                 if (contentState.openToast) {
                   contentState.openToast(
                     chrome.i18n.getMessage("reopenToolbarToast"),
@@ -454,7 +435,6 @@ const ToolbarWrap = () => {
                   );
                 }
 
-                // Visually hide the toolbar
                 setVisuallyHidden(true);
 
                 setContentState((prev) => ({
@@ -463,7 +443,7 @@ const ToolbarWrap = () => {
                   drawingMode: false,
                   blurMode: false,
                 }));
-                // After toast finishes (~3s), apply real hiding logic
+                // Wait for toast (~3s) before real hide.
                 setTimeout(() => {
                   setContentState((prev) => ({
                     ...prev,
@@ -481,7 +461,7 @@ const ToolbarWrap = () => {
                     toolbarHover: false,
                     hideUI: true,
                   });
-                }, 3000); // match your toast duration
+                }, 3000);
               }}
             >
               <div className="popup-control popup-close">

@@ -1,7 +1,6 @@
 import React, { useRef, useContext, useEffect } from "react";
 import { Rnd } from "react-rnd";
 
-// Context
 import { contentStateContext } from "../context/ContentState";
 
 const ResizableBox = () => {
@@ -15,7 +14,6 @@ const ResizableBox = () => {
     recordingRef.current = contentState.recording;
   }, [contentState.recording]);
 
-  // Check for contentState.regionDimensions to update the Rnd component width and height
   useEffect(() => {
     if (contentState.recordingType != "region") return;
     if (!contentState.customRegion) return;
@@ -34,17 +32,14 @@ const ResizableBox = () => {
     if (contentState.regionY === undefined) return;
     if (contentState.fromRegion) return;
 
-    // Get parent element dimensions
     const parentWidth = parentRef.current.offsetWidth;
     const parentHeight = parentRef.current.offsetHeight;
 
-    // Calculate maximum size that fits within parent element
     const maxWidth = parentWidth - contentState.regionX;
     const maxHeight = parentHeight - contentState.regionY;
     const newWidth = Math.min(contentState.regionWidth, maxWidth);
     const newHeight = Math.min(contentState.regionHeight, maxHeight);
 
-    // Update content state with new size
     setContentState((prevContentState) => ({
       ...prevContentState,
       regionWidth: newWidth,
@@ -82,11 +77,9 @@ const ResizableBox = () => {
   };
 
   const handleResize = (e, direction, ref, delta, position) => {
-    // Get numeric values of width and height
     const width = parseInt(ref.style.width, 10);
     const height = parseInt(ref.style.height, 10);
 
-    // Update content state
     setContentState((prevContentState) => ({
       ...prevContentState,
       regionWidth: width,
@@ -139,10 +132,9 @@ const ResizableBox = () => {
     };
   }, []);
 
-  // Shadow DOM event forwarding: mouse events from inside the Shadow DOM
-  // get retargeted to the shadow host and stop at `document` — they never
-  // reach `window`. re-resizable listens on `window`, so we forward the
-  // events that originate from our shadow container.
+  // Shadow DOM mouse events retarget to the host and stop at `document`,
+  // never reaching `window`. re-resizable listens on `window`, so forward
+  // events from our shadow container.
   useEffect(() => {
     const shadowHostId = "screenity-root-container";
 
@@ -174,6 +166,15 @@ const ResizableBox = () => {
     };
   }, []);
 
+  // Hide handles + dashed outline as soon as the countdown starts (or pending
+  // recording is set), not when contentState.recording flips. The latter races
+  // the cloudrecorder's first frame capture, leaking handles into the first
+  // ~33ms of the recording.
+  const hideRegionUI =
+    contentState.recording ||
+    contentState.countdownActive ||
+    contentState.pendingRecording;
+
   return (
     <div
       style={{
@@ -184,24 +185,19 @@ const ResizableBox = () => {
         height: "100%",
         zIndex: -1,
         pointerEvents:
-          recordingRef.current ||
+          hideRegionUI ||
           contentState.drawingMode ||
           contentState.blurMode
             ? "none"
             : "auto",
       }}
-      className={recordingRef.current ? "region-recording" : ""}
+      className={hideRegionUI ? "region-recording" : ""}
       onClick={(e) => {
-        // showExtension false, as long as not clicking on the region
         if (
           e.target.className.indexOf("resize-handle") === -1 &&
           e.target.className.indexOf("react-draggable") === -1 &&
           e.target.className.indexOf("region-rect") === -1
         ) {
-          // setContentState((prevContentState) => ({
-          //   ...prevContentState,
-          //   showExtension: false,
-          // }));
         }
       }}
       ref={parentRef}
@@ -215,7 +211,7 @@ const ResizableBox = () => {
           height: "100%",
           zIndex: 1,
           pointerEvents:
-            recordingRef.current ||
+            hideRegionUI ||
             contentState.drawingMode ||
             contentState.blurMode
               ? "none"
@@ -230,7 +226,7 @@ const ResizableBox = () => {
           position: "relative",
           zIndex: 2,
           pointerEvents:
-            recordingRef.current ||
+            hideRegionUI ||
             contentState.drawingMode ||
             contentState.blurMode
               ? "none"
@@ -260,15 +256,15 @@ const ResizableBox = () => {
         onResizeStop={handleResize}
         onDragStop={handleMove}
         disableDragging={
-          contentState.recording ||
+          hideRegionUI ||
           contentState.drawingMode ||
           contentState.blurMode
-        } // Disable dragging when recording
+        }
         enableResizing={
-          !contentState.recording &&
+          !hideRegionUI &&
           !contentState.drawingMode &&
           !contentState.blurMode
-        } // Disable resizing when recording
+        }
       >
         <div
           ref={cropRef}
@@ -276,14 +272,15 @@ const ResizableBox = () => {
           style={{
             width: "100%",
             height: "100%",
-            outline: recordingRef.current ? "none" : "2px dashed #D9D9D9",
-            outlineOffset: "2px", // Pushes it inside the box to avoid it being visible in recordings
+            outline: hideRegionUI ? "none" : "2px dashed #D9D9D9",
+            // Push outline inside the box so it isn't visible in recordings.
+            outlineOffset: "2px",
             boxShadow: "0 0 0 9999px rgba(0, 0, 0, 0.2)",
             borderRadius: "5px",
             zIndex: 2,
             boxSizing: "border-box",
             pointerEvents:
-              recordingRef.current ||
+              hideRegionUI ||
               contentState.drawingMode ||
               contentState.blurMode
                 ? "none"

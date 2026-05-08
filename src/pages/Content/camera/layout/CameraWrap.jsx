@@ -24,15 +24,13 @@ const CameraWrap = (props) => {
   const updateUIPosition = () => {
     const ref =
       props.shadowRef.current.shadowRoot.querySelector(".camera-draggable");
-    const circleCenterX =
-      ref.getBoundingClientRect().left + ref.getBoundingClientRect().width / 2;
-    const circleCenterY =
-      ref.getBoundingClientRect().top + ref.getBoundingClientRect().height / 2;
-    const circleRadius = ref.getBoundingClientRect().width / 2;
-    const squareBottomRightX =
-      ref.getBoundingClientRect().left + ref.getBoundingClientRect().width;
-    const squareBottomRightY =
-      ref.getBoundingClientRect().top + ref.getBoundingClientRect().height;
+    // Cached: fires at ~60Hz during resize, was 12 reflows/call.
+    const refRect = ref.getBoundingClientRect();
+    const circleCenterX = refRect.left + refRect.width / 2;
+    const circleCenterY = refRect.top + refRect.height / 2;
+    const circleRadius = refRect.width / 2;
+    const squareBottomRightX = refRect.left + refRect.width;
+    const squareBottomRightY = refRect.top + refRect.height;
     const handle =
       props.shadowRef.current.shadowRoot.querySelector(".camera-resize");
     const toolbar =
@@ -48,31 +46,25 @@ const CameraWrap = (props) => {
     const x = r - r / Math.sqrt(2);
     const y = r - r / Math.sqrt(2);
 
-    handle.style.bottom = `${y - handle.getBoundingClientRect().width / 2}px`;
-    handle.style.right = `${x - handle.getBoundingClientRect().height / 2}px`;
-    toolbar.style.top = `${y - toolbar.getBoundingClientRect().width / 2}px`;
-    toolbar.style.left = `${x - toolbar.getBoundingClientRect().height / 2}px`;
+    const handleRect = handle.getBoundingClientRect();
+    const toolbarRect = toolbar.getBoundingClientRect();
+    handle.style.bottom = `${y - handleRect.width / 2}px`;
+    handle.style.right = `${x - handleRect.height / 2}px`;
+    toolbar.style.top = `${y - toolbarRect.width / 2}px`;
+    toolbar.style.left = `${x - toolbarRect.height / 2}px`;
   };
 
   const saveDimensions = () => {
     const ref =
       props.shadowRef.current.shadowRoot.querySelector(".camera-draggable");
+    const rect = ref.getBoundingClientRect();
+    const dims = { size: rect.width, x: rect.x, y: rect.y };
 
     setContentState((prevContentState) => ({
       ...prevContentState,
-      cameraDimensions: {
-        size: ref.getBoundingClientRect().width,
-        x: ref.getBoundingClientRect().x,
-        y: ref.getBoundingClientRect().y,
-      },
+      cameraDimensions: dims,
     }));
-    chrome.storage.local.set({
-      cameraDimensions: {
-        size: ref.getBoundingClientRect().width,
-        x: ref.getBoundingClientRect().x,
-        y: ref.getBoundingClientRect().y,
-      },
-    });
+    chrome.storage.local.set({ cameraDimensions: dims });
   };
 
   useEffect(() => {
@@ -85,7 +77,7 @@ const CameraWrap = (props) => {
     updateUIPosition();
   }, [cameraRef.current]);
 
-  // I need to make sure the camera is never offscreen (if the user resizes the window)
+  // Keep the camera onscreen when the window is resized.
   useLayoutEffect(() => {
     const updateCameraPosition = () => {
       if (
@@ -97,19 +89,24 @@ const CameraWrap = (props) => {
       let xpos = cameraRef.current.getDraggablePosition().x;
       let ypos = cameraRef.current.getDraggablePosition().y;
 
-      // Width and height of camera
-      const width = ref.getBoundingClientRect().width;
-      const height = ref.getBoundingClientRect().height;
+      const cameraRect = ref.getBoundingClientRect();
+      const width = cameraRect.width;
+      const height = cameraRect.height;
 
       const { innerWidth, innerHeight } = window;
 
-      // Keep camera positioned relative to the bottom and right of the screen, proportionally
       if (xpos + width > innerWidth) {
         xpos = innerWidth - width;
       }
       if (ypos + height > innerHeight) {
         ypos = innerHeight - height;
       }
+      // Clamp top/left too: the right/bottom clamp can go negative if the
+      // viewport is smaller than the saved bubble (external monitor saved,
+      // built-in restored). Rnd's bounds="window" only constrains drag,
+      // not initial render.
+      if (xpos < 0) xpos = 0;
+      if (ypos < 0) ypos = 0;
 
       cameraRef.current.updatePosition({ x: xpos, y: ypos });
 

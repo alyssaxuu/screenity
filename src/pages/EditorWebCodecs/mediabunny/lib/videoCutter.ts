@@ -59,12 +59,34 @@ export class VideoCutter {
     ];
     let processedTime = 0;
 
-    const addSegment = async (start, end) => {
+    const debugLog = process.env.SCREENITY_DEV_MODE === "true";
+    if (debugLog) {
+      console.log("[cut-debug][cutter] start", {
+        cutStart,
+        cutEnd,
+        total,
+        sourceBlobSize: sourceBlob.size,
+        sourceBlobType: sourceBlob.type,
+        videoCodec,
+        hasAudio: !!audioTrack,
+      });
+    }
+
+    const addSegment = async (start: number, end: number, segIdx: number) => {
       const segDur = end - start;
       const baseTimestamp = outPts / 1_000_000;
+      let videoSampleCount = 0;
+      let audioSampleCount = 0;
+      let firstVideoTs: number | null = null;
+      let lastVideoTs: number | null = null;
+      let firstAudioTs: number | null = null;
+      let lastAudioTs: number | null = null;
 
       const videoSink = new VideoSampleSink(videoTrack);
       for await (const sample of videoSink.samples(start, end)) {
+        if (firstVideoTs === null) firstVideoTs = sample.timestamp;
+        lastVideoTs = sample.timestamp;
+        videoSampleCount += 1;
         const adjusted = Math.max(0, baseTimestamp + (sample.timestamp - start));
         sample.setTimestamp(adjusted);
         await videoSource.add(sample);
@@ -76,6 +98,9 @@ export class VideoCutter {
       if (audioTrack && audioSource) {
         const audioSink = new AudioSampleSink(audioTrack);
         for await (const sample of audioSink.samples(start, end)) {
+          if (firstAudioTs === null) firstAudioTs = sample.timestamp;
+          lastAudioTs = sample.timestamp;
+          audioSampleCount += 1;
           const adjusted = Math.max(0, baseTimestamp + (sample.timestamp - start));
           sample.setTimestamp(adjusted);
           await audioSource.add(sample);
@@ -85,17 +110,38 @@ export class VideoCutter {
         }
       }
 
+      if (debugLog) {
+        console.log(`[cut-debug][cutter] segment ${segIdx} done`, {
+          requestedRange: [start, end],
+          segDur,
+          baseTimestamp,
+          videoSampleCount,
+          audioSampleCount,
+          firstVideoTs,
+          lastVideoTs,
+          firstAudioTs,
+          lastAudioTs,
+          outPtsAfter: outPts + segDur * 1_000_000,
+        });
+      }
+
       outPts += segDur * 1_000_000;
     };
 
     for (let i = 0; i < totalSegments.length; i++) {
       const [start, end] = totalSegments[i];
-      await addSegment(start, end);
+      await addSegment(start, end, i);
     }
 
     await output.finalize();
 
     const blob = new Blob([outputTarget.buffer], { type: "video/mp4" });
+    if (debugLog) {
+      console.log("[cut-debug][cutter] finalize complete", {
+        outputBlobSize: blob.size,
+        expectedDuration: total - (cutEnd - cutStart),
+      });
+    }
     if (onProgress) onProgress(1);
     return blob;
   }
@@ -103,12 +149,16 @@ export class VideoCutter {
   getDuration(blob) {
     return new Promise((res, rej) => {
       const v = document.createElement("video");
-      v.src = URL.createObjectURL(blob);
+      const url = URL.createObjectURL(blob);
+      v.src = url;
       v.onloadedmetadata = () => {
-        URL.revokeObjectURL(v.src);
+        URL.revokeObjectURL(url);
         res(v.duration);
       };
-      v.onerror = () => rej(new Error("Failed to load video"));
+      v.onerror = () => {
+        URL.revokeObjectURL(url);
+        rej(new Error("Failed to load video"));
+      };
     });
   }
 }

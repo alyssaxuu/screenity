@@ -1,10 +1,10 @@
 import React, { useContext, useRef, useEffect, useState } from "react";
 import WaveSurfer from "wavesurfer.js";
 import styles from "../../styles/edit/_Waveform.module.scss";
-import { ContentStateContext } from "../../context/ContentState"; // Import the ContentState context
+import { ContentStateContext } from "../../context/ContentState";
 
 const WaveformGenerator = (props) => {
-  const [contentState, setContentState] = useContext(ContentStateContext); // Access the ContentState context
+  const [contentState, setContentState] = useContext(ContentStateContext);
   const wavesurferRef = useRef(null);
   const waveformContainerRef = useRef(null);
   const customCursorRef = useRef(null);
@@ -113,6 +113,11 @@ const WaveformGenerator = (props) => {
     return () => {
       if (wavesurferRef.current) {
         wavesurferRef.current.destroy();
+        wavesurferRef.current = null;
+      }
+      // WaveSurfer 7 leaves old canvas behind on destroy.
+      if (container) {
+        container.innerHTML = "";
       }
       container.removeEventListener("mouseenter", handleMouseEnter);
       container.removeEventListener("mousemove", handleMouseMove);

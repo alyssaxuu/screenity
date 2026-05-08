@@ -1,4 +1,3 @@
-// src/content/handlers/recordingHandlers.js
 import {
   registerMessage,
   messageRouter,
@@ -8,6 +7,7 @@ import { updateFromStorage } from "../utils/updateFromStorage";
 
 import { checkAuthStatus } from "../utils/checkAuthStatus";
 import { traceStep, setStartFlowOutcome } from "../../../utils/startFlowTrace";
+import { perfMark } from "../../../utils/perfMarks";
 import JSZip from "jszip";
 
 const CLOUD_FEATURES_ENABLED =
@@ -60,7 +60,7 @@ export const setupHandlers = () => {
     }
 
     window.postMessage(payload, targetOrigin);
-    // Replay once shortly after first post to reduce race conditions with late listeners.
+    // Replay shortly after to reduce races with late listeners.
     setTimeout(() => {
       window.postMessage(
         {
@@ -100,9 +100,7 @@ export const setupHandlers = () => {
         sceneId: sceneId || null,
         reason: reason || "unknown",
       });
-    } catch {
-      // best effort
-    }
+    } catch {}
   };
 
   const fetchLocalPlaybackSourceFromExtension = async ({
@@ -210,9 +208,7 @@ export const setupHandlers = () => {
           sceneId: source.offer.sceneId || null,
           usedBy: "app-editor",
         });
-      } catch {
-        // best effort
-      }
+      } catch {}
 
       return activeLocalPlaybackSource;
     })();
@@ -256,10 +252,30 @@ export const setupHandlers = () => {
       },
     });
 
+  // Pending scene-create handoffs awaiting reply from the editor page.
+  // Keyed by requestId so concurrent multi-scene flows don't collide.
+  const pendingSceneCreates = new Map();
+
   const onWindowProjectMessage = (event) => {
     if (event.source !== window) return;
     if (event.origin !== TRUSTED_APP_ORIGIN) return;
     const data = event?.data || {};
+
+    if (data?.source === "create-scene-from-recording-result") {
+      const pending = pendingSceneCreates.get(data.requestId);
+      if (pending) {
+        pendingSceneCreates.delete(data.requestId);
+        clearTimeout(pending.timeout);
+        pending.respond({
+          ok: !!data.ok,
+          status: data.status ?? 0,
+          body: data.body ?? null,
+          error: data.error || null,
+        });
+      }
+      return;
+    }
+
     if (data?.type !== "screenity-local-playback-request") return;
 
     const requestedProjectId = data?.projectId || null;
@@ -362,16 +378,59 @@ export const setupHandlers = () => {
     revokeActiveLocalPlaybackSource("content-beforeunload");
   });
 
-  // Initialize message router
   if (!window.__screenityHandlersInitialized) {
     messageRouter();
     window.__screenityHandlersInitialized = true;
   }
 
-  // Register content message handlers
+  // Bridge from BG to the editor page: BG forwards a scene-create payload
+  // here; we postMessage it into the page (same-origin) so the editor's own
+  // app code does the API call (cookie auth, no CORS, no SW lifecycle).
+  registerMessage("proxy-create-scene", (message, sender) => {
+    if (window.location.origin !== TRUSTED_APP_ORIGIN) {
+      return { ok: false, error: "untrusted-origin" };
+    }
+    const { projectId, requestId, payload } = message || {};
+    if (!projectId || !requestId || !payload) {
+      return { ok: false, error: "invalid-proxy-create-scene" };
+    }
+    return new Promise((resolve) => {
+      const post = () => {
+        window.postMessage(
+          {
+            source: "create-scene-from-recording",
+            projectId,
+            requestId,
+            payload,
+          },
+          TRUSTED_APP_ORIGIN,
+        );
+      };
+      // Repost on a 500ms cadence in case the editor app's listener
+      // isn't mounted yet (?load=true loading shell, async route swap).
+      // The pending entry gates against duplicate replies.
+      post();
+      const repost = setInterval(post, 500);
+      const timeout = setTimeout(() => {
+        if (pendingSceneCreates.has(requestId)) {
+          pendingSceneCreates.delete(requestId);
+          clearInterval(repost);
+          resolve({ ok: false, error: "editor-no-reply-timeout" });
+        }
+      }, 15_000);
+      pendingSceneCreates.set(requestId, {
+        respond: (val) => {
+          clearInterval(repost);
+          resolve(val);
+        },
+        timeout,
+      });
+    });
+  });
+
   registerMessage("time", () => {
-    // Timer is driven by ContentState's storage-based tick.
-    // Ignore external timer pushes to avoid jitter/skips.
+    // Timer is driven by ContentState's storage tick;
+    // ignore external pushes to avoid jitter/skips.
   });
 
   registerMessage("toggle-popup", () => {
@@ -385,7 +444,8 @@ export const setupHandlers = () => {
     updateFromStorage();
   });
 
-  registerMessage("ready-to-record", () => {
+  registerMessage("ready-to-record", async () => {
+    perfMark("Content ready-to-record.received");
     traceStep("readyToRecordReceived");
 
     setContentState((prev) => ({
@@ -395,10 +455,16 @@ export const setupHandlers = () => {
       preparingRecording: false,
       pendingRecording: true,
     }));
+
+    // BG is source of truth; reading React default would race the user
+    // setting and produce double beeps.
+    const { countdown: storedCountdown } = await chrome.storage.local.get([
+      "countdown",
+    ]);
     const state = getState();
 
-    if (state.countdown) {
-      // Start countdown
+    if (storedCountdown) {
+      perfMark("Content countdown.start");
       traceStep("countdownStart");
       setContentState((prev) => ({
         ...prev,
@@ -408,8 +474,7 @@ export const setupHandlers = () => {
       }));
       chrome.runtime.sendMessage({ type: "diag-countdown-started" }).catch(() => {});
     } else {
-      // No countdown, start immediately. countdownCancelled is cleared
-      // in startStreaming so it can't be stale here.
+      // countdownCancelled is cleared in startStreaming, so not stale here.
       state.startRecordingAfterCountdown();
     }
   });
@@ -505,8 +570,7 @@ export const setupHandlers = () => {
   registerMessage("recording-ended", async () => {
     const state = getState();
 
-    // Double-check with storage before resetting UI
-    // This prevents false positives when service worker restarts with stale state
+    // SW restart can leave stale state; double-check storage before reset.
     const { recording, recorderSession, pendingRecording } =
       await chrome.storage.local.get([
         "recording",
@@ -517,9 +581,7 @@ export const setupHandlers = () => {
     const isActuallyRecording =
       recording || (recorderSession && recorderSession.status === "recording");
 
-    // Only reset if we're truly not recording
     if (isActuallyRecording || pendingRecording) {
-      // Recording is actually still active - ignore this stale message
       console.warn(
         "Ignoring stale recording-ended message - recording still active",
       );
@@ -545,8 +607,23 @@ export const setupHandlers = () => {
       ...prev,
       pendingRecording: false,
       preparingRecording: false,
+      recording: false,
+      paused: false,
+      time: 0,
+      timer: 0,
       pipEnded: false,
     }));
+    const state = getState();
+    if (state && typeof state.openModal === "function") {
+      state.openModal(
+        chrome.i18n.getMessage("recordingFailedModalTitle"),
+        chrome.i18n.getMessage("recordingFailedModalDescription"),
+        chrome.i18n.getMessage("permissionsModalDismiss"),
+        null,
+        () => {},
+        () => {},
+      );
+    }
   });
 
   registerMessage("start-stream", () => {
@@ -681,10 +758,10 @@ export const setupHandlers = () => {
       () => {
         state.dismissRecording();
       },
-      null, // image
-      null, // learnMore
-      null, // learnMoreLink
-      false, // colorSafe
+      null,
+      null,
+      null,
+      false,
       chrome.i18n.getMessage("getHelpButton"),
       () => {
         chrome.runtime.sendMessage({
@@ -699,14 +776,12 @@ export const setupHandlers = () => {
 
   registerMessage("stream-ended-warning", (message) => {
     const state = getState();
-    // Show a toast warning but don't stop the recording
-    // The user can decide whether to continue or stop manually
     if (state.openToast) {
       state.openToast(
         message.message ||
           chrome.i18n.getMessage("streamEndedWarningToast"),
         () => {},
-        10000, // Show for 10 seconds
+        10000,
       );
     }
   });
@@ -833,11 +908,9 @@ export const setupHandlers = () => {
         updateFromStorage(true, sender.id);
       }
     } else {
-      // After navigation, PiP is always destroyed (the iframe that owned it
-      // was torn down with the old page).  Set pipEnded: true so the inline
-      // camera overlay is visible immediately.  If the camera iframe
-      // successfully re-enters PiP later, a "pip-started" message will flip
-      // this back to false.
+      // Post-navigation, PiP is destroyed with the old iframe. Set pipEnded
+      // so the inline camera overlay shows immediately; "pip-started" will
+      // flip it back if the new iframe re-enters PiP.
       setContentState((prev) => ({
         ...prev,
         showExtension: true,
@@ -900,7 +973,6 @@ export const setupHandlers = () => {
   });
 
   registerMessage("time-warning", () => {
-    // Only trigger when actively recording
     const state = getState();
 
     if (state.recording && !state.paused) {
@@ -920,7 +992,6 @@ export const setupHandlers = () => {
   });
   registerMessage("time-stopped", () => {
     const state = getState();
-    // Only trigger when actively recording
     if (state.recording && !state.paused) {
       setContentState((prev) => ({
         ...prev,
@@ -960,7 +1031,6 @@ export const setupHandlers = () => {
   });
   registerMessage("check-auth", async (message) => {
     if (!CLOUD_FEATURES_ENABLED) {
-      // Default to local user
       const { recording } = await chrome.storage.local.get("recording");
 
       setContentState((prev) => ({
@@ -992,7 +1062,7 @@ export const setupHandlers = () => {
     }));
 
     if (result.authenticated) {
-      // Client-side zoom is not available for authenticated users.
+      // Client-side zoom is unavailable for authenticated users.
       setContentState((prev) => ({
         ...prev,
         onboarding: false,

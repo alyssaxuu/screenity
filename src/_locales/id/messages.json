@@ -63,6 +63,18 @@
     "message": "Tampaknya pengaturan keamanan situs web ini mencegah ekstensi peramban menggunakan kamera atau mikrofon Anda di halaman ini. Untuk merekam dengan keduanya, mulai rekaman dari tab lain dan beralih kembali ke sini setelah rekaman dimulai.",
     "description": "Modal description shown when the current page's Permissions-Policy header blocks browser extensions from using camera or microphone"
   },
+  "opfsLoadErrorTitle": {
+    "message": "Tidak dapat memuat rekaman Anda",
+    "description": "Modal title shown when the editor cannot read the recording file from the device's storage"
+  },
+  "opfsLoadErrorDescription": {
+    "message": "Sepertinya Screenity tidak dapat memuat rekaman dari penyimpanan perangkat Anda. Rekaman mungkin telah dihapus atau dipindahkan. Jika ini terus terjadi, hubungi kami di support@screenity.io.",
+    "description": "Modal description shown when the editor cannot read the recording file from the device's storage"
+  },
+  "recordingWriterFailedToast": {
+    "message": "Perekaman dihentikan karena masalah penyimpanan. Rekaman parsial Anda telah disimpan.",
+    "description": "Toast shown when the recording chunk writer fails mid-recording and the partial file is preserved"
+  },
   "allowCameraAccessButton": {
     "message": "Izinkan akses kamera",
     "description": "Tombol izinkan akses kamera"
@@ -358,6 +370,18 @@
   "sandboxProgressDescription": {
     "message": "Simpan tab ini terbuka. Ini akan diperbarui dengan perekaman Anda saat sudah siap.",
     "description": "Deskripsi halaman sandbox saat merekam / menyimpan"
+  },
+  "sandboxFinalizingRecording": {
+    "message": "Menyelesaikan rekaman...",
+    "description": "Shown over the player when the editor is waiting for the recorder to finish flushing the recording to disk"
+  },
+  "sandboxToastReverted": {
+    "message": "Dikembalikan ke asli",
+    "description": "Toast confirmation shown when the user reverts edits to the original recording"
+  },
+  "sandboxToastSaved": {
+    "message": "Perubahan disimpan",
+    "description": "Toast confirmation shown when the user saves an edit operation"
   },
   "sandboxEditorMainTitle": {
     "message": "Editor",
@@ -1588,5 +1612,59 @@
   "cancelButton": {
     "message": "Batal",
     "description": "Generic cancel button label"
+  },
+  "editorStuckTitle": {
+    "message": "Masih menyiapkan rekaman Anda…"
+  },
+  "editorStuckDescription": {
+    "message": "Screenity membutuhkan waktu lebih lama dari biasanya untuk memuat rekaman Anda. Data Anda mungkin masih tersimpan di perangkat ini. Coba pulihkan, atau hubungi kami jika rekaman tidak kembali."
+  },
+  "editorStuckTryRecover": {
+    "message": "Coba pulihkan"
+  },
+  "editorStuckGetHelp": {
+    "message": "Dapatkan bantuan"
+  },
+  "editorRecoveryFailedTitle": {
+    "message": "Tidak dapat membuka rekaman Anda"
+  },
+  "editorRecoveryFailedDescription": {
+    "message": "Terjadi masalah saat memuat rekaman ke editor. Rekaman Anda mungkin masih tersimpan di perangkat. Anda dapat mencoba memulihkannya sekarang."
+  },
+  "downloadGIFTooLongToast": {
+    "message": "Ekspor GIF dibatasi hingga 30 detik. Pangkas klip Anda dan coba lagi."
+  },
+  "audioSilentToast": {
+    "message": "Tidak ada audio terdeteksi. Periksa mikrofon, sakelar bisu, atau perangkat audio Anda."
+  },
+  "restartFailedToast": {
+    "message": "Tidak dapat memulai ulang rekaman Anda. Coba hentikan lalu mulai lagi."
+  },
+  "recordingFailedModalTitle": {
+    "message": "Rekaman tidak dapat dimulai"
+  },
+  "recordingFailedModalDescription": {
+    "message": "Sesuatu menghalangi rekaman untuk dimulai. Silakan coba lagi. Jika hal ini terus terjadi, hubungi kami di support@screenity.io."
+  },
+  "editAudioTooLargeTitle": {
+    "message": "File audio terlalu besar"
+  },
+  "editAudioTooLargeDescription": {
+    "message": "Coba klip audio yang lebih pendek. File besar tidak dapat diproses di browser. Rekaman asli Anda tetap aman."
+  },
+  "restoreEmptyToast": {
+    "message": "Tidak ada rekaman yang dapat dipulihkan. Data mungkin telah dihapus."
+  },
+  "restoreTimeoutToast": {
+    "message": "Pemulihan memakan waktu terlalu lama. Rekaman Anda aman. Coba klik Pulihkan lagi sebentar lagi."
+  },
+  "cameraUnavailableToast": {
+    "message": "Kamera terputus. Perekaman layar tetap berjalan."
+  },
+  "downloadInterruptedLargeToast": {
+    "message": "Unduhan terputus. Rekaman terlalu besar untuk dicoba ulang secara otomatis. Coba simpan lagi dari editor."
+  },
+  "recordingCorruptToast": {
+    "message": "Rekaman ini tidak dapat diputar. File mungkin tidak lengkap atau rusak. Coba unduh file mentah dari menu Simpan."
   }
 }

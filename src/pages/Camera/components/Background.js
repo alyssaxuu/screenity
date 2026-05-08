@@ -6,6 +6,7 @@ import {
   renderBlurFromVideo,
   renderPersonCutoutFromVideo,
   renderEffectBackground,
+  loadSegmentationModel,
 } from "../utils/backgroundUtils";
 
 const Background = () => {
@@ -55,7 +56,6 @@ const Background = () => {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  // Re-render background image on resize or effect change
   useEffect(() => {
     if (!effectRef.current || blurRef.current) return;
 
@@ -82,13 +82,61 @@ const Background = () => {
     }
   }, [windowSize, effectRef.current, blurRef.current]);
 
-  // Self-contained render loop — segments video directly, no React state per frame
   useEffect(() => {
     if (!backgroundEffects) return;
 
     let animFrameId;
     let running = true;
     let consecutiveErrors = 0;
+    let lastSuccessAt = Date.now();
+    let recreatingSegmenter = false;
+
+    // Watchdog: if the segmenter goes silent (returns null masks for
+    // 5s+ while video is delivering frames), the GPU context likely
+    // crashed or the segmenter is wedged. Recreate it once. Without
+    // this the user's blur/effect freezes mid-recording with no error
+    // and no recovery.
+    const STALE_MASK_THRESHOLD_MS = 5000;
+    const recreateSegmenter = async () => {
+      if (recreatingSegmenter) return;
+      recreatingSegmenter = true;
+      try {
+        chrome.runtime.sendMessage({
+          type: "diag-forward",
+          event: "recorder-segmenter-recreate-attempt",
+          data: { msSinceLastSuccess: Date.now() - lastSuccessAt },
+        });
+      } catch {}
+      try {
+        try { segmenterRef.current?.close?.(); } catch {}
+        const fresh = await loadSegmentationModel();
+        if (fresh && running) {
+          segmenterRef.current = fresh;
+          lastSuccessAt = Date.now();
+          consecutiveErrors = 0;
+          try {
+            chrome.runtime.sendMessage({
+              type: "diag-forward",
+              event: "recorder-segmenter-recreate-ok",
+            });
+          } catch {}
+        } else if (running) {
+          // Recreate failed; disable effects so the camera feed isn't frozen.
+          console.warn(
+            "[Screenity] Segmenter recreate failed; disabling background effects",
+          );
+          try {
+            chrome.runtime.sendMessage({
+              type: "diag-forward",
+              event: "recorder-segmenter-recreate-failed",
+            });
+          } catch {}
+          setBackgroundEffects(false);
+        }
+      } finally {
+        recreatingSegmenter = false;
+      }
+    };
 
     const tick = () => {
       if (!running) return;
@@ -102,6 +150,7 @@ const Background = () => {
 
           if (result && result.categoryMask) {
             consecutiveErrors = 0;
+            lastSuccessAt = Date.now();
             if (blurRef.current) {
               renderBlurFromVideo(video, result, canvasRef);
             } else if (effectRef.current) {
@@ -117,6 +166,12 @@ const Background = () => {
                 canvasContextRef,
               );
             }
+          } else if (
+            Date.now() - lastSuccessAt > STALE_MASK_THRESHOLD_MS &&
+            !recreatingSegmenter
+          ) {
+            // Video frames flowing but segmenter silent: GPU context loss.
+            recreateSegmenter();
           }
         }
       } catch (error) {
@@ -124,6 +179,13 @@ const Background = () => {
         console.error("Background segmentation error:", error);
         if (consecutiveErrors >= 3) {
           console.warn("Disabling background effects after repeated failures");
+          try {
+            chrome.runtime.sendMessage({
+              type: "diag-forward",
+              event: "recorder-segmenter-disabled-after-errors",
+              data: { error: String(error?.message || error).slice(0, 200) },
+            });
+          } catch {}
           setBackgroundEffects(false);
           return;
         }
@@ -140,7 +202,6 @@ const Background = () => {
     };
   }, [backgroundEffects]);
 
-  // Listen for Chrome extension messages
   useEffect(() => {
     const handleMessage = (request) => {
       if (request.type === "set-background-effect") {

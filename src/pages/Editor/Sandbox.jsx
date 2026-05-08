@@ -1,6 +1,5 @@
 import React, { useEffect, useRef } from "react";
 
-// Import all the utils
 import addAudioToVideo from "./utils/addAudioToVideo";
 import base64ToBlob from "./utils/base64toBlob";
 import blobToArrayBuffer from "./utils/blobToArrayBuffer";
@@ -30,11 +29,9 @@ const Sandbox = () => {
 
     try {
       const { createFFmpeg } = FFmpeg;
-      // Initialize ffmpeg.js
       ffmpegInstance.current = createFFmpeg({
         log: false,
         progress: (params) => {
-          // Send progress updates to parent window
           if (params.ratio && params.ratio >= 0) {
             const percentage = Math.min(Math.round(params.ratio * 100), 100);
             sendMessage({
@@ -62,7 +59,6 @@ const Sandbox = () => {
     script.src = "assets/vendor/ffmpeg.min.js";
     script.async = true;
 
-    // On load, set scriptLoaded to true
     script.onload = () => {
       scriptLoaded.current = true;
       loadFfmpeg();
@@ -103,7 +99,12 @@ const Sandbox = () => {
         const base64 = await toBase64(blob);
         sendMessage({ type: "updated-blob", base64: base64, topLevel: true });
       } catch (error) {
-        sendMessage({ type: "ffmpeg-error", error: JSON.stringify(error) });
+        const errMsg = error instanceof Error ? error.message : String(error);
+        if (errMsg.includes("background-audio-too-large")) {
+          sendMessage({ type: "audio-too-large" });
+        } else {
+          sendMessage({ type: "ffmpeg-error", error: JSON.stringify(error) });
+        }
       }
     } else if (message.type === "base64-to-blob") {
       try {
@@ -138,7 +139,6 @@ const Sandbox = () => {
         });
         const base64 = await toBase64(blob);
         sendMessage({ type: "updated-blob", base64: base64, topLevel: true });
-        //sendMessage({ type: "crop-update" });
       } catch (error) {
         sendMessage({ type: "ffmpeg-error", error: JSON.stringify(error) });
       }
@@ -245,6 +245,56 @@ const Sandbox = () => {
     const handler = (event) => onMessage(event.data);
     window.addEventListener("message", handler);
     return () => window.removeEventListener("message", handler);
+  }, []);
+
+  useEffect(() => {
+    // editor.html is sandboxed (manifest sandbox.pages); chrome.storage
+    // is undefined. Skip the storage-bridge.
+    if (
+      typeof chrome === "undefined" ||
+      !chrome.storage ||
+      !chrome.storage.onChanged
+    ) {
+      return;
+    }
+    const storageHandler = (changes, areaName) => {
+      if (areaName !== "local") return;
+      if (!changes.editorRecordingError) return;
+      const payload = changes.editorRecordingError.newValue;
+      if (!payload) return;
+      try {
+        iframeRef.current?.contentWindow?.postMessage(
+          { type: "recording-error-from-parent", payload },
+          "*",
+        );
+      } catch {}
+    };
+    chrome.storage.onChanged.addListener(storageHandler);
+    const respondWithLatest = () => {
+      chrome.storage.local.get(["editorRecordingError"]).then((res) => {
+        if (!res?.editorRecordingError) return;
+        try {
+          iframeRef.current?.contentWindow?.postMessage(
+            {
+              type: "recording-error-from-parent",
+              payload: res.editorRecordingError,
+            },
+            "*",
+          );
+        } catch {}
+      });
+    };
+    const requestHandler = (event) => {
+      if (event?.data?.type === "request-recording-error-state") {
+        respondWithLatest();
+      }
+    };
+    window.addEventListener("message", requestHandler);
+    respondWithLatest();
+    return () => {
+      chrome.storage.onChanged.removeListener(storageHandler);
+      window.removeEventListener("message", requestHandler);
+    };
   }, []);
 
   return (

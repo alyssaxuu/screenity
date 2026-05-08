@@ -1,13 +1,14 @@
 import React, { useContext } from "react";
 import styles from "../../styles/edit/_EditorNav.module.scss";
-import { ContentStateContext } from "../../context/ContentState"; // Import the ContentState context
+import { ContentStateContext } from "../../context/ContentState";
 
 const URL = "/assets/";
 
 const CropNav = () => {
-  const [contentState, setContentState] = useContext(ContentStateContext); // Access the ContentState context
+  const [contentState, setContentState] = useContext(ContentStateContext);
 
   const handleCancel = () => {
+    contentState.cancelEditOp();
     setContentState((prevContentState) => ({
       ...prevContentState,
       mode: "player",
@@ -24,6 +25,16 @@ const CropNav = () => {
   };
 
   const handleRevert = () => {
+    const prev = {
+      blob: contentState.blob,
+      start: contentState.start,
+      end: contentState.end,
+      width: contentState.width,
+      height: contentState.height,
+      left: contentState.left,
+      top: contentState.top,
+      fromCropper: contentState.fromCropper,
+    };
     setContentState((prevContentState) => ({
       ...prevContentState,
       blob: contentState.originalBlob,
@@ -35,6 +46,12 @@ const CropNav = () => {
       top: 0,
       fromCropper: false,
     }));
+    contentState.openToast?.(
+      chrome.i18n.getMessage("sandboxToastReverted"),
+      () => {
+        setContentState((p) => ({ ...p, ...prev }));
+      },
+    );
   };
 
   const saveChanges = async () => {
@@ -47,12 +64,15 @@ const CropNav = () => {
 
     setContentState((prev) => ({
       ...prev,
-      // mode: "player",
       fromCropper: true,
       hasTempChanges: false,
     }));
 
     contentState.clearBackup();
+    contentState.openToast?.(
+      chrome.i18n.getMessage("sandboxToastSaved"),
+      () => contentState.undo?.(),
+    );
   };
 
   return (
@@ -76,7 +96,6 @@ const CropNav = () => {
           <button
             className="button simpleButton blackButton"
             onClick={handleCancel}
-            disabled={contentState.isFfmpegRunning}
           >
             {chrome.i18n.getMessage("sandboxEditorCancelButton")}
           </button>

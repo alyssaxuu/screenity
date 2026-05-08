@@ -1,6 +1,6 @@
-import localforage from "localforage";
 import { createTab, sendMessageTab } from "../tabManagement";
 import { resetWatchdogState } from "./resetWatchdogState";
+import { openExistingChunksStore } from "../../CloudRecorder/recorderStorage/chooseChunksStore";
 
 const RECOVERABLE_CLOUD_STATUSES = new Set([
   "recording",
@@ -11,12 +11,39 @@ const RECOVERABLE_CLOUD_STATUSES = new Set([
   "upload-stalled",
 ]);
 
-// Mirror the store names CloudRecorder.jsx uses. createInstance({ name }) sets
-// the IndexedDB database name directly, so these reach the same databases
-// regardless of any global localforage.config() call.
-const cloudScreenStore = localforage.createInstance({ name: "chunks" });
-const cloudCameraStore = localforage.createInstance({ name: "cameraChunks" });
-const cloudAudioStore = localforage.createInstance({ name: "audioChunks" });
+// Per-track .length() against whatever backend the previous session used.
+// Sessions persisted before the OPFS migration carry no storageBackends
+// field, so default to IDB across all three tracks so legacy state still
+// recovers.
+const countChunks = async (storedSession) => {
+  const backends = storedSession?.storageBackends || {
+    screen: "idb",
+    audio: "idb",
+    camera: "idb",
+  };
+  const opfsSessionId =
+    storedSession?.opfsSessionId || storedSession?.id || null;
+
+  const counts = await Promise.all(
+    ["screen", "camera", "audio"].map(async (track) => {
+      try {
+        const { store } = openExistingChunksStore({
+          sessionId: opfsSessionId,
+          track,
+          backend: backends[track] || "idb",
+        });
+        return await store.length().catch(() => 0);
+      } catch {
+        return 0;
+      }
+    }),
+  );
+  return {
+    screenCount: counts[0],
+    cameraCount: counts[1],
+    audioCount: counts[2],
+  };
+};
 
 export const checkCloudRestore = async () => {
   try {
@@ -30,11 +57,9 @@ export const checkCloudRestore = async () => {
       return { cloudRestore: false };
     }
 
-    const [screenCount, cameraCount, audioCount] = await Promise.all([
-      cloudScreenStore.length().catch(() => 0),
-      cloudCameraStore.length().catch(() => 0),
-      cloudAudioStore.length().catch(() => 0),
-    ]);
+    const { screenCount, cameraCount, audioCount } = await countChunks(
+      recorderSession,
+    );
 
     return {
       cloudRestore: screenCount > 0 || cameraCount > 0 || audioCount > 0,
@@ -54,10 +79,24 @@ export const restoreCloudRecording = async () => {
   const tab = await createTab("download.html", true, true);
   if (!tab?.id) return;
 
-  chrome.tabs.onUpdated.addListener(function listener(tabId, info) {
+  let settled = false;
+  const safetyId = setTimeout(() => {
+    if (settled) return;
+    settled = true;
+    chrome.tabs.onUpdated.removeListener(listener);
+    console.warn(
+      "[Screenity][BG] cloud-restore tab load timed out",
+      tab.id,
+    );
+  }, 30000);
+  function listener(tabId, info) {
     if (info.status === "complete" && tabId === tab.id) {
+      if (settled) return;
+      settled = true;
+      clearTimeout(safetyId);
       chrome.tabs.onUpdated.removeListener(listener);
       sendMessageTab(tab.id, { type: "recover-cloud-indexed-db" });
     }
-  });
+  }
+  chrome.tabs.onUpdated.addListener(listener);
 };

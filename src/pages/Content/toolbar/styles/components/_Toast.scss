@@ -31,10 +31,12 @@
 	gap: 8px;
 	font-size: 15px;
 	line-height: 1.5;
-	max-width: 100%;
+	max-width: min(480px, calc(100vw - 50px));
 	overflow: hidden;
 	justify-content: center;
 	align-items: center;
+	word-wrap: break-word;
+	overflow-wrap: anywhere;
 }
 .ToastRoot[data-state='open'] {
   animation: slideIn 150ms cubic-bezier(0.16, 1, 0.3, 1);

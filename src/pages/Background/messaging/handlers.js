@@ -1,4 +1,5 @@
 import { registerMessage } from "../../../messaging/messageRouter";
+import { perfMark, perfSpan } from "../../utils/perfMarks";
 import {
   focusTab,
   createTab,
@@ -8,12 +9,15 @@ import {
 } from "../tabManagement";
 
 import { startAfterCountdown, startRecording } from "../recording/startRecording";
+import { noteCountdownStarted } from "../recording/countdownFallback";
 import {
   handleStopRecordingTab,
   handleStopRecordingTabBackup,
 } from "../recording/stopRecording";
 import { sendChunks } from "../recording/sendChunks";
 import { chunksStore } from "../recording/chunkHandler";
+import { openExistingChunksStore } from "../../CloudRecorder/recorderStorage/chooseChunksStore";
+import { destroySessionDir } from "../../CloudRecorder/recorderStorage/opfsKvStore";
 import { handleSaveToDrive } from "../drive/handleSaveToDrive";
 import { addAlarmListener } from "../alarms/addAlarmListener";
 import { cancelRecording, handleDismiss } from "../recording/cancelRecording";
@@ -30,6 +34,8 @@ import {
   sendMessageTab,
   parseEditorTargetUrl,
   resolveEditorTabForTarget,
+  getValidatedEditorTab,
+  setEditorTabReference,
 } from "../tabManagement";
 import {
   handleRestart,
@@ -78,9 +84,30 @@ import { supportContextQuery } from "../../utils/buildSupportContext";
 
 const API_BASE = process.env.SCREENITY_API_BASE_URL;
 const APP_BASE = process.env.SCREENITY_APP_BASE;
+
+// Flip a project to isPublic:true after recording finishes. v2 removed
+// the publish system, so isPublic is the only access gate — without
+// this PATCH the share URL we copy to clipboard would 404 for viewers.
+// Fire-and-forget; clipboard/toast UX is identical on success or failure.
+const markProjectPublic = async (projectId) => {
+  if (!projectId || !API_BASE) return;
+  try {
+    const { screenityToken } = await chrome.storage.local.get("screenityToken");
+    if (!screenityToken) return;
+    await fetch(`${API_BASE}/videos/${projectId}`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${screenityToken}`,
+      },
+      body: JSON.stringify({ isPublic: true }),
+    });
+  } catch (err) {
+    console.warn("markProjectPublic failed:", err?.message || err);
+  }
+};
 const CLOUD_FEATURES_ENABLED =
   process.env.SCREENITY_ENABLE_CLOUD_FEATURES === "true";
-// Debug toggle for post-stop/chunk flow
 const DEBUG_POSTSTOP = false;
 const STOP_RECORDING_TAB_DEBOUNCE_MS = 1200;
 const CLOUD_LOCAL_PLAYBACK_MAX_BYTES = 250 * 1024 * 1024;
@@ -119,6 +146,22 @@ const normalizeLocalPlaybackOffer = (offer = {}) => {
   const estimatedBytes = Math.max(0, Number(offer.estimatedBytes) || 0);
   const createdAt = Number(offer.createdAt) || now;
 
+  // storageBackend / opfsSessionId let the read-chunk + clear handlers route
+  // to the same backend the writer used. Older offers without these fields
+  // default to IDB to match pre-OPFS behaviour.
+  const storageBackend =
+    offer.storageBackend === "opfs" ? "opfs" : "idb";
+  const opfsSessionId =
+    storageBackend === "opfs" && offer.opfsSessionId
+      ? String(offer.opfsSessionId)
+      : null;
+  // Container is the mimeType the editor's <video> should use. Defaults
+  // to webm for back-compat; WebCodecs sessions overwrite to video/mp4.
+  const container =
+    offer.container === "video/mp4" ? "video/mp4" : "video/webm";
+  const encoderKind =
+    offer.encoderKind === "webcodecs" ? "webcodecs" : "mediarecorder";
+
   return {
     offerId: offer.offerId || crypto.randomUUID(),
     projectId: offer.projectId || null,
@@ -131,10 +174,28 @@ const normalizeLocalPlaybackOffer = (offer = {}) => {
     estimatedBytes,
     mediaId: offer.mediaId || null,
     bunnyVideoId: offer.bunnyVideoId || null,
+    storageBackend,
+    opfsSessionId,
+    container,
+    encoderKind,
     createdAt,
     expiresAt,
     updatedAt: now,
   };
+};
+
+const offerScreenStore = (offer) => {
+  if (offer?.storageBackend === "opfs" && offer.opfsSessionId) {
+    return openExistingChunksStore({
+      sessionId: offer.opfsSessionId,
+      track: "screen",
+      backend: "opfs",
+    }).store;
+  }
+  // Pre-migration default: cloud screen track was a localforage instance
+  // sharing the regular Recorder's IDB DB / "chunks" store name. The
+  // imported chunksStore matches that exactly.
+  return chunksStore;
 };
 
 const isLocalPlaybackOfferExpired = (offer) =>
@@ -173,12 +234,19 @@ const clearStoredLocalPlaybackOffer = async ({
   }
 
   if (clearChunks) {
-    await chunksStore.clear().catch((err) => {
+    const targetStore = offerScreenStore(existing);
+    await targetStore.clear().catch((err) => {
       console.warn(
-        "[Screenity][BG] Failed to clear chunksStore while clearing local playback offer",
+        "[Screenity][BG] Failed to clear screen chunks while clearing local playback offer",
         err,
       );
     });
+    if (
+      existing?.storageBackend === "opfs" &&
+      existing?.opfsSessionId
+    ) {
+      await destroySessionDir(existing.opfsSessionId).catch(() => {});
+    }
   }
 
   await chrome.storage.local.set({
@@ -235,8 +303,7 @@ const ensureAudioOffscreen = async () => {
     const hasAnyOffscreen = contexts.some(
       (context) => context.contextType === "OFFSCREEN_DOCUMENT",
     );
-    // If an offscreen document already exists (e.g. the recorder), reuse it
-    // — Chrome only allows one offscreen document per extension.
+    // reuse existing offscreen doc if any; Chrome only allows one per extension
     if (hasAnyOffscreen) return true;
     await chrome.offscreen.createDocument({
       url: "audiooffscreen.html",
@@ -389,8 +456,7 @@ const handleCheckStorageQuota = async (retried = false) => {
       credentials: "include",
     });
 
-    // On 401, invalidate auth cache and retry once so loginWithWebsite()
-    // in the outer handler can refresh the token on the next attempt.
+    // 401: invalidate auth cache so loginWithWebsite refreshes the token
     if (res.status === 401 && !retried) {
       await chrome.storage.local.set({ lastAuthCheck: 0 });
       const refresh = await loginWithWebsite();
@@ -416,7 +482,7 @@ const handleCheckStorageQuota = async (retried = false) => {
   }
 };
 
-const handleFinishMultiRecording = async () => {
+export const handleFinishMultiRecording = async () => {
   try {
     const { recordingToScene } = await chrome.storage.local.get([
       "recordingToScene",
@@ -438,27 +504,11 @@ const handleFinishMultiRecording = async () => {
         return;
       }
 
-      const res = await fetch(
-        `${API_BASE}/videos/${multiProjectId}/auto-publish`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${await chrome.storage.local
-              .get("screenityToken")
-              .then((r) => r.screenityToken)}`,
-          },
-        },
-      );
-
       const url = `${process.env.SCREENITY_APP_BASE}/editor/${multiProjectId}/edit?share=true`;
       const publicUrl = `${process.env.SCREENITY_APP_BASE}/view/${multiProjectId}/`;
 
-      if (!res.ok) {
-        console.warn("Failed to auto-publish multi recording", res.status);
-      }
+      markProjectPublic(multiProjectId);
 
-      // Open the editor directly
       createTab(url, true, true).then(() => {
         if (publicUrl) {
           copyToClipboard(publicUrl);
@@ -469,8 +519,7 @@ const handleFinishMultiRecording = async () => {
         }
       });
     } else {
-      // Multi recording on existing project: only reuse editorTab if it still
-      // matches this project and expected editor/view URL.
+      // existing-project multi recording: only reuse editorTab if it still matches
       const { projectId, instantMode } = await chrome.storage.local.get([
         "projectId",
         "instantMode",
@@ -529,7 +578,6 @@ const handleFinishMultiRecording = async () => {
       }
     }
 
-    // Reset multi-mode state
     await chrome.storage.local.set({
       multiMode: false,
       multiSceneCount: 0,
@@ -584,10 +632,18 @@ const registerRecordingTabListener = (ownerTabId) => {
   }
   recordingTabListener = (closedTabId) => {
     if (closedTabId === ownerTabId) {
-      chrome.runtime.sendMessage({
-        type: "stop-recording-tab",
-        reason: "recorder-owner-tab-closed",
-        tabId: closedTabId,
+      // chrome.runtime.sendMessage from the SW doesn't fire BG's own listeners,
+      // so call the stop handler directly
+      Promise.resolve(
+        handleStopRecordingTab({
+          reason: "recorder-owner-tab-closed",
+          tabId: closedTabId,
+        }),
+      ).catch((err) => {
+        console.error(
+          "[Screenity][BG] handleStopRecordingTab failed in tab-removed",
+          err,
+        );
       });
       clearRecordingSessionSafe("owner-tab-removed", { closedTabId });
     }
@@ -614,7 +670,6 @@ const normalizeIncomingSession = (incoming = {}, sender) => {
     ...incoming,
     recorderTabId: ownerTabId,
     capturedTabId,
-    // Keep tabId for backward compatibility.
     tabId: capturedTabId,
   };
 };
@@ -710,7 +765,6 @@ export const copyToClipboard = (text) => {
   });
 };
 
-// Initialize message router and register all handlers
 export const setupHandlers = () => {
   registerProxyStorageHandlers();
   registerMessage("desktop-capture", async (message, sender) => {
@@ -755,6 +809,135 @@ export const setupHandlers = () => {
       return { ok: false, error: err?.message || String(err) };
     }
   });
+  // Forward a scene-create payload to the editor tab, which does the
+  // POST itself (same-origin cookie auth). Sidesteps the MV3 SW-fetch
+  // hang we hit when the cloud recorder tab tears down right after
+  // dispatching the request. The editor confirms via reply message.
+  registerMessage("forward-create-scene", async (message) => {
+    const { projectId, payload } = message || {};
+    if (!projectId || !payload) {
+      return { ok: false, error: "missing-projectId-or-payload" };
+    }
+    let validated = await getValidatedEditorTab({
+      expectedProjectId: projectId,
+      expectedKind: "editor",
+      reason: "forward-create-scene",
+    });
+    let openedTabId = null;
+    if (!validated.ok || !validated.tab?.id) {
+      // No editor tab; happens in multi-mode between scenes. Open one
+      // in the background as a same-origin proxy: same-origin POST is
+      // immune to the MV3 SW-fetch lifecycle hang we hit when posting
+      // bearer-auth from the SW alone. The tab stays open to serve
+      // subsequent scenes; finish-multi-recording will reuse/focus it.
+      const targetUrl = `${process.env.SCREENITY_APP_BASE}/editor/${projectId}/edit?load=true`;
+      try {
+        const tab = await chrome.tabs.create({
+          url: targetUrl,
+          active: false,
+        });
+        if (tab?.id) {
+          openedTabId = tab.id;
+          await setEditorTabReference({
+            tabId: tab.id,
+            tabUrl: targetUrl,
+            source: "forward-create-scene:auto-open",
+            expectedProjectId: projectId,
+          });
+          validated = { ok: true, tab: { id: tab.id }, reason: null };
+        }
+      } catch (err) {
+        return {
+          ok: false,
+          error: `failed-to-open-editor-tab:${err?.message || err}`,
+        };
+      }
+      if (!validated.tab?.id) {
+        return { ok: false, error: "no-editor-tab" };
+      }
+    }
+    const requestId =
+      (typeof crypto !== "undefined" && crypto.randomUUID?.()) ||
+      `scene-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
+    // Editor tab was just opened by prepare-open-editor; the content
+    // script may not have mounted yet. Retry with backoff until it can
+    // receive messages, capped at ~10s total.
+    const backoffsMs = [0, 200, 400, 800, 1200, 1600, 2000, 2400, 2800];
+    let lastErr = null;
+    for (const wait of backoffsMs) {
+      if (wait > 0) {
+        await new Promise((r) => setTimeout(r, wait));
+      }
+      try {
+        const reply = await chrome.tabs.sendMessage(
+          validated.tab.id,
+          {
+            type: "proxy-create-scene",
+            projectId,
+            requestId,
+            payload,
+          },
+          // Target top frame only: content script also runs in any
+          // sub-iframes (manifest matches <all_urls>), and a postMessage
+          // from a sub-iframe doesn't bubble to the editor's top window.
+          { frameId: 0 },
+        );
+        return reply || { ok: false, error: "no-reply-from-editor" };
+      } catch (err) {
+        lastErr = err?.message || String(err);
+        if (!/Receiving end does not exist|Could not establish/i.test(lastErr)) {
+          // Different error; don't keep retrying.
+          break;
+        }
+      }
+    }
+    return { ok: false, error: lastErr || "tabs-sendMessage-failed" };
+  });
+
+  // Bearer-auth API call routed through the SW so it survives the calling
+  // tab's teardown (e.g. cloud recorder closing post-stop). Restricted to the
+  // configured Screenity API base. Kept for non-cloud-recorder callers; the
+  // cloud recorder uses the port-based path above instead.
+  registerMessage("pro-api-fetch", async (message) => {
+    // Heartbeat resets the SW idle timer for the duration of the fetch,
+    // helpful when the originating tab tears down right after dispatch.
+    const ping = () => {
+      try {
+        chrome.runtime.getPlatformInfo(() => void chrome.runtime.lastError);
+      } catch {}
+    };
+    ping();
+    const keepAlive = setInterval(ping, 10_000);
+    try {
+      const { path, method = "GET", body } = message || {};
+      if (typeof path !== "string" || !path.startsWith("/")) {
+        return { ok: false, error: "invalid-path" };
+      }
+      if (!API_BASE) return { ok: false, error: "no-api-base" };
+      const { screenityToken } = await chrome.storage.local.get([
+        "screenityToken",
+      ]);
+      const headers = { "Content-Type": "application/json" };
+      if (screenityToken) headers.Authorization = `Bearer ${screenityToken}`;
+      const res = await fetch(`${API_BASE}${path}`, {
+        method,
+        headers,
+        body: body != null ? JSON.stringify(body) : undefined,
+        keepalive: true,
+      });
+      const text = await res.text();
+      let json = null;
+      try {
+        json = text ? JSON.parse(text) : null;
+      } catch {}
+      return { ok: res.ok, status: res.status, body: json, text };
+    } catch (err) {
+      return { ok: false, error: err?.message || String(err) };
+    } finally {
+      clearInterval(keepAlive);
+    }
+  });
+
   registerMessage("offscreen-diag", async (message) => {
     console.warn("[Screenity][OffscreenDiag]", message.source, message.payload);
     return { ok: true };
@@ -768,9 +951,35 @@ export const setupHandlers = () => {
     chrome.runtime.sendMessage(pendingOffscreenLoad).catch(() => {});
     return { ok: true, delivered: true };
   });
+  // Offscreen recorder can't call chrome.scripting; SW proxies the viewport
+  // probe so the recorder can size tab-capture constraints to the tab's
+  // actual aspect ratio (avoiding the default 1920x1080 pillarbox).
+  registerMessage("get-tab-viewport", async (message) => {
+    const tabId = Number(message?.tabId);
+    if (!Number.isFinite(tabId) || tabId < 0) {
+      return { ok: false, error: "invalid-tab-id" };
+    }
+    try {
+      const results = await chrome.scripting.executeScript({
+        target: { tabId },
+        func: () => ({
+          w: Math.round(window.innerWidth * (window.devicePixelRatio || 1)),
+          h: Math.round(window.innerHeight * (window.devicePixelRatio || 1)),
+        }),
+      });
+      const r = results?.[0]?.result;
+      if (r && r.w > 0 && r.h > 0) {
+        return { ok: true, width: r.w, height: r.h };
+      }
+      return { ok: false, error: "no-result" };
+    } catch (err) {
+      return { ok: false, error: err?.message || String(err) };
+    }
+  });
+
   registerMessage("offscreen-request-stream", async (message, sender) => {
     try {
-      // Fall back to recordingUiTabId so the picker anchors to the user's tab, not the offscreen doc.
+      // anchor picker to user's tab, not the offscreen doc
       let initiatingTabId = message.initiatingTabId || null;
       if (!initiatingTabId) {
         const { recordingUiTabId } = await chrome.storage.local.get([
@@ -799,14 +1008,12 @@ export const setupHandlers = () => {
     resetActiveTabRestart(message),
   );
   registerMessage("video-ready", async (message) => {
+    perfMark("BG.handlers video-ready.received");
     await videoReady(message);
     await clearRecordingSessionSafe("video-ready");
   });
 
-  // Download-path remux request from the sandbox. Ensures the remux
-  // offscreen document is open, forwards the request, and returns the
-  // response. On any SW-side failure the caller falls back to the
-  // in-sandbox BufferTarget remux.
+  // download-path remux request from sandbox; falls back to in-sandbox BufferTarget on failure
   registerMessage("remux-request", async (message) => {
     if (
       !message?.requestId ||
@@ -824,13 +1031,28 @@ export const setupHandlers = () => {
       };
     }
     try {
-      const response = await chrome.runtime.sendMessage({
-        type: "remux-start",
-        requestId: message.requestId,
-        inputFileName: message.inputFileName,
-        outputFileName: message.outputFileName,
-      });
-      return response || { ok: false, error: "no-offscreen-response" };
+      // deterministic timeout so a wedged offscreen can't hang the caller forever
+      const REMUX_TIMEOUT_MS = 60_000;
+      let timeoutId = null;
+      try {
+        const response = await Promise.race([
+          chrome.runtime.sendMessage({
+            type: "remux-start",
+            requestId: message.requestId,
+            inputFileName: message.inputFileName,
+            outputFileName: message.outputFileName,
+          }),
+          new Promise((_, reject) => {
+            timeoutId = setTimeout(
+              () => reject(new Error("remux-offscreen-timeout")),
+              REMUX_TIMEOUT_MS,
+            );
+          }),
+        ]);
+        return response || { ok: false, error: "no-offscreen-response" };
+      } finally {
+        if (timeoutId) clearTimeout(timeoutId);
+      }
     } catch (err) {
       return {
         ok: false,
@@ -839,8 +1061,7 @@ export const setupHandlers = () => {
     }
   });
 
-  // Fired by Region/Recorder.jsx pagehide — the iframe is being torn down
-  // because the user navigated away from the recorded tab.
+  // pagehide from Region/Recorder.jsx; user navigated away from the recorded tab
   registerMessage("region-iframe-destroyed", async () => {
     const { recording, recorderSession, customRegion } =
       await chrome.storage.local.get([
@@ -852,19 +1073,17 @@ export const setupHandlers = () => {
       recording ||
       (recorderSession && recorderSession.status === "recording");
     if (!isActivelyRecording) return;
-    // Only treat as a real region-recording teardown when the iframe was
-    // actually hosting the MediaRecorder (customRegion flow). Plain
-    // tab-area records in the pinned recorder tab, so navigation of the
-    // recorded page must not tear it down.
+    // only customRegion hosts MediaRecorder in the iframe; plain tab capture lives
+    // in the pinned recorder tab and must not be torn down by recorded-page navigation
     if (!customRegion) return;
 
     diagEvent("region-iframe-destroyed");
     await chrome.storage.local.set({
       recording: false,
       customRegion: false,
-      // Clear recordingTab so stopRecording() doesn't think the editor was
-      // already opened by the stop-recording-tab flow (recordingTab points
-      // to the pinned recorder.html tab which didn't open any editor).
+      // recordingTab points to pinned recorder.html which didn't open the editor;
+      // clear it so stopRecording() doesn't skip editor open
+
       recordingTab: null,
       postStopEditorOpening: false,
       postStopEditorOpened: false,
@@ -873,12 +1092,14 @@ export const setupHandlers = () => {
         : null,
     });
 
-    // If no chunks were persisted (user navigated almost immediately),
-    // show a toast instead of opening an empty editor.
+    // user navigated before any chunks persisted; toast instead of empty editor
     const chunkCount = await chunksStore.length().catch(() => 0);
     if (chunkCount === 0) {
       diagEvent("region-nav-no-chunks");
-      const { activeTab } = await chrome.storage.local.get(["activeTab"]);
+      const { activeTab, sandboxTab } = await chrome.storage.local.get([
+        "activeTab",
+        "sandboxTab",
+      ]);
       if (activeTab) {
         sendMessageTab(activeTab, {
           type: "show-toast",
@@ -886,13 +1107,28 @@ export const setupHandlers = () => {
           timeout: 5000,
         }).catch(() => {});
       }
+      // editor opened pre-unload would otherwise hang at "Preparing recording..."
+      if (Number.isInteger(sandboxTab)) {
+        try {
+          await chrome.storage.local.set({
+            editorRecordingError: {
+              ts: Date.now(),
+              sandboxTab,
+              error: "stream-error",
+              why: "Recording stopped before any data was captured",
+              errorCode: "REC_REGION_NAV_NO_CHUNKS",
+              source: "region-iframe-destroyed",
+            },
+          });
+        } catch {}
+      }
       return;
     }
 
     await videoReady();
   });
 
-  registerMessage("start-recording", (message) => startRecording(message));
+  registerMessage("start-recording", (message) => startRecording("start-recording-message"));
   registerMessage("countdown-finished", async (message) => {
     const { recording, restarting, pendingRecording } =
       await chrome.storage.local.get([
@@ -900,9 +1136,8 @@ export const setupHandlers = () => {
       "restarting",
       "pendingRecording",
     ]);
-    // pendingRecording/restarting are expected transitional flags while countdown
-    // runs. During restart, `recording` may still be true briefly from the
-    // previous session, so only block when recording is active AND not restarting.
+    // restart leaves `recording: true` briefly from the previous session, so block
+    // only when recording is active AND not restarting
     if (recording && !restarting) {
       diagEvent("countdown-finished", { skipped: true, reason: "already-recording" });
       const decisionAt = Date.now();
@@ -936,18 +1171,20 @@ export const setupHandlers = () => {
         started: true,
       },
     });
-    startAfterCountdown();
+    startAfterCountdown("countdown-finished");
     return { ok: true };
   });
   registerMessage("restarted", (message) => restartActiveTab(message));
   const sendChunksToSandbox = async (sender) => {
+    perfMark("BG.handlers sendChunksToSandbox.enter", {
+      senderTab: sender?.tab?.id || null,
+    });
     if (DEBUG_POSTSTOP)
       console.debug("[Screenity][BG] sendChunksToSandbox invoked", {
         senderTab: sender?.tab?.id,
       });
 
     const { sandboxTab } = await chrome.storage.local.get(["sandboxTab"]);
-    // Prefer stored sandboxTab but fall back to the caller tab if available
     const targetTab = sandboxTab || sender?.tab?.id || null;
     if (!targetTab) {
       if (DEBUG_POSTSTOP)
@@ -955,38 +1192,8 @@ export const setupHandlers = () => {
       throw new Error("no-sandbox-tab");
     }
 
-    const pingReady = async () => {
-      return new Promise((resolve) => {
-        chrome.runtime.sendMessage(
-          { type: "ping", _targetTabId: targetTab },
-          (response) => {
-            resolve(response?.status === "ready");
-          },
-        );
-      });
-    };
-
-    const maxPingAttempts = 10;
-    let pingOk = false;
-    for (let attempt = 1; attempt <= maxPingAttempts; attempt += 1) {
-      // eslint-disable-next-line no-await-in-loop
-      pingOk = await pingReady();
-      if (DEBUG_POSTSTOP)
-        console.debug("[Screenity][BG] ping attempt", { attempt, pingOk });
-      if (pingOk) break;
-      // eslint-disable-next-line no-await-in-loop
-      await new Promise((r) => setTimeout(r, 200));
-    }
-
-    if (!pingOk) {
-      if (DEBUG_POSTSTOP)
-        console.warn(
-          "[Screenity][BG] sandbox not ready after pings, proceeding anyway",
-          { targetTab },
-        );
-      // Proceed even if ping failed — runtime message ports can be unreliable
-      // during page load; we'll attempt to send chunks regardless.
-    }
+    // sandboxed iframes don't receive runtime.sendMessage; chunk delivery uses
+    // tabs.sendMessage with frameId which does reach them, so no ping needed
 
     const maxAttempts = 6;
     const delayMs = 250;
@@ -1055,6 +1262,10 @@ export const setupHandlers = () => {
   );
   registerMessage("cancel-recording", (message) => cancelRecording(message));
   registerMessage("stop-recording-tab", (message, sender, sendResponse) => {
+    perfMark("BG.handlers stop-recording-tab.received", {
+      reason: message?.reason || null,
+      senderTabId: sender?.tab?.id || null,
+    });
     logStopRecordingTabEvent(message, sender);
     const now = Date.now();
     if (
@@ -1101,17 +1312,22 @@ export const setupHandlers = () => {
   });
   registerMessage("set-mic-active-tab", (message) => setMicActiveTab(message));
 
-  // Diagnostic events routed from content scripts / sandbox
-  registerMessage("diag-countdown-started", () => diagEvent("countdown-started"));
+  registerMessage("diag-countdown-started", () => {
+    diagEvent("countdown-started");
+    // countdown started means stream setup is done; extend the fallback window
+    // so it doesn't fire during countdown (and start the recording too early)
+    noteCountdownStarted();
+  });
   registerMessage("diag-countdown-cancelled", () => diagEvent("countdown-cancelled"));
   registerMessage("diag-editor-ready", (message) =>
     diagEvent("editor-load-ready", { path: message?.path || null }),
   );
-  // Only accept "sandbox-" / "sw-" prefixed events so a compromised context can't spoof lifecycle events.
+  // prefix allowlist so a compromised context can't spoof lifecycle events
   registerMessage("diag-forward", (message) => {
     const ev = typeof message?.event === "string" ? message.event : null;
     if (!ev) return;
-    if (!ev.startsWith("sandbox-") && !ev.startsWith("sw-")) return;
+    const allowedPrefixes = ["sandbox-", "sw-", "opfs-", "recorder-"];
+    if (!allowedPrefixes.some((p) => ev.startsWith(p))) return;
     diagEvent(ev, message?.data ?? null);
   });
   registerMessage("open-editor-recovery", async () => {
@@ -1126,18 +1342,43 @@ export const setupHandlers = () => {
       error: message?.error || null,
     });
   });
+  // camera bubble failed but recording is live; surface as toast, never tear down
+  registerMessage("camera-bubble-unavailable", async (message) => {
+    try {
+      const { tabRecordedID, recordingUiTabId } = await chrome.storage.local.get([
+        "tabRecordedID",
+        "recordingUiTabId",
+      ]);
+      const target = tabRecordedID || recordingUiTabId;
+      if (target) {
+        sendMessageTab(target, {
+          type: "show-toast",
+          message:
+            chrome.i18n.getMessage("cameraUnavailableToast") ||
+            "Camera disconnected. Still recording your screen.",
+          timeout: 6000,
+        }).catch((err) => {
+          diagEvent("warning", {
+            note: "camera-unavailable-toast undelivered",
+            err: String(err).slice(0, 80),
+          });
+        });
+      }
+    } catch {}
+  });
   registerMessage("on-get-permissions", (message) =>
     handleOnGetPermissions(message),
   );
   registerMessage(
     "recording-complete",
-    async (message, sender) => await handleRecordingComplete(message, sender),
+    async (message, sender) => {
+      perfMark("BG.handlers recording-complete.received");
+      return await handleRecordingComplete(message, sender);
+    },
   );
   registerMessage("check-recording", (message) => checkRecording(message));
   registerMessage("open-download-mp4", async () => {
-    // If cloud features are enabled and the user is signed in, block the
-    // local "fast MP4" recovery flow to avoid diverging from the pro/server
-    // workflow. Show a toast instead.
+    // cloud-enabled signed-in users skip local fast-MP4 recovery to stay on the pro flow
     if (CLOUD_FEATURES_ENABLED) {
       try {
         const { authenticated } = await loginWithWebsite();
@@ -1240,7 +1481,6 @@ export const setupHandlers = () => {
     const errorWhy = message?.errorWhy || null;
     const source = message?.source || "error-modal";
 
-    // Check auth for form routing
     let user = null;
     let isLoggedIn = false;
     if (CLOUD_FEATURES_ENABLED) {
@@ -1343,7 +1583,6 @@ export const setupHandlers = () => {
         keepalive: true,
       }).catch(() => {});
     } catch {
-      // best effort
     }
   });
   registerMessage("restore-recording", (message) => restoreRecording(message));
@@ -1377,7 +1616,7 @@ export const setupHandlers = () => {
   );
   registerMessage("is-pinned", async () => await isPinned());
 
-  // Prevent Chrome from discarding the CloudRecorder tab during recording
+  // prevent Chrome from discarding the CloudRecorder tab while recording
   registerMessage("set-tab-auto-discardable", (message, sender) =>
     setTabAutoDiscardableSafe(message, sender),
   );
@@ -1449,8 +1688,9 @@ export const setupHandlers = () => {
       console.warn("Cloud features disabled, cannot handle login");
       return;
     }
-    // User is explicitly initiating login — clear the stay-logged-out flag.
     await chrome.storage.local.set({ stayLoggedOut: false });
+    // cancel deferred-logout token clear; otherwise drain listener clobbers fresh token
+    await chrome.storage.local.remove(["logoutPendingTokenClear"]);
 
     const currentTab = await getCurrentTab();
 
@@ -1467,17 +1707,26 @@ export const setupHandlers = () => {
       sendResponse({ success: false, message: "Cloud features disabled" });
       return true;
     }
-    await chrome.storage.local.remove([
-      "screenityToken",
+    // keep screenityToken during active recording for bunnyTusUploader.refreshTusAuth;
+    // removed by recording-end cleanup
+    const { recording, pendingRecording } = await chrome.storage.local.get([
+      "recording",
+      "pendingRecording",
+    ]);
+    const recordingBusy = Boolean(recording || pendingRecording);
+    const removeKeys = [
       "screenityUser",
       "lastAuthCheck",
       "isSubscribed",
       "isLoggedIn",
       "proSubscription",
-    ]);
+    ];
+    if (!recordingBusy) {
+      removeKeys.push("screenityToken");
+    }
+    await chrome.storage.local.remove(removeKeys);
 
-    // Preserve a post-logout marker so popup can render the LoggedOut state.
-    // stayLoggedOut blocks auto-login until the user explicitly clicks "Log in".
+    // stayLoggedOut blocks auto-login until user explicitly clicks "Log in"
     await chrome.storage.local.set({
       isLoggedIn: false,
       wasLoggedIn: true,
@@ -1485,9 +1734,44 @@ export const setupHandlers = () => {
       isSubscribed: false,
       proSubscription: null,
       screenityUser: null,
+      ...(recordingBusy ? { logoutPendingTokenClear: true } : {}),
     });
 
-    sendResponse({ success: true });
+    if (recordingBusy) {
+      // drain listener; don't await, sendResponse must fire immediately
+      const drainListener = async (changes, area) => {
+        if (area !== "local") return;
+        if (
+          !(changes.recording || changes.pendingRecording)
+        )
+          return;
+        const snap = await chrome.storage.local.get([
+          "recording",
+          "pendingRecording",
+          "logoutPendingTokenClear",
+          "stayLoggedOut",
+        ]);
+        if (snap.recording || snap.pendingRecording) return;
+        if (!snap.logoutPendingTokenClear) {
+          // flag cleared by re-login
+          chrome.storage.onChanged.removeListener(drainListener);
+          return;
+        }
+        // gate on stayLoggedOut so a stray flag write can't silently log user out
+        if (snap.stayLoggedOut !== true) {
+          chrome.storage.onChanged.removeListener(drainListener);
+          await chrome.storage.local.remove(["logoutPendingTokenClear"]);
+          return;
+        }
+        chrome.storage.onChanged.removeListener(drainListener);
+        await chrome.storage.local.remove([
+          "screenityToken",
+          "logoutPendingTokenClear",
+        ]);
+      };
+      chrome.storage.onChanged.addListener(drainListener);
+    }
+    sendResponse({ success: true, deferredTokenClear: recordingBusy });
     return true;
   });
 
@@ -1496,7 +1780,6 @@ export const setupHandlers = () => {
     const { x, y, surface, region, isTab } = payload;
     const senderWindowId = sender.tab?.windowId;
 
-    // Ask Recorder for current video time
     sendMessageRecord({ type: "get-video-time" }, (response) => {
       const videoTime = response?.videoTime ?? null;
 
@@ -1558,10 +1841,33 @@ export const setupHandlers = () => {
     });
   });
 
+  // serialize to avoid read-modify-write race losing clicks; cap array for long recordings
+  const CLICK_EVENTS_MAX = 5000;
+  let _clickWriteQueue = Promise.resolve();
   function storeClick(click) {
-    chrome.storage.local.get({ clickEvents: [] }, (data) => {
-      chrome.storage.local.set({ clickEvents: [...data.clickEvents, click] });
-    });
+    _clickWriteQueue = _clickWriteQueue
+      .catch(() => {})
+      .then(async () => {
+        try {
+          // 2s cap so a wedged storage call can't block subsequent click writes
+          await Promise.race([
+            (async () => {
+              const { clickEvents = [] } = await chrome.storage.local.get({
+                clickEvents: [],
+              });
+              const next = clickEvents.concat(click);
+              if (next.length > CLICK_EVENTS_MAX) {
+                next.splice(0, next.length - CLICK_EVENTS_MAX);
+              }
+              await chrome.storage.local.set({ clickEvents: next });
+            })(),
+            new Promise((_, reject) =>
+              setTimeout(() => reject(new Error("click-write-timeout")), 2000),
+            ),
+          ]);
+        } catch {
+        }
+      });
   }
 
   function getMonitorForWindow(message, sender, sendResponse) {
@@ -1588,7 +1894,6 @@ export const setupHandlers = () => {
           console.warn("[get-monitor-for-window] No matching monitor");
           sendResponse({ error: "No matching monitor" });
         } else {
-          // Save monitor info directly into chrome.storage.local
           chrome.storage.local.set(
             {
               displays,
@@ -1765,8 +2070,7 @@ export const setupHandlers = () => {
     }
   });
   registerMessage("preparing-recording", async () => {
-    // Prefer stored activeTab over getCurrentTab() which can return
-    // the pinned recorder tab instead of the user's page.
+    // getCurrentTab can return the pinned recorder tab; prefer stored activeTab
     const { activeTab } = await chrome.storage.local.get(["activeTab"]);
     const tabId = activeTab || (await getCurrentTab())?.id;
     if (tabId) {
@@ -1829,30 +2133,12 @@ export const setupHandlers = () => {
 
       chrome.runtime.sendMessage({ type: "turn-off-pip" });
 
-      // Copy to clipboard immediately after focusTab, before the auto-publish
-      // network request.  The auto-publish await can take hundreds of ms, during
-      // which the renderer may lose document focus — causing navigator.clipboard
-      // to throw "Document is not focused".  Copying here gives the best chance
-      // the tab is still the topmost focused document.
+      // New-project recordings are user-facing public-shareable, so
+      // flip isPublic before we hand the share URL to the clipboard.
+      markProjectPublic(projectId);
+
       if (publicUrl) {
         copyToClipboard(publicUrl);
-      }
-
-      if (projectId) {
-        await fetch(
-          `${API_BASE}/videos/${projectId}/auto-publish`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${await chrome.storage.local
-                .get("screenityToken")
-                .then((r) => r.screenityToken)}`,
-            },
-          },
-        ).catch((err) =>
-          console.warn("[Screenity][BG] Failed to auto-publish project", err),
-        );
       }
     } else if (message.multiMode) {
       messageTab = (await getCurrentTab())?.id || null;
@@ -1868,9 +2154,8 @@ export const setupHandlers = () => {
       chrome.runtime.sendMessage({ type: "turn-off-pip" });
     }
 
-    // Copy for the non-newProject paths (scene additions are excluded because
-    // publicUrl is null there; multiMode new-project is excluded because it
-    // goes through handleFinishMultiRecording which has its own clipboard call).
+    // non-newProject paths only; scene additions have null publicUrl, multiMode
+    // new-project goes through handleFinishMultiRecording with its own clipboard
     if (publicUrl && !message.newProject) {
       copyToClipboard(publicUrl);
     }
@@ -1985,15 +2270,20 @@ export const setupHandlers = () => {
       return { ok: false, error: "chunk-index-out-of-range", index };
     }
 
-    const item = await chunksStore.getItem(`chunk_${index}`).catch(() => null);
+    const targetStore = offerScreenStore(offer);
+    const item = await targetStore.getItem(`chunk_${index}`).catch(() => null);
     if (!item?.chunk) {
       return { ok: false, error: "chunk-missing", index };
     }
 
+    // OPFS-stored Blobs come back with type "" (raw bytes); reconstruct
+    // the mimeType from the offer's recorded container so the editor's
+    // <video> element knows whether it's MP4 or WebM.
+    const containerMime = offer.container || "video/webm";
     const blob =
-      item.chunk instanceof Blob
+      item.chunk instanceof Blob && item.chunk.type
         ? item.chunk
-        : new Blob([item.chunk], { type: "video/webm" });
+        : new Blob([item.chunk], { type: containerMime });
     const arrayBuffer = await blob.arrayBuffer();
     const base64 = btoa(
       new Uint8Array(arrayBuffer).reduce(
@@ -2007,7 +2297,7 @@ export const setupHandlers = () => {
       chunk: {
         index,
         size: blob.size,
-        mimeType: blob.type || "video/webm",
+        mimeType: blob.type || containerMime,
         base64,
       },
       offer: {
@@ -2155,7 +2445,7 @@ export const setupHandlers = () => {
   registerMessage("clear-recording-alarm", async () => {
     await chrome.alarms.clear("recording-alarm");
   });
-  // Relay toasts to the active content script (extension pages can't reach it directly).
+  // extension pages can't message content scripts directly
   registerMessage("show-toast", async (message) => {
     try {
       const { activeTab } = await chrome.storage.local.get(["activeTab"]);

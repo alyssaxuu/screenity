@@ -24,8 +24,8 @@ const DevHUD = ({ contentStateRef, setContentState }) => {
   useEffect(() => {
     const el = document.createElement("div");
     el.id = "screenity-dev-hud-portal";
-    // Make the container itself invisible/non-interfering but ensure its
-    // children (position:fixed) are not clipped by host-page CSS.
+    // Container invisible but children (position:fixed) must not be
+    // clipped by host-page CSS.
     el.style.cssText = [
       "position:fixed !important",
       "top:0 !important",
@@ -131,8 +131,7 @@ const DevHUD = ({ contentStateRef, setContentState }) => {
 
   if (!portalEl) return null;
 
-  // Shared wrapper style — lives inside the zero-size fixed container,
-  // so it needs its own position:fixed to escape.
+  // Lives inside the zero-size fixed container so needs its own position:fixed.
   const wrapBase = {
     position: "fixed",
     bottom: 6,

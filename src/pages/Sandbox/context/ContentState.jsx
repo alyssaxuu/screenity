@@ -22,6 +22,8 @@ import {
   isRecordingDebugEnabled,
 } from "../../utils/recordingDebug";
 import { diagForward } from "../../utils/diagForward";
+import { perfMark, perfSpan } from "../../utils/perfMarks";
+import { chooseReader } from "../recorderStorage/chooseReader";
 import {
   Input,
   Output,
@@ -47,7 +49,6 @@ export const ContentStateContext = createContext();
 
 const DEBUG_RECORDER =
   typeof window !== "undefined" ? !!window.SCREENITY_DEBUG_RECORDER : false;
-// Enable post-stop debug logs for sandbox
 const DEBUG_POSTSTOP = DEBUG_RECORDER;
 
 const ContentState = (props) => {
@@ -56,7 +57,6 @@ const ContentState = (props) => {
   const chunkCount = useRef(0);
   const recdbgSessionRef = useRef(null);
   const tabIdRef = useRef(null);
-  // Stale-result guard + stuck-edit watchdog.
   const opIdRef = useRef(0);
   const editWatchdogRef = useRef(null);
 
@@ -146,13 +146,20 @@ const ContentState = (props) => {
       chrome.runtime.sendMessage({ type: "recdbg-ping" });
   }, []);
 
+  // legacy ffmpeg editor loads entire blob into WASM (~3x peak RAM); cap edit length
+  const isLegacyFfmpegEditor =
+    typeof window !== "undefined" &&
+    typeof window.location !== "undefined" &&
+    /\/editor\.html(?:[?#]|$)/.test(window.location.pathname + window.location.search);
+  const MAX_EDIT_LIMIT_S = isLegacyFfmpegEditor ? 600 : 3600;
+
   const defaultState = {
     time: 0,
     editLimit: 420,
-    // Last successful (or failed) download remux outcome. Populated at
-    // the end of download(); consumed by DevHUD in dev builds to show
-    // which tier ran and how long it took.
+    playerLoading: false,
+    finalizingRecording: false,
     lastDownloadInfo: null,
+    lastRecordingBackend: null,
     blob: null,
     webm: null,
     originalBlob: null,
@@ -162,7 +169,7 @@ const ContentState = (props) => {
     trimming: false,
     cutting: false,
     muting: false,
-    editErrorType: null, // null | "too-long" | "timeout" | "failed"
+    editErrorType: null, // null | "too-long" | "timeout" | "failed" | "audio-too-large"
     history: [{}], // Initialize history with a default state
     redoHistory: [],
     undoDisabled: true,
@@ -171,7 +178,9 @@ const ContentState = (props) => {
     mode: "player",
     ffmpegLoaded: false,
     frame: null,
+    pendingCropEntry: false,
     getFrame: null,
+    openToast: null,
     isFfmpegRunning: false,
     reencoding: false,
     prevWidth: 0,
@@ -221,6 +230,8 @@ const ContentState = (props) => {
   const pseudoProgressStartAtRef = useRef(null);
   const diagMountAtRef = useRef(null);
   const diagMakeVideoAtRef = useRef(null);
+  const editorReadyDiagSentRef = useRef(false);
+  const editorErrorShownRef = useRef(false);
   const diagHeartbeatCountRef = useRef(0);
 
   const setContentState = useCallback((updater) => {
@@ -238,6 +249,20 @@ const ContentState = (props) => {
       launchRecordingIdRef.current = params.get("recordingId") || null;
     } catch {}
   }, []);
+
+  useEffect(() => {
+    // emit diag-editor-ready once; WebM has many "ready:true" branches
+    if (!contentState.ready) return;
+    if (editorReadyDiagSentRef.current) return;
+    editorReadyDiagSentRef.current = true;
+    const blobType = contentStateRef.current?.blob?.type
+      || contentStateRef.current?.rawBlob?.type
+      || null;
+    const path = blobType?.includes("mp4") ? "mp4-fast" : "webm";
+    chrome.runtime
+      .sendMessage({ type: "diag-editor-ready", path })
+      .catch(() => {});
+  }, [contentState.ready]);
 
   useEffect(() => {
     if (launchModeRef.current !== "postStop") return;
@@ -397,68 +422,42 @@ const ContentState = (props) => {
   }, [contentState.chunkIndex, contentState.chunkCount]);
 
   const buildBlobFromChunks = async () => {
-    const items = [];
-
-    await chunksStore.ready();
-    if (DEBUG_POSTSTOP)
-      console.debug(
-        "[Screenity][Sandbox] buildBlobFromChunks: chunksStore ready, iterating",
-      );
-
-    await chunksStore.iterate((value) => (items.push(value), undefined));
-    if (DEBUG_POSTSTOP)
-      console.debug("[Screenity][Sandbox] buildBlobFromChunks: items loaded", {
-        count: items.length,
-      });
-
-    items.sort((a, b) => (a.timestamp ?? 0) - (b.timestamp ?? 0));
-    const parts = items.map((c) =>
-      c.chunk instanceof Blob ? c.chunk : new Blob([c.chunk]),
-    );
-
-    if (!parts.length) {
-      debug("No chunks found in IndexedDB");
+    const { lastRecordingBackendRef } = await chrome.storage.local.get([
+      "lastRecordingBackendRef",
+    ]);
+    const reader = chooseReader(lastRecordingBackendRef);
+    await reader.open(lastRecordingBackendRef);
+    let readResult;
+    try {
+      readResult = await reader.readBlob();
+    } finally {
+      await reader.close().catch(() => {});
+    }
+    if (!readResult || readResult.chunkCount === 0) {
+      debug("No chunks found in chunk reader");
       if (DEBUG_POSTSTOP)
         console.warn(
-          "[Screenity][Sandbox] buildBlobFromChunks: no parts found in IndexedDB",
+          "[Screenity][Sandbox] buildBlobFromChunks: no parts found",
         );
       debugRecordingEventWithSession(recdbgSessionRef.current, "blob-empty", {
         chunkCount: 0,
       });
       return null;
     }
-
-    const first = parts[0];
-    const inferredType = first?.type || "video/webm";
-
-    const blob = new Blob(parts, { type: inferredType });
+    const blob = readResult.blob;
     if (DEBUG_POSTSTOP)
       console.debug(
         "[Screenity][Sandbox] buildBlobFromChunks: reconstructed blob",
         {
           size: blob.size,
           type: blob.type,
+          chunkCount: readResult.chunkCount,
         },
       );
     reconstructVideo(blob);
     return blob;
   };
 
-  // useEffect(() => {
-  //   contentStateRef.current = contentState;
-  // }, [contentState]);
-
-  // Check if the user is offline
-  // useEffect(() => {
-  //   if (!navigator.onLine) {
-  //     setContentState((prevState) => ({
-  //       ...prevState,
-  //       offline: true,
-  //     }));
-  //   }
-  // }, []);
-
-  // Generate a title based on the current time unless this is a tab recording
   useEffect(() => {
     const loadInitialTitle = async () => {
       const date = new Date();
@@ -505,7 +504,6 @@ const ContentState = (props) => {
     loadInitialTitle();
   }, []);
 
-  // Show a popup when attempting to close the tab if the user has not downloaded their video
   useEffect(() => {
     if (!contentState.saved) {
       window.onbeforeunload = function () {
@@ -541,13 +539,34 @@ const ContentState = (props) => {
     }));
   };
 
+  // each entry pins a blob (multi-GB on long recordings); cap to bound memory
+  const MAX_HISTORY_DEPTH = 20;
   const addToHistory = useCallback(() => {
-    setContentState((prevState) => ({
-      ...prevState,
-      history: [...prevState.history, prevState],
-      redoHistory: [], // Clear redo history when a new state is added
-    }));
+    setContentState((prevState) => {
+      const next = [...prevState.history, prevState];
+      if (next.length > MAX_HISTORY_DEPTH) {
+        next.splice(0, next.length - MAX_HISTORY_DEPTH);
+      }
+      return {
+        ...prevState,
+        history: next,
+        redoHistory: [],
+      };
+    });
   }, [contentState]);
+
+  // History snapshots taken mid-edit can carry isFfmpegRunning:true and
+  // edit-mode flags. Restoring such a snapshot leaves redo greyed out and
+  // edit buttons disabled. The action gate already confirms no FFmpeg
+  // is in flight by the time undo/redo can fire, so reset on every restore.
+  const RESET_RUNTIME_FLAGS = {
+    isFfmpegRunning: false,
+    trimming: false,
+    cutting: false,
+    muting: false,
+    cropping: false,
+    reencoding: false,
+  };
 
   const undo = useCallback(() => {
     if (contentState.history.length > 1) {
@@ -559,6 +578,7 @@ const ContentState = (props) => {
         ...previousState,
         history: newHistory,
         redoHistory: [contentState, ...contentState.redoHistory],
+        ...RESET_RUNTIME_FLAGS,
       }));
     }
   }, [contentState]);
@@ -572,6 +592,7 @@ const ContentState = (props) => {
         ...nextState,
         history: [...contentState.history, contentState],
         redoHistory: newRedoHistory,
+        ...RESET_RUNTIME_FLAGS,
       }));
     }
   }, [contentState]);
@@ -602,13 +623,38 @@ const ContentState = (props) => {
   useEffect(() => {
     if (!contentState.blob) return;
 
-    // Get duration of video blob
     const video = document.createElement("video");
     video.preload = "metadata";
     video.onloadedmetadata = async () => {
+      // fragmented MP4 mvhd can be wrong; cross-check storage but only on original
+      // (edited blobs are shorter than recordingDuration)
+      const isOriginalBlob =
+        !contentState.originalBlob ||
+        contentState.blob === contentState.originalBlob;
+      let durationSec = video.duration;
+      if (isOriginalBlob) {
+        try {
+          const { recordingDuration } = await chrome.storage.local.get([
+            "recordingDuration",
+          ]);
+          const recSec = Number(recordingDuration) > 0
+            ? Number(recordingDuration) / 1000
+            : 0;
+          const probedSec = Number.isFinite(video.duration) && video.duration > 0
+            ? video.duration
+            : 0;
+          if (recSec > probedSec + 0.3) {
+            durationSec = recSec;
+          } else if (probedSec > 0) {
+            durationSec = probedSec;
+          } else if (recSec > 0) {
+            durationSec = recSec;
+          }
+        } catch {}
+      }
       setContentState((prevState) => ({
         ...prevState,
-        duration: video.duration,
+        duration: durationSec,
         width: video.videoWidth,
         height: video.videoHeight,
         prevWidth: video.videoWidth,
@@ -622,9 +668,8 @@ const ContentState = (props) => {
   }, [contentState.blob]);
 
   const reconstructVideo = async (withBlob) => {
-    // Sniff MIME type from magic bytes (WebCodecs chunks are MP4, not WebM).
-    // `base64ToUint8Array` returns Blob for data-URL inputs and Uint8Array for
-    // raw base64 — handle both. A Blob has .size; a Uint8Array has .length.
+    // sniff magic bytes; WebCodecs chunks are MP4 not WebM.
+    // base64ToUint8Array returns Blob for data-URL, Uint8Array for raw
     let inferredType = "video/webm; codecs=vp8,opus";
     if (!withBlob && videoChunks.current.length > 0) {
       try {
@@ -667,9 +712,34 @@ const ContentState = (props) => {
 
     let blob;
     try {
-      blob = withBlob
-        ? withBlob
-        : new Blob(videoChunks.current, { type: inferredType });
+      if (withBlob) {
+        blob = withBlob;
+      } else {
+        // trim at first gap; sparse holes from out-of-order arrivals corrupt video
+        let firstGap = -1;
+        for (let i = 0; i < videoChunks.current.length; i += 1) {
+          if (videoChunks.current[i] == null) {
+            firstGap = i;
+            break;
+          }
+        }
+        const safeChunks =
+          firstGap >= 0
+            ? videoChunks.current.slice(0, firstGap)
+            : videoChunks.current;
+        if (firstGap >= 0) {
+          diagForward("sandbox-reconstruct-trimmed-at-gap", {
+            firstGap,
+            haveCount: safeChunks.length,
+            totalSlots: videoChunks.current.length,
+          });
+        }
+        blob = new Blob(safeChunks, { type: inferredType });
+      }
+      perfMark("Sandbox blob-built", {
+        bytes: blob?.size ?? 0,
+        chunks: videoChunks.current.length,
+      });
     } catch (err) {
       diagForward("sandbox-reconstruct-error", {
         error: String(err?.message || err).slice(0, 200),
@@ -689,35 +759,6 @@ const ContentState = (props) => {
         console.log("[Screenity][Sandbox] reconstructVideo: fast MP4 path taken", {
           size: blob.size,
         });
-      //const TOO_BIG_BYTES = 200 * 1024 * 1024;
-      // const TOO_BIG_BYTES = 0;
-      // if (blob.size > TOO_BIG_BYTES) {
-      //   // Convert Blob → base64 first so we can pass to sandbox
-      //   const reader = new FileReader();
-      //   reader.onloadend = () => {
-      //     const base64 = reader.result;
-
-      //     setContentState((prev) => ({
-      //       ...prev,
-      //       base64,
-      //       compressing: true,
-      //       mp4ready: false,
-      //       ready: false,
-      //       rawBlob: prev.rawBlob || blob,
-      //     }));
-
-      //     // Send to sandbox for compression
-      //     sendMessage({
-      //       type: "compress-video",
-      //       base64,
-      //       topLevel: true,
-      //     });
-      //   };
-      //   reader.readAsDataURL(blob);
-
-      //   return;
-      // }
-
       setContentState((prev) => ({
         ...prev,
         blob: blob,
@@ -725,18 +766,20 @@ const ContentState = (props) => {
         mp4ready: true,
         ready: true,
         rawBlob: blob,
+        originalBlob: prev.originalBlob || blob,
         isFfmpegRunning: false,
         noffmpeg: false,
-        // Native MP4 from WebCodecs: trim/crop go through mediabunny streaming
-        // ops, and mute/add-audio have their own 15-min cap. 7 min is a
-        // leftover from the ffmpeg.wasm era — bump to 15 min to match.
-        editLimit: Math.max(prev.editLimit || 0, 900),
+        editLimit: Math.max(prev.editLimit || 0, MAX_EDIT_LIMIT_S),
       }));
 
-      // Extract duration, width, height
       const video = document.createElement("video");
       video.preload = "metadata";
       video.onloadedmetadata = () => {
+        perfMark("Sandbox video-loadedmetadata", {
+          duration: video.duration,
+          w: video.videoWidth,
+          h: video.videoHeight,
+        });
         setContentState((prev) => ({
           ...prev,
           duration: video.duration,
@@ -812,7 +855,6 @@ const ContentState = (props) => {
       }
     }
 
-    // Check if token is present
     const { token } = await chrome.storage.local.get("token");
 
     let driveEnabled = false;
@@ -828,7 +870,6 @@ const ContentState = (props) => {
       duration: safeDuration / 1000,
     }));
 
-    // Check if user is in Windows 10
     const isWindows10 = navigator.userAgent.match(/Windows NT 10.0/);
 
     try {
@@ -838,7 +879,6 @@ const ContentState = (props) => {
             blob,
             safeDuration,
             async (fixedWebm) => {
-              // Skip conversion only if Chrome is outdated or recording exceeds edit limit
               if (
                 contentStateRef.current.updateChrome ||
                 contentStateRef.current.noffmpeg ||
@@ -873,7 +913,6 @@ const ContentState = (props) => {
           const fixedWebm = await fixWebmDurationFallback(blob, {
             type: "video/webm; codecs=vp8, opus",
           });
-          // Skip conversion only if Chrome is outdated or recording exceeds edit limit
           if (
             contentStateRef.current.updateChrome ||
             contentStateRef.current.noffmpeg ||
@@ -903,11 +942,9 @@ const ContentState = (props) => {
           reader.readAsDataURL(fixedWebm);
         }
       } else {
-        // Duration unknown — skip fixing, use raw blob as-is
         console.warn(
           "[Screenity][WebM] skipping duration fix: safeDuration=0, blob will have broken seek metadata",
         );
-        // Skip conversion only if Chrome is outdated or recording exceeds edit limit
         if (
           contentStateRef.current.updateChrome ||
           contentStateRef.current.noffmpeg ||
@@ -950,8 +987,7 @@ const ContentState = (props) => {
       chrome.runtime.sendMessage({ type: "recording-complete" });
     }
 
-    // 45s safety timeout for the direct-blob path — force ready if
-    // fixWebmDuration or readAsDataURL hangs.
+    // 45s safety timeout for direct-blob path; fixWebmDuration/readAsDataURL can hang
     if (withBlob) {
       setTimeout(() => {
         const s = contentStateRef.current;
@@ -1011,6 +1047,9 @@ const ContentState = (props) => {
   }, [contentState.chunkCount]);
 
   const handleBatch = (chunks, sendResponse) => {
+    if (videoChunks.current.length === 0) {
+      perfMark("Sandbox first-chunk-batch", { batchLen: chunks?.length });
+    }
     if (DEBUG_POSTSTOP)
       console.debug("[Screenity][Sandbox] handleBatch called", {
         chunksLen: chunks?.length,
@@ -1061,10 +1100,9 @@ const ContentState = (props) => {
       }
     })();
 
-    return true; // Keep the messaging channel open for the response
+    return true;
   };
 
-  // Check Chrome version
   useEffect(() => {
     const version = navigator.userAgent.match(/Chrom(e|ium)\/([0-9]+)\./);
 
@@ -1079,9 +1117,10 @@ const ContentState = (props) => {
     }
   }, []);
 
-  const makeVideoTab = (sendResponse = null, message) => {
+  const makeVideoTab = async (sendResponse = null, message) => {
     if (makeVideoCheck.current) return;
     makeVideoCheck.current = true;
+    perfMark("Sandbox makeVideoTab.enter", { override: message?.override });
     if (DEBUG_POSTSTOP)
       console.debug("[Screenity][Sandbox] makeVideoTab invoked", {
         override: message?.override,
@@ -1090,12 +1129,119 @@ const ContentState = (props) => {
       ...prevState,
       override: message.override,
     }));
-    // All chunks received, reconstruct video
-    checkMemory();
-    reconstructVideo();
+    // clear leftover memoryError without surfacing modal; recording-time toast already fired
+    try {
+      chrome.storage.local.set({ memoryError: false });
+    } catch {}
+    let directBlob = null;
+    let opfsReadFailed = false;
+    let backendRefForThisLoad = null;
+    try {
+      const { lastRecordingBackendRef } = await chrome.storage.local.get([
+        "lastRecordingBackendRef",
+      ]);
+      backendRefForThisLoad = lastRecordingBackendRef;
+      if (process.env.SCREENITY_DEV_MODE === "true") {
+        console.log(
+          "[recorder-opfs][sandbox] makeVideoTab backend",
+          lastRecordingBackendRef || { backend: "idb" },
+        );
+      }
+      setContentState((prev) => ({
+        ...prev,
+        lastRecordingBackend: lastRecordingBackendRef?.backend || "idb",
+      }));
+      if (lastRecordingBackendRef?.backend === "opfs") {
+        const reader = chooseReader(lastRecordingBackendRef);
+        await reader.open(lastRecordingBackendRef);
+        const { blob: rawBlob } = await reader.readBlob({
+          // OPFS file isn't ready yet, recorder still flushing under load.
+          // Surface a labeled loading state so the user knows it's progressing.
+          onSlowFinalize: () => {
+            setContentState((prev) =>
+              prev.finalizingRecording ? prev : { ...prev, finalizingRecording: true },
+            );
+          },
+        });
+        setContentState((prev) =>
+          prev.finalizingRecording ? { ...prev, finalizingRecording: false } : prev,
+        );
+        await reader.close().catch(() => {});
+        // materialize so Blob URL doesn't break when mtime changes
+        let blob = rawBlob;
+        if (rawBlob && rawBlob.size <= 1_500_000_000) {
+          try {
+            const buf = await rawBlob.arrayBuffer();
+            blob = new Blob([buf], { type: rawBlob.type || "video/mp4" });
+          } catch {
+            blob = rawBlob;
+          }
+        }
+        if (blob) {
+          directBlob = blob;
+          diagForward("sandbox-opfs-direct-read", {
+            outputBytes: blob.size,
+          });
+          if (process.env.SCREENITY_DEV_MODE === "true") {
+            console.log("[recorder-opfs][sandbox] opfs-direct-read-ok", {
+              bytes: blob.size,
+            });
+          }
+        } else {
+          opfsReadFailed = true;
+        }
+      }
+    } catch (err) {
+      opfsReadFailed = true;
+      diagForward("sandbox-opfs-direct-read-fail", {
+        err: String(err?.message || err).slice(0, 200),
+      });
+      console.warn(
+        "[Screenity][Sandbox] OPFS direct read failed",
+        err,
+      );
+    }
 
-    // Timeout: if duration-fix hasn't finished, mark ready so the user
-    // isn't stuck forever. Don't overwrite an already-fixed webm.
+    if (opfsReadFailed && !directBlob) {
+      try {
+        const idbReader = chooseReader({ backend: "idb" });
+        await idbReader.open({ backend: "idb" });
+        const { blob, chunkCount } = await idbReader.readBlob();
+        await idbReader.close().catch(() => {});
+        if (blob && chunkCount > 0) {
+          directBlob = blob;
+          if (process.env.SCREENITY_DEV_MODE === "true") {
+            console.log(
+              "[recorder-opfs][sandbox] OPFS failed but IDB fallback succeeded",
+              { bytes: blob.size, chunkCount },
+            );
+          }
+        }
+      } catch {}
+      if (!directBlob) {
+        if (typeof contentStateRef.current?.openModal === "function") {
+          contentStateRef.current.openModal(
+            chrome.i18n.getMessage("opfsLoadErrorTitle"),
+            chrome.i18n.getMessage("opfsLoadErrorDescription"),
+            null,
+            chrome.i18n.getMessage("permissionsModalDismiss"),
+            () => {},
+            () => {},
+            null,
+            null,
+            null,
+            true,
+            false,
+          );
+        }
+        diagForward("sandbox-recording-load-failed", {
+          backend: backendRefForThisLoad?.backend || "unknown",
+        });
+      }
+    }
+    reconstructVideo(directBlob);
+
+    // mark ready if duration-fix hangs; don't overwrite an already-fixed webm
     const safetyCheck = () => {
       const s = contentStateRef.current;
       if (DEBUG_POSTSTOP)
@@ -1117,11 +1263,10 @@ const ContentState = (props) => {
           ? Date.now() - diagMakeVideoAtRef.current
           : null,
       });
-      if (s?.ready) return; // Fix already completed, nothing to do
+      if (s?.ready) return;
 
       const complete = s?.chunkCount > 0 && s?.chunkIndex >= s?.chunkCount;
       if (complete && s?.rawBlob) {
-        // Keep the fixed webm if it landed between checks.
         if (s?.webm) {
           if (DEBUG_RECORDER)
             console.log(
@@ -1148,7 +1293,6 @@ const ContentState = (props) => {
         chrome.runtime.sendMessage({ type: "recording-complete" });
       }
     };
-    // First check at 30s; if still not ready, final check at 60s
     setTimeout(() => {
       if (!contentStateRef.current?.ready) {
         safetyCheck();
@@ -1207,6 +1351,49 @@ const ContentState = (props) => {
         }));
       } else if (message.type === "ping") {
         sendResponse({ status: "ready" });
+      } else if (message.type === "editor-force-close") {
+        // BG closes this tab when a new recording starts. the OPFS file
+        // backing this editor is about to be deleted, so the unsaved-changes
+        // prompt would just block the start flow.
+        try {
+          window.onbeforeunload = null;
+        } catch {}
+        sendResponse?.({ ok: true });
+      } else if (message.type === "recording-error") {
+        // suppress when this editor already loaded; error belongs to a later attempt
+        const editorAlreadyLoaded =
+          Boolean(contentStateRef.current?.ready) ||
+          Boolean(contentStateRef.current?.blob);
+        if (editorAlreadyLoaded) return;
+        diagForward("sandbox-recording-error-received", {
+          error: String(message?.error || "").slice(0, 120),
+          why: String(message?.why || "").slice(0, 240),
+          errorCode: message?.errorCode || null,
+        });
+        if (
+          !editorErrorShownRef.current &&
+          typeof contentStateRef.current?.openModal === "function"
+        ) {
+          editorErrorShownRef.current = true;
+          contentStateRef.current.openModal(
+            chrome.i18n.getMessage("opfsLoadErrorTitle"),
+            message?.why || chrome.i18n.getMessage("opfsLoadErrorDescription"),
+            null,
+            chrome.i18n.getMessage("permissionsModalDismiss"),
+            () => {},
+            () => {},
+            null,
+            null,
+            null,
+            true,
+            false,
+          );
+        }
+        setContentState((prev) => ({
+          ...prev,
+          ready: true,
+          recordingFailed: true,
+        }));
       } else if (message.type === "new-chunk-tab") {
         if (DEBUG_POSTSTOP)
           console.debug("[Screenity][Sandbox] received new-chunk-tab", {
@@ -1232,9 +1419,9 @@ const ContentState = (props) => {
         setContentState((prevContentState) => ({
           ...prevContentState,
           fallback: true,
-          noffmpeg: false, // Pretending FFmpeg is loaded (using Mediabunny)
+          noffmpeg: false, // mediabunny stands in for FFmpeg here
           isFfmpegRunning: false,
-          editLimit: 3600, // Set high edit limit (1 hour) for recovery mode
+          editLimit: MAX_EDIT_LIMIT_S,
         }));
 
         buildBlobFromChunks()
@@ -1250,7 +1437,7 @@ const ContentState = (props) => {
             sendResponse({ status: "error", error: error.message });
           });
 
-        return true; // Keep message port open for async response
+        return true;
       } else if (message.type === "large-recording") {
         setContentState((prevContentState) => ({
           ...prevContentState,
@@ -1271,7 +1458,6 @@ const ContentState = (props) => {
                 ffmpegLoaded: true,
                 processingProgress: 0,
               }));
-              // Try to recover chunks.
               buildBlobFromChunks()
                 .then((blob) => {
                   if (!blob) {
@@ -1315,14 +1501,14 @@ const ContentState = (props) => {
             sendResponse({ status: "error", error: error.message });
           });
 
-        return true; // Keep message port open for async response
+        return true;
       } else if (message.type === "fallback-recording") {
         setContentState((prevContentState) => ({
           ...prevContentState,
           fallback: true,
           noffmpeg: false,
           isFfmpegRunning: true,
-          editLimit: 3600,
+          editLimit: MAX_EDIT_LIMIT_S,
         }));
         const shouldGate =
           launchModeRef.current === "postStop" &&
@@ -1337,7 +1523,6 @@ const ContentState = (props) => {
                 ffmpegLoaded: true,
                 processingProgress: 0,
               }));
-              // Try to recover chunks.
               buildBlobFromChunks()
                 .then((blob) => {
                   if (!blob) {
@@ -1403,7 +1588,6 @@ const ContentState = (props) => {
                 ffmpegLoaded: true,
                 processingProgress: 0,
               }));
-              // Try to recover chunks.
               buildBlobFromChunks().catch(() => {});
               sendResponse({ status: "error", error: result.error });
               return;
@@ -1441,6 +1625,56 @@ const ContentState = (props) => {
     ],
   );
 
+  // sandbox self-triggers reconstruct on OPFS; recovery mode is driven by restore-recording
+  useEffect(() => {
+    let cancelled = false;
+    const params = new URLSearchParams(window.location.search || "");
+    const isRecoveryMode = params.get("mode") === "recover";
+    if (isRecoveryMode) return;
+
+    // 500ms retry in case backendRef hasn't propagated yet
+    const attemptSelfTrigger = async (isRetry = false) => {
+      try {
+        const { lastRecordingBackendRef } = await chrome.storage.local.get([
+          "lastRecordingBackendRef",
+        ]);
+        if (cancelled) return true;
+        if (lastRecordingBackendRef?.backend === "opfs") {
+          if (process.env.SCREENITY_DEV_MODE === "true") {
+            console.log(
+              "[recorder-opfs][sandbox] self-trigger makeVideoTab for OPFS backend",
+              isRetry ? "(retry)" : "",
+            );
+          }
+          makeVideoTab(null, { override: false });
+          return true;
+        }
+        return false;
+      } catch (err) {
+        if (process.env.SCREENITY_DEV_MODE === "true") {
+          console.warn(
+            "[recorder-opfs][sandbox] self-trigger failed",
+            err,
+          );
+        }
+        return false;
+      }
+    };
+
+    (async () => {
+      const hit = await attemptSelfTrigger(false);
+      if (!hit && !cancelled) {
+        setTimeout(() => {
+          if (!cancelled) attemptSelfTrigger(true);
+        }, 500);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   useEffect(() => {
     const messageListener = (message, sender, sendResponse) => {
       const shouldKeepPortOpen = onChromeMessage(message, sender, sendResponse);
@@ -1449,21 +1683,109 @@ const ContentState = (props) => {
 
     chrome.runtime.onMessage.addListener(messageListener);
 
-    // Storage fallback listener: watch for background writing a `chunks_ready_for:<tabId>` key
     const storageListener = (changes, areaName) => {
       if (areaName !== "local") return;
       try {
         const tabId = tabIdRef.current;
+        // BG writes editorRecordingError; sandboxed context can't use runtime.onMessage
+        if (changes.editorRecordingError && changes.editorRecordingError.newValue) {
+          const payload = changes.editorRecordingError.newValue;
+          // suppress when THIS editor already loaded; error belongs to a later attempt
+          const editorAlreadyLoaded =
+            Boolean(contentStateRef.current?.ready) ||
+            Boolean(contentStateRef.current?.blob);
+          if (
+            !editorAlreadyLoaded &&
+            (tabId == null ||
+              payload?.sandboxTab == null ||
+              payload.sandboxTab === tabId)
+          ) {
+            diagForward("sandbox-recording-error-received", {
+              error: String(payload?.error || "").slice(0, 120),
+              why: String(payload?.why || "").slice(0, 240),
+              errorCode: payload?.errorCode || null,
+            });
+            if (
+              !editorErrorShownRef.current &&
+              typeof contentStateRef.current?.openModal === "function"
+            ) {
+              editorErrorShownRef.current = true;
+              // prefer i18n over raw codes like "REC_STOP_NO_CHUNKS"
+              const rawWhy = payload?.why;
+              const whyIsCode =
+                typeof rawWhy === "string" && /^[A-Z][A-Z0-9_]+$/.test(rawWhy);
+              // pipeline failures get copy that says the recording may still be on-device
+              const pipelineFailureCodes = new Set([
+                "EDITOR_TAB_LOAD_TIMEOUT",
+                "EDITOR_CONTENT_SCRIPT_TIMEOUT",
+                "EDITOR_MESSAGE_DELIVERY_FAILED",
+              ]);
+              const isPipelineFailure = pipelineFailureCodes.has(
+                payload?.errorCode,
+              );
+              const isStuckTimeout =
+                payload?.errorCode === "EDITOR_STUCK_TIMEOUT";
+              let title;
+              let description;
+              if (isStuckTimeout) {
+                title = chrome.i18n.getMessage("editorStuckTitle");
+                description = chrome.i18n.getMessage("editorStuckDescription");
+              } else if (isPipelineFailure) {
+                title = chrome.i18n.getMessage("editorRecoveryFailedTitle");
+                description = chrome.i18n.getMessage(
+                  "editorRecoveryFailedDescription",
+                );
+              } else {
+                title = chrome.i18n.getMessage("opfsLoadErrorTitle");
+                description =
+                  whyIsCode || !rawWhy
+                    ? chrome.i18n.getMessage("opfsLoadErrorDescription")
+                    : rawWhy;
+              }
+              contentStateRef.current.openModal(
+                title,
+                description,
+                chrome.i18n.getMessage("editorStuckTryRecover"),
+                chrome.i18n.getMessage("permissionsModalDismiss"),
+                () => {
+                  try {
+                    chrome.runtime.sendMessage({ type: "restore-recording" });
+                  } catch {}
+                },
+                () => {},
+                null,
+                null,
+                null,
+                false,
+                chrome.i18n.getMessage("editorStuckGetHelp"),
+                () => {
+                  try {
+                    chrome.runtime.sendMessage({
+                      type: "report-error",
+                      source: "editor-recovery-failed",
+                      errorCode: payload?.errorCode || null,
+                    });
+                  } catch {}
+                },
+              );
+              setContentState((prev) => ({
+                ...prev,
+                ready: true,
+                recordingFailed: true,
+              }));
+            }
+          }
+        }
         if (!tabId) return;
+        // sandboxed ffmpeg iframes may not expose indexedDB; only run in top
+        if (window.top !== window.self) return;
         const key = `chunks_ready_for:${tabId}`;
         if (changes[key]) {
           if (DEBUG_POSTSTOP)
             console.debug("[Screenity][Sandbox] storage fallback triggered", {
               key,
             });
-          // Ensure IndexedDB is available in this frame before attempting
-          // to read chunks. Some sandboxed/iframe contexts (ffmpeg iframe)
-          // may not expose IndexedDB; guard to avoid localforage throwing.
+          // sandboxed iframes may not expose IndexedDB; guard against localforage throwing
           if (!window.indexedDB) {
             if (DEBUG_POSTSTOP)
               console.warn(
@@ -1472,7 +1794,6 @@ const ContentState = (props) => {
             return;
           }
 
-          // Asynchronously attempt to build the blob from IndexedDB
           buildBlobFromChunks()
             .then((blob) => {
               if (!blob) {
@@ -1504,18 +1825,11 @@ const ContentState = (props) => {
       }
     };
 
-    // Only attach the storage fallback listener in the top-level window
-    // (editor/page) — avoid running this inside sandboxed iframes used for
-    // FFmpeg which may not expose IndexedDB.
+    // attach in both contexts; iframe needs editorRecordingError modal trigger,
+    // chunks-ready fallback below self-guards on window.top===window.self
     let storageListenerAttached = false;
-    if (window.top === window.self) {
-      chrome.storage.onChanged.addListener(storageListener);
-      storageListenerAttached = true;
-    } else if (DEBUG_POSTSTOP) {
-      console.debug(
-        "[Screenity][Sandbox] running inside an iframe; skipping storage fallback listener",
-      );
-    }
+    chrome.storage.onChanged.addListener(storageListener);
+    storageListenerAttached = true;
 
     return () => {
       chrome.runtime.onMessage.removeListener(messageListener);
@@ -1526,8 +1840,46 @@ const ContentState = (props) => {
   }, []);
 
   const onMessage = async (event) => {
+    if (event.data.type === "recording-error-from-parent") {
+      const payload = event.data.payload || {};
+      // suppress when this editor already loaded; parent forwards every error
+      const editorAlreadyLoaded =
+        Boolean(contentStateRef.current?.ready) ||
+        Boolean(contentStateRef.current?.blob);
+      if (editorAlreadyLoaded) return;
+      diagForward("sandbox-recording-error-received-via-parent", {
+        error: String(payload?.error || "").slice(0, 120),
+        why: String(payload?.why || "").slice(0, 240),
+        errorCode: payload?.errorCode || null,
+      });
+      if (
+        !editorErrorShownRef.current &&
+        typeof contentStateRef.current?.openModal === "function"
+      ) {
+        editorErrorShownRef.current = true;
+        contentStateRef.current.openModal(
+          chrome.i18n.getMessage("opfsLoadErrorTitle"),
+          payload?.why || chrome.i18n.getMessage("opfsLoadErrorDescription"),
+          null,
+          chrome.i18n.getMessage("permissionsModalDismiss"),
+          () => {},
+          () => {},
+          null,
+          null,
+          null,
+          true,
+          false,
+        );
+        setContentState((prev) => ({
+          ...prev,
+          ready: true,
+          recordingFailed: true,
+        }));
+      }
+      return;
+    }
     if (event.data.type === "updated-blob") {
-      // Discard results from a timed-out or superseded operation.
+      // discard timed-out/superseded ops
       const msgOpId = event.data._opId;
       if (msgOpId != null && msgOpId !== opIdRef.current) return;
 
@@ -1539,9 +1891,8 @@ const ContentState = (props) => {
       const isTopLevel = event.data.topLevel === true;
       const isFromAudio = event.data.fromAudio === true;
 
-      if (isFromAudio) {
-        // Mid-chain: add-audio succeeded; reencode is still pending.
-        // Forward the same opId so the reencode result is also validated.
+      if (isFromAudio && !event.data.skipReencode) {
+        // legacy ffmpeg path needs a follow-up reencode; webcodecs skips
         sendMessage({
           type: "reencode-video",
           blob,
@@ -1582,6 +1933,21 @@ const ContentState = (props) => {
       const video = document.createElement("video");
       video.preload = "metadata";
       video.onloadedmetadata = async () => {
+        if (process.env.SCREENITY_DEV_MODE === "true") {
+          console.log("[Screenity][cut-debug] updated-blob received", {
+            blobSize: blob?.length ?? blob?.size,
+            blobIsBlob: blob instanceof Blob,
+            measuredDuration: video.duration,
+            previousDuration: contentState.duration,
+            isFromAudio,
+            wasCropping,
+            wasCutting: contentState.cutting,
+            wasMuting: contentState.muting,
+            wasTrimming: contentState.trimming,
+            videoWidth: video.videoWidth,
+            videoHeight: video.videoHeight,
+          });
+        }
         setContentState((prev) => ({
           ...prev,
           duration: video.duration,
@@ -1612,7 +1978,6 @@ const ContentState = (props) => {
       const base64 = event.data.base64;
 
       const blob = base64ToUint8Array(base64);
-      // Download the blob
       const url = URL.createObjectURL(blob);
       await requestDownload(url, ".mp4");
       setContentState((prevContentState) => ({
@@ -1623,11 +1988,7 @@ const ContentState = (props) => {
       }));
     } else if (event.data.type === "download-gif") {
       const base64 = event.data.base64;
-      // const blob = new Blob([base64ToUint8Array(base64)], {
-      //   type: "image/gif",
-      // });
       const blob = base64ToUint8Array(base64);
-      // Download the blob
       const url = URL.createObjectURL(blob);
       await requestDownload(url, ".gif");
       setContentState((prevContentState) => ({
@@ -1637,11 +1998,23 @@ const ContentState = (props) => {
         downloadingGIF: false,
       }));
     } else if (event.data.type === "new-frame") {
+      // crop entries leak blob URLs otherwise
+      const prevFrame = contentStateRef.current?.frame;
+      if (typeof prevFrame === "string" && prevFrame.startsWith("blob:")) {
+        try {
+          URL.revokeObjectURL(prevFrame);
+        } catch {}
+      }
       const url = URL.createObjectURL(event.data.frame);
       setContentState((prevContentState) => ({
         ...prevContentState,
         frame: url,
         isFfmpegRunning: false,
+        // Defer the mode flip until the frame is in hand so the cropper
+        // doesn't mount over an empty stage (causing a black flash).
+        ...(prevContentState.pendingCropEntry
+          ? { mode: "crop", pendingCropEntry: false }
+          : {}),
       }));
     } else if (event.data.type === "ffmpeg-loaded") {
       setContentState((prevContentState) => ({
@@ -1660,34 +2033,22 @@ const ContentState = (props) => {
       }));
       console.log("[Screenity][Editor] recording-complete sent from ffmpeg-load-error fallback");
       chrome.runtime.sendMessage({ type: "recording-complete" });
-
-      // if (!navigator.onLine) {
-      //   setContentState((prevState) => ({
-      //     ...prevState,
-      //     offline: true,
-      //   }));
-
-      //   // Try loading ffmpeg again when reconnected to the internet
-      //   window.addEventListener("online", () => {
-      //     setContentState((prevState) => ({
-      //       ...prevState,
-      //       offline: false,
-      //     }));
-      //     contentState.loadFFmpeg();
-      //   });
-      // }
     } else if (event.data.type === "ffmpeg-error") {
-      console.warn("FFmpeg error:", event.data.error);
+      console.warn("FFmpeg error:", {
+        error: event.data.error,
+        errorMessage: event.data.errorMessage,
+        opType: event.data.opType,
+        errorStack: event.data.errorStack,
+      });
       clearEditOp();
 
-      // Fallback: allow playback/download using webm/rawBlob even if conversion fails
+      // fall back to webm/rawBlob even if conversion fails
       setContentState((prev) => {
-        // If an edit was actively running, surface the failure to the user
         const wasEditing = prev.isFfmpegRunning && (prev.cutting || prev.trimming || prev.muting || prev.cropping || prev.reencoding);
         return {
           ...prev,
           noffmpeg: true,
-          ffmpegLoaded: true, // treat as "done trying"
+          ffmpegLoaded: true,
           isFfmpegRunning: false,
           muting: false,
           cutting: false,
@@ -1703,8 +2064,21 @@ const ContentState = (props) => {
       });
 
       chrome.runtime.sendMessage({ type: "recording-complete" });
+    } else if (event.data.type === "audio-too-large") {
+      clearEditOp();
+      setContentState((prev) => ({
+        ...prev,
+        isFfmpegRunning: false,
+        muting: false,
+        cutting: false,
+        trimming: false,
+        reencoding: false,
+        cropping: false,
+        processingProgress: 0,
+        editErrorType: "audio-too-large",
+      }));
     } else if (event.data.type === "edit-too-long") {
-      // Too long for in-browser processing — reset so user can retry or trim.
+      // Too long for in-browser processing, reset so user can retry or trim.
       clearEditOp();
       setContentState((prev) => ({
         ...prev,
@@ -1743,9 +2117,6 @@ const ContentState = (props) => {
       }));
     } else if (event.data.type === "download-webm") {
       const base64 = event.data.base64;
-      // const blob = new Blob([base64ToUint8Array(base64)], {
-      //   type: "video/webm",
-      // });
       const blob = base64ToUint8Array(base64);
 
       const url = URL.createObjectURL(blob);
@@ -1760,28 +2131,32 @@ const ContentState = (props) => {
     }
   };
 
-  // Listen to PostMessage events
   useEffect(() => {
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
   }, [onMessage]);
+
+  // covers the race where parent received the storage change before this iframe mounted
+  useEffect(() => {
+    try {
+      window.parent.postMessage(
+        { type: "request-recording-error-state" },
+        "*",
+      );
+    } catch {}
+  }, []);
 
   const sendMessage = (message) => {
     window.parent.postMessage(message, "*");
   };
 
   const getBlob = async () => {
-    // Skip conversion only if Chrome is outdated or recording exceeds edit limit
     if (
       contentState.noffmpeg ||
       (contentState.duration > contentState.editLimit && !contentState.override)
     ) {
       return;
     }
-
-    // const webmVideo = new Blob([base64ToUint8Array(contentState.base64)], {
-    //   type: "video/webm",
-    // });
 
     const webmVideo = base64ToUint8Array(contentState.base64);
 
@@ -1792,12 +2167,10 @@ const ContentState = (props) => {
     }));
 
     if (contentState.offline && contentState.ffmpeg === true) {
-      // Offline (if I need to do anything differently)
     } else if (
       !contentState.updateChrome &&
       (contentState.duration <= contentState.editLimit || contentState.override)
     ) {
-      // Set isFfmpegRunning to true when starting conversion
       setContentState((prevState) => ({
         ...prevState,
         isFfmpegRunning: true,
@@ -1820,24 +2193,20 @@ const ContentState = (props) => {
     getBlob();
   }, [contentState.base64, contentState.ffmpeg, contentState.ffmpegLoaded]);
 
-  // 30s fallback: if FFmpeg never loads (blocked CDN, worker crash, etc.),
-  // force recovery mode so the user can still download their recording.
+  // 30s fallback for blocked CDN / worker crash; force recovery mode
   useEffect(() => {
     if (!contentState.base64) return;
     if (!contentState.ffmpeg) return;
-    if (contentState.ffmpegLoaded) return; // FFmpeg loaded normally — nothing to do
-    if (contentState.noffmpeg) return;     // already in fallback — nothing to do
+    if (contentState.ffmpegLoaded) return;
+    if (contentState.noffmpeg) return;
 
     const timer = setTimeout(() => {
-      // Re-check via ref in case state changed since the effect ran.
       const current = contentStateRef.current;
       if (current.ffmpegLoaded || current.noffmpeg) return;
       chrome.storage.local.set({ editorLoadTimeoutAt: Date.now() });
       setContentState((prev) => {
-        // Double-check inside the updater for concurrent state races.
         if (prev.ffmpegLoaded || prev.noffmpeg) return prev;
-        // Also set ready when falling back — getBlob() early-returns
-        // when noffmpeg is true, so ready would never be set otherwise.
+        // also set ready: getBlob early-returns on noffmpeg so ready wouldn't fire
         const fallbackWebm = prev.webm || prev.rawBlob;
         return {
           ...prev,
@@ -1863,13 +2232,12 @@ const ContentState = (props) => {
 
     setContentState((prevState) => ({
       ...prevState,
-      isFfmpegRunning: true, // Set isFfmpegRunning to true to indicate that ffmpeg is running
+      isFfmpegRunning: true,
     }));
 
     sendMessage({ type: "get-frame", time: 0, blob: contentState.blob });
   }, [contentState.blob, contentState.ffmpeg, contentState.isFfmpegRunning]);
 
-  // Returns the opId to include in outgoing messages for stale-result validation.
   const beginEditOp = () => {
     if (editWatchdogRef.current) {
       clearTimeout(editWatchdogRef.current);
@@ -1878,7 +2246,7 @@ const ContentState = (props) => {
     const id = opIdRef.current;
     editWatchdogRef.current = setTimeout(() => {
       editWatchdogRef.current = null;
-      opIdRef.current += 1; // invalidate any late-arriving result
+      opIdRef.current += 1;
       setContentState((prev) => ({
         ...prev,
         isFfmpegRunning: false,
@@ -1890,16 +2258,30 @@ const ContentState = (props) => {
         processingProgress: 0,
         editErrorType: "timeout",
       }));
-    }, 5 * 60 * 1000); // 5-minute ceiling
+    }, 5 * 60 * 1000);
     return id;
   };
 
-  // Clears the watchdog when an op completes or fails normally.
   const clearEditOp = () => {
     if (editWatchdogRef.current) {
       clearTimeout(editWatchdogRef.current);
       editWatchdogRef.current = null;
     }
+  };
+
+  const cancelEditOp = () => {
+    opIdRef.current += 1;
+    clearEditOp();
+    setContentState((prev) => ({
+      ...prev,
+      isFfmpegRunning: false,
+      muting: false,
+      cutting: false,
+      trimming: false,
+      reencoding: false,
+      cropping: false,
+      processingProgress: 0,
+    }));
   };
 
   const addAudio = async (videoBlob, audioBlob, volume) => {
@@ -1939,9 +2321,41 @@ const ContentState = (props) => {
       !contentState.override
     )
       return;
+    // undo/redo/keyboard/programmatic restore can leave start>=end; bail clearly
+    if (
+      !Number.isFinite(contentState.start) ||
+      !Number.isFinite(contentState.end) ||
+      contentState.start >= contentState.end
+    ) {
+      setContentState((prev) => ({
+        ...prev,
+        editErrorType: "invalid-trim-range",
+      }));
+      return;
+    }
 
     const sourceBlob = contentState.blob;
     const opId = beginEditOp();
+
+    if (process.env.SCREENITY_DEV_MODE === "true") {
+      console.log("[Screenity][cut-debug] handleTrim dispatch", {
+        cut,
+        opId,
+        sourceBlobSize: sourceBlob?.size,
+        sourceBlobType: sourceBlob?.type,
+        duration: contentState.duration,
+        start: contentState.start,
+        end: contentState.end,
+        startTime: contentState.start * contentState.duration,
+        endTime: contentState.end * contentState.duration,
+        expectedOutputDuration: cut
+          ? contentState.duration -
+            (contentState.end * contentState.duration -
+              contentState.start * contentState.duration)
+          : contentState.end * contentState.duration -
+            contentState.start * contentState.duration,
+      });
+    }
 
     setContentState((prev) => ({
       ...prev,
@@ -1971,6 +2385,17 @@ const ContentState = (props) => {
       !contentState.override
     )
       return;
+    if (
+      !Number.isFinite(contentState.start) ||
+      !Number.isFinite(contentState.end) ||
+      contentState.start >= contentState.end
+    ) {
+      setContentState((prev) => ({
+        ...prev,
+        editErrorType: "invalid-trim-range",
+      }));
+      return;
+    }
 
     const sourceBlob = contentState.blob;
     const opId = beginEditOp();
@@ -2067,18 +2492,35 @@ const ContentState = (props) => {
   };
 
   const requestDownload = async (url, ext) => {
+    // rapid double-click would otherwise create two downloads + double-revoke
+    if (contentStateRef.current?.downloadInProgress) {
+      console.warn("[Screenity] download already in progress, ignoring");
+      return;
+    }
+    setContentState((prev) => ({
+      ...prev,
+      downloadInProgress: true,
+      downloadError: null,
+    }));
+
     const rawTitle = contentStateRef.current.title || "Screenity recording";
 
     const base = sanitizeDownloadFilename(rawTitle);
     const filename = `${base}${ext}`;
 
+    let revoked = false;
     const revoke = () => {
+      if (revoked) return;
+      revoked = true;
       try {
         URL.revokeObjectURL(url);
       } catch {}
+      try {
+        setContentState((prev) => ({ ...prev, downloadInProgress: false }));
+      } catch {}
     };
 
-    // Brave fallback: send base64 to background for download
+    // Brave: route via background for download
     if ((navigator.brave && (await navigator.brave.isBrave())) || false) {
       const resp = await fetch(url);
       const blob = await resp.blob();
@@ -2100,19 +2542,55 @@ const ContentState = (props) => {
 
     const downloadId = await new Promise((resolve, reject) => {
       chrome.downloads.download({ url, filename, saveAs: true }, (id) => {
-        if (chrome.runtime.lastError || !id) {
-          reject(chrome.runtime.lastError || new Error("Download failed"));
+        const lastErr = chrome.runtime.lastError;
+        // user cancelled Save-As; don't show "Download failed"
+        const errMsg = String(lastErr?.message || "");
+        if (errMsg.includes("USER_CANCELED") || errMsg.includes("canceled")) {
+          revoke();
+          resolve(null);
+          return;
+        }
+        if (lastErr || !id) {
+          reject(lastErr || new Error("Download failed"));
         } else {
           resolve(id);
         }
       });
     });
+    if (downloadId == null) return;
 
     await new Promise((resolve) => {
+      let settled = false;
+      const timeoutMs = 10 * 60 * 1000;
+      const timeoutId = setTimeout(() => {
+        if (settled) return;
+        settled = true;
+        try {
+          chrome.downloads.onChanged.removeListener(handler);
+        } catch {}
+        revoke();
+        console.warn(
+          "[Screenity] download status listener timed out, releasing handle",
+          { downloadId, filename, timeoutMs },
+        );
+        // surface error so editor toasts fire; silent resolve would mask as success
+        try {
+          setContentState((prev) => ({
+            ...prev,
+            downloadError: "timeout",
+            downloadInProgress: false,
+          }));
+        } catch {}
+        resolve();
+      }, timeoutMs);
+
       const handler = async (delta) => {
         if (delta.id !== downloadId || !delta.state) return;
 
         const done = () => {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timeoutId);
           chrome.downloads.onChanged.removeListener(handler);
           revoke();
           resolve();
@@ -2125,18 +2603,39 @@ const ContentState = (props) => {
           try {
             const resp = await fetch(url);
             const blob = await resp.blob();
-            await new Promise((res) => {
-              const reader = new FileReader();
-              reader.onloadend = () => {
+            // sendMessage caps at ~64MB; base64 inflates 4/3, so cap at 30MB
+            const BASE64_FALLBACK_MAX_BYTES = 30 * 1024 * 1024;
+            if (blob.size > BASE64_FALLBACK_MAX_BYTES) {
+              try {
+                setContentState((prev) => ({
+                  ...prev,
+                  downloadError: "interrupted-too-large",
+                  downloadInProgress: false,
+                }));
+              } catch {}
+              try {
                 chrome.runtime.sendMessage({
-                  type: "request-download",
-                  base64: reader.result,
-                  title: filename,
+                  type: "show-toast",
+                  message: chrome.i18n.getMessage(
+                    "downloadInterruptedLargeToast",
+                  ),
+                  timeout: 8000,
                 });
-                res();
-              };
-              reader.readAsDataURL(blob);
-            });
+              } catch {}
+            } else {
+              await new Promise((res) => {
+                const reader = new FileReader();
+                reader.onloadend = () => {
+                  chrome.runtime.sendMessage({
+                    type: "request-download",
+                    base64: reader.result,
+                    title: filename,
+                  });
+                  res();
+                };
+                reader.readAsDataURL(blob);
+              });
+            }
           } finally {
             done();
           }
@@ -2152,19 +2651,9 @@ const ContentState = (props) => {
     });
   };
 
-  // Re-mux a fragmented MP4 blob to a standard (non-fragmented) MP4 blob
-  // via container copy (no re-decode, no re-encode). The recorder writes
-  // fMP4 for crash safety, but users expect a standard MP4 on download
-  // for universal compatibility (QuickTime seeking, editors, etc.).
-  // Typical cost: ~1-3 seconds for a 10-min recording.
-  //
-  // Uses BufferTarget despite the memory cost. fastStart: false is NOT a
-  // pure append-only write: mediabunny writes an mdat header placeholder
-  // up front, then samples, then patches the mdat size at the end via a
-  // positioned write. A naive stream-to-blob pipe drops those positioned
-  // patches, producing a file with an empty mdat and orphan samples that
-  // no player can open. A positioned StreamTarget would need a random-
-  // access backing store (a buffer), so BufferTarget is the right tool.
+  // fMP4 -> standard MP4 via container copy. QuickTime/editors need fastStart.
+  // BufferTarget is required: fastStart:false patches the mdat size with a
+  // positioned write at the end, which a stream-to-blob pipe would drop.
   const remuxFragmentedToStandardMp4 = async (fragmentedBlob, onProgress) => {
     const input = new Input({
       formats: ALL_FORMATS,
@@ -2188,12 +2677,7 @@ const ContentState = (props) => {
     return new Blob([target.buffer], { type: "video/mp4" });
   };
 
-  // Route the remux through an offscreen document that spawns a dedicated
-  // worker and writes the output to OPFS via a sync access handle. Keeps
-  // peak RAM near zero regardless of recording length, and avoids the
-  // 2 GB ArrayBuffer ceiling that BufferTarget hits on very long clips.
-  // Falls back silently: if any hop fails, the caller tries the in-sandbox
-  // BufferTarget path instead.
+  // OPFS sync access handle in an offscreen worker; bypasses BufferTarget's 2 GB cap
   const remuxViaOffscreenOpfs = async (fragmentedBlob, onProgress) => {
     const requestId =
       (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
@@ -2220,14 +2704,8 @@ const ContentState = (props) => {
     };
     chrome.runtime.onMessage.addListener(progressListener);
 
-    // Transport via OPFS rather than passing the Blob through
-    // chrome.runtime.sendMessage. Chrome's structured clone for extension
-    // messaging is lossy for Blobs crossing the service worker: the Blob
-    // arrives as a plain object and BlobSource rejects it with
-    // "blob must be a Blob.". Writing the input to OPFS first and passing
-    // a filename (string) sidesteps the issue entirely; the worker reads
-    // back via navigator.storage.getDirectory() in its own context.
-    const inputFileName = `remux-in-${requestId}.mp4`;
+    // sendMessage's structured clone is lossy for Blobs across the SW
+    // (BlobSource rejects with "blob must be a Blob"); transport via OPFS+filename
     const outputFileName = `remux-${requestId}.mp4`;
     let opfsDir;
     try {
@@ -2239,16 +2717,52 @@ const ContentState = (props) => {
       );
     }
 
+    // reuse OPFS input when size matches; edits diverge so fall back to staging
+    let stagedInputFileName = null;
+    let inputFileName;
     try {
-      // Stage the input in OPFS. createWritable is async and streams to
-      // disk without blocking the main thread for the full duration.
-      const inputHandle = await opfsDir.getFileHandle(inputFileName, {
-        create: true,
-      });
-      const writable = await inputHandle.createWritable();
-      await writable.write(fragmentedBlob);
-      await writable.close();
-      devLog("staged-input-in-opfs", { inputFileName });
+      const { lastRecordingBackendRef } = await chrome.storage.local.get([
+        "lastRecordingBackendRef",
+      ]);
+      if (
+        lastRecordingBackendRef?.backend === "opfs" &&
+        typeof lastRecordingBackendRef.fileName === "string" &&
+        lastRecordingBackendRef.fileName.length > 0
+      ) {
+        try {
+          const handle = await opfsDir.getFileHandle(
+            lastRecordingBackendRef.fileName,
+          );
+          const opfsFile = await handle.getFile();
+          if (
+            fragmentedBlob &&
+            typeof fragmentedBlob.size === "number" &&
+            opfsFile.size === fragmentedBlob.size
+          ) {
+            inputFileName = lastRecordingBackendRef.fileName;
+            devLog("reused-opfs-input", { inputFileName });
+          } else {
+            devLog("opfs-input-size-mismatch-skipping-reuse", {
+              opfsBytes: opfsFile.size,
+              blobBytes: fragmentedBlob?.size,
+            });
+          }
+        } catch {}
+      }
+    } catch {}
+
+    try {
+      if (!inputFileName) {
+        stagedInputFileName = `remux-in-${requestId}.mp4`;
+        const inputHandle = await opfsDir.getFileHandle(stagedInputFileName, {
+          create: true,
+        });
+        const writable = await inputHandle.createWritable();
+        await writable.write(fragmentedBlob);
+        await writable.close();
+        inputFileName = stagedInputFileName;
+        devLog("staged-input-in-opfs", { inputFileName });
+      }
 
       const response = await chrome.runtime.sendMessage({
         type: "remux-request",
@@ -2268,18 +2782,20 @@ const ContentState = (props) => {
       return outputBlob;
     } finally {
       chrome.runtime.onMessage.removeListener(progressListener);
-      // Input file is no longer needed once the worker finished (or failed).
-      try {
-        await opfsDir.removeEntry(inputFileName).catch(() => {});
-      } catch {}
-      // Output file is left in place; the Blob we just returned may still
-      // be streaming to chrome.downloads. The worker's age-based sweep
-      // cleans it up on the next remux.
+      // never delete the recording itself
+      if (stagedInputFileName) {
+        try {
+          await opfsDir.removeEntry(stagedInputFileName).catch(() => {});
+        } catch {}
+      }
+      // output left in place; worker's age-based sweep cleans next remux
     }
   };
 
   const download = async () => {
-    if (contentState.isFfmpegRunning || contentState.downloading) return;
+    // ref: rapid clicks fire before state propagates
+    const latest = contentStateRef.current || contentState;
+    if (latest.isFfmpegRunning || latest.downloading) return;
 
     setContentState((prev) => ({
       ...prev,
@@ -2298,7 +2814,8 @@ const ContentState = (props) => {
     const remuxStartedAt = Date.now();
     let remuxedBlob = null;
     let remuxPath = null;
-    // Tier 1: offscreen + OPFS. Flat memory, works for any recording size.
+
+    // tier 1: offscreen+OPFS, bounded memory
     try {
       diagForward("remux-offscreen-start", { inputBytes: inputSize });
       remuxedBlob = await remuxViaOffscreenOpfs(
@@ -2315,8 +2832,7 @@ const ContentState = (props) => {
       });
     }
 
-    // Tier 2: in-sandbox BufferTarget. Costs ~recording size in RAM; hits
-    // a 2 GB ArrayBuffer ceiling on very long clips.
+    // tier 2: in-sandbox BufferTarget, capped at ~2 GB
     if (!remuxedBlob) {
       try {
         remuxedBlob = await remuxFragmentedToStandardMp4(
@@ -2326,7 +2842,10 @@ const ContentState = (props) => {
         remuxPath = "buffer-target";
         diagForward("remux-buffer-target-ok", { inputBytes: inputSize });
       } catch (err) {
-        console.warn("[Screenity] buffer-target remux failed, falling back", err);
+        console.warn(
+          "[Screenity] buffer-target remux failed, falling back",
+          err,
+        );
         diagForward("remux-buffer-target-fail", {
           inputBytes: inputSize,
           err: String(err?.message || err).slice(0, 200),
@@ -2335,9 +2854,10 @@ const ContentState = (props) => {
     }
 
     const remuxDurationMs = Date.now() - remuxStartedAt;
+    const finalPath = remuxPath || "fmp4-fallback";
     if (process.env.SCREENITY_DEV_MODE === "true") {
       console.log("[remux][sandbox] summary", {
-        path: remuxPath || "fmp4-fallback",
+        path: finalPath,
         durationMs: remuxDurationMs,
         inputBytes: inputSize,
         outputBytes: remuxedBlob?.size || 0,
@@ -2346,7 +2866,7 @@ const ContentState = (props) => {
     setContentState((prev) => ({
       ...prev,
       lastDownloadInfo: {
-        path: remuxPath || "fmp4-fallback",
+        path: finalPath,
         durationMs: remuxDurationMs,
         inputBytes: inputSize,
         outputBytes: remuxedBlob?.size || 0,
@@ -2366,15 +2886,11 @@ const ContentState = (props) => {
           path: remuxPath,
         });
       } else {
-        // Tier 3: serve the fMP4 as-is. Plays in Chrome/VLC/most modern
-        // players; some older editors may have seeking quirks.
         throw new Error("both-remux-paths-failed");
       }
     } catch (err) {
       console.error("MP4 download failed:", err);
-      // Fallback: serve the fMP4 as-is so the user doesn't lose the
-      // recording if re-mux fails. Chrome/VLC/most modern players read it
-      // fine; older tools may struggle with seeking.
+      // tier 3: serve fMP4 as-is so the user doesn't lose the recording
       try {
         const url = URL.createObjectURL(contentState.blob);
         await requestDownload(url, ".mp4");
@@ -2418,7 +2934,6 @@ const ContentState = (props) => {
       return;
     }
 
-    // ➜ ADD THIS: If untouched + already webm → skip FFmpeg entirely
     if (!contentState.hasBeenEdited && contentState.webm) {
       const url = URL.createObjectURL(contentState.webm);
       await requestDownload(url, ".webm");
@@ -2459,7 +2974,16 @@ const ContentState = (props) => {
     if (contentState.isFfmpegRunning || contentState.downloading) {
       return;
     }
-    if (contentState.duration > 30) return;
+    if (contentState.duration > 30) {
+      try {
+        chrome.runtime.sendMessage({
+          type: "show-toast",
+          message: chrome.i18n.getMessage("downloadGIFTooLongToast"),
+          timeout: 6000,
+        });
+      } catch {}
+      return;
+    }
 
     setContentState((prevState) => ({
       ...prevState,
@@ -2506,6 +3030,7 @@ const ContentState = (props) => {
   contentState.createBackup = createBackup;
   contentState.restoreBackup = restoreBackup;
   contentState.clearBackup = clearBackup;
+  contentState.cancelEditOp = cancelEditOp;
 
   return (
     <ContentStateContext.Provider value={[contentState, setContentState]}>
@@ -2515,6 +3040,7 @@ const ContentState = (props) => {
           setContentState={setContentState}
           contentStateRef={contentStateRef}
           lastDownloadInfo={contentState.lastDownloadInfo}
+          lastRecordingBackend={contentState.lastRecordingBackend}
         />
       )}
     </ContentStateContext.Provider>

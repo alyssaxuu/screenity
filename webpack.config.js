@@ -8,6 +8,19 @@ const TerserPlugin = require("terser-webpack-plugin");
 
 const isDev = env.NODE_ENV === "development";
 
+// SCREENITY_BS_BUILD=1: slim build for BrowserStack inline-CRX size limit.
+// drops post-recording UI + WASM. recording + camera paths preserved.
+const isBsBuild = process.env.SCREENITY_BS_BUILD === "1";
+const BS_DROPPED_ENTRIES = new Set([
+  "editorviewer",
+  "cloudrecorder",
+  "backup",
+  "download",
+  "waveform",
+  "setup",
+  "playground",
+]);
+
 const ASSET_PATH = process.env.ASSET_PATH || "/";
 
 if (process.env.SCREENITY_SKIP_ENV) {
@@ -23,6 +36,13 @@ const entryPoints = {
   background: path.join(__dirname, "src", "pages", "Background", "index.js"),
   contentScript: path.join(__dirname, "src", "pages", "Content", "index.jsx"),
   recorder: path.join(__dirname, "src", "pages", "Recorder", "index.jsx"),
+  recorderkeepalive: path.join(
+    __dirname,
+    "src",
+    "pages",
+    "Recorder",
+    "recorderKeepalive.js"
+  ),
   cloudrecorder: path.join(
     __dirname,
     "src",
@@ -82,7 +102,25 @@ const entryPoints = {
     "RemuxOffscreen",
     "worker.js"
   ),
+  recorderopfsworker: path.join(
+    __dirname,
+    "src",
+    "pages",
+    "Recorder",
+    "recorderStorage",
+    "opfs",
+    "writerWorker.js"
+  ),
 };
+
+if (isBsBuild) {
+  for (const k of Object.keys(entryPoints)) {
+    if (BS_DROPPED_ENTRIES.has(k)) delete entryPoints[k];
+  }
+  console.log(
+    `[webpack] SCREENITY_BS_BUILD: dropped entries [${[...BS_DROPPED_ENTRIES].join(",")}]`,
+  );
+}
 
 const htmlPlugins = Object.keys(entryPoints)
   .map((entryName) => {
@@ -90,7 +128,9 @@ const htmlPlugins = Object.keys(entryPoints)
     if (
       entryName === "background" ||
       entryName === "contentScript" ||
-      entryName === "remuxworker"
+      entryName === "remuxworker" ||
+      entryName === "recorderopfsworker" ||
+      entryName === "recorderkeepalive"
     ) {
       return null;
     }
@@ -117,11 +157,21 @@ const htmlPlugins = Object.keys(entryPoints)
       "index.html"
     );
 
+    // recorder needs keepalive injected BEFORE its main bundle so audio +
+    // locks + mediaSession signals are live before the heavy parse hits,
+    // otherwise hidden-tab throttling kicks in. manual sort is required:
+    // auto sort flips the order based on the chunk graph.
+    const isRecorder = entryName === "recorder";
+    const chunks = isRecorder
+      ? ["recorderkeepalive", entryName]
+      : [entryName];
+
     const options = {
       template: templatePath,
       filename: `${entryName}.html`,
-      chunks: [entryName],
+      chunks,
       cache: true,
+      ...(isRecorder ? { chunksSortMode: "manual" } : {}),
     };
 
     // Add favicon only for backup page
@@ -175,6 +225,9 @@ const config = {
 
   output: {
     filename: "[name].bundle.js",
+    // chrome rejects extension files starting with "_". force a "chunk."
+    // prefix so webpack's default _f608.bundle.js etc. don't trip it.
+    chunkFilename: "chunk.[name].[contenthash:8].bundle.js",
     path: path.resolve(__dirname, "build"),
     clean: !isDev, // Only wipe build dir in production; dev keeps it to avoid re-copying 40MB of assets
     publicPath: ASSET_PATH,
@@ -289,6 +342,13 @@ const config = {
           from: "src/assets/",
           to: path.join(__dirname, "build/assets"),
           force: true,
+          filter: isBsBuild
+            ? (resourcePath) =>
+                !/ffmpeg-core\.wasm$/.test(resourcePath) &&
+                !/vision_wasm.*\.wasm$/.test(resourcePath) &&
+                !/\/videos\//.test(resourcePath) &&
+                !/pin\.gif$/.test(resourcePath)
+            : undefined,
         },
         {
           from: "src/_locales/",
@@ -309,6 +369,15 @@ if (isDev) {
     minimizer: [
       new TerserPlugin({
         extractComments: false,
+        terserOptions: {
+          compress: {
+            // strip log/debug/info in prod, keep warn/error for support.
+            // drop_console array form removes calls even in callbacks
+            // where pure_funcs alone wouldn't.
+            drop_console: ["log", "debug", "info"],
+            pure_funcs: ["console.log", "console.debug", "console.info"],
+          },
+        },
       }),
     ],
   };

@@ -2,8 +2,16 @@ const DEVICE_ID_ERRORS = new Set(["OverconstrainedError", "NotFoundError"]);
 
 const isDeviceIdError = (err) => err && DEVICE_ID_ERRORS.has(err.name);
 
-const cloneConstraints = (constraints) =>
-  JSON.parse(JSON.stringify(constraints || {}));
+// Constraints can contain nested objects (deviceId.exact) so a deep clone is required.
+const cloneConstraints = (constraints) => {
+  const src = constraints || {};
+  if (typeof structuredClone === "function") {
+    try {
+      return structuredClone(src);
+    } catch {}
+  }
+  return JSON.parse(JSON.stringify(src));
+};
 
 const updateConstraintsDeviceId = (constraints, kind, deviceId) => {
   if (!constraints || !deviceId) return;

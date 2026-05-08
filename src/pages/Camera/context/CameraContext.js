@@ -5,6 +5,7 @@ import React, {
   useRef,
   useEffect,
   useCallback,
+  useMemo,
 } from "react";
 import {
   loadSegmentationModel,
@@ -128,7 +129,6 @@ export const CameraProvider = ({ children }) => {
           segmenterRef.current = model;
           setIsModelLoaded(true);
         } else {
-          // Model returned null — fall back to raw camera feed
           console.warn("Segmentation model unavailable, disabling background effects");
           handleSetBackgroundEffects(false);
         }
@@ -244,31 +244,45 @@ export const CameraProvider = ({ children }) => {
     return true;
   };
 
-  const contextValue = {
-    width,
-    height,
-    backgroundEffects,
-    isModelLoaded,
-    pipMode,
-    isCameraMode,
-    videoRef,
-    streamRef,
-    recordingTypeRef,
-    offScreenCanvasRef,
-    offScreenCanvasContextRef,
-    segmenterRef,
-    blurRef,
-    effectRef,
-    setWidth: handleSetWidth,
-    setHeight: handleSetHeight,
-    setBackgroundEffects: handleSetBackgroundEffects,
-    setPipMode,
-    setIsCameraMode,
-    loadCustomEffect,
-    enableBlur,
-    setCustomEffect,
-    clearEffect,
-  };
+  // Memoized so consumers (Camera, Background) only re-render when one
+  // of the actual state values changes. Refs and setters are stable
+  // identities anyway; without memoization a fresh object every render
+  // forced every consumer to re-render on any provider re-render.
+  const contextValue = useMemo(
+    () => ({
+      width,
+      height,
+      backgroundEffects,
+      isModelLoaded,
+      pipMode,
+      isCameraMode,
+      videoRef,
+      streamRef,
+      recordingTypeRef,
+      offScreenCanvasRef,
+      offScreenCanvasContextRef,
+      segmenterRef,
+      blurRef,
+      effectRef,
+      setWidth: handleSetWidth,
+      setHeight: handleSetHeight,
+      setBackgroundEffects: handleSetBackgroundEffects,
+      setPipMode,
+      setIsCameraMode,
+      loadCustomEffect,
+      enableBlur,
+      setCustomEffect,
+      clearEffect,
+    }),
+    [
+      width,
+      height,
+      backgroundEffects,
+      isModelLoaded,
+      pipMode,
+      isCameraMode,
+    ],
+  );
 
   return (
     <CameraContext.Provider value={contextValue}>

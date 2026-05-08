@@ -7,7 +7,7 @@ export const discardRecording = async () => {
   sendMessageRecord({ type: "dismiss-recording" });
   chrome.action.setIcon({ path: "assets/icon-34.png" });
 
-  // Await teardown before flipping recording:false - otherwise handleAlarm fires against a torn-down offscreen.
+  // await teardown before recording:false; otherwise handleAlarm fires against torn-down offscreen
   try {
     await discardOffscreenDocuments();
   } catch {}
@@ -20,7 +20,6 @@ export const discardRecording = async () => {
       "recordingTab",
     ]);
 
-  // Close the recorder tab if it's an extension page
   if (recordingTab) {
     try {
       const tab = await chrome.tabs.get(recordingTab);
@@ -30,7 +29,7 @@ export const discardRecording = async () => {
     } catch {}
   }
 
-  // Keep multiMode on but reset project state if no scenes were saved
+  // keep multiMode but reset project state when no scenes saved yet
   const multiState = multiMode
     ? {
         multiMode: true,
@@ -54,6 +53,12 @@ export const discardRecording = async () => {
     pendingRecording: false,
     offscreen: false,
     postStopEditorOpened: false,
+    region: false,
+    customRegion: false,
+    memoryError: false,
+    backup: false,
+    backupSetup: false,
+    backupTab: null,
     ...multiState,
   });
   chrome.storage.local.set({ pipForceClose: Date.now() });

@@ -1,6 +1,6 @@
 /**
  * Clipboard-friendly debug summary for support.
- * Same privacy rules as buildSupportContext — no URLs, tokens, or user content.
+ * Same privacy rules as buildSupportContext, no URLs, tokens, or user content.
  */
 
 import { makeSupportCode } from "./errorCodes";
@@ -42,7 +42,6 @@ export const buildSupportDebugInfo = async (opts = {}) => {
   const os = await shortOS();
   const ts = new Date().toISOString();
 
-  // Pull relevant state from storage
   let store = {};
   try {
     store = await chrome.storage.local.get([
@@ -57,14 +56,11 @@ export const buildSupportDebugInfo = async (opts = {}) => {
       "streamLifecycleLog",
       "diagnosticLog",
     ]);
-  } catch {
-    // storage read failed — continue with defaults
-  }
+  } catch {}
 
   const attemptId = store.recordingAttemptId || null;
   const supportCode = makeSupportCode(attemptId);
 
-  // Determine error code: prefer explicit, fall back to stored
   const errorCode =
     opts.errorCode ||
     store.lastRecordingError?.errorCode ||
@@ -74,13 +70,11 @@ export const buildSupportDebugInfo = async (opts = {}) => {
     opts.errorWhy || store.lastRecordingError?.why || ""
   );
 
-  // Recording mode
   const recType = store.recordingType || "unknown";
   const fastRec = store.fastRecorderInUse ? "active" : "off";
   const fastOff = store.fastRecorderDisabledReason || null;
   const sub = store.isSubscribed ? "pro" : "free";
 
-  // Last diagnostic session outcome + editor handoff check
   let lastOutcome = null;
   let editorHandoffIncomplete = false;
   if (store.diagnosticLog?.sessions?.length) {
@@ -98,7 +92,6 @@ export const buildSupportDebugInfo = async (opts = {}) => {
     }
   }
 
-  // Build the text block
   const lines = [
     `Screenity Debug Info`,
     `====================`,
@@ -129,7 +122,6 @@ export const buildSupportDebugInfo = async (opts = {}) => {
   if (attemptId) lines.push(`Ref:       ${attemptId}`);
   lines.push(`Time:      ${ts}`);
 
-  // Start-flow trace timeline
   try {
     const trace = await getStartFlowTrace();
     if (trace) {
@@ -140,9 +132,7 @@ export const buildSupportDebugInfo = async (opts = {}) => {
         lines.push(timeline);
       }
     }
-  } catch {
-    // best effort
-  }
+  } catch {}
 
   return lines.join("\n");
 };

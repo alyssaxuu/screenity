@@ -1,4 +1,5 @@
 import { sendMessageTab, focusTab } from "../tabManagement";
+import { removeTab } from "../tabManagement/removeTab";
 import { discardOffscreenDocuments } from "../offscreen/discardOffscreenDocuments";
 import { resetWatchdogState } from "./resetWatchdogState";
 
@@ -33,24 +34,58 @@ export const handleDismiss = async () => {
 
 export const cancelRecording = async () => {
   try {
-    // Reset the icon to its default state
     chrome.action.setIcon({ path: "assets/icon-34.png" });
 
-    // Get the active tab from storage
-    const { activeTab, recordingUiTabId, tabRecordedID } =
+    const { activeTab, recordingUiTabId, tabRecordedID, recordingTab } =
       await chrome.storage.local.get([
         "activeTab",
         "recordingUiTabId",
         "tabRecordedID",
+        "recordingTab",
       ]);
 
     await chrome.storage.local.set({
       pendingRecording: false,
       recordingUiTabId: null,
       tabRecordedID: null,
+      recordingTab: null,
+      // mirror stopRecording's cleared fields so cancel can't leak into next attempt
+      region: false,
+      customRegion: false,
+      recording: false,
+      restarting: false,
+      offscreen: false,
+      memoryError: false,
+      backup: false,
+      backupSetup: false,
+      backupTab: null,
     });
 
-    // Send stop message, focus the tab, and clean up
+    // URL-guard so we never close a user tab by mistake
+    if (recordingTab) {
+      try {
+        const tab = await chrome.tabs.get(recordingTab);
+        const url = tab?.url || "";
+        if (
+          url.includes("recorder.html") ||
+          url.includes("cloudrecorder.html")
+        ) {
+          try {
+            await removeTab(recordingTab);
+          } catch (removeErr) {
+            // distinguish benign "No tab with id" race from real failures
+            const msg = String(removeErr?.message || removeErr);
+            if (!/No tab with id/i.test(msg)) {
+              console.warn(
+                "[Screenity][BG] cancelRecording: removeTab failed",
+                { tabId: recordingTab, err: msg },
+              );
+            }
+          }
+        }
+      } catch {}
+    }
+
     const candidateTabs = [activeTab, recordingUiTabId, tabRecordedID].filter(
       (id, idx, arr) => Number.isInteger(id) && arr.indexOf(id) === idx,
     );

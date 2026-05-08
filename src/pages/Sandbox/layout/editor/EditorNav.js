@@ -1,13 +1,14 @@
 import React, { useContext } from "react";
 import styles from "../../styles/edit/_EditorNav.module.scss";
-import { ContentStateContext } from "../../context/ContentState"; // Import the ContentState context
+import { ContentStateContext } from "../../context/ContentState";
 
 const URL = "/assets/";
 
 const EditorNav = () => {
-  const [contentState, setContentState] = useContext(ContentStateContext); // Access the ContentState context
+  const [contentState, setContentState] = useContext(ContentStateContext);
 
   const handleCancel = () => {
+    contentState.cancelEditOp();
     setContentState((prevContentState) => ({
       ...prevContentState,
       mode: "player",
@@ -19,12 +20,26 @@ const EditorNav = () => {
   };
 
   const handleRevert = () => {
+    const prevBlob = contentState.blob;
+    const prevStart = contentState.start;
+    const prevEnd = contentState.end;
     setContentState((prevContentState) => ({
       ...prevContentState,
       blob: contentState.originalBlob,
       start: 0,
       end: 1,
     }));
+    contentState.openToast?.(
+      chrome.i18n.getMessage("sandboxToastReverted"),
+      () => {
+        setContentState((prev) => ({
+          ...prev,
+          blob: prevBlob,
+          start: prevStart,
+          end: prevEnd,
+        }));
+      },
+    );
   };
 
   const saveChanges = async () => {
@@ -39,6 +54,10 @@ const EditorNav = () => {
     }));
 
     contentState.clearBackup();
+    contentState.openToast?.(
+      chrome.i18n.getMessage("sandboxToastSaved"),
+      () => contentState.undo?.(),
+    );
   };
 
   return (
@@ -62,7 +81,6 @@ const EditorNav = () => {
           <button
             className="button simpleButton blackButton"
             onClick={handleCancel}
-            disabled={contentState.isFfmpegRunning}
           >
             {chrome.i18n.getMessage("sandboxEditorCancelButton")}
           </button>

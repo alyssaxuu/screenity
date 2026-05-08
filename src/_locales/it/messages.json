@@ -63,6 +63,18 @@
     "message": "Sembra che le impostazioni di sicurezza di questo sito impediscano alle estensioni del browser di utilizzare la fotocamera o il microfono in questa pagina. Per registrare con essi, avvia una registrazione da un'altra scheda e torna qui una volta iniziata.",
     "description": "Modal description shown when the current page's Permissions-Policy header blocks browser extensions from using camera or microphone"
   },
+  "opfsLoadErrorTitle": {
+    "message": "Impossibile caricare la registrazione",
+    "description": "Modal title shown when the editor cannot read the recording file from the device's storage"
+  },
+  "opfsLoadErrorDescription": {
+    "message": "Sembra che Screenity non sia riuscito a caricare la registrazione dall'archiviazione del dispositivo. Potrebbe essere stata cancellata o spostata. Se il problema persiste, contattaci a support@screenity.io.",
+    "description": "Modal description shown when the editor cannot read the recording file from the device's storage"
+  },
+  "recordingWriterFailedToast": {
+    "message": "Registrazione interrotta a causa di un problema di archiviazione. La registrazione parziale è stata salvata.",
+    "description": "Toast shown when the recording chunk writer fails mid-recording and the partial file is preserved"
+  },
   "allowCameraAccessButton": {
     "message": "Consenti accesso alla fotocamera",
     "description": "Pulsante per consentire l'accesso alla fotocamera"
@@ -358,6 +370,18 @@
   "sandboxProgressDescription": {
     "message": "Lascia aperta questa scheda. Si aggiornerà con il tuo video una volta pronto.",
     "description": "Descrizione nella pagina di registrazione mentre si sta registrando/salvando"
+  },
+  "sandboxFinalizingRecording": {
+    "message": "Finalizzazione della registrazione...",
+    "description": "Shown over the player when the editor is waiting for the recorder to finish flushing the recording to disk"
+  },
+  "sandboxToastReverted": {
+    "message": "Ripristinato all'originale",
+    "description": "Toast confirmation shown when the user reverts edits to the original recording"
+  },
+  "sandboxToastSaved": {
+    "message": "Modifiche salvate",
+    "description": "Toast confirmation shown when the user saves an edit operation"
   },
   "sandboxEditorMainTitle": {
     "message": "Editor",
@@ -1568,5 +1592,74 @@
   "cancelButton": {
     "message": "Annulla",
     "description": "Generic cancel button label"
+  },
+  "editorStuckTitle": {
+    "message": "Stiamo ancora preparando la tua registrazione…"
+  },
+  "editorStuckDescription": {
+    "message": "Screenity sta impiegando più del solito a caricare la tua registrazione. I tuoi dati potrebbero essere ancora su questo dispositivo. Prova a recuperarla, o contattaci se non torna."
+  },
+  "editorStuckTryRecover": {
+    "message": "Prova a recuperare"
+  },
+  "editorStuckGetHelp": {
+    "message": "Ottieni aiuto"
+  },
+  "editorRecoveryFailedTitle": {
+    "message": "Impossibile aprire la tua registrazione"
+  },
+  "editorRecoveryFailedDescription": {
+    "message": "Qualcosa è andato storto durante il caricamento della tua registrazione nell'editor. La registrazione potrebbe essere ancora salvata sul tuo dispositivo. Puoi provare a recuperarla ora."
+  },
+  "downloadGIFTooLongToast": {
+    "message": "L'esportazione GIF ha un limite di 30 secondi. Taglia la clip e riprova."
+  },
+  "audioSilentToast": {
+    "message": "Nessun audio rilevato. Controlla il microfono, il pulsante di muto o il dispositivo audio."
+  },
+  "restartFailedToast": {
+    "message": "Impossibile riavviare la tua registrazione. Fermala e ricominciala."
+  },
+  "recordingFailedModalTitle": {
+    "message": "Impossibile avviare la registrazione"
+  },
+  "recordingFailedModalDescription": {
+    "message": "Qualcosa ha impedito l'avvio della registrazione. Riprova. Se continua a succedere, scrivici a support@screenity.io."
+  },
+  "editAudioTooLargeTitle": {
+    "message": "Il file audio è troppo grande"
+  },
+  "editAudioTooLargeDescription": {
+    "message": "Prova con una clip audio più breve. I file grandi non possono essere elaborati nel browser. La tua registrazione originale è al sicuro."
+  },
+  "restoreEmptyToast": {
+    "message": "Nessuna registrazione recuperabile trovata. I dati potrebbero essere stati cancellati."
+  },
+  "restoreTimeoutToast": {
+    "message": "Il recupero sta richiedendo troppo tempo. La tua registrazione è al sicuro. Riprova a fare clic su Recupera tra un momento."
+  },
+  "cameraUnavailableToast": {
+    "message": "Fotocamera disconnessa. La registrazione dello schermo continua."
+  },
+  "downloadInterruptedLargeToast": {
+    "message": "Download interrotto. La registrazione è troppo grande per riprovare automaticamente. Salvala di nuovo dall'editor."
+  },
+  "recordingCorruptToast": {
+    "message": "Questa registrazione non può essere riprodotta. Il file potrebbe essere incompleto o danneggiato. Scarica il file originale dal menu Salva."
+  },
+  "overLimitModalTitle": {
+    "message": "Il video è troppo lungo per essere elaborato sul tuo dispositivo"
+  },
+  "overLimitModalDescription": {
+    "message": "Dato che Screenity è completamente privato e gira in locale, è limitato dall'hardware del tuo dispositivo. Elaborare un video di questa durata richiederebbe troppo tempo e molte risorse. Tranquillo, puoi comunque scaricare il file WEBM o la registrazione grezza, ma la modifica e l'esportazione MP4 non sono disponibili. Detto questo, puoi comunque provare a elaborare il video, se accetti i rischi."
+  },
+  "overLimitModalDescriptionFastPath": {
+    "message": "Dato che Screenity è completamente privato e gira in locale, è limitato dall'hardware del tuo dispositivo. Elaborare un video di questa durata richiederebbe troppo tempo e molte risorse. Il tuo MP4 è pronto da scaricare così com'è, ma la modifica nel browser non è disponibile per clip così lunghe. Puoi comunque provare a elaborare il video, se accetti i rischi."
+  },
+  "overLimitModalButton": {
+    "message": "Capisco i rischi, prova comunque"
+  },
+  "overLimitModalLearnMore": {
+    "message": "Scopri di più sull'elaborazione di video lunghi."
   }
 }

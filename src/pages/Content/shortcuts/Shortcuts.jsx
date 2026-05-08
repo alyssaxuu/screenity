@@ -1,6 +1,5 @@
 import React, { useEffect, useContext, useRef } from "react";
 
-// Context
 import { contentStateContext } from "../context/ContentState";
 import { undoCanvas, redoCanvas, saveCanvas } from "../canvas/modules/History";
 
@@ -11,30 +10,7 @@ const Shortcuts = ({ shortcuts }) => {
   useEffect(() => {
     contentStateRef.current = contentState;
   }, [contentState]);
-  /* For the record, this is the shortcuts object:
-	shortcuts: {
-      "start-recording": "ctrl+shift+1",
-      "stop-recording": "ctrl+shift+2",
-      "pause-recording": "ctrl+shift+3",
-      "resume-recording": "ctrl+shift+4",
-      "dismiss-recording": "ctrl+shift+5",
-      "restart-recording": "ctrl+shift+6",
-      "toggle-drawing-mode": "ctrl+shift+7",
-    },
-	*/
 
-  // Set up all the hotkeys programmatically from the shortcuts object, without using useEffect
-
-  /*
-  useHotkeys(shortcuts["toggle-drawing-mode"], () => {
-    setContentState((prevContentState) => ({
-      ...prevContentState,
-      drawingMode: !prevContentState.drawingMode,
-    }));
-  });
-  */
-
-  // in-app shortcuts for screenity tools
   useEffect(() => {
     const getDeepActiveElement = () => {
       let active = document.activeElement;
@@ -263,54 +239,89 @@ const Shortcuts = ({ shortcuts }) => {
     };
   }, []);
 
-  // Push to talk (while Alt/Option + Shift + J key is pressed enable microphone, disable on key up)
+  // Push-to-talk: Alt+Shift+U held = mic on; release = off. Guards against
+  // "mic stayed on after I let go":
+  //  1. Modifier released before U: keyup arrives with altKey/shiftKey=false.
+  //     Track armed state in a ref and disarm on ANY of {U, Alt, Shift}.
+  //  2. Auto-repeat: holding fires keydown repeatedly. Skip event.repeat.
+  //  3. Blur/visibility change (Cmd-Tab, Alt-Tab): we never see the keyup.
+  //     Disarm on blur and visibilitychange.
+  const pttArmedRef = useRef(false);
   useEffect(() => {
+    const isPttChord = (event) =>
+      event.code === "KeyU" && event.altKey && event.shiftKey;
+
+    const armPtt = () => {
+      if (pttArmedRef.current) return;
+      pttArmedRef.current = true;
+      setContentState((prevContentState) => ({
+        ...prevContentState,
+        micActive: true,
+      }));
+      chrome.storage.local.set({ micActive: true });
+      chrome.runtime.sendMessage({
+        type: "set-mic-active-tab",
+        active: true,
+        defaultAudioInput: contentStateRef.current.defaultAudioInput,
+      });
+    };
+
+    const disarmPtt = () => {
+      if (!pttArmedRef.current) return;
+      pttArmedRef.current = false;
+      setContentState((prevContentState) => ({
+        ...prevContentState,
+        micActive: false,
+      }));
+      chrome.storage.local.set({ micActive: false });
+      chrome.runtime.sendMessage({
+        type: "set-mic-active-tab",
+        active: false,
+        defaultAudioInput: contentStateRef.current.defaultAudioInput,
+      });
+    };
+
     const handleKeyDown = (event) => {
       if (!contentStateRef.current.pushToTalk) return;
-      if (event.code === "KeyU" && event.altKey && event.shiftKey) {
-        setContentState((prevContentState) => ({
-          ...prevContentState,
-          micActive: true,
-        }));
-
-        chrome.storage.local.set({
-          micActive: true,
-        });
-
-        chrome.runtime.sendMessage({
-          type: "set-mic-active-tab",
-          active: true,
-          defaultAudioInput: contentState.defaultAudioInput,
-        });
-      }
+      if (event.repeat) return;
+      if (isPttChord(event)) armPtt();
     };
 
     const handleKeyUp = (event) => {
       if (!contentStateRef.current.pushToTalk) return;
-      if (event.code === "KeyU" && event.altKey && event.shiftKey) {
-        setContentState((prevContentState) => ({
-          ...prevContentState,
-          micActive: false,
-        }));
+      if (!pttArmedRef.current) return;
+      // Users may release chord members in any order.
+      const isChordKey =
+        event.code === "KeyU" ||
+        event.code === "AltLeft" ||
+        event.code === "AltRight" ||
+        event.code === "ShiftLeft" ||
+        event.code === "ShiftRight";
+      if (isChordKey) disarmPtt();
+    };
 
-        chrome.storage.local.set({
-          micActive: false,
-        });
-
-        chrome.runtime.sendMessage({
-          type: "set-mic-active-tab",
-          active: false,
-          defaultAudioInput: contentState.defaultAudioInput,
-        });
-      }
+    const handleBlurOrHidden = () => {
+      // Focus loss eats further key events; disarm proactively so the
+      // user doesn't end up with a hot mic they can't see.
+      if (contentStateRef.current.pushToTalk) disarmPtt();
     };
 
     window.addEventListener("keydown", handleKeyDown);
     window.addEventListener("keyup", handleKeyUp);
+    window.addEventListener("blur", handleBlurOrHidden);
+    document.addEventListener("visibilitychange", handleBlurOrHidden);
 
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
       window.removeEventListener("keyup", handleKeyUp);
+      window.removeEventListener("blur", handleBlurOrHidden);
+      document.removeEventListener("visibilitychange", handleBlurOrHidden);
+      // Don't leak "on" state if unmounted while armed (recording ended,
+      // tab navigation).
+      if (pttArmedRef.current) {
+        pttArmedRef.current = false;
+        chrome.storage.local.set({ micActive: false });
+      }
     };
   }, []);
 

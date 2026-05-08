@@ -35,6 +35,47 @@ const Sandbox = () => {
     return () => window.removeEventListener("message", handler);
   }, []);
 
+  useEffect(() => {
+    const storageHandler = (changes, areaName) => {
+      if (areaName !== "local") return;
+      if (!changes.editorRecordingError) return;
+      const payload = changes.editorRecordingError.newValue;
+      if (!payload) return;
+      try {
+        iframeRef.current?.contentWindow?.postMessage(
+          { type: "recording-error-from-parent", payload },
+          "*",
+        );
+      } catch {}
+    };
+    chrome.storage.onChanged.addListener(storageHandler);
+    const respondWithLatest = () => {
+      chrome.storage.local.get(["editorRecordingError"]).then((res) => {
+        if (!res?.editorRecordingError) return;
+        try {
+          iframeRef.current?.contentWindow?.postMessage(
+            {
+              type: "recording-error-from-parent",
+              payload: res.editorRecordingError,
+            },
+            "*",
+          );
+        } catch {}
+      });
+    };
+    const requestHandler = (event) => {
+      if (event?.data?.type === "request-recording-error-state") {
+        respondWithLatest();
+      }
+    };
+    window.addEventListener("message", requestHandler);
+    respondWithLatest();
+    return () => {
+      chrome.storage.onChanged.removeListener(storageHandler);
+      window.removeEventListener("message", requestHandler);
+    };
+  }, []);
+
   return (
     <div>
       <iframe

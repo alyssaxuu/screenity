@@ -24,11 +24,9 @@ import {
   HelpIconPopup,
 } from "../toolbar/components/SVG";
 
-/* Component import */
 import RecordingTab from "./layout/RecordingTab";
 import VideosTab from "./layout/VideosTab";
 
-// Layouts
 import SettingsMenu from "./layout/SettingsMenu";
 import InactiveSubscription from "./layout/InactiveSubscription";
 import LoggedOut from "./layout/LoggedOut";
@@ -38,7 +36,6 @@ import {
   runProCameraOnboardingIfNeeded,
 } from "./onboarding/proOnboarding";
 
-// Context
 import { contentStateContext } from "../context/ContentState";
 import { supportContextQuery } from "../../utils/buildSupportContext";
 
@@ -94,10 +91,8 @@ const PopupContainer = (props) => {
     const buildURL = async () => {
       const locale = chrome.i18n.getMessage("@@ui_locale");
 
-      // Default URL
       let baseURL = "https://help.screenity.io/";
 
-      // If logged in, switch to Tally with prefilled params
       if (contentState?.isLoggedIn && contentState?.screenityUser) {
         const { name, email } = contentState.screenityUser;
         const qs = await supportContextQuery({
@@ -108,7 +103,6 @@ const PopupContainer = (props) => {
         baseURL = `https://tally.so/r/310MNg?extension=true&${qs}`;
       }
 
-      // If non-English locale, wrap with Google Translate
       if (!locale.includes("en")) {
         setURL(
           `https://translate.google.com/translate?sl=en&tl=${locale}&u=${encodeURIComponent(
@@ -195,11 +189,11 @@ const PopupContainer = (props) => {
       let xpos = DragRef.current.getDraggablePosition().x;
       let ypos = DragRef.current.getDraggablePosition().y;
 
-      // Width and height of popup
-      const width = PopupRef.current.getBoundingClientRect().width;
-      const height = PopupRef.current.getBoundingClientRect().height;
+      const rect = PopupRef.current.getBoundingClientRect();
+      const width = rect.width;
+      const height = rect.height;
 
-      // Keep popup positioned relative to the bottom and right of the screen, proportionally
+      // Keep popup positioned proportionally to bottom-right.
       if (xpos > window.innerWidth + 10) {
         xpos = window.innerWidth + 10;
       }
@@ -207,7 +201,6 @@ const PopupContainer = (props) => {
         ypos = window.innerHeight - height - 40;
       }
 
-      // Check if attached to right or bottom, if so, keep it there
       if (contentStateRef.current.popupPosition.fixed) {
         if (xpos < window.innerWidth) {
           xpos = window.innerWidth + 10;
@@ -226,9 +219,10 @@ const PopupContainer = (props) => {
   };
 
   const handleDrag = (e, d) => {
-    // Width and height
-    const width = PopupRef.current.getBoundingClientRect().width;
-    const height = PopupRef.current.getBoundingClientRect().height;
+    // Drag fires ~60Hz; cache rect to avoid 120 reflows/sec.
+    const rect = PopupRef.current.getBoundingClientRect();
+    const width = rect.width;
+    const height = rect.height;
 
     if (
       d.x - 40 < width ||
@@ -252,11 +246,10 @@ const PopupContainer = (props) => {
     let xpos = d.x;
     let ypos = d.y;
 
-    // Width and height
-    const width = PopupRef.current.getBoundingClientRect().width;
-    const height = PopupRef.current.getBoundingClientRect().height;
+    const rect = PopupRef.current.getBoundingClientRect();
+    const width = rect.width;
+    const height = rect.height;
 
-    // Check if popup is off screen
     if (d.x - 40 < width) {
       setElastic(anim);
       xpos = width + 40;
@@ -291,7 +284,6 @@ const PopupContainer = (props) => {
       },
     }));
 
-    // Is it on the left or right, also top or bottom
     let left = xpos < window.innerWidth / 2 ? true : false;
     let right = xpos < window.innerWidth / 2 ? false : true;
     let top = ypos < window.innerHeight / 2 ? true : false;
@@ -604,7 +596,6 @@ const PopupContainer = (props) => {
               contentState.wasLoggedIn ? (
               <LoggedOut
                 onManageClick={() => {
-                  // Log back in
                   chrome.runtime.sendMessage({ type: "handle-login" });
                 }}
                 onDowngradeClick={() => {
@@ -616,9 +607,9 @@ const PopupContainer = (props) => {
                     ...prev,
                     isLoggedIn: false,
                     wasLoggedIn: false,
-                    bigTab: "record", // Ensure UI state sync
+                    bigTab: "record",
                   }));
-                  setTab("record"); // Switch immediately
+                  setTab("record");
 
                   requestAnimationFrame(() => {
                     if (recordTabRef.current && pillRef.current) {

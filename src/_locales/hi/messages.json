@@ -63,6 +63,18 @@
     "message": "ऐसा लगता है कि इस वेबसाइट की सुरक्षा सेटिंग्स ब्राउज़र एक्सटेंशन को इस पेज पर आपके कैमरा या माइक्रोफोन का उपयोग करने से रोकती हैं। इनके साथ रिकॉर्ड करने के लिए, किसी अन्य टैब से रिकॉर्डिंग शुरू करें और रिकॉर्डिंग शुरू होने के बाद यहाँ वापस आएँ।",
     "description": "Modal description shown when the current page's Permissions-Policy header blocks browser extensions from using camera or microphone"
   },
+  "opfsLoadErrorTitle": {
+    "message": "आपकी रिकॉर्डिंग लोड नहीं हो सकी",
+    "description": "Modal title shown when the editor cannot read the recording file from the device's storage"
+  },
+  "opfsLoadErrorDescription": {
+    "message": "ऐसा लगता है कि Screenity आपके डिवाइस के स्टोरेज से रिकॉर्डिंग लोड नहीं कर सका। यह मिटा दी गई हो या हटाई गई हो सकती है। अगर यह समस्या बार-बार हो, तो कृपया support@screenity.io पर हमसे संपर्क करें।",
+    "description": "Modal description shown when the editor cannot read the recording file from the device's storage"
+  },
+  "recordingWriterFailedToast": {
+    "message": "स्टोरेज समस्या के कारण रिकॉर्डिंग बंद हो गई। आपकी आंशिक रिकॉर्डिंग सहेज ली गई है।",
+    "description": "Toast shown when the recording chunk writer fails mid-recording and the partial file is preserved"
+  },
   "allowCameraAccessButton": {
     "message": "कैमरा अनुमति दें",
     "description": "कैमरा अनुमति दें बटन"
@@ -358,6 +370,18 @@
   "sandboxProgressDescription": {
     "message": "इस टैब को खुला रखें। यह आपकी रेकॉर्डिंग तैयार होने पर अपडेट हो जाएगा।",
     "description": "सैंडबॉक्स पृष्ठ में रेकॉर्डिंग / सहेजने के दौरान विवरण"
+  },
+  "sandboxFinalizingRecording": {
+    "message": "रिकॉर्डिंग पूरी की जा रही है...",
+    "description": "Shown over the player when the editor is waiting for the recorder to finish flushing the recording to disk"
+  },
+  "sandboxToastReverted": {
+    "message": "मूल पर वापस लाया गया",
+    "description": "Toast confirmation shown when the user reverts edits to the original recording"
+  },
+  "sandboxToastSaved": {
+    "message": "बदलाव सहेजे गए",
+    "description": "Toast confirmation shown when the user saves an edit operation"
   },
   "sandboxEditorMainTitle": {
     "message": "संपादक",
@@ -1588,5 +1612,59 @@
   "cancelButton": {
     "message": "रद्द करें",
     "description": "Generic cancel button label"
+  },
+  "editorStuckTitle": {
+    "message": "आपकी रिकॉर्डिंग अभी भी तैयार हो रही है…"
+  },
+  "editorStuckDescription": {
+    "message": "Screenity को आपकी रिकॉर्डिंग लोड करने में सामान्य से अधिक समय लग रहा है। आपका डेटा अब भी इस डिवाइस पर हो सकता है। इसे रिकवर करने का प्रयास करें, या यदि यह वापस न आए तो हमसे संपर्क करें।"
+  },
+  "editorStuckTryRecover": {
+    "message": "रिकवर करने का प्रयास करें"
+  },
+  "editorStuckGetHelp": {
+    "message": "मदद लें"
+  },
+  "editorRecoveryFailedTitle": {
+    "message": "आपकी रिकॉर्डिंग नहीं खुल सकी"
+  },
+  "editorRecoveryFailedDescription": {
+    "message": "रिकॉर्डिंग को एडिटर में लोड करते समय कुछ गड़बड़ हो गई। आपकी रिकॉर्डिंग अब भी आपके डिवाइस पर सहेजी हो सकती है। आप इसे अभी रिकवर करने का प्रयास कर सकते हैं।"
+  },
+  "downloadGIFTooLongToast": {
+    "message": "GIF एक्सपोर्ट की सीमा 30 सेकंड है। अपनी क्लिप को छोटा करें और फिर से प्रयास करें।"
+  },
+  "audioSilentToast": {
+    "message": "कोई ऑडियो नहीं मिला। अपना माइक, म्यूट स्विच, या ऑडियो डिवाइस जांचें।"
+  },
+  "restartFailedToast": {
+    "message": "आपकी रिकॉर्डिंग दोबारा शुरू नहीं हो सकी। रोककर फिर से शुरू करने का प्रयास करें।"
+  },
+  "recordingFailedModalTitle": {
+    "message": "रिकॉर्डिंग शुरू नहीं हो सकी"
+  },
+  "recordingFailedModalDescription": {
+    "message": "किसी कारण से रिकॉर्डिंग शुरू नहीं हो पाई। कृपया फिर से प्रयास करें। यदि यह बार-बार हो रहा है, तो हमें support@screenity.io पर संपर्क करें।"
+  },
+  "editAudioTooLargeTitle": {
+    "message": "ऑडियो फ़ाइल बहुत बड़ी है"
+  },
+  "editAudioTooLargeDescription": {
+    "message": "छोटी ऑडियो क्लिप आज़माएं। बड़ी फ़ाइलें ब्राउज़र में प्रोसेस नहीं हो सकतीं। आपकी मूल रिकॉर्डिंग सुरक्षित है।"
+  },
+  "restoreEmptyToast": {
+    "message": "कोई रिकवर करने योग्य रिकॉर्डिंग नहीं मिली। डेटा क्लियर हो चुका हो सकता है।"
+  },
+  "restoreTimeoutToast": {
+    "message": "रिकवरी में बहुत समय लग रहा है। आपकी रिकॉर्डिंग सुरक्षित है। थोड़ी देर में रिकवर पर फिर से क्लिक करें।"
+  },
+  "cameraUnavailableToast": {
+    "message": "कैमरा डिस्कनेक्ट हो गया। स्क्रीन रिकॉर्डिंग जारी है।"
+  },
+  "downloadInterruptedLargeToast": {
+    "message": "डाउनलोड बाधित हुआ। रिकॉर्डिंग इतनी बड़ी है कि स्वचालित रूप से दोबारा प्रयास नहीं हो सकता। एडिटर से दोबारा सहेजने का प्रयास करें।"
+  },
+  "recordingCorruptToast": {
+    "message": "यह रिकॉर्डिंग प्ले नहीं की जा सकती। फ़ाइल अधूरी या ख़राब हो सकती है। सेव मेनू से रॉ फ़ाइल डाउनलोड करने का प्रयास करें।"
   }
 }

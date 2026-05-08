@@ -63,6 +63,18 @@
     "message": "Похоже, настройки безопасности этого сайта не позволяют расширениям браузера использовать камеру или микрофон на этой странице. Чтобы записывать с их использованием, начните запись в другой вкладке и переключитесь сюда после её начала.",
     "description": "Modal description shown when the current page's Permissions-Policy header blocks browser extensions from using camera or microphone"
   },
+  "opfsLoadErrorTitle": {
+    "message": "Не удалось загрузить запись",
+    "description": "Modal title shown when the editor cannot read the recording file from the device's storage"
+  },
+  "opfsLoadErrorDescription": {
+    "message": "Похоже, Screenity не смог загрузить запись из хранилища вашего устройства. Возможно, она была удалена или перемещена. Если это продолжится, напишите нам на support@screenity.io.",
+    "description": "Modal description shown when the editor cannot read the recording file from the device's storage"
+  },
+  "recordingWriterFailedToast": {
+    "message": "Запись остановлена из-за проблемы с хранилищем. Ваша частичная запись сохранена.",
+    "description": "Toast shown when the recording chunk writer fails mid-recording and the partial file is preserved"
+  },
   "allowCameraAccessButton": {
     "message": "Разрешить доступ к камере",
     "description": "Кнопка разрешения доступа к камере"
@@ -358,6 +370,18 @@
   "sandboxProgressDescription": {
     "message": "Оставьте эту вкладку открытой. Она будет обновлена с вашей записью, как только она будет готова.",
     "description": "Описание на странице песочницы во время записи / сохранения"
+  },
+  "sandboxFinalizingRecording": {
+    "message": "Завершение записи...",
+    "description": "Shown over the player when the editor is waiting for the recorder to finish flushing the recording to disk"
+  },
+  "sandboxToastReverted": {
+    "message": "Возвращено к оригиналу",
+    "description": "Toast confirmation shown when the user reverts edits to the original recording"
+  },
+  "sandboxToastSaved": {
+    "message": "Изменения сохранены",
+    "description": "Toast confirmation shown when the user saves an edit operation"
   },
   "sandboxEditorMainTitle": {
     "message": "Редактор",
@@ -1588,5 +1612,59 @@
   "cancelButton": {
     "message": "Отмена",
     "description": "Generic cancel button label"
+  },
+  "editorStuckTitle": {
+    "message": "Запись ещё готовится…"
+  },
+  "editorStuckDescription": {
+    "message": "Screenity загружает вашу запись дольше обычного. Возможно, данные всё ещё хранятся на этом устройстве. Попробуйте восстановить её или свяжитесь с нами, если она не вернётся."
+  },
+  "editorStuckTryRecover": {
+    "message": "Восстановить"
+  },
+  "editorStuckGetHelp": {
+    "message": "Получить помощь"
+  },
+  "editorRecoveryFailedTitle": {
+    "message": "Не удалось открыть запись"
+  },
+  "editorRecoveryFailedDescription": {
+    "message": "При загрузке записи в редактор что-то пошло не так. Возможно, ваша запись всё ещё сохранена на устройстве. Вы можете попробовать восстановить её сейчас."
+  },
+  "downloadGIFTooLongToast": {
+    "message": "Экспорт в GIF ограничен 30 секундами. Обрежьте клип и попробуйте снова."
+  },
+  "audioSilentToast": {
+    "message": "Звук не обнаружен. Проверьте микрофон, переключатель отключения звука или аудиоустройство."
+  },
+  "restartFailedToast": {
+    "message": "Не удалось перезапустить запись. Остановите её и начните заново."
+  },
+  "recordingFailedModalTitle": {
+    "message": "Не удалось начать запись"
+  },
+  "recordingFailedModalDescription": {
+    "message": "Что-то помешало запустить запись. Пожалуйста, попробуйте снова. Если это повторяется, напишите нам на support@screenity.io."
+  },
+  "editAudioTooLargeTitle": {
+    "message": "Аудиофайл слишком большой"
+  },
+  "editAudioTooLargeDescription": {
+    "message": "Попробуйте более короткий аудиоклип. Большие файлы нельзя обработать в браузере. Ваша оригинальная запись в сохранности."
+  },
+  "restoreEmptyToast": {
+    "message": "Записей для восстановления не найдено. Возможно, данные были удалены."
+  },
+  "restoreTimeoutToast": {
+    "message": "Восстановление занимает слишком много времени. Ваша запись в сохранности. Через мгновение нажмите Восстановить снова."
+  },
+  "cameraUnavailableToast": {
+    "message": "Камера отключена. Запись экрана продолжается."
+  },
+  "downloadInterruptedLargeToast": {
+    "message": "Загрузка прервана. Запись слишком большая для автоматического повтора. Попробуйте сохранить её снова из редактора."
+  },
+  "recordingCorruptToast": {
+    "message": "Эту запись невозможно воспроизвести. Возможно, файл повреждён или неполный. Попробуйте скачать исходный файл через меню Сохранить."
   }
 }

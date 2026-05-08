@@ -1,6 +1,5 @@
 import { sendMessageTab, getCurrentTab } from "../tabManagement";
 
-// Main command listener
 export const onCommandListener = () => {
   let lastToggleDrawingAt = 0;
   const TOGGLE_DRAWING_COOLDOWN_MS = 400;
@@ -10,20 +9,29 @@ export const onCommandListener = () => {
     if (!activeTab || !activeTab.id) return;
 
     if (command === "start-recording") {
-      // Validate if it's possible to inject into content
+      // shortcut pressed from another window must not start a second recording
+      try {
+        const { recording, pendingRecording, restarting } =
+          await chrome.storage.local.get([
+            "recording",
+            "pendingRecording",
+            "restarting",
+          ]);
+        if (recording || pendingRecording || restarting) {
+          return;
+        }
+      } catch {}
+      const tabUrl = String(activeTab.url || "");
       if (
         !(
-          (navigator.onLine === false &&
-            !activeTab.url.includes("/playground.html") &&
-            !activeTab.url.includes("/setup.html")) ||
-          activeTab.url.startsWith("chrome://") ||
-          (activeTab.url.startsWith("chrome-extension://") &&
-            !activeTab.url.includes("/playground.html") &&
-            !activeTab.url.includes("/setup.html"))
+          tabUrl.startsWith("chrome://") ||
+          (tabUrl.startsWith("chrome-extension://") &&
+            !tabUrl.includes("/playground.html") &&
+            !tabUrl.includes("/setup.html"))
         ) &&
-        !activeTab.url.includes("stackoverflow.com/") &&
-        !activeTab.url.includes("chrome.google.com/webstore") &&
-        !activeTab.url.includes("chromewebstore.google.com")
+        !tabUrl.includes("stackoverflow.com/") &&
+        !tabUrl.includes("chrome.google.com/webstore") &&
+        !tabUrl.includes("chromewebstore.google.com")
       ) {
         sendMessageTab(activeTab.id, { type: "start-stream" });
       } else {
@@ -35,7 +43,6 @@ export const onCommandListener = () => {
           .then((tab) => {
             chrome.storage.local.set({ activeTab: tab.id });
 
-            // Wait for the tab to load
             chrome.tabs.onUpdated.addListener(function _(tabId, changeInfo) {
               if (tabId === tab.id && changeInfo.status === "complete") {
                 setTimeout(() => {

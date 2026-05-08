@@ -12,7 +12,7 @@ export function getBitrates(quality) {
     case "4k":
       return { audio: 192000, video: 20000000 };
     case "1080p":
-      return { audio: 128000, video: 8000000 };
+      return { audio: 128000, video: 12000000 };
     case "720p":
       return { audio: 128000, video: 5000000 };
     case "480p":
@@ -22,7 +22,7 @@ export function getBitrates(quality) {
     case "240p":
       return { audio: 64000, video: 1000000 };
     default:
-      return { audio: 128000, video: 8000000 };
+      return { audio: 128000, video: 12000000 };
   }
 }
 export const VIDEO_QUALITIES = {

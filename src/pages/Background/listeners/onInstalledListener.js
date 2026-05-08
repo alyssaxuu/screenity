@@ -12,10 +12,8 @@ export const onInstalledListener = () => {
     const locale = chrome.i18n.getMessage("@@ui_locale");
 
     if (details.reason === "install") {
-      // Clear storage on fresh install
       chrome.storage.local.clear();
 
-      // Set uninstall URL based on locale
       const installQs = await supportContextQuery({ source: "uninstall" });
       const installUrl = `https://tally.so/r/w8Zro5?${installQs}`;
       chrome.runtime.setUninstallURL(
@@ -39,12 +37,10 @@ export const onInstalledListener = () => {
       });
     } else if (details.reason === "update") {
       if (details.previousVersion === "2.8.6") {
-        // Do not clear local storage on update; preserve onboarding/versioned keys.
         chrome.storage.local.set({ updatingFromOld: true });
       } else {
         chrome.storage.local.set({ updatingFromOld: false });
 
-        // Onboarding for new cloud version
         if (details.previousVersion === "3.1.16" && cloudFeaturesEnabled) {
           chrome.storage.local.set({
             showProSplash: cloudFeaturesEnabled,
@@ -63,15 +59,10 @@ export const onInstalledListener = () => {
       );
     }
 
-    // Disable backups for older Chrome versions
-    if (navigator.userAgent.includes("Chrome/")) {
-      const chromeVersion = parseInt(
-        navigator.userAgent.match(/Chrome\/([0-9]+)/)?.[1] ?? "0"
-      );
-      if (chromeVersion <= 109) {
-        chrome.storage.local.set({ backup: false });
-      }
-    }
+    // Backup mode is deprecated: hidden from the settings dropdown and
+    // forced off for all users on install/update. OPFS-backed recording
+    // covers the same crash-resilience without the picker UX.
+    chrome.storage.local.set({ backup: false, backupSetup: false });
 
     if (details.reason === "install") {
       chrome.storage.local.set({ systemAudio: true });
@@ -83,7 +74,10 @@ export const onInstalledListener = () => {
       removeTab(backupTab);
     }
 
-    executeScripts();
+    // update only; manifest auto-injects on page load. install would double-mount React on dev.
+    if (details.reason === "update") {
+      executeScripts();
+    }
 
     setTimeout(() => {
       tryResumePendingUploads({ trigger: `onInstalled:${details.reason}` }).catch(

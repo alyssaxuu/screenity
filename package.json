@@ -1,11 +1,12 @@
 {
   "name": "screenity",
-  "version": "4.3.0",
+  "version": "4.4.0",
   "description": "The free and privacy-friendly screen recorder with no sign in needed.",
   "scripts": {
     "build": "cross-env NODE_ENV=development node utils/build.js",
     "build:prod": "cross-env NODE_ENV=production node utils/build.js",
     "build:release": "cross-env NODE_ENV=production SCREENITY_SKIP_ENV=true node utils/build.js",
+    "build:bs": "cross-env NODE_ENV=production SCREENITY_BS_BUILD=1 node utils/build.js",
     "start": "cross-env NODE_ENV=development node utils/server.js",
     "dev": "npm run hot-reload",
     "watch": "cross-env NODE_ENV=development webpack --watch",
@@ -16,7 +17,10 @@
     "package:release": "npm run build:release && cd build && zip -r ../extension.zip . && cd ..",
     "clean": "rm -rf build && mkdir build",
     "lint": "eslint src/**/*.js --fix",
-    "build:content-css": "sass src/pages/Content/styles/app.scss src/pages/Content/styles/app.css --no-source-map"
+    "build:content-css": "sass src/pages/Content/styles/app.scss src/pages/Content/styles/app.css --no-source-map",
+    "check:i18n": "node scripts/check-i18n.mjs",
+    "verify:zip": "node scripts/verify-no-secrets.mjs",
+    "release": "node scripts/release.mjs"
   },
   "dependencies": {
     "@babel/plugin-transform-react-jsx": "^7.27.1",
@@ -69,9 +73,11 @@
     "@babel/plugin-transform-runtime": "^7.27.1",
     "@babel/preset-env": "^7.20.2",
     "@babel/preset-react": "^7.27.1",
+    "@playwright/test": "^1.59.1",
     "@types/react": "^18.3.21",
     "@types/react-dom": "^18.3.7",
     "babel-loader": "^9.1.3",
+    "browserstack-local": "^1.5.13",
     "copy-webpack-plugin": "^7.0.0",
     "cross-env": "^7.0.3",
     "css-loader": "^6.7.2",
@@ -81,6 +87,7 @@
     "prettier": "^2.7.1",
     "sass": "^1.97.3",
     "sass-loader": "^16.0.7",
+    "selenium-webdriver": "^4.43.0",
     "source-map-loader": "^3.0.1",
     "style-loader": "^3.3.1",
     "stylelint": "^17.8.0",

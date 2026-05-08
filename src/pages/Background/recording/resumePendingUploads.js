@@ -1,8 +1,6 @@
-// Background retry queue for incomplete upload journals - resumed silently in an offscreen doc.
-
 const JOURNAL_KEY_PREFIX = "uploadJournal-";
 const MAX_RESUME_ATTEMPTS = 5;
-const RESUME_LOCK_TTL_MS = 10 * 60 * 1000; // 10 min - stale lock recovery.
+const RESUME_LOCK_TTL_MS = 10 * 60 * 1000;
 
 const getAllStorage = () =>
   new Promise((resolve) => {
@@ -21,7 +19,7 @@ const pickResumeCandidates = (storage) => {
     if (!value || typeof value !== "object") continue;
     if (value.trackType === "audio") continue; // audio is diagnostic, never uploaded
     if (value.status === "completed") continue;
-    if ((value.offset || 0) >= (value.totalBytes || 0)) continue;
+    // status is source of truth; offset>=totalBytes still needs finalize()
     if ((value.resumeAttempts || 0) >= MAX_RESUME_ATTEMPTS) {
       abandonedKeys.push(key);
       continue;

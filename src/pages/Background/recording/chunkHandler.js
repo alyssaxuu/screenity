@@ -2,6 +2,7 @@ import localforage from "localforage";
 import { blobToBase64 } from "../utils/blobToBase64";
 import { sendMessageTab } from "../tabManagement";
 import { diagEvent } from "../../utils/diagnosticLog";
+import { perfMark, perfSpan } from "../../utils/perfMarks";
 
 localforage.config({
   driver: localforage.INDEXEDDB,
@@ -9,13 +10,8 @@ localforage.config({
   version: 1,
 });
 
-// In-memory lock for handleChunks. The previous storage-based `sendingChunks`
-// flag was check-then-set via async chrome.storage calls — two concurrent
-// handleChunks triggers (one from the recorder's stop flow, one from the
-// sandbox's send-chunks-to-sandbox request) could both pass the check before
-// either wrote the flag. That caused duplicate batches to interleave at the
-// sandbox and scramble chunk order. An in-process promise chain is atomic in
-// the SW event loop and strictly serializes handleChunks calls.
+// in-memory promise chain. storage-based sendingChunks flag was racy:
+// check-then-set via async chrome.storage let two concurrent triggers pass.
 let _sendChain = Promise.resolve();
 
 export const chunksStore = localforage.createInstance({ name: "chunks" });
@@ -33,12 +29,6 @@ export const clearAllRecordings = async () => {
 };
 
 export const handleChunks = async (chunks, override = false, target = null) => {
-  // Serialize via in-memory promise chain. Atomic in the SW event loop, so
-  // two concurrent triggers (e.g. the automatic send on stop and the
-  // sandbox's `send-chunks-to-sandbox` request) run back-to-back instead of
-  // overlapping. Prevents duplicate batches from interleaving at the sandbox
-  // and scrambling chunk order. The old storage-based `sendingChunks` flag
-  // is racy — async read + async write leaves a gap where both callers pass.
   const priorChain = _sendChain;
   let releaseChain;
   _sendChain = new Promise((resolve) => {
@@ -48,9 +38,7 @@ export const handleChunks = async (chunks, override = false, target = null) => {
     await priorChain;
   } catch {}
 
-  // From here down, any early return or throw must still release the lock.
-  // The inner try/finally below covers the main body; this wrapper catches
-  // anything before it (e.g. a failing storage read).
+  // outer try/finally guarantees lock release even if the storage read throws
   let mainCompleted = false;
   try {
   const { sandboxTab, bannerSupport } = await chrome.storage.local.get([
@@ -65,7 +53,7 @@ export const handleChunks = async (chunks, override = false, target = null) => {
       override,
     });
 
-  // Keep the legacy storage flag in sync for anything still reading it.
+  // legacy flag kept in sync for callers still reading it
   await chrome.storage.local.set({ sendingChunks: true });
 
   try {
@@ -168,7 +156,7 @@ export const handleChunks = async (chunks, override = false, target = null) => {
     };
 
     let currentIndex = 0;
-    // Sample first 3, last 3, every ~totalBatches/10 between - caps at ~10 diag events.
+    // sample first 3, last 3, ~every totalBatches/10 between; caps diag at ~10 events
     const totalBatches = Math.max(1, Math.ceil(chunks.length / batchSize));
     const sampleStride = Math.max(1, Math.floor(totalBatches / 10));
     const shouldEmitBatch = (batchIndex) => {
@@ -181,6 +169,9 @@ export const handleChunks = async (chunks, override = false, target = null) => {
       const end = Math.min(currentIndex + batchSize, chunks.length);
       const rawBatch = chunks.slice(currentIndex, end);
 
+      const endEncode = perfSpan("BG.chunkHandler batch-base64", {
+        batchLen: rawBatch.length,
+      });
       const batch = await Promise.all(
         rawBatch.map(async (chunk) => {
           try {
@@ -191,6 +182,11 @@ export const handleChunks = async (chunks, override = false, target = null) => {
           }
         }),
       );
+      const totalBytes = batch.reduce(
+        (s, b) => s + (b?.chunk?.length || 0),
+        0,
+      );
+      endEncode({ totalBytes });
 
       const filtered = batch.filter(Boolean);
       if (filtered.length > 0) {
@@ -200,7 +196,12 @@ export const handleChunks = async (chunks, override = false, target = null) => {
             filteredLen: filtered.length,
             currentIndex,
           });
+        const endSend = perfSpan("BG.chunkHandler batch-send", {
+          batchLen: filtered.length,
+          bytes: totalBytes,
+        });
         const ok = await sendBatch(filtered);
+        endSend({ ok });
         if (shouldEmitBatch(batchIndex)) {
           diagEvent("sw-sendchunks-batch", {
             batchIndex,
@@ -235,8 +236,6 @@ export const handleChunks = async (chunks, override = false, target = null) => {
     mainCompleted = true;
   }
   } finally {
-    // Release the in-memory lock so queued callers can proceed, regardless of
-    // whether the inner body completed normally.
     void mainCompleted;
     if (releaseChain) releaseChain();
   }

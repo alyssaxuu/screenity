@@ -89,12 +89,16 @@ const Sandbox = () => {
             base64,
             topLevel: true,
             fromAudio: true,
+            skipReencode: true,
             _opId: message._opId,
           });
           break;
         }
 
         case "compress-video": {
+          if (typeof message.base64 !== "string" || !message.base64.startsWith("data:")) {
+            throw new Error("compress-video: expected data: URL");
+          }
           const rawBlob = await fetch(message.base64).then((r) => r.blob());
 
           const compressed = await reencodeVideo(
@@ -118,6 +122,9 @@ const Sandbox = () => {
         }
 
         case "base64-to-blob": {
+          if (typeof message.base64 !== "string" || !message.base64.startsWith("data:")) {
+            throw new Error("base64-to-blob: expected data: URL");
+          }
           const rawBlob = await fetch(message.base64).then((r) => r.blob());
 
           const header = await rawBlob.slice(4, 8).text();
@@ -276,10 +283,27 @@ const Sandbox = () => {
       }
     } catch (error) {
       const errMsg = error instanceof Error ? error.message : String(error);
+      const errStack = error instanceof Error ? error.stack : null;
+      // Error props are non-enumerable; JSON.stringify drops them.
+      console.error("[Screenity][EditorWebCodecs] op failed", {
+        type: message.type,
+        message: errMsg,
+        stack: errStack,
+        opId: message._opId,
+      });
       if (errMsg.includes("too long")) {
         sendMessage({ type: "edit-too-long", _opId: message._opId });
+      } else if (errMsg.includes("background-audio-too-large")) {
+        sendMessage({ type: "audio-too-large", _opId: message._opId });
       } else {
-        sendMessage({ type: "ffmpeg-error", error: JSON.stringify(error), _opId: message._opId });
+        sendMessage({
+          type: "ffmpeg-error",
+          error: errMsg || "unknown",
+          errorStack: errStack,
+          errorMessage: errMsg,
+          opType: message.type,
+          _opId: message._opId,
+        });
       }
     }
   };
@@ -288,6 +312,47 @@ const Sandbox = () => {
     const handler = (event) => onMessage(event.data);
     window.addEventListener("message", handler);
     return () => window.removeEventListener("message", handler);
+  }, []);
+
+  useEffect(() => {
+    const storageHandler = (changes, areaName) => {
+      if (areaName !== "local") return;
+      if (!changes.editorRecordingError) return;
+      const payload = changes.editorRecordingError.newValue;
+      if (!payload) return;
+      try {
+        iframeRef.current?.contentWindow?.postMessage(
+          { type: "recording-error-from-parent", payload },
+          "*",
+        );
+      } catch {}
+    };
+    chrome.storage.onChanged.addListener(storageHandler);
+    const respondWithLatest = () => {
+      chrome.storage.local.get(["editorRecordingError"]).then((res) => {
+        if (!res?.editorRecordingError) return;
+        try {
+          iframeRef.current?.contentWindow?.postMessage(
+            {
+              type: "recording-error-from-parent",
+              payload: res.editorRecordingError,
+            },
+            "*",
+          );
+        } catch {}
+      });
+    };
+    const requestHandler = (event) => {
+      if (event?.data?.type === "request-recording-error-state") {
+        respondWithLatest();
+      }
+    };
+    window.addEventListener("message", requestHandler);
+    respondWithLatest();
+    return () => {
+      chrome.storage.onChanged.removeListener(storageHandler);
+      window.removeEventListener("message", requestHandler);
+    };
   }, []);
 
   return (

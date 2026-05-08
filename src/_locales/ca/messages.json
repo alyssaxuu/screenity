@@ -63,6 +63,18 @@
     "message": "Sembla que la configuració de seguretat d'aquest lloc web impedeix que les extensions del navegador utilitzin la càmera o el micròfon en aquesta pàgina. Per gravar amb ells, inicia una gravació des d'una altra pestanya i torna aquí un cop comenci.",
     "description": "Modal description shown when the current page's Permissions-Policy header blocks browser extensions from using camera or microphone"
   },
+  "opfsLoadErrorTitle": {
+    "message": "No es pot carregar la teva gravació",
+    "description": "Modal title shown when the editor cannot read the recording file from the device's storage"
+  },
+  "opfsLoadErrorDescription": {
+    "message": "Sembla que Screenity no ha pogut carregar la gravació de l'emmagatzematge del teu dispositiu. És possible que s'hagi esborrat o mogut. Si això continua passant, contacta amb nosaltres a support@screenity.io.",
+    "description": "Modal description shown when the editor cannot read the recording file from the device's storage"
+  },
+  "recordingWriterFailedToast": {
+    "message": "Gravació aturada per un problema d'emmagatzematge. La gravació parcial s'ha desat.",
+    "description": "Toast shown when the recording chunk writer fails mid-recording and the partial file is preserved"
+  },
   "allowCameraAccessButton": {
     "message": "Permet l'accés a la càmera",
     "description": "Botó per permetre l'accés a la càmera"
@@ -358,6 +370,18 @@
   "sandboxProgressDescription": {
     "message": "Deixa aquesta pestanya oberta. S'actualitzarà amb la teva gravació quan estigui llesta.",
     "description": "Descripció a la pàgina de l'àrea de proves mentre es grava/guarda"
+  },
+  "sandboxFinalizingRecording": {
+    "message": "Finalitzant gravació...",
+    "description": "Shown over the player when the editor is waiting for the recorder to finish flushing the recording to disk"
+  },
+  "sandboxToastReverted": {
+    "message": "Revertit a l'original",
+    "description": "Toast confirmation shown when the user reverts edits to the original recording"
+  },
+  "sandboxToastSaved": {
+    "message": "Canvis desats",
+    "description": "Toast confirmation shown when the user saves an edit operation"
   },
   "sandboxEditorMainTitle": {
     "message": "Editor",
@@ -1588,5 +1612,59 @@
   "cancelButton": {
     "message": "Cancel·la",
     "description": "Generic cancel button label"
+  },
+  "editorStuckTitle": {
+    "message": "Encara preparant la teva gravació…"
+  },
+  "editorStuckDescription": {
+    "message": "Screenity està trigant més del normal a carregar la teva gravació. Les teves dades poden seguir en aquest dispositiu. Prova de recuperar-la, o contacta'ns si no torna."
+  },
+  "editorStuckTryRecover": {
+    "message": "Prova de recuperar"
+  },
+  "editorStuckGetHelp": {
+    "message": "Obtenir ajuda"
+  },
+  "editorRecoveryFailedTitle": {
+    "message": "No s'ha pogut obrir la teva gravació"
+  },
+  "editorRecoveryFailedDescription": {
+    "message": "Alguna cosa ha anat malament en carregar la teva gravació a l'editor. Pot ser que encara estigui desada al teu dispositiu. Pots provar de recuperar-la ara."
+  },
+  "downloadGIFTooLongToast": {
+    "message": "L'exportació a GIF té un límit de 30 segons. Retalla el teu clip i torna-ho a provar."
+  },
+  "audioSilentToast": {
+    "message": "No s'ha detectat àudio. Revisa el micròfon, el botó de silenci o el dispositiu d'àudio."
+  },
+  "restartFailedToast": {
+    "message": "No s'ha pogut reiniciar la teva gravació. Atura-la i torna a començar."
+  },
+  "recordingFailedModalTitle": {
+    "message": "No s'ha pogut iniciar la gravació"
+  },
+  "recordingFailedModalDescription": {
+    "message": "Alguna cosa ha impedit que la gravació s'iniciés. Torna-ho a provar. Si segueix passant, escriu-nos a support@screenity.io."
+  },
+  "editAudioTooLargeTitle": {
+    "message": "El fitxer d'àudio és massa gran"
+  },
+  "editAudioTooLargeDescription": {
+    "message": "Prova amb un clip d'àudio més curt. Els fitxers grans no es poden processar al navegador. La teva gravació original està segura."
+  },
+  "restoreEmptyToast": {
+    "message": "No s'ha trobat cap gravació recuperable. Les dades poden haver estat esborrades."
+  },
+  "restoreTimeoutToast": {
+    "message": "La recuperació està trigant massa. La teva gravació està segura. Torna a fer clic a Recuperar d'aquí a un moment."
+  },
+  "cameraUnavailableToast": {
+    "message": "Càmera desconnectada. Es continua gravant la pantalla."
+  },
+  "downloadInterruptedLargeToast": {
+    "message": "Descàrrega interrompuda. La gravació és massa gran per reintentar-la automàticament. Torna a desar-la des de l'editor."
+  },
+  "recordingCorruptToast": {
+    "message": "Aquesta gravació no es pot reproduir. El fitxer pot estar incomplet o malmès. Descarrega el fitxer original des del menú Desar."
   }
 }

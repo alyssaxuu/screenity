@@ -1,6 +1,10 @@
 import React, { useEffect, useRef, useCallback } from "react";
 import { getUserMediaWithFallback } from "../utils/mediaDeviceFallback";
-import { WebCodecsRecorder } from "../Recorder/webcodecs/WebCodecsRecorder";
+import {
+  WebCodecsRecorder,
+  preloadWebCodecsModules,
+} from "../Recorder/webcodecs/WebCodecsRecorder";
+import { startPrewarm, stopPrewarm } from "../Recorder/streamWarmup";
 import {
   debugRecordingEvent,
   resetRecordingDebugSession,
@@ -13,7 +17,12 @@ import {
   getFastRecorderStickyState,
   markFastRecorderFailure,
   validateFastRecorderOutputBlob,
+  isTransientFastRecorderError,
 } from "../../media/fastRecorderGate";
+import { chooseWriter } from "../Recorder/recorderStorage/chooseWriter";
+import { chooseReader } from "../Recorder/recorderStorage/chooseReader";
+import { lifecycle } from "../utils/lifecycleLog";
+import { perfMark, perfSpan } from "../utils/perfMarks";
 
 import localforage from "localforage";
 
@@ -23,13 +32,10 @@ localforage.config({
   version: 1,
 });
 
-// Get chunks store
 const chunksStore = localforage.createInstance({
   name: "chunks",
 });
 
-// Debug flag for logging
-//   window.SCREENITY_DEBUG_RECORDER = true;
 const DEBUG_RECORDER =
   typeof window !== "undefined" ? !!window.SCREENITY_DEBUG_RECORDER : false;
 const logPrefix = "[Screenity Region Recorder]";
@@ -114,16 +120,14 @@ const Recorder = () => {
   const recordingStartTimeRef = useRef(null);
   const recordingTick = useRef(null);
 
-  // Main stream (recording)
   const liveStream = useRef(null);
+  const prewarmRef = useRef(null);
 
-  // Helper streams
   const helperVideoStream = useRef(null);
   const helperAudioStream = useRef(null);
   const startRetryTimer = useRef(null);
   const startRetryAttempts = useRef(0);
 
-  // Audio controls, with refs to persist across renders
   const aCtx = useRef(null);
   const destination = useRef(null);
   const audioInputSource = useRef(null);
@@ -135,10 +139,8 @@ const Recorder = () => {
   const useWebCodecs = useRef(false);
   const recdbgSessionRef = useRef(null);
 
-  // Target
   const target = useRef(null);
 
-  // Recording ref
   const recordingRef = useRef();
   const regionRef = useRef();
   const backupRef = useRef(false);
@@ -151,10 +153,12 @@ const Recorder = () => {
   const streamingDataHandled = useRef(false);
   const streamingDataRetryTimer = useRef(null);
 
-  // Retry get-streaming-data from the SW with backoff. The initial
-  // sendMessage can fail silently if the SW is mid-wakeup; this retry
-  // plus SW-side retry plus the handler's idempotency guard cover the
-  // handshake reliably on slow Windows cold-starts.
+  const chunkWriter = useRef(null);
+  const chunkBackendRef = useRef(null);
+
+  // Retry with backoff: SW mid-wakeup can drop the initial sendMessage
+  // silently. Combined with SW-side retry and handler idempotency, this
+  // covers slow Windows cold-starts.
   const requestStreamingDataWithRetry = (attempt = 0) => {
     if (streamingDataHandled.current) return;
     const backoffMs = [0, 250, 500, 1000, 2000];
@@ -300,50 +304,98 @@ const Recorder = () => {
   async function saveChunk(e, i) {
     const ts = e.timecode ?? 0;
 
-    // FLAG: disabled duplicate chunk check due to issues with some devices
-    // if (
-    //   savedCount.current > 0 &&
-    //   ts === lastTimecode.current &&
-    //   e.data.size === lastSize.current
-    // ) {
-    //   return false;
-    // }
-
     if (!(await canFitChunk(e.data.size))) {
-      if (!lowStorageAbort.current) {
-        chrome.runtime.sendMessage({
-          type: "show-toast",
-          message: chrome.i18n.getMessage("toastStorageCritical"),
-          timeout: 8000,
+      // Post-stop, navigator.storage.estimate() can read false-low.
+      // Don't surface "Memory limit reached"; save the tail chunk.
+      if (isFinishing.current || !recordingRef.current) {
+        lifecycle("Region.Recorder", "saveChunk-canFitChunk-suppressed", {
+          isFinishing: Boolean(isFinishing.current),
+          recordingRef: Boolean(recordingRef.current),
+          savedCount: savedCount.current,
+          size: e?.data?.size ?? null,
         });
+      } else {
+        if (!lowStorageAbort.current) {
+          chrome.runtime.sendMessage({
+            type: "show-toast",
+            message: chrome.i18n.getMessage("toastStorageCritical"),
+            timeout: 8000,
+          });
+        }
+        lifecycle("Region.Recorder", "memory-error-flag-set", {
+          reason: "saveChunk-canFitChunk",
+          size: e?.data?.size ?? null,
+          savedCount: savedCount.current,
+        });
+        lowStorageAbort.current = true;
+        chrome.storage.local.set({
+          recording: false,
+          restarting: false,
+          tabRecordedID: null,
+          memoryError: true,
+        });
+        sendStopWithReason("region-low-storage-headroom");
+        window.location.reload();
+        return false;
       }
-      lowStorageAbort.current = true;
-      chrome.storage.local.set({
-        recording: false,
-        restarting: false,
-        tabRecordedID: null,
-        memoryError: true,
-      });
-      sendStopWithReason("region-low-storage-headroom");
-      // Reload this iframe
-      window.location.reload();
-      return false;
     }
 
+    lifecycle("Region.Recorder", "saveChunk-enter", {
+      i,
+      size: e?.data?.size ?? null,
+      timecode: ts,
+      hasWriter: Boolean(chunkWriter.current),
+      lowStorageAbort: lowStorageAbort.current,
+    });
     try {
-      await chunksStore.setItem(`chunk_${i}`, {
-        index: i,
-        chunk: e.data,
-        timestamp: ts,
-      });
+      if (chunkWriter.current) {
+        await chunkWriter.current.write({
+          chunk: e.data,
+          index: i,
+          timestamp: ts,
+        });
+      } else {
+        await chunksStore.setItem(`chunk_${i}`, {
+          index: i,
+          chunk: e.data,
+          timestamp: ts,
+        });
+      }
     } catch (err) {
+      lifecycle("Region.Recorder", "saveChunk-write-failed", {
+        i,
+        err: String(err?.message || err).slice(0, 120),
+        code: err?.code || null,
+      });
+      // OPFS writer death preserves the partial file; quota fail uses a generic toast.
+      const isOpfsWriterDead = err?.code === "opfs-writer-failed";
+      if (isOpfsWriterDead && err?.fileName) {
+        chunkBackendRef.current = {
+          backend: "opfs",
+          fileName: err.fileName,
+        };
+        try {
+          await chrome.storage.local.set({
+            lastRecordingBackendRef: chunkBackendRef.current,
+          });
+        } catch {}
+      }
       if (!lowStorageAbort.current) {
+        const toastMessage = isOpfsWriterDead
+          ? chrome.i18n.getMessage("recordingWriterFailedToast")
+          : chrome.i18n.getMessage("toastStorageCritical");
         chrome.runtime.sendMessage({
           type: "show-toast",
-          message: chrome.i18n.getMessage("toastStorageCritical"),
+          message: toastMessage,
           timeout: 8000,
         });
       }
+      lifecycle("Region.Recorder", "memory-error-flag-set", {
+        reason: "saveChunk-write-failed",
+        isOpfsWriterDead,
+        err: String(err?.message || err).slice(0, 120),
+        savedCount: savedCount.current,
+      });
       lowStorageAbort.current = true;
       chrome.storage.local.set({
         recording: false,
@@ -351,8 +403,9 @@ const Recorder = () => {
         tabRecordedID: null,
         memoryError: true,
       });
-      sendStopWithReason("region-save-chunk-failed");
-      // Reload this iframe
+      sendStopWithReason(
+        isOpfsWriterDead ? "opfs-writer-failed" : "region-save-chunk-failed",
+      );
       window.location.reload();
       return false;
     }
@@ -360,6 +413,10 @@ const Recorder = () => {
     lastTimecode.current = ts;
     lastSize.current = e.data.size;
     savedCount.current += 1;
+    lifecycle("Region.Recorder", "saveChunk-ok", {
+      i,
+      savedCount: savedCount.current,
+    });
 
     if (backupRef.current) {
       chrome.runtime.sendMessage({ type: "write-file", index: i });
@@ -368,17 +425,18 @@ const Recorder = () => {
   }
 
   const rebuildBlobFromChunks = async () => {
-    const items = [];
-    await chunksStore.ready();
-    await chunksStore.iterate((value) => (items.push(value), undefined));
-    items.sort((a, b) => (a.timestamp ?? 0) - (b.timestamp ?? 0));
-    const parts = items.map((c) =>
-      c.chunk instanceof Blob ? c.chunk : new Blob([c.chunk]),
-    );
-    if (!parts.length) return null;
-    const first = parts[0];
-    const inferredType = first?.type || "video/mp4";
-    return new Blob(parts, { type: inferredType });
+    const backendRef = chunkBackendRef.current || { backend: "idb" };
+    const reader = chooseReader(backendRef);
+    try {
+      await reader.open(backendRef);
+      const { blob, chunkCount } = await reader.readBlob();
+      if (!blob || chunkCount === 0) return null;
+      return blob;
+    } finally {
+      try {
+        await reader.close();
+      } catch {}
+    }
   };
 
   const updateFreeFinalizeStatus = async (stage, percent = 0, error = null) => {
@@ -411,8 +469,15 @@ const Recorder = () => {
   };
 
   async function drainQueue() {
-    if (draining.current) return;
+    if (draining.current) {
+      lifecycle("Region.Recorder", "drainQueue-skip-busy", {
+        pendingLen: pending.current.length,
+      });
+      return;
+    }
     draining.current = true;
+    const drainStartedAt = Date.now();
+    const initialPending = pending.current.length;
 
     try {
       while (pending.current.length) {
@@ -426,6 +491,15 @@ const Recorder = () => {
         pendingBytes.current -= e.data.size;
 
         if (!(await canFitChunk(e.data.size))) {
+          if (isFinishing.current || !recordingRef.current) {
+            lifecycle("Region.Recorder", "drainQueue-canFitChunk-suppressed", {
+              isFinishing: Boolean(isFinishing.current),
+              recordingRef: Boolean(recordingRef.current),
+              savedCount: savedCount.current,
+              size: e?.data?.size ?? null,
+            });
+            // Keep the chunk to avoid losing the tail; skip memoryError abort.
+          } else {
           if (!lowStorageAbort.current) {
             chrome.runtime.sendMessage({
               type: "show-toast",
@@ -433,6 +507,12 @@ const Recorder = () => {
               timeout: 8000,
             });
           }
+          lifecycle("Region.Recorder", "memory-error-flag-set", {
+            reason: "drainQueue-canFitChunk",
+            size: e?.data?.size ?? null,
+            savedCount: savedCount.current,
+            recorderState: recorder.current?.state || null,
+          });
           lowStorageAbort.current = true;
           chrome.storage.local.set({
             recording: false,
@@ -443,9 +523,9 @@ const Recorder = () => {
           sendStopWithReason("region-drainqueue-low-storage");
           pending.current.length = 0;
           pendingBytes.current = 0;
-          // Reload this iframe
           window.location.reload();
           break;
+          }
         }
 
         const i = index.current;
@@ -454,11 +534,26 @@ const Recorder = () => {
       }
     } finally {
       draining.current = false;
+      lifecycle("Region.Recorder", "drainQueue-done", {
+        elapsedMs: Date.now() - drainStartedAt,
+        initialPending,
+        savedCount: savedCount.current,
+        finalPending: pending.current.length,
+      });
     }
   }
 
   async function waitForDrain() {
+    // Cap so a wedged drain doesn't block stop forever.
+    const deadline = Date.now() + 30000;
     while (draining.current || pending.current.length) {
+      if (Date.now() > deadline) {
+        console.warn("[Region] waitForDrain timed out", {
+          pending: pending.current.length,
+          draining: draining.current,
+        });
+        break;
+      }
       await new Promise((r) => setTimeout(r, 10));
     }
   }
@@ -472,7 +567,6 @@ const Recorder = () => {
     );
   }, []);
 
-  // Receive post message from parent (this is an iframe)
   useEffect(() => {
     const onMessage = (event) => {
       if (event.data.type === "crop-target") {
@@ -490,9 +584,23 @@ const Recorder = () => {
   }, []);
 
   async function startRecording() {
-    // Check that a recording is not already in progress
     if (recorder.current !== null) return;
+    // Bail out if this iframe isn't actually the recording target. Without
+    // this guard, a stale state (e.g. start-recording-tab arriving by some
+    // unexpected path) makes the iframe spin its 5s preflight retry loop,
+    // then fire "Capture stream is not ready yet" - which tears down a
+    // legitimate recording happening in a different tab.
+    if (!regionRef.current && !target.current) {
+      persistRegionStartDebug({
+        stage: "start-recording-bailout",
+        reason: "not-region-target-for-this-iframe",
+      });
+      return;
+    }
     persistRegionStartDebug({ stage: "start-recording-enter" });
+
+    await stopPrewarm(prewarmRef.current);
+    prewarmRef.current = null;
 
     const hasHelperVideoTrack =
       !!helperVideoStream.current &&
@@ -528,7 +636,8 @@ const Recorder = () => {
         error: "stream-error",
         why: "Capture stream is not ready yet",
       });
-      window.location.reload();
+      // Don't location.reload(): active getDisplayMedia triggers a
+      // beforeunload prompt. BG teardown handles cleanup.
       return;
     }
 
@@ -545,7 +654,6 @@ const Recorder = () => {
     draining.current = false;
     lowStorageAbort.current = false;
     pendingBytes.current = 0;
-    // Check if the stream actually has data in it
     try {
       if (helperVideoStream.current.getVideoTracks().length === 0) {
         persistRegionStartDebug({
@@ -564,7 +672,6 @@ const Recorder = () => {
           why: "No video tracks available",
         });
 
-        // Reload this iframe
         window.location.reload();
         return;
       }
@@ -596,7 +703,6 @@ const Recorder = () => {
         why: String(err),
       });
 
-      // Reload this iframe
       window.location.reload();
       return;
     }
@@ -653,7 +759,6 @@ const Recorder = () => {
         videoBitsPerSecond = 500000;
       }
 
-      // List all mimeTypes
       const mimeTypes = [
         "video/webm;codecs=avc1",
         "video/webm;codecs=vp8,opus",
@@ -664,7 +769,6 @@ const Recorder = () => {
         "video/webm",
       ];
 
-      // Check if the browser supports any of the mimeTypes, make sure to select the first one that is supported from the list
       let mimeType = mimeTypes.find((mimeType) =>
         MediaRecorder.isTypeSupported(mimeType),
       );
@@ -684,7 +788,7 @@ const Recorder = () => {
       const { useWebCodecsRecorder } = await chrome.storage.local.get([
         "useWebCodecsRecorder",
       ]);
-      // Default-on: treat undefined as enabled; only explicit `false` opts out.
+      // undefined defaults to enabled; only explicit `false` opts out.
       const userSetting = useWebCodecsRecorder === false ? false : true;
       const stickyState = await getFastRecorderStickyState();
       const probeResult = await probeFastRecorderSupport();
@@ -814,6 +918,57 @@ const Recorder = () => {
         useWebCodecs.current = true;
         await chrome.storage.local.set({ fastRecorderInUse: true });
 
+        // Fall back to IDB if OPFS open() fails.
+        chunkWriter.current = null;
+        const writerRecordingId = `region-${Date.now()}-${Math.random()
+          .toString(36)
+          .slice(2, 8)}`;
+        try {
+          let selection = await chooseWriter({ preferOpfs: true });
+          let openResult = null;
+          try {
+            openResult = await selection.writer.open(writerRecordingId);
+          } catch (openErr) {
+            if (selection.backend === "opfs") {
+              try {
+                await selection.writer.abort();
+              } catch {}
+              selection = await chooseWriter({ preferOpfs: false });
+              openResult = await selection.writer.open(writerRecordingId);
+            } else {
+              throw openErr;
+            }
+          }
+          chunkWriter.current = selection.writer;
+          const backendRefAtOpen = openResult?.backendRef || {
+            backend: selection.backend,
+          };
+          chunkBackendRef.current = backendRefAtOpen;
+          try {
+            await chrome.storage.local.set({
+              lastRecordingBackendRef: backendRefAtOpen,
+            });
+          } catch {}
+          if (process.env.SCREENITY_DEV_MODE === "true") {
+            console.log("[recorder-opfs][region] writer-open", {
+              backend: selection.backend,
+              path: "webcodecs",
+              backendRef: backendRefAtOpen,
+            });
+          }
+        } catch (err) {
+          persistRegionStartDebug({
+            stage: "chunk-writer-init-failed",
+            err: String(err?.message || err).slice(0, 120),
+          });
+          chunkBackendRef.current = { backend: "idb" };
+          try {
+            await chrome.storage.local.set({
+              lastRecordingBackendRef: { backend: "idb" },
+            });
+          } catch {}
+        }
+
         recorder.current = new WebCodecsRecorder(liveStream.current, {
           width,
           height,
@@ -840,13 +995,33 @@ const Recorder = () => {
               });
               return;
             }
+            // OPFS holds an exclusive handle; close before reading.
+            if (chunkWriter.current) {
+              try {
+                const closeResult = await chunkWriter.current.close();
+                chunkBackendRef.current =
+                  closeResult?.backendRef || { backend: "idb" };
+              } catch (err) {
+                if (err?.code === "opfs-writer-failed" && err?.fileName) {
+                  // Close failed; partial file is still on disk.
+                  chunkBackendRef.current = {
+                    backend: "opfs",
+                    fileName: err.fileName,
+                  };
+                } else {
+                  chunkBackendRef.current = { backend: "idb" };
+                }
+              }
+              chunkWriter.current = null;
+            }
             await updateFreeFinalizeStatus("chunks_ready", 95);
             let validation = null;
             try {
               const blob = await rebuildBlobFromChunks();
               validation = await validateFastRecorderOutputBlob(blob, {
                 minBytes: 64 * 1024,
-                timeoutMs: 4000,
+                // 15s for multi-GB demuxer scans on slow disks.
+                timeoutMs: 15000,
                 videoCodec: recorder.current?.selectedVideoCodec || undefined,
                 audioCodec: hasAudioTrack ? "mp4a.40.2" : null,
                 recordingId,
@@ -906,13 +1081,29 @@ const Recorder = () => {
               });
             }
 
+            await chrome.storage.local.set({
+              lastRecordingBackendRef: chunkBackendRef.current || {
+                backend: "idb",
+              },
+            });
             await updateFreeFinalizeStatus("ready", 100);
             if (!sentLast.current) {
               sentLast.current = true;
               isFinished.current = true;
               isFinishing.current = false;
               if (!isRestarting.current) {
-                chrome.runtime.sendMessage({ type: "video-ready" });
+                // Verify ≥1 chunk persisted before claiming ready;
+                // zero-output encoder (config mismatch, immediate close)
+                // would otherwise produce 0-byte video.
+                if (savedCount.current === 0 && !hasChunks.current) {
+                  chrome.runtime.sendMessage({
+                    type: "recording-error",
+                    error: "stream-error",
+                    why: "No recording data was generated",
+                  });
+                } else {
+                  chrome.runtime.sendMessage({ type: "video-ready" });
+                }
               }
             }
           },
@@ -921,23 +1112,31 @@ const Recorder = () => {
             handleWebCodecsChunk(blob, timestampUs);
           },
           onError: (err) => {
-            markFastRecorderFailure("webcodecs-error", {
-              error: String(err),
-            });
-            chrome.storage.local.set({
-              useWebCodecsRecorder: false,
+            const errStr = String(err);
+            const transient = isTransientFastRecorderError(errStr);
+            markFastRecorderFailure("webcodecs-error", { error: errStr });
+            // Keep useWebCodecsRecorder on for transient stream errors.
+            const persisted = {
               lastWebCodecsFailureAt: Date.now(),
-              lastWebCodecsFailureCode: "webcodecs-error",
-            });
-            updateFreeFinalizeStatus("failed", 100, String(err));
-            chrome.runtime.sendMessage({
-              type: "show-toast",
-              message: chrome.i18n.getMessage("webcodecsFailedOffToast"),
-            });
+              lastWebCodecsFailureCode: transient
+                ? "webcodecs-transient"
+                : "webcodecs-error",
+            };
+            if (!transient) persisted.useWebCodecsRecorder = false;
+            chrome.storage.local.set(persisted);
+            updateFreeFinalizeStatus("failed", 100, errStr);
+            if (!transient) {
+              chrome.runtime.sendMessage({
+                type: "show-toast",
+                message: chrome.i18n.getMessage("webcodecsFailedOffToast"),
+              });
+            }
             chrome.runtime.sendMessage({
               type: "recording-error",
               error: "stream-error",
-              why: "Fast recorder failed. Please try compatibility mode.",
+              why: transient
+                ? errStr
+                : "Fast recorder failed. Please try compatibility mode.",
             });
           },
           onStop: async () => {
@@ -979,6 +1178,12 @@ const Recorder = () => {
 
       const startMediaRecorderWithCodec = async (codec) => {
         const mimeType = selectMimeType(codec);
+        lifecycle("Region.Recorder", "startMediaRecorderWithCodec", {
+          codec,
+          mimeType,
+          hasExistingRecorder: Boolean(recorder.current),
+          hasChunkWriter: Boolean(chunkWriter.current),
+        });
         if (!mimeType) {
           chrome.runtime.sendMessage({
             type: "recording-error",
@@ -986,7 +1191,6 @@ const Recorder = () => {
             why: `No supported mimeTypes available for ${codec}`,
           });
 
-          // Reload this iframe
           window.location.reload();
           return false;
         }
@@ -1002,6 +1206,30 @@ const Recorder = () => {
           audioBitsPerSecond: audioBitsPerSecond,
           videoBitsPerSecond: videoBitsPerSecond,
         });
+
+        // Force IDB: MediaRecorder chunks must relay to null-origin sandbox.
+        if (!chunkWriter.current) {
+          try {
+            const selection = await chooseWriter({ preferOpfs: false });
+            chunkWriter.current = selection.writer;
+            const openResult = await chunkWriter.current.open(
+              `region-mr-${Date.now()}-${Math.random()
+                .toString(36)
+                .slice(2, 8)}`,
+            );
+            const backendRefAtOpen = openResult?.backendRef || {
+              backend: "idb",
+            };
+            chunkBackendRef.current = backendRefAtOpen;
+            try {
+              await chrome.storage.local.set({
+                lastRecordingBackendRef: backendRefAtOpen,
+              });
+            } catch {}
+          } catch (err) {
+            chunkWriter.current = null;
+          }
+        }
         debug("MediaRecorder config", {
           mimeType: recorder.current?.mimeType,
           audioBitsPerSecond,
@@ -1040,11 +1268,21 @@ const Recorder = () => {
 
         recorder.current.onerror = (ev) => {
           if (token !== recorderToken) return;
-          chrome.runtime.sendMessage({
-            type: "recording-error",
-            error: "mediarecorder",
-            why: String(ev?.error || "unknown"),
-          });
+          const errStr = String(ev?.error || ev?.error?.name || "unknown");
+          const isTransient =
+            /invalidstateerror/i.test(errStr) ||
+            /not in recording state/i.test(errStr) ||
+            /already (stopped|inactive)/i.test(errStr);
+          if (!isTransient) {
+            chrome.runtime.sendMessage({
+              type: "recording-error",
+              error: "mediarecorder",
+              why: errStr,
+            });
+          }
+          if (!isFinishing.current) {
+            stopRecording().catch(() => {});
+          }
         };
 
         recorder.current.onstop = async () => {
@@ -1078,6 +1316,10 @@ const Recorder = () => {
               savedCount: savedCount.current,
               pending: pending.current.length,
             });
+            // Mark terminal so 15s watchdog can't re-fire recording-error.
+            sentLast.current = true;
+            isFinished.current = true;
+            isFinishing.current = false;
             chrome.runtime.sendMessage({
               type: "recording-error",
               error: "stream-error",
@@ -1097,6 +1339,12 @@ const Recorder = () => {
         recorder.current.ondataavailable = async (e) => {
           if (token !== recorderToken) return;
           if (!e || !e.data || !e.data.size) {
+            lifecycle("Region.Recorder", "ondataavailable-empty", {
+              hasEvent: Boolean(e),
+              hasData: Boolean(e?.data),
+              size: e?.data?.size ?? null,
+              recorderState: recorder.current?.state || null,
+            });
             if (recorder.current && recorder.current.state === "inactive") {
               chrome.storage.local.set({
                 recording: false,
@@ -1106,6 +1354,14 @@ const Recorder = () => {
               sendStopWithReason("region-empty-mediarecorder-data");
             }
             return;
+          }
+          // Avoid spamming logs on long recordings.
+          if (recdbgChunkCount < 3) {
+            lifecycle("Region.Recorder", "ondataavailable", {
+              index: recdbgChunkCount,
+              size: e.data.size,
+              timecode: e.timecode ?? 0,
+            });
           }
 
           if (lowStorageAbort.current) {
@@ -1140,10 +1396,22 @@ const Recorder = () => {
 
           if (
             !codecFallbackTriggered &&
-            (recdbgChunkCount >= 3 || elapsedSec >= 3)
+            recdbgChunkCount >= 3 &&
+            elapsedSec >= 3 &&
+            recordingRef.current &&
+            !isFinishing.current &&
+            !isRestarting.current
           ) {
             if (derivedMbps < 5 && getCodecLabel(mimeType) !== "vp8") {
               codecFallbackTriggered = true;
+              lifecycle("Region.Recorder", "codec-fallback", {
+                from: getCodecLabel(mimeType),
+                to: "vp8",
+                derivedMbps,
+                recdbgChunkCount,
+                elapsedSec,
+                savedCount: savedCount.current,
+              });
               debugRecordingEvent(recdbgSessionRef, "codec-fallback", {
                 from: getCodecLabel(mimeType),
                 to: "vp8",
@@ -1238,7 +1506,6 @@ const Recorder = () => {
         why: String(err),
       });
 
-      // Reload this iframe
       window.location.reload();
       return;
     }
@@ -1251,9 +1518,25 @@ const Recorder = () => {
     const isMediaRecorder = recorder.current instanceof MediaRecorder;
     if (isMediaRecorder) {
       try {
+        // Snapshot stream/track health pre-start to attribute zero-chunk
+        // recordings to a dead-at-start stream.
+        const vTracks = liveStream.current?.getVideoTracks?.() || [];
+        const aTracks = liveStream.current?.getAudioTracks?.() || [];
+        lifecycle("Region.Recorder", "mediarecorder-start", {
+          videoTracks: vTracks.length,
+          audioTracks: aTracks.length,
+          videoState: vTracks[0]
+            ? {
+                readyState: vTracks[0].readyState,
+                muted: vTracks[0].muted,
+                enabled: vTracks[0].enabled,
+              }
+            : null,
+          mimeType: recorder.current?.mimeType || null,
+          recorderState: recorder.current?.state || null,
+        });
         recorder.current.start(5000);
-        // Force an early first chunk so even very short recordings have
-        // data in IndexedDB before the user can navigate away.
+        // Force early first chunk so short recordings persist before nav.
         setTimeout(() => {
           try { recorder.current?.requestData?.(); } catch (_) {}
         }, 250);
@@ -1269,6 +1552,10 @@ const Recorder = () => {
             liveStream.current?.getVideoTracks?.()[0] || null,
           ),
         });
+        lifecycle("Region.Recorder", "memory-error-flag-set", {
+          reason: "mediarecorder-start-throw",
+          err: String(err).slice(0, 120),
+        });
         chrome.storage.local.set({
           recording: false,
           restarting: false,
@@ -1277,7 +1564,6 @@ const Recorder = () => {
         });
         sendStopWithReason("region-mediarecorder-start-throw");
 
-        // Reload this iframe
         window.location.reload();
         return;
       }
@@ -1346,6 +1632,33 @@ const Recorder = () => {
           why: "Audio track became inactive",
         });
       };
+      // Mirrors Recorder.jsx sysTrack.onended; surfaces mid-recording
+      // mic disconnects.
+      aTrack.onended = () => {
+        try {
+          chrome.runtime.sendMessage({
+            type: "diag-forward",
+            event: "recorder-region-audio-track-ended",
+            data: {
+              trackLabel: String(aTrack.label || "").slice(0, 80),
+            },
+          });
+        } catch {}
+        chrome.runtime.sendMessage({
+          type: "show-toast",
+          message: chrome.i18n.getMessage("audioTrackEndedToast"),
+          timeout: 8000,
+        }).catch(() => {});
+      };
+      aTrack.onmute = () => {
+        try {
+          chrome.runtime.sendMessage({
+            type: "diag-forward",
+            event: "recorder-region-audio-track-muted",
+            data: { trackLabel: String(aTrack.label || "").slice(0, 80) },
+          });
+        } catch {}
+      };
     }
 
     const helperVideoTrack =
@@ -1369,6 +1682,11 @@ const Recorder = () => {
     recordingStartTimeRef.current = null;
     isFinishing.current = true;
     regionRef.current = false;
+    // Reset customRegion crop target: otherwise it sticks for the iframe's
+    // life and a later regular screen recording (stream in a separate
+    // recorder tab) hits "Capture stream is not ready yet" at 5s.
+    target.current = null;
+    streamingDataHandled.current = false;
     await updateFreeFinalizeStatus("stopping", 0);
     await setRecordingTimingState({
       recording: false,
@@ -1401,8 +1719,45 @@ const Recorder = () => {
           }
         } catch {}
 
+        // Watchdog: if onstop never fires, force finalize so the editor
+        // isn't stuck waiting for video-ready.
+        setTimeout(() => {
+          if (sentLast.current || isFinished.current) return;
+          // Mark terminal in both branches so a late onstop can't double-
+          // fire recording-error / video-ready.
+          sentLast.current = true;
+          isFinished.current = true;
+          isFinishing.current = false;
+          if (!hasChunks.current || savedCount.current === 0) {
+            chrome.runtime.sendMessage({
+              type: "recording-error",
+              error: "stream-error",
+              why: "Recorder stop timed out with no data",
+            });
+            return;
+          }
+          chrome.runtime.sendMessage({ type: "video-ready" });
+        }, 15000);
+
         await waitForDrain();
         recorder.current = null;
+        // Capture backendRef for the sandbox.
+        if (chunkWriter.current) {
+          try {
+            const closeResult = await chunkWriter.current.close();
+            // Prefer close-result backendRef; never hardcode "idb",
+            // would misroute editor reads when chunks are in OPFS.
+            if (closeResult?.backendRef) {
+              chunkBackendRef.current = closeResult.backendRef;
+            }
+            if (chunkBackendRef.current) {
+              await chrome.storage.local.set({
+                lastRecordingBackendRef: chunkBackendRef.current,
+              });
+            }
+          } catch {}
+          chunkWriter.current = null;
+        }
         await updateFreeFinalizeStatus("chunks_ready", 100);
       }
     }
@@ -1436,6 +1791,8 @@ const Recorder = () => {
     stopRecordingTick();
     recordingStartTimeRef.current = null;
     regionRef.current = false;
+    target.current = null;
+    streamingDataHandled.current = false;
     useWebCodecs.current = false;
     await setRecordingTimingState({
       recording: false,
@@ -1449,7 +1806,12 @@ const Recorder = () => {
     isRestarting.current = true;
     isDismissing.current = true;
     if (recorder.current !== null) {
-      recorder.current.stop();
+      // Detach handlers before stop(); queued onstop microtask would
+      // otherwise fire post-dismiss and open the editor on a discarded recording.
+      try { recorder.current.onstop = null; } catch {}
+      try { recorder.current.ondataavailable = null; } catch {}
+      try { recorder.current.onerror = null; } catch {}
+      try { recorder.current.stop(); } catch {}
       recorder.current = null;
     }
     if (liveStream.current !== null) {
@@ -1472,6 +1834,11 @@ const Recorder = () => {
       });
       helperAudioStream.current = null;
     }
+    // dismissRecording reuses isRestarting as an "incoming-chunks shield"
+    // during teardown; release here or a later restartRecording sees a
+    // stuck-true flag and early-returns false.
+    isRestarting.current = false;
+    isDismissing.current = false;
   };
 
   const restartRecording = async () => {
@@ -1592,7 +1959,7 @@ const Recorder = () => {
         return stream;
       })
       .catch((err) => {
-        // Try again without the device ID
+        // Retry without device ID.
         const audioStreamOptions = {
           mimeType: "video/webm;codecs=vp8,opus",
           audio: true,
@@ -1610,21 +1977,24 @@ const Recorder = () => {
 
     return result;
   }
-  // Set audio input volume
   function setAudioInputVolume(volume) {
     if (!audioInputGain.current) return;
     audioInputGain.current.gain.value = volume;
   }
 
-  // Set audio output volume
   function setAudioOutputVolume(volume) {
     if (!audioOutputGain.current) return;
     audioOutputGain.current.gain.value = volume;
   }
 
   async function startStreaming(data) {
+    perfMark("Region.Recorder startStreaming.enter", {
+      hasTarget: Boolean(target.current),
+      systemAudio: Boolean(data?.systemAudio),
+      hasMic: Boolean(data?.defaultAudioInput && data.defaultAudioInput !== "none"),
+    });
     try {
-      // Get quality value
+      const endStorageReads = perfSpan("Region.Recorder storage.reads");
       const { qualityValue } = await chrome.storage.local.get(["qualityValue"]);
 
       let width = 1920;
@@ -1653,15 +2023,19 @@ const Recorder = () => {
       const { fpsValue } = await chrome.storage.local.get(["fpsValue"]);
       let fps = parseInt(fpsValue);
 
-      // Check if fps is a number
       if (isNaN(fps)) {
         fps = 30;
       }
+      endStorageReads();
 
       let stream;
 
       const constraints = {
         preferCurrentTab: true,
+        // Suppress Chrome's "Share this tab instead" banner: the crop target
+        // is a RestrictionTarget tied to this tab's DOM; switching surfaces
+        // mid-session breaks the crop.
+        surfaceSwitching: "exclude",
         audio: data.systemAudio,
         video: {
           frameRate: fps,
@@ -1673,7 +2047,12 @@ const Recorder = () => {
           },
         },
       };
+      const endGetDisplayMedia = perfSpan("Region.Recorder getDisplayMedia");
       stream = await navigator.mediaDevices.getDisplayMedia(constraints);
+      endGetDisplayMedia({
+        videoTracks: stream?.getVideoTracks?.()?.length ?? 0,
+        audioTracks: stream?.getAudioTracks?.()?.length ?? 0,
+      });
       if (!stream || typeof stream.getVideoTracks !== "function") {
         chrome.runtime.sendMessage({
           type: "recording-error",
@@ -1695,16 +2074,19 @@ const Recorder = () => {
 
       helperVideoStream.current = stream;
 
-      // Create an audio context, destination, and stream
+      stopPrewarm(prewarmRef.current);
+      prewarmRef.current = startPrewarm(helperVideoStream.current);
+      preloadWebCodecsModules();
+
       aCtx.current = new AudioContext();
       destination.current = aCtx.current.createMediaStreamDestination();
       liveStream.current = new MediaStream();
+      const endMic = perfSpan("Region.Recorder startAudioStream(mic)");
       const micstream = await startAudioStream(data.defaultAudioInput);
+      endMic({ hasMic: Boolean(micstream) });
 
-      // Save the helper streams
       helperAudioStream.current = micstream;
 
-      // Check if micstream has an audio track
       if (
         helperAudioStream.current != null &&
         helperAudioStream.current.getAudioTracks().length > 0
@@ -1716,15 +2098,12 @@ const Recorder = () => {
         audioInputSource.current
           .connect(audioInputGain.current)
           .connect(destination.current);
-      } else {
-        // No microphone available
       }
 
       if (helperAudioStream.current != null && !data.micActive) {
         setAudioInputVolume(0);
       }
 
-      // Check if stream has an audio track
       if (helperVideoStream.current.getAudioTracks().length > 0) {
         audioOutputGain.current = aCtx.current.createGain();
         audioOutputSource.current = aCtx.current.createMediaStreamSource(
@@ -1733,11 +2112,8 @@ const Recorder = () => {
         audioOutputSource.current
           .connect(audioOutputGain.current)
           .connect(destination.current);
-      } else {
-        // No system audio available
       }
 
-      // Add the tracks to the stream
       const helperVideoTrack = helperVideoStream.current.getVideoTracks()[0];
       if (!helperVideoTrack) {
         chrome.runtime.sendMessage({
@@ -1773,16 +2149,16 @@ const Recorder = () => {
             window.location.reload();
             return;
           }
+          const endCropTo = perfSpan("Region.Recorder cropTo");
           await track.cropTo(target.current);
+          endCropTo();
         } else {
-          // No target
           chrome.runtime.sendMessage({
             type: "recording-error",
             error: "cancel-modal",
             why: "No target",
           });
 
-          // Reload this iframe
           window.location.reload();
         }
       } catch (err) {
@@ -1792,11 +2168,10 @@ const Recorder = () => {
           why: String(err),
         });
 
-        // Reload this iframe
         window.location.reload();
       }
 
-      // Send message to go back to the previously active tab
+      perfMark("Region.Recorder reset-active-tab.sent");
       chrome.runtime.sendMessage({ type: "reset-active-tab" });
     } catch (err) {
       chrome.runtime.sendMessage({
@@ -1805,7 +2180,6 @@ const Recorder = () => {
         why: String(err),
       });
 
-      // Reload this iframe
       window.location.reload();
     }
   }
@@ -1823,9 +2197,8 @@ const Recorder = () => {
   useEffect(() => {
     const handleBeforeUnload = (e) => {
       if (recordingRef.current && regionRef.current) {
-        // Flush any buffered data from the MediaRecorder into IndexedDB.
-        // The "Leave page?" dialog gives the ondataavailable handler enough
-        // time to persist the chunk before the frame is torn down.
+        // The "Leave page?" dialog gives ondataavailable enough time to
+        // persist the chunk before the frame is torn down.
         try {
           recorder.current?.requestData?.();
         } catch (_) {}
@@ -1835,20 +2208,15 @@ const Recorder = () => {
     };
     window.addEventListener("beforeunload", handleBeforeUnload);
 
-    // When the iframe is actually being destroyed (user clicked "Leave" or
-    // the parent page navigated), fire a message to the background to force
-    // stop the recording. pagehide fires synchronously during teardown and
-    // chrome.runtime.sendMessage from an extension page is delivered via IPC
-    // before the frame is gone — no async race.
+    // pagehide fires synchronously during iframe teardown; the IPC
+    // sendMessage is delivered before the frame is gone (no async race).
     const handlePageHide = () => {
       if (recordingRef.current && regionRef.current) {
         try {
           chrome.runtime.sendMessage({
             type: "region-iframe-destroyed",
           });
-        } catch (_) {
-          // Extension context may already be invalidated
-        }
+        } catch (_) {}
       }
     };
     window.addEventListener("pagehide", handlePageHide);
@@ -1866,25 +2234,37 @@ const Recorder = () => {
       } else {
         setAudioInputVolume(0);
       }
-    } else {
-      // No microphone available
     }
   };
 
   const onMessage = useCallback(
     (request, sender, sendResponse) => {
       if (request.type === "loaded") {
+        perfMark("Region.Recorder loaded.received", {
+          isRegion: Boolean(request.region),
+        });
         backupRef.current = request.backup;
         if (request.region) {
           requestStreamingDataWithRetry();
         }
+        // Ack so BG's sendMessageRecord doesn't reject + trigger retries.
+        try { sendResponse?.({ ok: true }); } catch {}
+        return true;
       }
       if (request.type === "streaming-data") {
-        if (streamingDataHandled.current) return;
-        streamingDataHandled.current = true;
-        if (regionRef.current) {
-          startStreaming(JSON.parse(request.data));
+        perfMark("Region.Recorder streaming-data.received", {
+          duplicate: streamingDataHandled.current,
+          regionMode: Boolean(regionRef.current),
+        });
+        const wasDuplicate = streamingDataHandled.current;
+        if (!wasDuplicate) {
+          streamingDataHandled.current = true;
+          if (regionRef.current) {
+            startStreaming(JSON.parse(request.data));
+          }
         }
+        try { sendResponse?.({ ok: true, duplicate: wasDuplicate }); } catch {}
+        return true;
       } else if (request.type === "start-recording-tab") {
         setRegionRestartPhase("restart-start-message-received", {
           regionMode: Boolean(regionRef.current),
@@ -1896,24 +2276,88 @@ const Recorder = () => {
           startRecording();
         }
       } else if (request.type === "restart-recording-tab") {
+        const recState = () => {
+          const r = recorder.current;
+          let recorderType = "none";
+          if (r) {
+            if (r instanceof MediaRecorder) recorderType = "MediaRecorder";
+            else if (useWebCodecs.current) recorderType = "WebCodecs";
+            else recorderType = "other";
+          }
+          return {
+            attemptId: request.attemptId || null,
+            hasRecorder: Boolean(r),
+            recorderType,
+            mediaRecorderState:
+              r instanceof MediaRecorder ? r.state : null,
+            recordingRef: Boolean(recordingRef.current),
+            isRestarting: Boolean(isRestarting.current),
+            isFinishing: Boolean(isFinishing.current),
+            hasLiveStream: Boolean(liveStream.current),
+            regionMode: Boolean(regionRef.current),
+            hasTarget: Boolean(target.current),
+            docHidden: document.hidden,
+          };
+        };
+        const stateAtEntry = recState();
+        lifecycle("Region.Recorder", "restart-tab-received", stateAtEntry);
+
         Promise.resolve(restartRecording())
           .then((restarted) => {
+            const after = recState();
             if (!restarted) {
-              sendResponse?.({ ok: false, error: "restart-teardown-failed" });
+              lifecycle("Region.Recorder", "restart-tab-result", {
+                ...after,
+                ok: false,
+                error: "restart-teardown-failed",
+              });
+              sendResponse?.({
+                ok: false,
+                error: "restart-teardown-failed",
+                recorderState: after,
+              });
               return;
             }
-            sendResponse?.({ ok: true, restarted: true });
+            lifecycle("Region.Recorder", "restart-tab-result", {
+              ...after,
+              ok: true,
+            });
+            sendResponse?.({
+              ok: true,
+              restarted: true,
+              recorderState: after,
+            });
           })
           .catch((error) => {
+            const reason = error?.message || String(error);
+            lifecycle("Region.Recorder", "restart-tab-result", {
+              ...recState(),
+              ok: false,
+              error: reason,
+              threw: true,
+            });
             sendResponse?.({
               ok: false,
-              error: error?.message || String(error),
+              error: reason,
+              recorderState: recState(),
             });
           });
         return true;
       } else if (request.type === "stop-recording-tab") {
+        // Ack BG so it doesn't surface stopAckTimeoutToast; ack is just "received".
+        try { sendResponse?.({ ok: true, received: true }); } catch {}
         if (isFinishing.current) return;
         stopRecording();
+      } else if (request.type === "recorder-keepalive-ping") {
+        try { sendResponse?.({ ok: true, alive: true, ts: Date.now() }); } catch {}
+        return true;
+      } else if (request.type === "recorder-wake-aggressive") {
+        // Bumping lastChunkAt proves the main thread is responsive.
+        try {
+          chrome.storage.local.set({ lastChunkAt: Date.now() });
+        } catch {}
+        try { sendResponse?.({ ok: true, woke: true }); } catch {}
+        return true;
       } else if (request.type === "set-mic-active-tab") {
         setMic(request);
       } else if (request.type === "set-audio-output-volume") {
@@ -1961,12 +2405,20 @@ const Recorder = () => {
   );
 
   useEffect(() => {
-    // Event listener (extension messaging)
     chrome.runtime.onMessage.addListener(onMessage);
+    perfMark("Region.Recorder mount.useEffect");
+    lifecycle("Region.Recorder", "iframe-mount", {
+      href: typeof window !== "undefined" ? window.location?.href?.slice(0, 200) : null,
+    });
 
     return () => {
       clearStartRetry();
       chrome.runtime.onMessage.removeListener(onMessage);
+      lifecycle("Region.Recorder", "iframe-unmount", {
+        regionRef: regionRef.current,
+        hasTarget: Boolean(target.current),
+        hasRecorder: Boolean(recorder.current),
+      });
     };
   }, []);
 

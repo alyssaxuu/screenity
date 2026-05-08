@@ -3,7 +3,6 @@ import CheckBlueIcon from "../../../../assets/check-blue.svg";
 import SoloDev from "../../../../assets/solo-dev.png";
 
 const FeatureItem = ({ text }) => {
-  // render with a checkmark icon on left and text on right
   return (
     <div className="welcome-feature-item">
       <div className="welcome-feature-icon">
@@ -99,7 +98,7 @@ const Welcome = (props) => {
           </a>
           <a
             className="welcome-support"
-            href="https://https://alyssax.substack.com/"
+            href="https://alyssax.substack.com/"
             target="_blank"
             rel="noopener noreferrer"
           >

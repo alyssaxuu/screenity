@@ -89,6 +89,34 @@ export const getCameraStream = async (
     const videoTrack = stream.getVideoTracks()[0];
     const { width, height, deviceId, frameRate } = videoTrack.getSettings();
 
+    // Camera track ends mid-recording (unplug, virtual cam crash, OS revoke).
+    // Stop the stream and surface via camera-bubble-unavailable; don't tear
+    // down the wrapping recording.
+    try {
+      videoTrack.addEventListener("ended", () => {
+        try {
+          chrome.runtime.sendMessage({
+            type: "diag-forward",
+            event: "camera-bubble-track-ended",
+            data: {
+              trackLabel: String(videoTrack?.label || "").slice(0, 80),
+              readyState: videoTrack?.readyState || null,
+            },
+          });
+        } catch {}
+        try {
+          stopCameraStream(streamRef, videoRef);
+        } catch {}
+        try {
+          chrome.runtime.sendMessage({
+            type: "camera-bubble-unavailable",
+            error: "camera-track-ended",
+            why: "camera disconnected during recording",
+          });
+        } catch {}
+      });
+    } catch {}
+
     if (setWidth && setHeight) {
       const isCamera = recordingTypeRef?.current === "camera";
       const w = isCamera || width / height < 1 ? "100%" : "auto";
@@ -99,7 +127,6 @@ export const getCameraStream = async (
       console.warn("⚠️ setWidth or setHeight not available from context.");
     }
 
-    // VIDEO REF SETUP
     if (!videoRef.current) {
       console.warn("⏳ videoRef not ready yet. Will poll every 100ms.");
       const maxWaitTime = 5000;
@@ -120,39 +147,166 @@ export const getCameraStream = async (
     const video = videoRef.current;
     video.srcObject = stream;
 
+    // Virtual cameras (OBS Virtual Camera, mmhmm, Snap Camera, etc.)
+    // trip up the naive `video.onloadedmetadata = ...` pattern in three
+    // ways:
+    //   1. Sync race: assigning srcObject can fire `loadedmetadata`
+    //      synchronously when the stream is already cached/active. By
+    //      the time we set `onloadedmetadata`, the event has already
+    //      fired and we hang forever.
+    //   2. Track muted: virtual cams often start with the video track
+    //      `muted=true` (the source app hasn't focused yet); they fire
+    //      `unmute` on the track before metadata.
+    //   3. Never fires: some virtual cams never fire `loadedmetadata`
+    //      until they receive their first real frame, which can take
+    //      arbitrarily long if the source app is paused.
+    //
+    // Check readyState, addEventListener (no clobber), listen on metadata
+    // and unmute, cap the wait at 12s so virtual cams don't hang the spinner.
+    const VIRTUAL_CAM_LOADED_TIMEOUT_MS = 12000;
     await new Promise((resolve) => {
-      video.onloadedmetadata = async () => {
+      let settled = false;
+      const finish = async () => {
+        if (settled) return;
+        settled = true;
+        cleanup();
         await video.play().catch((err) => {
           console.error("❌ Error during video.play():", err);
         });
-
         await new Promise((r) => setTimeout(r, 100));
-
         const canvas = offScreenCanvasRef?.current;
         if (!canvas) {
           console.warn("⚠️ offScreenCanvasRef.current is null.");
           return resolve();
         }
-
         canvas.width = video.videoWidth || 1280;
         canvas.height = video.videoHeight || 720;
-
         const context = canvas.getContext("2d");
         if (!context) {
           console.error("❌ Failed to get 2D context from canvas.");
           return resolve();
         }
-
         offScreenCanvasContextRef.current = context;
-
         resolve();
       };
+
+      const onMetadata = () => {
+        finish();
+      };
+      const onUnmute = () => {
+        // Track unmuted but readyState may still be 0; re-check in case
+        // HAVE_METADATA was already reached.
+        if (video.readyState >= 1) finish();
+      };
+      const cleanup = () => {
+        try {
+          video.removeEventListener("loadedmetadata", onMetadata);
+          video.removeEventListener("loadeddata", onMetadata);
+        } catch {}
+        try {
+          videoTrack?.removeEventListener?.("unmute", onUnmute);
+        } catch {}
+        if (timeoutId) clearTimeout(timeoutId);
+      };
+
+      // Sync race: already past metadata.
+      if (video.readyState >= 1 && video.videoWidth > 0) {
+        finish();
+        return;
+      }
+
+      video.addEventListener("loadedmetadata", onMetadata, { once: true });
+      video.addEventListener("loadeddata", onMetadata, { once: true });
+      try {
+        videoTrack?.addEventListener?.("unmute", onUnmute);
+      } catch {}
+
+      // Bounded fallback for virtual cams that never deliver metadata.
+      // Proceed with default 1280x720; real frames are picked up later.
+      const timeoutId = setTimeout(() => {
+        if (settled) return;
+        console.warn(
+          "[Screenity] Camera loadedmetadata timeout (likely virtual camera); proceeding with defaults",
+          {
+            readyState: video.readyState,
+            videoWidth: video.videoWidth,
+            trackMuted: videoTrack?.muted,
+            trackLabel: videoTrack?.label,
+          },
+        );
+        try {
+          chrome.runtime.sendMessage({
+            type: "diag-forward",
+            event: "recorder-camera-metadata-timeout",
+            data: {
+              readyState: video.readyState,
+              videoWidth: video.videoWidth,
+              videoHeight: video.videoHeight,
+              trackMuted: !!videoTrack?.muted,
+              trackLabel: String(videoTrack?.label || "").slice(0, 80),
+            },
+          });
+        } catch {}
+        finish();
+      }, VIRTUAL_CAM_LOADED_TIMEOUT_MS);
     });
 
     onFinish();
   } catch (err) {
     console.error("❌ Failed to get camera stream:", err);
     onFinish();
+    // Surface to BG only during setup (pendingRecording=true):
+    // 1. screen+camera with camera denied during setup; BG must clear
+    //    pendingRecording or the next record stalls.
+    // 2. tab+camera with bubble failure mid-recording: stay silent;
+    //    propagating a recording-error tears down the live recording.
+    try {
+      const { recording, pendingRecording } = await chrome.storage.local.get([
+        "recording",
+        "pendingRecording",
+      ]);
+      const isPermissionDenial =
+        err?.name === "NotAllowedError" ||
+        err?.name === "PermissionDeniedError";
+      // Diag fires regardless of fatality; "clicked record and got nothing"
+      // reports need to distinguish permission denials from device-not-found
+      // and getUserMedia hangs.
+      try {
+        chrome.runtime.sendMessage({
+          type: "diag-forward",
+          event: "recorder-camera-acquire-failed",
+          data: {
+            errorName: err?.name || null,
+            isPermissionDenial,
+            duringSetup: pendingRecording === true && recording !== true,
+            recordingActive: recording === true,
+            message: String(err?.message || err).slice(0, 200),
+          },
+        });
+      } catch {}
+      if (pendingRecording === true && recording !== true) {
+        // Setup-time failure: fatal. BG must clear pendingRecording.
+        chrome.runtime.sendMessage({
+          type: "recording-error",
+          error: isPermissionDenial
+            ? "camera-permission-denied"
+            : "camera-stream-error",
+          why: String(err?.message || err),
+        });
+      } else if (recording === true) {
+        // Recording is live: don't tear down for a cosmetic camera issue.
+        // Surface a non-fatal toast via BG -> recorded tab's content script.
+        chrome.runtime.sendMessage({
+          type: "camera-bubble-unavailable",
+          error: isPermissionDenial
+            ? "camera-permission-denied"
+            : "camera-stream-error",
+          why: String(err?.message || err),
+        });
+      }
+    } catch {
+      // BG context might be gone (SW asleep).
+    }
   }
 };
 
@@ -233,15 +387,31 @@ export const surfaceHandler = async (request, videoRef) => {
   }
 };
 
+let _cameraToggleReacquireTimer = null;
 export const cameraToggledToolbar = async (request) => {
   if (request.active) {
-    setTimeout(() => {
-      stopCameraStream();
-      getCameraStream({
-        video: {
-          deviceId: { exact: request.id },
+    // Cancel any pending re-acquire so rapid toolbar toggles don't stack
+    // up multiple getCameraStream calls fighting for the same device.
+    if (_cameraToggleReacquireTimer) {
+      clearTimeout(_cameraToggleReacquireTimer);
+    }
+    _cameraToggleReacquireTimer = setTimeout(() => {
+      _cameraToggleReacquireTimer = null;
+      // Pass refs so the prior camera stream actually stops; calling
+      // stopCameraStream() with no args is a silent no-op (early return).
+      const refs = getContextRefs();
+      stopCameraStream(refs.streamRef, refs.videoRef);
+      getCameraStream(
+        {
+          video: {
+            deviceId: { exact: request.id },
+          },
         },
-      });
+        refs.streamRef,
+        refs.videoRef,
+        refs.offScreenCanvasRef,
+        refs.offScreenCanvasContextRef,
+      );
     }, 2000);
     setPipMode(false);
   }

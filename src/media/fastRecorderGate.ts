@@ -1,7 +1,13 @@
 declare const chrome: any;
 
-// @ts-ignore — mediabunny ships types but this file is loose with any
-import { Input, BlobSource, ALL_FORMATS } from "mediabunny";
+// mediabunny is ~3MB; defer until validateFastRecorderOutputBlob runs.
+let _mediabunnyPromise: Promise<typeof import("mediabunny")> | null = null;
+const loadMediabunny = () => {
+  if (!_mediabunnyPromise) {
+    _mediabunnyPromise = import("mediabunny");
+  }
+  return _mediabunnyPromise;
+};
 
 export type FastRecorderProbeResult = {
   ok: boolean;
@@ -90,11 +96,45 @@ export const getFastRecorderStickyState = async (): Promise<FastRecorderStickySt
   }
 };
 
+// Stream-setup failures, not codec issues. Don't sticky-disable on these.
+const TRANSIENT_ERROR_PATTERNS = [
+  /no video track/i,
+  /stream missing/i,
+  /display stream missing/i,
+  /track ended/i,
+  /track inactive/i,
+  /capture stream is not ready/i,
+  // Hardware codec reclaimed by Chrome (idle/background/pressure).
+  /codec reclaimed/i,
+  /reclaimed due to inactivity/i,
+  // stop() raced with an in-flight encode/flush.
+  /encoder.*closed/i,
+  /encoder is closed/i,
+];
+
+export const isTransientFastRecorderError = (errorString: string) => {
+  if (!errorString) return false;
+  return TRANSIENT_ERROR_PATTERNS.some((re) => re.test(errorString));
+};
+const isTransientError = isTransientFastRecorderError;
+
 export const markFastRecorderFailure = async (
   reasonCode: string,
   details: Record<string, any> = {}
 ) => {
   try {
+    const errStr = typeof details?.error === "string" ? details.error : "";
+    if (isTransientError(errStr)) {
+      await chrome.storage.local.set({
+        [STORAGE_KEYS.lastFailureAt]: Date.now(),
+        fastRecorderTransientFailure: {
+          reasonCode,
+          details,
+          at: Date.now(),
+        },
+      });
+      return;
+    }
     await chrome.storage.local.set({
       [STORAGE_KEYS.stickyDisabled]: true,
       [STORAGE_KEYS.stickyReason]: reasonCode,
@@ -294,9 +334,7 @@ export const probeFastRecorderSupport = async (): Promise<FastRecorderProbeResul
       await chrome.storage.local.set({
         [STORAGE_KEYS.probe]: { ok, reasons, details, at },
       });
-    } catch {
-      // ignore
-    }
+    } catch {}
 
     return { ok, reasons, details, at };
   } catch (err: any) {
@@ -315,9 +353,7 @@ export const probeFastRecorderSupport = async (): Promise<FastRecorderProbeResul
       await chrome.storage.local.set({
         [STORAGE_KEYS.probe]: result,
       });
-    } catch {
-      // ignore
-    }
+    } catch {}
     return result;
   }
 };
@@ -366,14 +402,10 @@ export const validateFastRecorderOutputBlob = async (
     details.recordingId = opts.recordingId;
   }
 
-  // Structural validation via the mediabunny demuxer. Handles moov-at-end
-  // (fastStart: false) efficiently, unlike the <video> element which has to
-  // scan the full file. This replaces the earlier <video>.onloadedmetadata +
-  // seek + requestVideoFrameCallback + black-frame pixel sample pipeline —
-  // those were designed around paranoia when we had no other structural check,
-  // and they stacked to ~3-4s of sequential timeouts against fastStart-false
-  // MP4s.
+  // mediabunny handles moov-at-end without the ~3-4s timeout stacking
+  // the old <video>+seek+rVFC pipeline incurred.
   try {
+    const { Input, BlobSource, ALL_FORMATS } = await loadMediabunny();
     const demuxInput: any = new Input({
       formats: ALL_FORMATS,
       source: new BlobSource(blob),
@@ -434,9 +466,7 @@ export const validateFastRecorderOutputBlob = async (
         ts: Date.now(),
       },
     });
-  } catch {
-    // ignore
-  }
+  } catch {}
 
   return { ok, hardFail, reasons, details };
 };

@@ -33,6 +33,15 @@
         font-family: Satoshi-Medium;
       }
     </style>
+    <!--
+      Webpack injects two <script defer> tags (chunks: ["recorderkeepalive",
+      "recorder"], chunksSortMode: "manual"):
+        1. recorderkeepalive.bundle.js: audio oscillator + Web Locks +
+           mediaSession signals to prevent hidden-tab throttling.
+        2. recorder.bundle.js: the React app.
+      Both deferred; document-order execution keeps signals in place
+      before the recorder bundle parses.
+    -->
   </head>
 
   <body>

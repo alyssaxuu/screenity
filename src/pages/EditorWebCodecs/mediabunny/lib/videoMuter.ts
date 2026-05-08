@@ -8,6 +8,7 @@ import {
   VideoSampleSource,
   VideoSampleSink,
   AudioSampleSource,
+  AudioSampleSink,
   AudioSample,
   ALL_FORMATS,
   QUALITY_HIGH,
@@ -26,14 +27,6 @@ export class VideoMuter {
     } = {}
   ) {
     const videoDuration = await this._getDuration(videoBlob);
-
-    // Cap at 15 min to avoid OOM — re-encoding needs several copies in memory.
-    if (videoDuration > 900) {
-      throw new Error(
-        `Video is too long for in-browser audio muting (${Math.round(videoDuration / 60)} min). ` +
-          `Maximum supported length is 15 minutes.`
-      );
-    }
 
     const input = new Input({
       source: new BlobSource(videoBlob),
@@ -56,81 +49,91 @@ export class VideoMuter {
     });
     output.addVideoTrack(videoSource);
 
-    let decodedAudio = null;
-    const ctx = new AudioContext();
-    try {
-      let buf = await videoBlob.arrayBuffer();
-      decodedAudio = await ctx.decodeAudioData(buf);
-      buf = null; // release compressed bytes; PCM is now in decodedAudio
-    } catch {
-      // decode failed; mute returns original blob below
-    } finally {
-      ctx.close().catch(() => {});
+    const audioTrack = await input.getPrimaryAudioTrack();
+    const audioDecodable = audioTrack
+      ? await audioTrack.canDecode().catch(() => false)
+      : false;
+    let audioSink = null;
+    let audioSource = null;
+    if (audioTrack && audioDecodable) {
+      audioSink = new AudioSampleSink(audioTrack);
+      audioSource = new AudioSampleSource({
+        codec: "aac",
+        bitrate: 128000,
+      });
+      output.addAudioTrack(audioSource);
     }
-
-    const sr = decodedAudio?.sampleRate || 48000;
-    const mixBuffer = new Float32Array(Math.ceil(sr * videoDuration));
-
-    if (decodedAudio) {
-      const channelData = decodedAudio.getChannelData(0);
-      const muteStartSample = Math.floor(muteStart * sr);
-      const muteEndSample = Math.floor(muteEnd * sr);
-
-      for (let i = 0; i < channelData.length; i++) {
-        mixBuffer[i] =
-          i >= muteStartSample && i < muteEndSample ? 0 : channelData[i] * videoVolume;
-      }
-    } else {
-      return videoBlob;
-    }
-
-    const audioSource = new AudioSampleSource({
-      codec: "aac",
-      bitrate: 128000,
-    });
-    output.addAudioTrack(audioSource);
 
     await output.start();
+
     for await (const frame of videoSink.samples(0, videoDuration)) {
       await videoSource.add(frame);
       frame.close();
       if (onProgress) onProgress(frame.timestamp / videoDuration);
     }
 
-    const totalSamples = Math.floor(videoDuration * sr);
-    const chunkSize = sr * 2;
-    let written = 0;
+    if (audioSink && audioSource) {
+      for await (const sample of audioSink.samples()) {
+        const s = sample.timestamp;
+        const e = s + sample.duration;
+        const fullyOutside = e <= muteStart || s >= muteEnd;
 
-    while (written < totalSamples) {
-      const slice = mixBuffer.slice(written, written + chunkSize);
-      const dur = slice.length / sr;
-      const sample = new AudioSample({
-        data: slice,
-        format: "f32-planar",
-        numberOfChannels: 1,
-        sampleRate: sr,
-        timestamp: written / sr,
-        duration: dur,
-      });
-      await audioSource.add(sample);
-      sample.close();
-      written += chunkSize;
+        if (fullyOutside && videoVolume === 1) {
+          await audioSource.add(sample);
+          sample.close();
+          continue;
+        }
+
+        const numChannels = sample.numberOfChannels;
+        const sr = sample.sampleRate;
+        const frameCount = sample.numberOfFrames;
+        const data = new Float32Array(frameCount * numChannels);
+        for (let ch = 0; ch < numChannels; ch++) {
+          const view = data.subarray(ch * frameCount, (ch + 1) * frameCount);
+          sample.copyTo(view, { format: "f32-planar", planeIndex: ch });
+        }
+
+        for (let f = 0; f < frameCount; f++) {
+          const t = s + f / sr;
+          const gain = t >= muteStart && t < muteEnd ? 0 : videoVolume;
+          if (gain !== 1) {
+            for (let ch = 0; ch < numChannels; ch++) {
+              data[ch * frameCount + f] *= gain;
+            }
+          }
+        }
+
+        const out = new AudioSample({
+          data,
+          format: "f32-planar",
+          numberOfChannels: numChannels,
+          sampleRate: sr,
+          timestamp: s,
+          duration: frameCount / sr,
+        });
+        await audioSource.add(out);
+        out.close();
+        sample.close();
+      }
     }
 
     await output.finalize();
-    // Always MP4 container — use correct MIME type.
     return new Blob([outputTarget.buffer], { type: "video/mp4" });
   }
 
   async _getDuration(blob) {
     return new Promise((resolve, reject) => {
       const v = document.createElement("video");
-      v.src = URL.createObjectURL(blob);
+      const url = URL.createObjectURL(blob);
+      v.src = url;
       v.onloadedmetadata = () => {
+        URL.revokeObjectURL(url);
         resolve(v.duration);
-        URL.revokeObjectURL(v.src);
       };
-      v.onerror = reject;
+      v.onerror = (e) => {
+        URL.revokeObjectURL(url);
+        reject(e);
+      };
     });
   }
 }

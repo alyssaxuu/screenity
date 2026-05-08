@@ -63,6 +63,18 @@
     "message": "이 웹사이트의 보안 설정이 브라우저 확장 프로그램에서 이 페이지의 카메라나 마이크를 사용하지 못하게 차단하고 있어요. 카메라와 마이크를 사용해 녹화하려면, 다른 탭에서 녹화를 시작한 뒤 녹화가 시작되면 이 탭으로 돌아오세요.",
     "description": "Modal description shown when the current page's Permissions-Policy header blocks browser extensions from using camera or microphone"
   },
+  "opfsLoadErrorTitle": {
+    "message": "녹화를 불러올 수 없어요",
+    "description": "Modal title shown when the editor cannot read the recording file from the device's storage"
+  },
+  "opfsLoadErrorDescription": {
+    "message": "Screenity가 기기 저장소에서 녹화 파일을 불러오지 못했어요. 삭제되었거나 이동되었을 수 있어요. 계속 발생하면 support@screenity.io로 문의해 주세요.",
+    "description": "Modal description shown when the editor cannot read the recording file from the device's storage"
+  },
+  "recordingWriterFailedToast": {
+    "message": "저장소 문제로 녹화가 중지되었어요. 부분 녹화는 저장되었어요.",
+    "description": "Toast shown when the recording chunk writer fails mid-recording and the partial file is preserved"
+  },
   "allowCameraAccessButton": {
     "message": "카메라 액세스 허용",
     "description": "Allow camera access button"
@@ -358,6 +370,18 @@
   "sandboxProgressDescription": {
     "message": "이 탭을 열어둡니다. 녹화가 준비되면 업데이트됩니다.",
     "description": "Description in sandbox page while recording / saving"
+  },
+  "sandboxFinalizingRecording": {
+    "message": "녹화 마무리 중...",
+    "description": "Shown over the player when the editor is waiting for the recorder to finish flushing the recording to disk"
+  },
+  "sandboxToastReverted": {
+    "message": "원본으로 되돌림",
+    "description": "Toast confirmation shown when the user reverts edits to the original recording"
+  },
+  "sandboxToastSaved": {
+    "message": "변경 사항 저장됨",
+    "description": "Toast confirmation shown when the user saves an edit operation"
   },
   "sandboxEditorMainTitle": {
     "message": "편집기",
@@ -1588,5 +1612,59 @@
   "cancelButton": {
     "message": "취소",
     "description": "Generic cancel button label"
+  },
+  "editorStuckTitle": {
+    "message": "녹화를 준비하는 중입니다…"
+  },
+  "editorStuckDescription": {
+    "message": "스크리니티가 평소보다 녹화를 불러오는 데 시간이 더 걸리고 있습니다. 데이터는 이 기기에 남아 있을 수 있습니다. 복구를 시도해 보시거나, 복구되지 않으면 문의해 주세요."
+  },
+  "editorStuckTryRecover": {
+    "message": "복구 시도"
+  },
+  "editorStuckGetHelp": {
+    "message": "도움 받기"
+  },
+  "editorRecoveryFailedTitle": {
+    "message": "녹화를 열 수 없습니다"
+  },
+  "editorRecoveryFailedDescription": {
+    "message": "편집기에 녹화를 불러오는 중 문제가 발생했습니다. 녹화 파일은 기기에 저장되어 있을 수 있습니다. 지금 복구를 시도해 보세요."
+  },
+  "downloadGIFTooLongToast": {
+    "message": "GIF 내보내기는 최대 30초까지 가능합니다. 클립을 자른 뒤 다시 시도해 주세요."
+  },
+  "audioSilentToast": {
+    "message": "오디오가 감지되지 않았습니다. 마이크, 음소거 스위치 또는 오디오 장치를 확인해 주세요."
+  },
+  "restartFailedToast": {
+    "message": "녹화를 다시 시작할 수 없습니다. 중지한 뒤 다시 시작해 주세요."
+  },
+  "recordingFailedModalTitle": {
+    "message": "녹화를 시작할 수 없습니다"
+  },
+  "recordingFailedModalDescription": {
+    "message": "녹화를 시작하지 못했습니다. 다시 시도해 주세요. 문제가 계속되면 support@screenity.io로 문의해 주세요."
+  },
+  "editAudioTooLargeTitle": {
+    "message": "오디오 파일이 너무 큽니다"
+  },
+  "editAudioTooLargeDescription": {
+    "message": "더 짧은 오디오 클립을 사용해 보세요. 큰 파일은 브라우저에서 처리할 수 없습니다. 원본 녹화는 안전하게 보관되어 있습니다."
+  },
+  "restoreEmptyToast": {
+    "message": "복구할 수 있는 녹화를 찾을 수 없습니다. 데이터가 삭제되었을 수 있습니다."
+  },
+  "restoreTimeoutToast": {
+    "message": "복구에 시간이 오래 걸리고 있습니다. 녹화는 안전합니다. 잠시 후 복구를 다시 눌러 보세요."
+  },
+  "cameraUnavailableToast": {
+    "message": "카메라 연결이 끊어졌습니다. 화면 녹화는 계속됩니다."
+  },
+  "downloadInterruptedLargeToast": {
+    "message": "다운로드가 중단되었습니다. 파일이 너무 커서 자동으로 다시 시도할 수 없습니다. 편집기에서 다시 저장해 보세요."
+  },
+  "recordingCorruptToast": {
+    "message": "이 녹화는 재생할 수 없습니다. 파일이 불완전하거나 손상되었을 수 있습니다. 저장 메뉴에서 원본 파일을 다운로드해 보세요."
   }
 }

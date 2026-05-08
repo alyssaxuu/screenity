@@ -1,17 +1,18 @@
 import React, { useContext, useEffect, useState, useRef, useMemo } from "react";
+import { createPortal } from "react-dom";
 import Plyr from "plyr-react";
 import "../../styles/plyr.css";
-import { ContentStateContext } from "../../context/ContentState"; // Import the ContentState context
+import { ContentStateContext } from "../../context/ContentState";
 
-// Components
 import Title from "./Title";
 
 const VideoPlayer = (props) => {
-  const [contentState, setContentState] = useContext(ContentStateContext); // Access the ContentState context
+  const [contentState, setContentState] = useContext(ContentStateContext);
 
   const playerRef = useRef(null);
   const [url, setUrl] = useState(null);
   const [source, setSource] = useState(null);
+  const [overlayHost, setOverlayHost] = useState(null);
   const contentStateRef = useRef(contentState);
   const bannerRef = useRef(null);
 
@@ -66,28 +67,6 @@ const VideoPlayer = (props) => {
     []
   );
 
-  /*
-  useEffect(() => {
-    if (contentState.blob) {
-      const objectURL = URL.createObjectURL(contentState.blob);
-      setSource({
-        type: "video",
-        sources: [
-          {
-            src: objectURL,
-            type: "video/mp4",
-          },
-        ],
-      });
-      setUrl(objectURL);
-
-      return () => {
-        URL.revokeObjectURL(objectURL);
-      };
-    }
-  }, [contentState.blob, playerRef]);
-	*/
-
   useEffect(() => {
     if (contentState.webm || contentState.blob) {
       let vid;
@@ -101,6 +80,8 @@ const VideoPlayer = (props) => {
         vid = contentState.webm;
       }
       const objectURL = URL.createObjectURL(vid);
+      // Long recordings can take seconds to parse metadata.
+      setContentState((prev) => ({ ...prev, playerLoading: true }));
       setSource({
         type: "video",
         sources: [
@@ -116,14 +97,83 @@ const VideoPlayer = (props) => {
         URL.revokeObjectURL(objectURL);
       };
     }
-  }, [
-    contentState.webm,
-    contentState.blob,
-    contentState.hasBeenEdited,
-    playerRef,
-  ]);
+  }, [contentState.webm, contentState.blob, playerRef]);
 
-  // Use a mutation observer to check if .plyr--video is added to the DOM
+  // plyr-react ref shape varies; bind directly to <video>. 15s safety
+  // timeout in case events never fire.
+  useEffect(() => {
+    if (!source) return;
+    let cleared = false;
+    const clear = () => {
+      if (cleared) return;
+      cleared = true;
+      setContentState((prev) =>
+        prev.playerLoading ? { ...prev, playerLoading: false } : prev,
+      );
+    };
+    let videoEl = null;
+    let safetyId = null;
+    let retryId = null;
+    let errorSurfaced = false;
+    // Corrupt/zero-byte/header-only OPFS file (recorder died before chunks
+    // landed, or quota hit past moov) fires MediaError. Without this,
+    // playerLoading only clears via the 15s safety timeout, leaving a black
+    // <video>. Surface a toast and clear loading immediately.
+    const onVideoError = () => {
+      if (errorSurfaced) return;
+      errorSurfaced = true;
+      try {
+        chrome.runtime.sendMessage({
+          type: "show-toast",
+          message: chrome.i18n.getMessage("recordingCorruptToast"),
+          timeout: 8000,
+        });
+      } catch {}
+      try {
+        chrome.runtime.sendMessage({
+          type: "diag-forward",
+          event: "editor-video-decode-error",
+          data: {
+            mediaError: videoEl?.error?.code ?? null,
+            mediaErrorMessage:
+              String(videoEl?.error?.message || "").slice(0, 120) || null,
+            blobSize: contentStateRef.current?.blob?.size ?? null,
+          },
+        });
+      } catch {}
+      clear();
+    };
+    const tryAttach = () => {
+      videoEl =
+        document.querySelector("#plyr-player") ||
+        document.querySelector(".plyr video");
+      const plyrEl = document.querySelector(".plyr");
+      if (plyrEl) setOverlayHost(plyrEl);
+      if (!videoEl) return false;
+      videoEl.addEventListener("loadedmetadata", clear);
+      videoEl.addEventListener("canplay", clear);
+      videoEl.addEventListener("error", onVideoError);
+      if (videoEl.readyState >= 1) clear();
+      // Error may have already fired pre-attach.
+      if (videoEl.error) onVideoError();
+      return true;
+    };
+    if (!tryAttach()) {
+      retryId = setTimeout(tryAttach, 50);
+    }
+    safetyId = setTimeout(clear, 15000);
+    return () => {
+      if (retryId) clearTimeout(retryId);
+      if (safetyId) clearTimeout(safetyId);
+      if (videoEl) {
+        videoEl.removeEventListener("loadedmetadata", clear);
+        videoEl.removeEventListener("canplay", clear);
+        videoEl.removeEventListener("error", onVideoError);
+      }
+      setOverlayHost(null);
+    };
+  }, [source]);
+
   useEffect(() => {
     if (contentStateRef.current.mp4ready || contentStateRef.current.blob)
       return;
@@ -192,6 +242,49 @@ const VideoPlayer = (props) => {
             options={options}
           />
         )}
+        {(contentState.playerLoading || contentState.finalizingRecording) &&
+          overlayHost &&
+          createPortal(
+            <div
+              className="screenity-player-loading"
+              style={{
+                position: "absolute",
+                inset: 0,
+                background: "rgba(0,0,0,0.55)",
+                display: "flex",
+                flexDirection: "column",
+                gap: "12px",
+                alignItems: "center",
+                justifyContent: "center",
+                zIndex: 5,
+                pointerEvents: "none",
+              }}
+            >
+              <div
+                style={{
+                  width: "32px",
+                  height: "32px",
+                  border: "3px solid rgba(255,255,255,0.2)",
+                  borderTopColor: "#fff",
+                  borderRadius: "50%",
+                  animation: "screenity-spin 0.9s linear infinite",
+                }}
+              />
+              {contentState.finalizingRecording && (
+                <div
+                  style={{
+                    color: "#fff",
+                    fontSize: "13px",
+                    fontWeight: 500,
+                    opacity: 0.9,
+                  }}
+                >
+                  {chrome.i18n.getMessage("sandboxFinalizingRecording")}
+                </div>
+              )}
+            </div>,
+            overlayHost
+          )}
         {contentState.mode === "player" && <Title />}
       </div>
       <style>
@@ -200,6 +293,9 @@ const VideoPlayer = (props) => {
 						.videoPlayer {
 							position: relative!important;
 						}
+					}
+					@keyframes screenity-spin {
+						to { transform: rotate(360deg); }
 					}
 					`}
       </style>

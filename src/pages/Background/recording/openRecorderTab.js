@@ -5,6 +5,7 @@ import { closeOffscreenDocument } from "../offscreen/closeOffscreenDocument.js";
 import { loginWithWebsite } from "../auth/loginWithWebsite.js";
 import { traceStep } from "../../utils/startFlowTrace.js";
 import { handleGetStreamingData } from "./recordingHelpers.js";
+import { perfMark, perfSpan } from "../../utils/perfMarks";
 
 const openRecorderTab = async (
   activeTab,
@@ -13,10 +14,16 @@ const openRecorderTab = async (
   camera = false,
   request
 ) => {
+  perfMark("BG.openRecorderTab.enter", {
+    isRegion,
+    camera,
+    activeTabId: activeTab?.id || null,
+  });
   let switchTab = true;
 
-  // Check subscription status
+  const endLogin = perfSpan("BG.openRecorderTab loginWithWebsite");
   const { authenticated, subscribed, cached, transient, error: authError } = await loginWithWebsite();
+  endLogin({ authenticated, subscribed, cached: Boolean(cached) });
   const isCloudRecorder = authenticated && subscribed;
   const recorderUrl = isCloudRecorder
       ? chrome.runtime.getURL("cloudrecorder.html")
@@ -31,15 +38,12 @@ const openRecorderTab = async (
     );
   }
 
-  // Cloud recordings need the tab active briefly so keepalive can start
+  // cloud recordings need the tab active briefly so keepalive can start
   if (isCloudRecorder && !switchTab) {
     switchTab = true;
   }
 
-  // Close any leftover recorder tab from a previous recording so we don't
-  // end up with two pinned tabs. Only close actual extension recorder pages -
-  // for region recordings, recordingTab can temporarily point to the user's
-  // active page, which we must NOT close.
+  // URL-guard: region recordings point recordingTab at the user's tab, never close that
   const { recordingTab: prevRecTab } = await chrome.storage.local.get([
     "recordingTab",
   ]);
@@ -53,31 +57,81 @@ const openRecorderTab = async (
       ) {
         await removeTab(prevRecTab);
       }
-    } catch {
-      // Tab doesn't exist - just clear the reference
-    }
+    } catch {}
     chrome.storage.local.set({ recordingTab: null });
   }
 
   const finalUrl = isRegion ? `${recorderUrl}?tab=true` : recorderUrl;
 
+  // Close any leftover setup.html: a user starting cloud recording has
+  // moved past onboarding, and if it's still open it tends to steal focus
+  // back from the editor when the recorder tab closes post-stop.
+  try {
+    const setupUrl = chrome.runtime.getURL("setup.html");
+    const allTabs = await chrome.tabs.query({});
+    const stale = allTabs.filter(
+      (t) => t.id != null && t.url && t.url.startsWith(setupUrl),
+    );
+    if (stale.length > 0) {
+      await chrome.tabs.remove(stale.map((t) => t.id));
+    }
+  } catch {}
+
+  const endTabCreate = perfSpan("BG.openRecorderTab tabs.create");
   const tab = await chrome.tabs.create({
     url: finalUrl,
     pinned: true,
     index: 0,
-    // FLAG: Check this is ok?
     active: switchTab,
   });
+  endTabCreate({ tabId: tab?.id });
+  // tabs.create can fulfill with no id in rare MV3 states (window-closed, profile-locked)
+  if (!tab || typeof tab.id !== "number") {
+    console.error(
+      "[Screenity][BG] openRecorderTab: tabs.create returned no usable tab",
+      tab,
+    );
+    chrome.runtime
+      .sendMessage({
+        type: "recording-error",
+        error: "stream-error",
+        why: "recorder tab create returned no id",
+        errorCode: "REC_START_NO_TAB",
+      })
+      .catch(() => {});
+    return;
+  }
 
-  // Apply autoDiscardable before the load listener so the tab can't be discarded pre-mount.
+  // Set recordingTab before the autoDiscardable retry loop (up to ~1.25s
+  // of awaits) so listeners that fire during it don't see a stale tab id.
+  chrome.storage.local.set({
+    recordingTab: tab.id,
+    offscreen: false,
+    region: false,
+    wasRegion: true,
+    clickEvents: [],
+    recordingUiTabId: activeTab.id,
+    ...(isRegion ? { tabRecordedID: activeTab.id } : {}),
+  });
+
+  // under memory pressure the set can succeed silently while the property stays true;
+  // verify via tabs.get roundtrip and retry with backoff
   let autoDiscardableApplied = false;
-  for (let attempt = 0; attempt < 2; attempt += 1) {
+  let autoDiscardableVerified = false;
+  const backoffsMs = [50, 200, 1000];
+  for (let attempt = 0; attempt < backoffsMs.length; attempt += 1) {
     try {
       await chrome.tabs.update(tab.id, { autoDiscardable: false });
       autoDiscardableApplied = true;
-      break;
+      try {
+        const tabState = await chrome.tabs.get(tab.id);
+        if (tabState && tabState.autoDiscardable === false) {
+          autoDiscardableVerified = true;
+          break;
+        }
+      } catch {}
     } catch (err) {
-      if (attempt === 1) {
+      if (attempt === backoffsMs.length - 1) {
         console.warn(
           "[Screenity] autoDiscardable failed for recorder tab",
           tab.id,
@@ -90,32 +144,28 @@ const openRecorderTab = async (
             error: String(err),
           },
         });
-      } else {
-        await new Promise((r) => setTimeout(r, 50));
       }
+    }
+    if (attempt < backoffsMs.length - 1) {
+      await new Promise((r) => setTimeout(r, backoffsMs[attempt]));
     }
   }
 
   chrome.storage.local.set({
-    recordingTab: tab.id,
-    offscreen: false,
-    region: false,
-    wasRegion: true,
-    clickEvents: [],
-    recordingUiTabId: activeTab.id,
     autoDiscardableApplied,
-    ...(isRegion ? { tabRecordedID: activeTab.id } : {}),
+    autoDiscardableVerified,
   });
 
   chrome.tabs.onUpdated.addListener(function _(tabId, changeInfo) {
     if (tabId === tab.id && changeInfo.status === "complete") {
       chrome.tabs.onUpdated.removeListener(_);
+      perfMark("BG.openRecorderTab tab-status-complete", { tabId });
       traceStep("recorderTabCreated");
-      // Include tabPreferred in the message so CloudRecorder can use it
-      // synchronously without racing against its own storage read.
+      // tabPreferred lets CloudRecorder use it synchronously without racing storage
       const isPlayground = activeTab.url.includes(
         chrome.runtime.getURL("playground.html")
       );
+      perfMark("BG.openRecorderTab loaded.sent");
       sendMessageRecord({
         type: "loaded",
         request: request,
@@ -128,11 +178,7 @@ const openRecorderTab = async (
             }
           : {}),
       });
-      // Proactively push streaming-data shortly after "loaded". The tab
-      // also pulls it, but that pull can drop if the SW is still waking
-      // or the tab's listener is not yet mounted. This push plus the
-      // tab-side retry plus the tab's idempotency guard give the handshake
-      // multiple chances to succeed before the start gate times out.
+      // push streaming-data; tab also pulls but pull can drop on cold-SW/late-mount
       setTimeout(() => {
         handleGetStreamingData().catch(() => {});
       }, 300);
@@ -141,9 +187,18 @@ const openRecorderTab = async (
 };
 
 export const startRecorderSession = async (request, tabId = null) => {
+  perfMark("BG.startRecorderSession.enter", {
+    customRegion: Boolean(request?.customRegion),
+    region: Boolean(request?.region),
+    camera: Boolean(request?.camera),
+  });
   console.log("[Screenity][startRecorderSession] entered", { request, tabId });
+  const endStorage = perfSpan("BG.startRecorderSession storage.read");
   const { backup } = await chrome.storage.local.get(["backup"]);
+  endStorage();
+  const endTab = perfSpan("BG.startRecorderSession getCurrentTab");
   let activeTab = await getCurrentTab();
+  endTab({ tabId: activeTab?.id || null });
 
   if (tabId !== null) {
     activeTab = await chrome.tabs.get(tabId);
@@ -162,7 +217,9 @@ export const startRecorderSession = async (request, tabId = null) => {
     chrome.storage.local.set({ tabPreferred: false });
   }
 
+  const endCloseOffscreen = perfSpan("BG.startRecorderSession closeOffscreenDocument");
   await closeOffscreenDocument();
+  endCloseOffscreen();
 
   if (request.region) {
     if (tabId !== null) chrome.tabs.update(tabId, { active: true });
@@ -174,12 +231,20 @@ export const startRecorderSession = async (request, tabId = null) => {
         region: true,
         recordingUiTabId: activeTab.id,
       });
+      const endSendLoaded = perfSpan("BG.startRecorderSession customRegion.sendLoaded");
       sendMessageRecord({
         type: "loaded",
         request: request,
         backup: backup,
         region: true,
-      });
+      })
+        .then(() => endSendLoaded({ ok: true }))
+        .catch((err) =>
+          endSendLoaded({
+            ok: false,
+            err: String(err?.message || err).slice(0, 100),
+          }),
+        );
     } else {
       chrome.storage.local.set({
         recordingTab: activeTab.id,
@@ -190,6 +255,7 @@ export const startRecorderSession = async (request, tabId = null) => {
       await openRecorderTab(activeTab, backup, true, false, request);
     }
   } else {
+    chrome.storage.local.set({ region: false });
     await openRecorderTab(activeTab, backup, false, request.camera, request);
   }
 };

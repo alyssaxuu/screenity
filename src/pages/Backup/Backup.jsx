@@ -108,10 +108,9 @@ const Backup = () => {
 
   const directoryPicker = async (prompt = true) => {
     chrome.runtime.sendMessage({ type: "focus-this-tab" });
-    let directoryPicker = null;
-    // Request access to create a file in a user-selected directory
+    let picked;
     try {
-      directoryPicker = await window.showDirectoryPicker({
+      picked = await window.showDirectoryPicker({
         startIn: "videos",
         mode: "readwrite",
       });
@@ -125,28 +124,13 @@ const Backup = () => {
       }
       return;
     }
-    // check if user cancelled the prompt
-    if (!directoryPicker) {
-      if (backupRef.current) {
-        chrome.runtime.sendMessage({
-          type: "recording-error",
-          error: "backup-error",
-          why: String(err),
-        });
-      }
-      return;
-    }
 
-    let directoryHandle = directoryPicker;
-
-    if (directoryPicker.name === "Screenity Recordings") {
-      directoryHandle = directoryPicker;
-    } else {
-      directoryHandle = await directoryPicker.getDirectoryHandle(
-        "Screenity Recordings",
-        { create: true },
-      );
-    }
+    const directoryHandle =
+      picked.name === "Screenity Recordings"
+        ? picked
+        : await picked.getDirectoryHandle("Screenity Recordings", {
+            create: true,
+          });
 
     await localDirectoryStore.clear();
     await localDirectoryStore.setItem("directoryHandle", directoryHandle);
@@ -171,13 +155,11 @@ const Backup = () => {
       localDirectoryStore.getItem("directoryHandle").then(async (directory) => {
         if (directory) {
           try {
-            const permissions = await verifyFilePermissions(
-              directory.directoryHandle,
-            );
+            const permissions = await verifyFilePermissions(directory);
             if (!permissions) {
               directoryPicker(prompt);
             } else {
-              initLocalDirectory(directory.directoryHandle, prompt);
+              initLocalDirectory(directory, prompt);
             }
           } catch (e) {
             localDirectoryStore.clear();
@@ -248,23 +230,18 @@ const Backup = () => {
     }
   };
 
-  // Delete the latest file saved in the local backup folder
   const deleteFile = async (restart = null) => {
     if (writingFile.current) {
       await writable.current.close();
       writingFile.current = false;
 
       const directory = await localDirectoryStore.getItem("directoryHandle");
-      if (directory && directory !== null) {
-        const permissions = await verifyFilePermissions(
-          directory.directoryHandle,
-        );
+      if (directory) {
+        const permissions = await verifyFilePermissions(directory);
         if (permissions) {
-          await directory.directoryHandle.removeEntry(titleRef.current);
-          if (restart) {
-            localSaving(false);
-          }
-        } else if (restart) {
+          await directory.removeEntry(titleRef.current);
+        }
+        if (restart) {
           localSaving(false);
         }
       }
@@ -313,7 +290,11 @@ const Backup = () => {
       writeFile(message.index);
     } else if (message.type === "close-writable") {
       if (!waitWrite.current) {
-        writable.current.close();
+        if (writable.current) {
+          try {
+            writable.current.close();
+          } catch (e) {}
+        }
       } else {
         closeRequest.current = true;
       }

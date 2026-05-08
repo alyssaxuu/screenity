@@ -9,6 +9,9 @@ const VideoPlayer = (props) => {
   const [url, setUrl] = useState(null);
   const [source, setSource] = useState(null);
   const [isSet, setIsSet] = useState(false);
+  // Probed from the blob's intrinsic dimensions; a fixed "16:9" would
+  // pillarbox recordings of square-ish tabs.
+  const [videoRatio, setVideoRatio] = useState("16:9");
 
   useEffect(() => {
     if (
@@ -23,7 +26,7 @@ const VideoPlayer = (props) => {
   const options = useMemo(
     () => ({
       controls: ["play", "mute", "captions", "settings", "pip", "fullscreen"],
-      ratio: "16:9",
+      ratio: videoRatio,
       blankVideo:
         "chrome-extension://" +
         chrome.i18n.getMessage("@@extension_id") +
@@ -32,8 +35,32 @@ const VideoPlayer = (props) => {
         global: true,
       },
     }),
-    []
+    [videoRatio]
   );
+
+  useEffect(() => {
+    if (!contentState.blob) return;
+    const probeUrl = URL.createObjectURL(contentState.blob);
+    const probe = document.createElement("video");
+    probe.preload = "metadata";
+    probe.muted = true;
+    probe.src = probeUrl;
+    const onMeta = () => {
+      const w = probe.videoWidth;
+      const h = probe.videoHeight;
+      if (w > 0 && h > 0) setVideoRatio(`${w}:${h}`);
+      cleanup();
+    };
+    const onErr = () => cleanup();
+    const cleanup = () => {
+      probe.removeEventListener("loadedmetadata", onMeta);
+      probe.removeEventListener("error", onErr);
+      URL.revokeObjectURL(probeUrl);
+    };
+    probe.addEventListener("loadedmetadata", onMeta);
+    probe.addEventListener("error", onErr);
+    return cleanup;
+  }, [contentState.blob]);
 
   useEffect(() => {
     if (contentState.blob) {

@@ -2,7 +2,6 @@ import React, { useEffect, useContext, useRef, useState } from "react";
 
 import { Rnd } from "react-rnd";
 
-// Context
 import { contentStateContext } from "../../context/ContentState";
 
 import CameraToolbar from "./CameraToolbar";
@@ -19,21 +18,18 @@ const CameraWrap = (props) => {
   const updateUIPosition = () => {
     const ref =
       props.shadowRef.current.shadowRoot.querySelector(".camera-draggable");
-    const circleCenterX =
-      ref.getBoundingClientRect().left + ref.getBoundingClientRect().width / 2;
-    const circleCenterY =
-      ref.getBoundingClientRect().top + ref.getBoundingClientRect().height / 2;
-    const circleRadius = ref.getBoundingClientRect().width / 2;
-    const squareBottomRightX =
-      ref.getBoundingClientRect().left + ref.getBoundingClientRect().width;
-    const squareBottomRightY =
-      ref.getBoundingClientRect().top + ref.getBoundingClientRect().height;
+    // Cached: fires at ~60Hz during resize, was 12 reflows/call.
+    const refRect = ref.getBoundingClientRect();
+    const circleCenterX = refRect.left + refRect.width / 2;
+    const circleCenterY = refRect.top + refRect.height / 2;
+    const circleRadius = refRect.width / 2;
+    const squareBottomRightX = refRect.left + refRect.width;
+    const squareBottomRightY = refRect.top + refRect.height;
     const handle =
       props.shadowRef.current.shadowRoot.querySelector(".camera-resize");
     const toolbar =
       props.shadowRef.current.shadowRoot.querySelector(".camera-toolbar");
 
-    // Calculate 'r' using the formula we derived earlier
     const c = Math.sqrt(
       Math.pow(circleCenterX - squareBottomRightX, 2) +
         Math.pow(circleCenterY - squareBottomRightY, 2)
@@ -41,36 +37,28 @@ const CameraWrap = (props) => {
     const a = circleRadius / Math.sqrt(2);
     const r = (c + Math.sqrt(c ** 2 + 16 * a ** 2)) / 4;
 
-    // Calculate the handle position
     const x = r - r / Math.sqrt(2);
     const y = r - r / Math.sqrt(2);
 
-    // Position the handle element to the calculated coordinates
-    handle.style.bottom = `${y - handle.getBoundingClientRect().width / 2}px`;
-    handle.style.right = `${x - handle.getBoundingClientRect().height / 2}px`;
-    toolbar.style.top = `${y - toolbar.getBoundingClientRect().width / 2}px`;
-    toolbar.style.left = `${x - toolbar.getBoundingClientRect().height / 2}px`;
+    const handleRect = handle.getBoundingClientRect();
+    const toolbarRect = toolbar.getBoundingClientRect();
+    handle.style.bottom = `${y - handleRect.width / 2}px`;
+    handle.style.right = `${x - handleRect.height / 2}px`;
+    toolbar.style.top = `${y - toolbarRect.width / 2}px`;
+    toolbar.style.left = `${x - toolbarRect.height / 2}px`;
   };
 
   const saveDimensions = () => {
     const ref =
       props.shadowRef.current.shadowRoot.querySelector(".camera-draggable");
+    const rect = ref.getBoundingClientRect();
+    const dims = { size: rect.width, x: rect.x, y: rect.y };
 
     setContentState((prevContentState) => ({
       ...prevContentState,
-      cameraDimensions: {
-        size: ref.getBoundingClientRect().width,
-        x: ref.getBoundingClientRect().x,
-        y: ref.getBoundingClientRect().y,
-      },
+      cameraDimensions: dims,
     }));
-    chrome.storage.local.set({
-      cameraDimensions: {
-        size: ref.getBoundingClientRect().width,
-        x: ref.getBoundingClientRect().x,
-        y: ref.getBoundingClientRect().y,
-      },
-    });
+    chrome.storage.local.set({ cameraDimensions: dims });
   };
 
   useEffect(() => {

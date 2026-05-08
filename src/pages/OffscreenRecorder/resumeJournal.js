@@ -1,5 +1,6 @@
 import localforage from "localforage";
 import BunnyTusUploader from "../CloudRecorder/bunnyTusUploader";
+import { openExistingChunksStore } from "../CloudRecorder/recorderStorage/chooseChunksStore";
 
 localforage.config({
   driver: localforage.INDEXEDDB,
@@ -9,29 +10,96 @@ localforage.config({
 
 const JOURNAL_KEY_PREFIX = "uploadJournal-";
 
-const chunkStoreForTrack = (trackType) => {
-  if (trackType === "camera") {
-    return localforage.createInstance({ name: "cameraChunks" });
+const trackName = (trackType) =>
+  trackType === "camera" ? "camera" : "screen";
+
+// Pulls per-journal storage backend from the persisted recorder session.
+// Journals written before the OPFS migration default to IDB. The uploader
+// itself doesn't carry backend state, so this routes through chrome.storage.
+const resolveBackendForJournal = async (journal) => {
+  const sessionId = journal?.sessionId || null;
+  const trackKey = trackName(journal?.trackType || "screen");
+
+  // Try the per-session snapshot first (it survives even after a newer
+  // session has overwritten the latest `recorderSession`).
+  if (sessionId) {
+    const sessionStateKey = `cloudRecorderSession:${sessionId}`;
+    try {
+      const snap = await chrome.storage.local.get([sessionStateKey]);
+      const session = snap?.[sessionStateKey];
+      if (session?.storageBackends) {
+        return {
+          backend: session.storageBackends[trackKey] || "idb",
+          opfsSessionId: session.opfsSessionId || sessionId,
+        };
+      }
+    } catch {}
   }
-  return localforage.createInstance({ name: "chunks" });
+
+  // Fallback: latest recorderSession may match if we're resuming the only
+  // outstanding session.
+  try {
+    const snap = await chrome.storage.local.get(["recorderSession"]);
+    const session = snap?.recorderSession;
+    if (
+      session?.storageBackends &&
+      (session.id === sessionId || !sessionId)
+    ) {
+      return {
+        backend: session.storageBackends[trackKey] || "idb",
+        opfsSessionId: session.opfsSessionId || sessionId,
+      };
+    }
+  } catch {}
+
+  return { backend: "idb", opfsSessionId: sessionId };
 };
 
-const loadChunksSorted = async (store) => {
+const chunkKeyPrefixForTrack = (trackType) =>
+  trackType === "camera" ? "camera_chunk_" : "chunk_";
+
+const loadChunksSorted = async (store, prefix = "chunk_") => {
   const items = [];
   await store.iterate((value, key) => {
-    if (!key || !key.startsWith("chunk_")) return;
+    if (!key || !key.startsWith(prefix)) return;
     if (!value || !value.chunk) return;
     items.push({
       index:
         typeof value.index === "number"
           ? value.index
-          : parseInt(key.replace("chunk_", ""), 10) || 0,
+          : parseInt(key.replace(prefix, ""), 10) || 0,
       chunk: value.chunk,
       timestamp: value.timestamp || 0,
     });
   });
   items.sort((a, b) => a.index - b.index);
   return items;
+};
+
+// Tus PATCH writes at the offset header without content validation, so
+// re-sending chunks already received corrupts the file silently.
+const skipAlreadyUploadedChunks = (chunks, alreadyUploadedBytes) => {
+  if (!alreadyUploadedBytes || alreadyUploadedBytes <= 0) return chunks;
+  let cumulative = 0;
+  for (let i = 0; i < chunks.length; i++) {
+    const chunkSize = chunks[i].chunk?.size || 0;
+    const chunkEnd = cumulative + chunkSize;
+    if (chunkEnd <= alreadyUploadedBytes) {
+      cumulative = chunkEnd;
+      continue;
+    }
+    // Boundary chunk straddles serverOffset; slice the uploaded prefix.
+    const sliceOffset = alreadyUploadedBytes - cumulative;
+    const remaining = chunks.slice(i);
+    if (sliceOffset > 0 && typeof remaining[0]?.chunk?.slice === "function") {
+      remaining[0] = {
+        ...remaining[0],
+        chunk: remaining[0].chunk.slice(sliceOffset),
+      };
+    }
+    return remaining;
+  }
+  return [];
 };
 
 const bumpResumeAttempts = async (journal) => {
@@ -80,11 +148,19 @@ export const resumeOneJournal = async (journal) => {
     resumeAttempts: journal.resumeAttempts || 0,
   });
 
-  const store = chunkStoreForTrack(trackType);
-  const chunks = await loadChunksSorted(store);
+  const { backend, opfsSessionId } = await resolveBackendForJournal(journal);
+  const { store } = openExistingChunksStore({
+    sessionId: opfsSessionId,
+    track: trackName(trackType),
+    backend,
+  });
+  const chunks = await loadChunksSorted(
+    store,
+    chunkKeyPrefixForTrack(trackType),
+  );
 
   if (!chunks.length) {
-    // Orphan journal - chunks cleared or never written. GC.
+    // Orphan journal: chunks cleared or never written. GC.
     emit("upload_resume_chunks_missing", { mediaId, trackType });
     try {
       await chrome.storage.local.remove([
@@ -92,24 +168,6 @@ export const resumeOneJournal = async (journal) => {
       ]);
     } catch {}
     return { ok: false, error: "chunks-missing" };
-  }
-
-  // Sparse chunks (purge ran mid-recording) would corrupt the replay - abandon and let server state stand.
-  const isContiguous = chunks.every((c, i) => c.index === i);
-  if (!isContiguous) {
-    emit("upload_resume_sparse_chunks", {
-      mediaId,
-      trackType,
-      firstIndex: chunks[0]?.index,
-      lastIndex: chunks[chunks.length - 1]?.index,
-      count: chunks.length,
-    });
-    try {
-      await chrome.storage.local.remove([
-        `${JOURNAL_KEY_PREFIX}${mediaId}`,
-      ]);
-    } catch {}
-    return { ok: false, error: "sparse-chunks" };
   }
 
   const uploader = new BunnyTusUploader({ trackType });
@@ -135,8 +193,52 @@ export const resumeOneJournal = async (journal) => {
     return { ok: false, error: `initialize: ${err?.message || err}` };
   }
 
+  // uploader.offset = bytes Bunny has. Finalize-only if full, else replay
+  // the gap (bail on sparse local chunks).
+  const serverOffset = uploader.offset || 0;
+  const journalTotalBytes = journal.totalBytes || 0;
+  const serverHasEverything =
+    journalTotalBytes > 0 && serverOffset >= journalTotalBytes;
+
+  let remainingChunks = [];
+  if (serverHasEverything) {
+    emit("upload_resume_finalize_only", {
+      mediaId,
+      trackType,
+      serverOffset,
+      journalTotalBytes,
+    });
+  } else {
+    const isContiguous = chunks.every((c, i) => c.index === i);
+    if (!isContiguous) {
+      emit("upload_resume_sparse_chunks", {
+        mediaId,
+        trackType,
+        firstIndex: chunks[0]?.index,
+        lastIndex: chunks[chunks.length - 1]?.index,
+        count: chunks.length,
+        serverOffset,
+        journalTotalBytes,
+      });
+      try {
+        await chrome.storage.local.remove([
+          `${JOURNAL_KEY_PREFIX}${mediaId}`,
+        ]);
+      } catch {}
+      return { ok: false, error: "sparse-chunks" };
+    }
+
+    remainingChunks = skipAlreadyUploadedChunks(chunks, serverOffset);
+    emit("upload_resume_chunks_skipped", {
+      mediaId,
+      serverOffset,
+      totalChunks: chunks.length,
+      remainingChunks: remainingChunks.length,
+    });
+  }
+
   try {
-    for (const { chunk } of chunks) {
+    for (const { chunk } of remainingChunks) {
       if (uploader.status === "aborted" || uploader.status === "error") break;
       await uploader.write(chunk);
     }

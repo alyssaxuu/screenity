@@ -63,6 +63,18 @@
     "message": "Görünüşe göre bu web sitesinin güvenlik ayarları, tarayıcı uzantılarının bu sayfada kameranızı veya mikrofonunuzu kullanmasını engelliyor. Bunlarla kayıt yapmak için başka bir sekmede kayda başlayın ve kayıt başladıktan sonra buraya geri dönün.",
     "description": "Modal description shown when the current page's Permissions-Policy header blocks browser extensions from using camera or microphone"
   },
+  "opfsLoadErrorTitle": {
+    "message": "Kaydınız yüklenemedi",
+    "description": "Modal title shown when the editor cannot read the recording file from the device's storage"
+  },
+  "opfsLoadErrorDescription": {
+    "message": "Görünüşe göre Screenity kaydı cihazınızın deposundan yükleyemedi. Silinmiş veya taşınmış olabilir. Bu sorun devam ederse, lütfen support@screenity.io adresinden bizimle iletişime geçin.",
+    "description": "Modal description shown when the editor cannot read the recording file from the device's storage"
+  },
+  "recordingWriterFailedToast": {
+    "message": "Depolama sorunu nedeniyle kayıt durdu. Kısmi kaydınız kaydedildi.",
+    "description": "Toast shown when the recording chunk writer fails mid-recording and the partial file is preserved"
+  },
   "allowCameraAccessButton": {
     "message": "Kamera erişimine izin ver",
     "description": "Kamera erişimine izin verme düğmesi"
@@ -358,6 +370,18 @@
   "sandboxProgressDescription": {
     "message": "Bu sekme açık kalmalıdır. Kaydınız hazır olduğunda güncellenecektir.",
     "description": "Kum havuzu sayfasındaki açıklama (kayıt / kaydediliyor)"
+  },
+  "sandboxFinalizingRecording": {
+    "message": "Kayıt sonlandırılıyor...",
+    "description": "Shown over the player when the editor is waiting for the recorder to finish flushing the recording to disk"
+  },
+  "sandboxToastReverted": {
+    "message": "Orijinaline geri alındı",
+    "description": "Toast confirmation shown when the user reverts edits to the original recording"
+  },
+  "sandboxToastSaved": {
+    "message": "Değişiklikler kaydedildi",
+    "description": "Toast confirmation shown when the user saves an edit operation"
   },
   "sandboxEditorMainTitle": {
     "message": "Editör",
@@ -1588,5 +1612,59 @@
   "cancelButton": {
     "message": "İptal",
     "description": "Generic cancel button label"
+  },
+  "editorStuckTitle": {
+    "message": "Kaydınız hâlâ hazırlanıyor…"
+  },
+  "editorStuckDescription": {
+    "message": "Screenity, kaydınızı yüklemekte normalden daha uzun sürüyor. Verileriniz hâlâ bu cihazda olabilir. Kurtarmayı deneyin veya kayıt geri gelmezse bizimle iletişime geçin."
+  },
+  "editorStuckTryRecover": {
+    "message": "Kurtarmayı deneyin"
+  },
+  "editorStuckGetHelp": {
+    "message": "Yardım alın"
+  },
+  "editorRecoveryFailedTitle": {
+    "message": "Kaydınız açılamadı"
+  },
+  "editorRecoveryFailedDescription": {
+    "message": "Kayıt düzenleyiciye yüklenirken bir sorun oluştu. Kaydınız hâlâ cihazınızda kayıtlı olabilir. Şimdi kurtarmayı deneyebilirsiniz."
+  },
+  "downloadGIFTooLongToast": {
+    "message": "GIF dışa aktarımı en fazla 30 saniyedir. Klibinizi kısaltıp tekrar deneyin."
+  },
+  "audioSilentToast": {
+    "message": "Ses algılanmadı. Mikrofonunuzu, sessize alma düğmesini veya ses cihazınızı kontrol edin."
+  },
+  "restartFailedToast": {
+    "message": "Kaydınız yeniden başlatılamadı. Durdurup yeniden başlatmayı deneyin."
+  },
+  "recordingFailedModalTitle": {
+    "message": "Kayıt başlatılamadı"
+  },
+  "recordingFailedModalDescription": {
+    "message": "Bir şey kaydın başlamasını engelledi. Lütfen tekrar deneyin. Sorun devam ederse support@screenity.io adresinden bize ulaşın."
+  },
+  "editAudioTooLargeTitle": {
+    "message": "Ses dosyası çok büyük"
+  },
+  "editAudioTooLargeDescription": {
+    "message": "Daha kısa bir ses klibi deneyin. Büyük dosyalar tarayıcıda işlenemez. Orijinal kaydınız güvendedir."
+  },
+  "restoreEmptyToast": {
+    "message": "Kurtarılabilir kayıt bulunamadı. Veriler silinmiş olabilir."
+  },
+  "restoreTimeoutToast": {
+    "message": "Kurtarma çok uzun sürüyor. Kaydınız güvende. Birazdan Kurtar düğmesine tekrar tıklayın."
+  },
+  "cameraUnavailableToast": {
+    "message": "Kamera bağlantısı kesildi. Ekran kaydı devam ediyor."
+  },
+  "downloadInterruptedLargeToast": {
+    "message": "İndirme kesintiye uğradı. Kayıt, otomatik olarak yeniden denenemeyecek kadar büyük. Düzenleyiciden tekrar kaydetmeyi deneyin."
+  },
+  "recordingCorruptToast": {
+    "message": "Bu kayıt oynatılamıyor. Dosya eksik veya bozuk olabilir. Kaydet menüsünden ham dosyayı indirmeyi deneyin."
   }
 }

@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useContext, useCallback } from "react";
 import * as AlertDialog from "@radix-ui/react-alert-dialog";
 
-// Context
 import { ContentStateContext } from "../../context/ContentState";
 
 const Modal = (props) => {
@@ -35,6 +34,19 @@ const Modal = (props) => {
       sideButton = false,
       sideButtonAction = () => {}
     ) => {
+      // Surface which error/info modal the user saw (title is i18n-resolved here).
+      try {
+        chrome.runtime
+          .sendMessage({
+            type: "diag-forward",
+            event: "sandbox-modal-open",
+            data: {
+              title: String(title || "").slice(0, 120),
+              description: String(description || "").slice(0, 240),
+            },
+          })
+          .catch(() => {});
+      } catch {}
       setTitle(title);
       setDescription(description);
       setButton1(button1);

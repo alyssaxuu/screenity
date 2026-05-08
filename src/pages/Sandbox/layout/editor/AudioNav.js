@@ -8,6 +8,7 @@ const AudioNav = () => {
   const [contentState, setContentState] = useContext(ContentStateContext);
 
   const handleCancel = () => {
+    contentState.cancelEditOp();
     setContentState((prev) => ({
       ...prev,
       mode: "player",
@@ -19,6 +20,12 @@ const AudioNav = () => {
   };
 
   const handleRevert = () => {
+    const prevSnap = {
+      blob: contentState.blob,
+      start: contentState.start,
+      end: contentState.end,
+      pendingAudio: contentState.pendingAudio,
+    };
     setContentState((prev) => ({
       ...prev,
       blob: contentState.originalBlob,
@@ -26,6 +33,12 @@ const AudioNav = () => {
       end: 1,
       pendingAudio: null,
     }));
+    contentState.openToast?.(
+      chrome.i18n.getMessage("sandboxToastReverted"),
+      () => {
+        setContentState((p) => ({ ...p, ...prevSnap }));
+      },
+    );
   };
 
   const saveChanges = async () => {
@@ -48,6 +61,10 @@ const AudioNav = () => {
     await contentState.waitForUpdatedBlob?.();
 
     contentState.clearBackup();
+    contentState.openToast?.(
+      chrome.i18n.getMessage("sandboxToastSaved"),
+      () => contentState.undo?.(),
+    );
   };
 
   return (
@@ -71,7 +88,6 @@ const AudioNav = () => {
           <button
             className="button simpleButton blackButton"
             onClick={handleCancel}
-            disabled={contentState.isFfmpegRunning}
           >
             {chrome.i18n.getMessage("sandboxEditorCancelButton")}
           </button>

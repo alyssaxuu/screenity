@@ -63,6 +63,18 @@
     "message": "此网站的安全设置阻止浏览器扩展在此页面上使用您的摄像头或麦克风。如需使用它们录制，请从另一个标签页开始录制，并在录制开始后切换回此处。",
     "description": "Modal description shown when the current page's Permissions-Policy header blocks browser extensions from using camera or microphone"
   },
+  "opfsLoadErrorTitle": {
+    "message": "无法加载您的录制内容",
+    "description": "Modal title shown when the editor cannot read the recording file from the device's storage"
+  },
+  "opfsLoadErrorDescription": {
+    "message": "Screenity 无法从您设备的存储中加载录制内容。它可能已被清除或移动。如果此问题持续存在，请通过 support@screenity.io 联系我们。",
+    "description": "Modal description shown when the editor cannot read the recording file from the device's storage"
+  },
+  "recordingWriterFailedToast": {
+    "message": "录制因存储问题停止。您的部分录制已保存。",
+    "description": "Toast shown when the recording chunk writer fails mid-recording and the partial file is preserved"
+  },
   "allowCameraAccessButton": {
     "message": "允许摄像头访问",
     "description": "Allow camera access button"
@@ -358,6 +370,18 @@
   "sandboxProgressDescription": {
     "message": "保持此选项卡打开。录制/保存完成后，它将更新。",
     "description": "Description in sandbox page while recording / saving"
+  },
+  "sandboxFinalizingRecording": {
+    "message": "正在完成录制...",
+    "description": "Shown over the player when the editor is waiting for the recorder to finish flushing the recording to disk"
+  },
+  "sandboxToastReverted": {
+    "message": "已还原为原始",
+    "description": "Toast confirmation shown when the user reverts edits to the original recording"
+  },
+  "sandboxToastSaved": {
+    "message": "已保存更改",
+    "description": "Toast confirmation shown when the user saves an edit operation"
   },
   "sandboxEditorMainTitle": {
     "message": "编辑器",
@@ -1584,5 +1608,62 @@
   "cancelButton": {
     "message": "取消",
     "description": "Generic cancel button label"
+  },
+  "editorStuckTitle": {
+    "message": "正在准备您的录制…"
+  },
+  "editorStuckDescription": {
+    "message": "Screenity 加载录制的时间比平时更长。您的数据可能仍保存在此设备上。请尝试恢复，如果仍无法加载，请与我们联系。"
+  },
+  "editorStuckTryRecover": {
+    "message": "尝试恢复"
+  },
+  "editorStuckGetHelp": {
+    "message": "获取帮助"
+  },
+  "editorRecoveryFailedTitle": {
+    "message": "无法打开您的录制"
+  },
+  "editorRecoveryFailedDescription": {
+    "message": "将录制加载到编辑器时出现问题。您的录制可能仍保存在设备上。您可以现在尝试恢复。"
+  },
+  "downloadGIFTooLongToast": {
+    "message": "GIF 导出最长为 30 秒。请裁剪您的片段后重试。"
+  },
+  "audioSilentToast": {
+    "message": "未检测到音频。请检查您的麦克风、静音开关或音频设备。"
+  },
+  "restartFailedToast": {
+    "message": "无法重新开始录制。请先停止再重新开始。"
+  },
+  "recordingFailedModalTitle": {
+    "message": "无法开始录制"
+  },
+  "recordingFailedModalDescription": {
+    "message": "录制未能开始。请重试。如果问题持续出现，请通过 support@screenity.io 与我们联系。"
+  },
+  "editAudioTooLargeTitle": {
+    "message": "音频文件过大"
+  },
+  "editAudioTooLargeDescription": {
+    "message": "请尝试更短的音频片段。过大的文件无法在浏览器中处理。您的原始录制不会受到影响。"
+  },
+  "restoreEmptyToast": {
+    "message": "未找到可恢复的录制。数据可能已被清除。"
+  },
+  "restoreTimeoutToast": {
+    "message": "恢复用时较长。您的录制是安全的。请稍候再次点击“恢复”。"
+  },
+  "cameraUnavailableToast": {
+    "message": "摄像头已断开。屏幕录制继续。"
+  },
+  "downloadInterruptedLargeToast": {
+    "message": "下载已中断。文件过大，无法自动重试。请从编辑器中重新保存。"
+  },
+  "recordingCorruptToast": {
+    "message": "此录制无法播放。文件可能不完整或已损坏。请从“保存”菜单下载原始文件。"
+  },
+  "stopRecording": {
+    "message": "停止录制"
   }
 }

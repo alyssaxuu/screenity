@@ -2,19 +2,19 @@ import "./styles/edit/_VideoPlayer.scss";
 import "./styles/global/_app.scss";
 
 import React, { useEffect, useRef, useContext } from "react";
-// Layout
 import Editor from "./layout/editor/Editor";
 import Player from "./layout/player/Player";
 import Modal from "./components/global/Modal";
+import Toast from "./components/global/Toast";
 
 import HelpButton from "./components/player/HelpButton";
 
-// Context
-import { ContentStateContext } from "./context/ContentState"; // Import the ContentState context
+import { ContentStateContext } from "./context/ContentState";
 import { diagForward } from "../utils/diagForward";
+import { perfMark } from "../utils/perfMarks";
 
 const Sandbox = () => {
-  const [contentState, setContentState] = useContext(ContentStateContext); // Access the ContentState context
+  const [contentState, setContentState] = useContext(ContentStateContext);
   const parentRef = useRef(null);
   const progress = useRef("");
 
@@ -42,16 +42,13 @@ const Sandbox = () => {
   useEffect(() => {
     if (!contentState.blob || !contentState.ffmpeg) return;
     if (contentState.frame) return;
-    // Frame extraction now works in fallback mode using Canvas API
     contentState.getFrame();
   }, [contentState.blob, contentState.ffmpeg]);
 
-  // Programmatically add custom scrollbars
   useEffect(() => {
     if (!parentRef) return;
     if (!parentRef.current) return;
 
-    // Check if on mac
     const isMac = navigator.platform.toUpperCase().indexOf("MAC") >= 0;
     if (isMac) return;
 
@@ -100,7 +97,6 @@ const Sandbox = () => {
   }, [contentState.chunkIndex, contentState.chunkCount]);
 
   useEffect(() => {
-    // Check if we need to show support banner
     chrome.runtime.sendMessage({ type: "check-banner-support" }, (response) => {
       if (response && response.bannerSupport) {
         setContentState((prev) => ({
@@ -111,35 +107,82 @@ const Sandbox = () => {
     });
   }, []);
 
-  // If editor was opened manually and we don't yet have a blob/ready state,
-  // proactively ask the background to send chunks to this sandbox tab.
+  // Editor opened without a blob/ready state: ask BG to send chunks.
+  // Retry because BG may be dormant on first wake, and a single dropped
+  // message would leave the editor stuck at "Preparing recording..." forever.
   useEffect(() => {
-    let requested = false;
-    if (requested) return; // guard
-    requested = true;
+    const RETRY_DELAYS_MS = [400, 2000, 6000, 14000];
+    let cancelled = false;
+    const timers = [];
 
-    const tryRequest = () => {
+    const tryRequest = async (attempt) => {
+      if (cancelled) return;
       try {
-        if (!contentState.blob && !contentState.ready) {
+        if (contentState.blob || contentState.ready) return;
+        // OPFS-backed: sandbox reads the file directly in makeVideoTab.
+        const { lastRecordingBackendRef } = await chrome.storage.local.get([
+          "lastRecordingBackendRef",
+        ]);
+        if (lastRecordingBackendRef?.backend === "opfs") {
           console.debug(
-            "[Screenity][Sandbox] requesting chunks from background (send-chunks-to-sandbox)",
+            "[Screenity][Sandbox] OPFS-backed recording; skipping SW chunk relay request",
           );
-          // Ask background to send chunks to this tab (background will
-          // determine the target tab or use this sender)
-          chrome.runtime.sendMessage(
-            { type: "send-chunks-to-sandbox" },
-            () => {},
-          );
+          return;
         }
+        console.debug(
+          "[Screenity][Sandbox] requesting chunks from background",
+          { attempt: attempt + 1 },
+        );
+        perfMark("Sandbox send-chunks-to-sandbox.requested", {
+          attempt: attempt + 1,
+        });
+        chrome.runtime.sendMessage(
+          { type: "send-chunks-to-sandbox" },
+          () => {},
+        );
       } catch (err) {}
     };
 
-    // Delay slightly to allow initial message listeners to be registered
-    const t = setTimeout(tryRequest, 400);
-    return () => clearTimeout(t);
+    perfMark("Sandbox boot");
+    RETRY_DELAYS_MS.forEach((ms, i) => {
+      timers.push(setTimeout(() => tryRequest(i), ms));
+    });
+
+    // Surface recovery modal if "Preparing recording..." sits 60s with no
+    // blob/ready/editorRecordingError; writing editorRecordingError reuses
+    // the ContentState consumer.
+    const STUCK_TIMEOUT_MS = 60_000;
+    const stuckTimer = setTimeout(() => {
+      try {
+        if (cancelled) return;
+        // editorRecordingError's own filter (ready=true → suppress) makes
+        // a stale write harmless if the editor already loaded.
+        chrome.runtime
+          .sendMessage({
+            type: "diag-forward",
+            event: "sandbox-stuck-timeout",
+            data: { afterMs: STUCK_TIMEOUT_MS },
+          })
+          .catch(() => {});
+        chrome.storage.local.set({
+          editorRecordingError: {
+            ts: Date.now(),
+            sandboxTab: null,
+            error: "editor-stuck",
+            why: chrome.i18n.getMessage("editorStuckDescription"),
+            errorCode: "EDITOR_STUCK_TIMEOUT",
+          },
+        });
+      } catch {}
+    }, STUCK_TIMEOUT_MS);
+    timers.push(stuckTimer);
+
+    return () => {
+      cancelled = true;
+      timers.forEach((t) => clearTimeout(t));
+    };
   }, []);
 
-  // Regenerate frame when entering crop mode to reflect current blob
   useEffect(() => {
     if (
       contentState.mode === "crop" &&
@@ -147,7 +190,7 @@ const Sandbox = () => {
       contentState.blob &&
       contentState.ffmpeg
     ) {
-      // Small delay to ensure state updates have propagated
+      // Let state updates propagate first.
       setTimeout(() => {
         contentState.getFrame();
       }, 50);
@@ -157,8 +200,8 @@ const Sandbox = () => {
   return (
     <div ref={parentRef}>
       <Modal />
+      <Toast />
       <video></video>
-      {/* Render the WaveformGenerator component and pass the ffmpeg instance as a prop */}
       {contentState.ffmpeg &&
         contentState.ready &&
         contentState.mode === "edit" && <Editor />}
@@ -200,10 +243,10 @@ const Sandbox = () => {
                     () => {
                       chrome.runtime.sendMessage({ type: "report-bug" });
                     },
-                    null, // image
-                    null, // learnMore
-                    null, // learnMoreLink
-                    false, // colorSafe
+                    null,
+                    null,
+                    null,
+                    false,
                     chrome.i18n.getMessage("getHelpButton"),
                     () => {
                       chrome.runtime.sendMessage({

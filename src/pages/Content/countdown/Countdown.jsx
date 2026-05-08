@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useContext, useRef } from "react";
 
-// Context
 import { contentStateContext } from "../context/ContentState";
+import { lifecycle } from "../../utils/lifecycleLog";
 
 const COUNTDOWN_TIME = 3;
 const DEBUG_START_FLOW =
@@ -82,7 +82,6 @@ const Countdown = () => {
     contentState.resetCountdown,
   ]);
 
-  // Handle cancellation
   const handleCancel = () => {
     if (contentState.countdownActive || contentState.isCountdownVisible) {
       cleanupTimers();
@@ -95,7 +94,6 @@ const Countdown = () => {
     }
   };
 
-  // Countdown logic
   useEffect(() => {
     if (!contentState.countdownActive) {
       cleanupTimers();
@@ -104,14 +102,18 @@ const Countdown = () => {
     }
 
     cleanupTimers();
-    // Reset immediately at run start so a stale previous `1` cannot
-    // short-circuit the next countdown cycle.
+    // Reset immediately so a stale previous `1` cannot short-circuit
+    // the next cycle.
     setCount(COUNTDOWN_TIME);
     completedRef.current = false;
     runIdRef.current += 1;
     const runId = runIdRef.current;
     startAtRef.current = performance.now();
     logStartFlow("countdown_start", { visible: true });
+    lifecycle("Content.Countdown", "ui-countdown-start", {
+      runId,
+      countdownTimeS: COUNTDOWN_TIME,
+    });
 
     const tick = () => {
       if (runIdRef.current !== runId) return;
@@ -141,8 +143,7 @@ const Countdown = () => {
       return;
     }
     const elapsedMs = performance.now() - startAtRef.current;
-    // Ignore stale count=1 carried from a previous run; valid final-second
-    // entry happens after ~2s for a 3..2..1 countdown.
+    // Ignore stale count=1 carried from a previous run.
     if (elapsedMs < (COUNTDOWN_TIME - 1) * 1000) {
       return;
     }
@@ -157,6 +158,9 @@ const Countdown = () => {
     }
 
     if (!cancelledRef.current && activeRef.current) {
+      lifecycle("Content.Countdown", "ui-end-hold-scheduled", {
+        endHoldMs: END_HOLD_MS,
+      });
       finishTimeoutRef.current = setTimeout(() => {
         if (cancelledRef.current || !activeRef.current) {
           finishTimeoutRef.current = null;
@@ -168,6 +172,7 @@ const Countdown = () => {
           countdownActive: false,
         }));
         const endedAt = Date.now();
+        lifecycle("Content.Countdown", "ui-end-hidden", { endedAt });
         const dispatchStartAfterHide = () => {
           if (cancelledRef.current) return;
           const startDispatchedAt = Date.now();
@@ -175,6 +180,11 @@ const Countdown = () => {
             visible: false,
             endedAt,
             startDispatchedAt,
+          });
+          lifecycle("Content.Countdown", "ui-dispatch-start", {
+            endedAt,
+            startDispatchedAt,
+            postHideDelayMs: startDispatchedAt - endedAt,
           });
           chrome.storage.local.set({
             countdownFinishedAt: endedAt,
@@ -187,13 +197,16 @@ const Countdown = () => {
             },
           });
           finishRef.current?.();
-          // Countdown-enabled flow should start from background only.
-          // Waiting briefly after hide avoids capturing the countdown frame.
+          // Brief wait after hide so the countdown frame isn't captured.
           startTimeoutRef.current = setTimeout(() => {
             if (cancelledRef.current) {
               startTimeoutRef.current = null;
               return;
             }
+            lifecycle("Content.Countdown", "ui-send-countdown-finished", {
+              endedAt,
+              ageMs: Date.now() - endedAt,
+            });
             chrome.runtime
               .sendMessage({
                 type: "countdown-finished",
@@ -215,7 +228,16 @@ const Countdown = () => {
     }
   }, [count, setContentState]);
 
-  // Start animation when countdown becomes visible
+  // Log every visible digit so UI ticks correlate with BG events.
+  useEffect(() => {
+    if (!contentState.isCountdownVisible) return;
+    if (!activeRef.current) return;
+    lifecycle("Content.Countdown", "ui-tick", {
+      count,
+      elapsedMs: Math.round(performance.now() - (startAtRef.current || 0)),
+    });
+  }, [count, contentState.isCountdownVisible]);
+
   useEffect(() => {
     if (contentState.isCountdownVisible && !wasVisibleRef.current) {
       resetRef.current?.();
@@ -251,7 +273,6 @@ const Countdown = () => {
     wasVisibleRef.current = contentState.isCountdownVisible;
   }, [contentState.isCountdownVisible]);
 
-  // Cleanup on unmount
   useEffect(() => {
     return cleanupTimers;
   }, []);

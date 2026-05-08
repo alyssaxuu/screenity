@@ -13,7 +13,12 @@ const BTN = {
 const BTN_RESET = { ...BTN, background: "rgba(200,50,50,0.7)" };
 const Z = 2147483647;
 
-const DevHUD = ({ setContentState, contentStateRef, lastDownloadInfo }) => {
+const DevHUD = ({
+  setContentState,
+  contentStateRef,
+  lastDownloadInfo,
+  lastRecordingBackend,
+}) => {
   const [collapsed, setCollapsed] = useState(true);
 
   if (collapsed) {
@@ -144,6 +149,24 @@ const DevHUD = ({ setContentState, contentStateRef, lastDownloadInfo }) => {
         })),
     },
     {
+      label: "Edit audio too large",
+      fn: () =>
+        setContentState((p) => ({
+          ...p,
+          editErrorType: "audio-too-large",
+          fallback: false,
+          mode: "audio",
+        })),
+    },
+    {
+      label: "Player loading (toggle)",
+      fn: () =>
+        setContentState((p) => ({
+          ...p,
+          playerLoading: !p.playerLoading,
+        })),
+    },
+    {
       label: "Offline",
       fn: () =>
         setContentState((p) => ({
@@ -215,6 +238,22 @@ const DevHUD = ({ setContentState, contentStateRef, lastDownloadInfo }) => {
           x
         </span>
       </div>
+      {lastRecordingBackend && (
+        <div
+          style={{
+            color: "#0ff",
+            fontSize: "9px",
+            background: "rgba(0,30,40,0.4)",
+            padding: "4px 6px",
+            borderRadius: "3px",
+            lineHeight: 1.4,
+            whiteSpace: "normal",
+          }}
+        >
+          <div>Recording backend</div>
+          <div style={{ color: "#8ff" }}>{lastRecordingBackend}</div>
+        </div>
+      )}
       {lastDownloadInfo && (
         <div
           style={{

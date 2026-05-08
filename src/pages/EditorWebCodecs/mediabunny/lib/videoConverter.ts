@@ -52,7 +52,7 @@ export class VideoConverter {
   async detectBestCodec(format: SupportedFormat): Promise<CodecInfo | null> {
     const outputFormat =
       format === "mp4"
-        ? new Mp4OutputFormat({ fastStart: "in-memory" })
+        ? new Mp4OutputFormat({ fastStart: false })
         : new WebMOutputFormat();
     const supportedCodecs = outputFormat.getSupportedVideoCodecs();
 
@@ -127,7 +127,7 @@ export class VideoConverter {
 
     const outputFormat =
       targetFormat === "mp4"
-        ? new Mp4OutputFormat({ fastStart: "in-memory" })
+        ? new Mp4OutputFormat({ fastStart: false })
         : new WebMOutputFormat();
 
     const target = new BufferTarget();

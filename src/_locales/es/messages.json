@@ -63,6 +63,18 @@
     "message": "Parece que la configuración de seguridad de este sitio web impide que las extensiones del navegador utilicen tu cámara o micrófono en esta página. Para grabar con ellos, inicia una grabación en otra pestaña y vuelve aquí una vez que comience.",
     "description": "Modal description shown when the current page's Permissions-Policy header blocks browser extensions from using camera or microphone"
   },
+  "opfsLoadErrorTitle": {
+    "message": "No se puede cargar tu grabación",
+    "description": "Modal title shown when the editor cannot read the recording file from the device's storage"
+  },
+  "opfsLoadErrorDescription": {
+    "message": "Parece que Screenity no pudo cargar la grabación desde el almacenamiento de tu dispositivo. Puede haber sido eliminada o movida. Si esto sigue ocurriendo, contáctanos en support@screenity.io.",
+    "description": "Modal description shown when the editor cannot read the recording file from the device's storage"
+  },
+  "recordingWriterFailedToast": {
+    "message": "Grabación detenida por un problema de almacenamiento. Tu grabación parcial se guardó.",
+    "description": "Toast shown when the recording chunk writer fails mid-recording and the partial file is preserved"
+  },
   "allowCameraAccessButton": {
     "message": "Permitir acceso a la cámara",
     "description": "Botón de permitir acceso a la cámara"
@@ -358,6 +370,18 @@
   "sandboxProgressDescription": {
     "message": "Deja esta pestaña abierta. Se actualizará con tu grabación cuando esté lista.",
     "description": "Descripción en la página de pruebas mientras se graba/guarda"
+  },
+  "sandboxFinalizingRecording": {
+    "message": "Finalizando grabación...",
+    "description": "Shown over the player when the editor is waiting for the recorder to finish flushing the recording to disk"
+  },
+  "sandboxToastReverted": {
+    "message": "Revertido al original",
+    "description": "Toast confirmation shown when the user reverts edits to the original recording"
+  },
+  "sandboxToastSaved": {
+    "message": "Cambios guardados",
+    "description": "Toast confirmation shown when the user saves an edit operation"
   },
   "sandboxEditorMainTitle": {
     "message": "Editor",
@@ -1588,5 +1612,59 @@
   "cancelButton": {
     "message": "Cancelar",
     "description": "Generic cancel button label"
+  },
+  "editorStuckTitle": {
+    "message": "Aún preparando tu grabación…"
+  },
+  "editorStuckDescription": {
+    "message": "Screenity está tardando más de lo habitual en cargar tu grabación. Tus datos podrían seguir en este dispositivo. Intenta recuperarla, o contáctanos si no aparece."
+  },
+  "editorStuckTryRecover": {
+    "message": "Intentar recuperar"
+  },
+  "editorStuckGetHelp": {
+    "message": "Obtener ayuda"
+  },
+  "editorRecoveryFailedTitle": {
+    "message": "No se pudo abrir tu grabación"
+  },
+  "editorRecoveryFailedDescription": {
+    "message": "Algo salió mal al cargar tu grabación en el editor. Puede que siga guardada en tu dispositivo. Puedes intentar recuperarla ahora."
+  },
+  "downloadGIFTooLongToast": {
+    "message": "La exportación a GIF tiene un límite de 30 segundos. Recorta tu clip e inténtalo de nuevo."
+  },
+  "audioSilentToast": {
+    "message": "No se detectó audio. Revisa tu micrófono, el botón de silencio o el dispositivo de audio."
+  },
+  "restartFailedToast": {
+    "message": "No se pudo reiniciar tu grabación. Detenla y vuelve a iniciarla."
+  },
+  "recordingFailedModalTitle": {
+    "message": "No se pudo iniciar la grabación"
+  },
+  "recordingFailedModalDescription": {
+    "message": "Algo impidió que la grabación se iniciara. Inténtalo de nuevo. Si sigue ocurriendo, escríbenos a support@screenity.io."
+  },
+  "editAudioTooLargeTitle": {
+    "message": "El archivo de audio es demasiado grande"
+  },
+  "editAudioTooLargeDescription": {
+    "message": "Prueba con un clip de audio más corto. Los archivos grandes no se pueden procesar en el navegador. Tu grabación original está a salvo."
+  },
+  "restoreEmptyToast": {
+    "message": "No se encontró ninguna grabación recuperable. Los datos pueden haberse borrado."
+  },
+  "restoreTimeoutToast": {
+    "message": "La recuperación está tardando demasiado. Tu grabación está a salvo. Vuelve a hacer clic en Recuperar en un momento."
+  },
+  "cameraUnavailableToast": {
+    "message": "Cámara desconectada. Se sigue grabando la pantalla."
+  },
+  "downloadInterruptedLargeToast": {
+    "message": "Descarga interrumpida. La grabación es demasiado grande para reintentarla automáticamente. Vuelve a guardarla desde el editor."
+  },
+  "recordingCorruptToast": {
+    "message": "Esta grabación no se puede reproducir. El archivo puede estar incompleto o dañado. Descarga el archivo original desde el menú Guardar."
   }
 }

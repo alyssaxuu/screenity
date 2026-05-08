@@ -5,12 +5,14 @@ import {
   messageDispatcher,
 } from "../../messaging/messageRouter";
 import { hydrateDiagnosticLog, diagEvent } from "../utils/diagnosticLog";
+import { initCountdownFallback } from "./recording/countdownFallback";
+import { initLifecycleObserver } from "./lifecycleObserver";
+import {
+  listSessionDirs,
+  destroySessionDir,
+} from "../CloudRecorder/recorderStorage/opfsKvStore";
 
-// Clear any storage flags that act as in-progress locks and could have been
-// left in a "true" state if the service worker was killed mid-operation.
-// Must run before any message handler or alarm handler has a chance to bail
-// out on a stale lock.  Storage reads/writes are fast enough that they
-// complete well before any queued event is dispatched to the worker.
+// Must run before any message/alarm handler can bail on a stale lock.
 const clearStaleLocks = async () => {
   try {
     const {
@@ -18,6 +20,9 @@ const clearStaleLocks = async () => {
       postStopEditorOpening,
       postStopEditorOpened,
       recording,
+      pendingRecording,
+      restarting,
+      recordingTab,
       multiMode,
       region,
     } = await chrome.storage.local.get([
@@ -25,6 +30,9 @@ const clearStaleLocks = async () => {
       "postStopEditorOpening",
       "postStopEditorOpened",
       "recording",
+      "pendingRecording",
+      "restarting",
+      "recordingTab",
       "multiMode",
       "region",
     ]);
@@ -32,15 +40,59 @@ const clearStaleLocks = async () => {
     const stale = {};
     if (sendingChunks) {
       stale.sendingChunks = false;
-      console.warn("[Screenity][BG] Stale lock found on startup: sendingChunks — clearing");
+      console.warn("[Screenity][BG] Stale lock found on startup: sendingChunks, clearing");
     }
     if (postStopEditorOpening) {
       stale.postStopEditorOpening = false;
-      console.warn("[Screenity][BG] Stale lock found on startup: postStopEditorOpening — clearing");
+      console.warn("[Screenity][BG] Stale lock found on startup: postStopEditorOpening, clearing");
     }
     if (postStopEditorOpened) {
       stale.postStopEditorOpened = false;
-      console.warn("[Screenity][BG] Stale lock found on startup: postStopEditorOpened — clearing");
+      console.warn("[Screenity][BG] Stale lock found on startup: postStopEditorOpened, clearing");
+    }
+
+    // SW died mid-dispatch or tab closed
+    if (recording || pendingRecording || restarting) {
+      let tabAlive = false;
+      if (recordingTab) {
+        try {
+          await new Promise((resolve) => {
+            chrome.tabs.get(recordingTab, (tab) => {
+              tabAlive = !chrome.runtime.lastError && Boolean(tab);
+              resolve();
+            });
+          });
+        } catch {
+          tabAlive = false;
+        }
+      }
+      if (!tabAlive) {
+        stale.recording = false;
+        stale.pendingRecording = false;
+        stale.restarting = false;
+        stale.recordingTab = null;
+        // stale stallLevel=1 from a prior crash would skip wake-aggressive next run
+        stale.recordingStallLevel = 0;
+        stale.firstChunkAt = null;
+        stale.lastChunkAt = null;
+        stale.customRegion = false;
+        stale.offscreen = false;
+        stale.memoryError = false;
+        // keep editorRecordingError + sandboxTab; the editor reads them on mount
+        // and onTabRemovedListener clears sandboxTab when the editor closes.
+        stale.backup = false;
+        stale.backupSetup = false;
+        stale.backupTab = null;
+        stale.paused = false;
+        stale.pausedAt = null;
+        stale.totalPausedMs = 0;
+        stale.tabRecordedID = null;
+        stale.recordingUiTabId = null;
+        console.warn(
+          "[Screenity][BG] Stale recording state on startup (no live recorderTab) - clearing",
+          { recording, pendingRecording, restarting, recordingTab },
+        );
+      }
     }
 
     if (multiMode && !recording) {
@@ -48,12 +100,12 @@ const clearStaleLocks = async () => {
       stale.multiSceneCount = 0;
       stale.multiProjectId = null;
       stale.multiLastSceneId = null;
-      console.warn("[Screenity][BG] Stale multi-mode state found on startup — clearing");
+      console.warn("[Screenity][BG] Stale multi-mode state found on startup, clearing");
     }
 
     if (region && !recording) {
       stale.region = false;
-      console.warn("[Screenity][BG] Stale region state found on startup — clearing");
+      console.warn("[Screenity][BG] Stale region state found on startup, clearing");
     }
 
     if (Object.keys(stale).length > 0) {
@@ -63,29 +115,122 @@ const clearStaleLocks = async () => {
         Object.keys(stale).join(", "),
       );
     }
+
+    // drain deferred logout-token-clear if its inline listener died with the SW
+    try {
+      const {
+        logoutPendingTokenClear,
+        recording,
+        pendingRecording,
+        stayLoggedOut,
+      } = await chrome.storage.local.get([
+        "logoutPendingTokenClear",
+        "recording",
+        "pendingRecording",
+        "stayLoggedOut",
+      ]);
+      if (
+        logoutPendingTokenClear &&
+        !recording &&
+        !pendingRecording
+      ) {
+        if (stayLoggedOut === true) {
+          await chrome.storage.local.remove([
+            "screenityToken",
+            "logoutPendingTokenClear",
+          ]);
+          console.info(
+            "[Screenity][BG] Drained deferred logout token-clear on startup",
+          );
+        } else {
+          // re-login during SW death; just clear the marker
+          await chrome.storage.local.remove(["logoutPendingTokenClear"]);
+        }
+      }
+    } catch {}
+
+    // setIcon persists across SW restarts; reconcile so a stuck red icon clears
+    try {
+      const { recording: finalRecording } = await chrome.storage.local.get([
+        "recording",
+      ]);
+      chrome.action.setIcon({
+        path: finalRecording
+          ? "assets/recording-logo.png"
+          : "assets/icon-34.png",
+      });
+    } catch (err) {
+      console.warn("[Screenity][BG] icon reconciliation failed:", err);
+    }
   } catch (err) {
     console.error("[Screenity][BG] Failed to clear stale startup locks:", err);
   }
 };
 
-// Event listeners must be registered synchronously at module evaluation time
-// so Chrome counts them for service worker keep-alive.
+// reaps cloud-chunks/ session dirs not referenced by any
+// cloudRecorderSession:* snapshot or the latest recorderSession.
+// without this, an SW kill mid-recording leaks chunks forever.
+const cleanupOrphanOpfsSessions = async () => {
+  try {
+    const dirs = await listSessionDirs();
+    if (!dirs.length) return;
+
+    const all = await new Promise((resolve) => {
+      try {
+        chrome.storage.local.get(null, (snap) => resolve(snap || {}));
+      } catch {
+        resolve({});
+      }
+    });
+
+    const liveIds = new Set();
+    if (all.recorderSession?.id) liveIds.add(all.recorderSession.id);
+    if (all.recorderSession?.opfsSessionId) {
+      liveIds.add(all.recorderSession.opfsSessionId);
+    }
+    for (const key of Object.keys(all)) {
+      if (!key.startsWith("cloudRecorderSession:")) continue;
+      const session = all[key];
+      if (session?.id) liveIds.add(session.id);
+      if (session?.opfsSessionId) liveIds.add(session.opfsSessionId);
+    }
+    // Upload journals can also reference a sessionId whose chunks may still
+    // be needed for resume, keep their dirs around.
+    for (const [key, value] of Object.entries(all)) {
+      if (!key.startsWith("uploadJournal-")) continue;
+      if (value?.sessionId) liveIds.add(value.sessionId);
+    }
+
+    const orphans = dirs.filter((id) => !liveIds.has(id));
+    if (!orphans.length) return;
+
+    await Promise.allSettled(orphans.map((id) => destroySessionDir(id)));
+    console.info(
+      "[Screenity][BG] Reaped orphan OPFS cloud-chunks sessions:",
+      orphans.length,
+    );
+  } catch (err) {
+    console.warn(
+      "[Screenity][BG] cleanupOrphanOpfsSessions failed:",
+      err,
+    );
+  }
+};
+
+// listeners must register synchronously at module eval so Chrome counts them for SW keep-alive
 messageRouter();
 initializeListeners();
 setupHandlers();
+initCountdownFallback();
+initLifecycleObserver();
 
-// Fire-and-forget: clears stale locks from a previous crashed session.
-// Runs after listener registration (required synchronous) but before Chrome
-// can dispatch any queued events to this worker.
+// runs after listener registration, before queued events dispatch
 clearStaleLocks();
+cleanupOrphanOpfsSessions();
 
-// One-time migration for users upgrading from 4.3.7. The finalize-hang bug on
-// abrupt stream end caused sticky-disable to fire for many WebCodecs users;
-// the underlying cause is fixed in this release (fragmented MP4 + streaming),
-// so the sticky flags are no longer warranted and should be cleared once so
-// affected users get WebCodecs again on their next recording. The user's
-// explicit opt-out (useWebCodecsRecorder === false) is preserved.
-const CURRENT_MIGRATION_VERSION = "4.3.9";
+// 4.3.7 finalize-hang bug sticky-disabled WebCodecs for many users; clear once.
+// User's explicit opt-out (useWebCodecsRecorder === false) is preserved by overwrite anyway.
+const CURRENT_MIGRATION_VERSION = "4.3.9-clearStickyTransient3";
 const runUpgradeMigrations = async () => {
   try {
     const { screenityMigratedForVersion } = await chrome.storage.local.get([
@@ -103,6 +248,7 @@ const runUpgradeMigrations = async () => {
       "lastWebCodecsFailureAt",
       "lastWebCodecsFailureCode",
       "lastFailedValidation",
+      "useWebCodecsRecorder",
     ]);
     await chrome.storage.local.set({
       screenityMigratedForVersion: CURRENT_MIGRATION_VERSION,
@@ -116,7 +262,42 @@ const runUpgradeMigrations = async () => {
 };
 runUpgradeMigrations();
 
-// Hydrate the diagnostic log from storage and record that the SW (re)started.
-hydrateDiagnosticLog().then(() => {
-  diagEvent("sw-init", { ts: Date.now() });
+// records whether a recording was active when the previous SW shut down
+hydrateDiagnosticLog().then(async () => {
+  let priorState = null;
+  try {
+    const snap = await chrome.storage.local.get([
+      "recording",
+      "pendingRecording",
+      "recordingTab",
+      "recordingStartTime",
+      "swLastSeenAt",
+    ]);
+    priorState = {
+      recording: !!snap.recording,
+      pendingRecording: !!snap.pendingRecording,
+      hadRecordingTab: snap.recordingTab != null,
+      msSinceLastBeat:
+        typeof snap.swLastSeenAt === "number"
+          ? Date.now() - snap.swLastSeenAt
+          : null,
+      msSinceRecordingStart:
+        typeof snap.recordingStartTime === "number"
+          ? Date.now() - snap.recordingStartTime
+          : null,
+    };
+  } catch {}
+  diagEvent("sw-init", { ts: Date.now(), priorState });
 });
+
+// alarms (not setInterval) so the SW can idle-evict between ticks
+try {
+  chrome.storage.local.set({ swLastSeenAt: Date.now() }).catch(() => {});
+  chrome.alarms.create("sw-heartbeat", {
+    periodInMinutes: 1,
+  });
+  chrome.alarms.onAlarm.addListener((alarm) => {
+    if (alarm?.name !== "sw-heartbeat") return;
+    chrome.storage.local.set({ swLastSeenAt: Date.now() }).catch(() => {});
+  });
+} catch {}

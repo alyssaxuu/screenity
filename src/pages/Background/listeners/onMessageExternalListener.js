@@ -6,6 +6,7 @@ import {
   clearEditorTabReference,
 } from "../tabManagement";
 import { loginWithWebsite } from "../auth/loginWithWebsite";
+import { handleFinishMultiRecording } from "../messaging/handlers";
 
 const CLOUD_FEATURES_ENABLED =
   process.env.SCREENITY_ENABLE_CLOUD_FEATURES === "true";
@@ -16,8 +17,6 @@ export const onMessageExternalListener = () => {
   chrome.runtime.onMessageExternal.addListener(
     async (message, sender, sendResponse) => {
       if (message.type === "AUTH_SUCCESS" && message.token) {
-        // User explicitly chose to stay logged out — ignore incoming tokens
-        // until they initiate a login themselves.
         const { stayLoggedOut } = await chrome.storage.local.get([
           "stayLoggedOut",
         ]);
@@ -34,6 +33,8 @@ export const onMessageExternalListener = () => {
           onboarding: false,
           showProSplash: false,
         });
+        // otherwise the drain listener clobbers this fresh token on next recording-end
+        await chrome.storage.local.remove(["logoutPendingTokenClear"]);
 
         const auth = await loginWithWebsite();
 
@@ -64,12 +65,11 @@ export const onMessageExternalListener = () => {
           sendMessageTab(originalTabId, { type: "LOGIN_SUCCESS" });
 
           if (sender.tab?.id) {
-            chrome.tabs.remove(sender.tab.id); // Close login tab
+            chrome.tabs.remove(sender.tab.id);
           }
 
           await chrome.storage.local.remove("originalTabId");
 
-          // Message tab to update from storage
           sendMessageTab(originalTabId, {
             type: "check-auth",
             senderId: sender.tab.id,
@@ -78,7 +78,6 @@ export const onMessageExternalListener = () => {
 
         return true;
       } else if (message.type === "SIGN_OUT") {
-        // Clear all auth-related storage
         await chrome.storage.local.remove([
           "screenityToken",
           "screenityUser",
@@ -172,6 +171,13 @@ export const onMessageExternalListener = () => {
       } else if (message.type === "PING_FROM_WEBAPP") {
         sendResponse({ success: true, message: "pong" });
 
+        return true;
+      } else if (message.type === "FINISH_MULTI_RECORDING") {
+        // Same logic as clicking the popup's Finish button. Used by
+        // web-app "I'm done adding scenes" flows and by e2e tests where
+        // we can't drive the popup UI directly.
+        await handleFinishMultiRecording();
+        sendResponse({ success: true });
         return true;
       }
     }

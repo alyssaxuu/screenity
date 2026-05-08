@@ -63,6 +63,18 @@
     "message": "Схоже, налаштування безпеки цього сайту не дозволяють розширенням браузера використовувати камеру або мікрофон на цій сторінці. Щоб записувати з ними, почніть запис в іншій вкладці та поверніться сюди після її початку.",
     "description": "Modal description shown when the current page's Permissions-Policy header blocks browser extensions from using camera or microphone"
   },
+  "opfsLoadErrorTitle": {
+    "message": "Не вдалося завантажити запис",
+    "description": "Modal title shown when the editor cannot read the recording file from the device's storage"
+  },
+  "opfsLoadErrorDescription": {
+    "message": "Схоже, Screenity не зміг завантажити запис зі сховища вашого пристрою. Можливо, його було очищено або переміщено. Якщо це повторюється, зв'яжіться з нами за адресою support@screenity.io.",
+    "description": "Modal description shown when the editor cannot read the recording file from the device's storage"
+  },
+  "recordingWriterFailedToast": {
+    "message": "Запис зупинено через проблему зі сховищем. Частковий запис збережено.",
+    "description": "Toast shown when the recording chunk writer fails mid-recording and the partial file is preserved"
+  },
   "allowCameraAccessButton": {
     "message": "Дозволити доступ до камери",
     "description": "Allow camera access button"
@@ -358,6 +370,18 @@
   "sandboxProgressDescription": {
     "message": "Залиште цю вкладку відкритою. Вона оновиться з вашим записом, коли він буде готовий.",
     "description": "Description in sandbox page while recording / saving"
+  },
+  "sandboxFinalizingRecording": {
+    "message": "Завершення запису...",
+    "description": "Shown over the player when the editor is waiting for the recorder to finish flushing the recording to disk"
+  },
+  "sandboxToastReverted": {
+    "message": "Повернуто до оригіналу",
+    "description": "Toast confirmation shown when the user reverts edits to the original recording"
+  },
+  "sandboxToastSaved": {
+    "message": "Зміни збережено",
+    "description": "Toast confirmation shown when the user saves an edit operation"
   },
   "sandboxEditorMainTitle": {
     "message": "Редактор",
@@ -1580,5 +1604,65 @@
   "cancelButton": {
     "message": "Скасувати",
     "description": "Generic cancel button label"
+  },
+  "editorStuckTitle": {
+    "message": "Запис ще готується…"
+  },
+  "editorStuckDescription": {
+    "message": "Screenity завантажує ваш запис довше, ніж зазвичай. Можливо, ваші дані ще зберігаються на цьому пристрої. Спробуйте відновити запис або зв'яжіться з нами, якщо він не повернеться."
+  },
+  "editorStuckTryRecover": {
+    "message": "Спробувати відновити"
+  },
+  "editorStuckGetHelp": {
+    "message": "Отримати допомогу"
+  },
+  "editorRecoveryFailedTitle": {
+    "message": "Не вдалося відкрити запис"
+  },
+  "editorRecoveryFailedDescription": {
+    "message": "Під час завантаження запису в редактор сталася помилка. Можливо, ваш запис ще збережено на пристрої. Ви можете спробувати відновити його зараз."
+  },
+  "downloadGIFTooLongToast": {
+    "message": "Експорт у GIF обмежено 30 секундами. Обріжте кліп і спробуйте знову."
+  },
+  "audioSilentToast": {
+    "message": "Звук не виявлено. Перевірте мікрофон, перемикач вимкнення звуку або аудіопристрій."
+  },
+  "restartFailedToast": {
+    "message": "Не вдалося перезапустити запис. Зупиніть його та почніть знову."
+  },
+  "recordingFailedModalTitle": {
+    "message": "Не вдалося розпочати запис"
+  },
+  "recordingFailedModalDescription": {
+    "message": "Щось завадило розпочати запис. Будь ласка, спробуйте ще раз. Якщо це повторюється, напишіть нам на support@screenity.io."
+  },
+  "editAudioTooLargeTitle": {
+    "message": "Аудіофайл завеликий"
+  },
+  "editAudioTooLargeDescription": {
+    "message": "Спробуйте коротший аудіокліп. Великі файли неможливо обробити в браузері. Ваш оригінальний запис у безпеці."
+  },
+  "restoreEmptyToast": {
+    "message": "Запису для відновлення не знайдено. Можливо, дані було очищено."
+  },
+  "restoreTimeoutToast": {
+    "message": "Відновлення триває надто довго. Ваш запис у безпеці. За мить натисніть Відновити знову."
+  },
+  "cameraUnavailableToast": {
+    "message": "Камеру відключено. Запис екрана триває."
+  },
+  "downloadInterruptedLargeToast": {
+    "message": "Завантаження перервано. Запис завеликий, щоб повторити автоматично. Спробуйте зберегти його знову з редактора."
+  },
+  "recordingCorruptToast": {
+    "message": "Цей запис неможливо відтворити. Файл може бути неповним або пошкодженим. Спробуйте завантажити вихідний файл через меню Зберегти."
+  },
+  "hostBannerTitle": {
+    "message": "Подобається Screenity? Підтримайте подальший розвиток!"
+  },
+  "hostBannerDescription": {
+    "message": "Screenity створює один інді-розробник. Самостійний хостинг безкоштовний, але якщо програма вам корисна, підтримайте її через Pro ❤️"
   }
 }

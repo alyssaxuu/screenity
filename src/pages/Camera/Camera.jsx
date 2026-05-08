@@ -34,22 +34,18 @@ const Camera = () => {
     setIsCameraMode,
   } = useCameraContext();
 
-  // Helper function to update loading states
   const updateLoadingState = (key, value) => {
     setLoadingStates((prev) => ({ ...prev, [key]: value }));
   };
 
-  // Calculate if anything is still loading
   const isLoading = Object.values(loadingStates).some((state) => state);
 
-  // Ensure the offScreenCanvas is created exactly once
   useEffect(() => {
     if (!offScreenCanvasRef.current) {
       offScreenCanvasRef.current = document.createElement("canvas");
     }
   }, []);
 
-  // Initialize message listener
   useEffect(() => {
     setupHandlers({
       setLoading: updateLoadingState,
@@ -87,11 +83,28 @@ const Camera = () => {
     }
   }, [backgroundEffects, isModelLoaded]);
 
+  // 30s ceiling on modelLoading; clears the spinner so the camera feed
+  // shows even if CameraContext's inner GPU+CPU timeouts race past.
   useEffect(() => {
+    if (!loadingStates.modelLoading) return;
+    const id = setTimeout(() => {
+      console.warn(
+        "[Screenity] modelLoading hard-capped at 30s; clearing spinner",
+      );
+      try {
+        chrome.runtime.sendMessage({
+          type: "diag-forward",
+          event: "recorder-camera-modelloading-hard-cap",
+        });
+      } catch {}
+      updateLoadingState("modelLoading", false);
+    }, 30000);
+    return () => clearTimeout(id);
+  }, [loadingStates.modelLoading]);
+
+  const acquireStream = () => {
     if (!videoRef.current || streamRef.current?.active) return;
-
     updateLoadingState("videoElement", true);
-
     chrome.storage.local.get(["defaultVideoInput"], (result) => {
       const constraints =
         result.defaultVideoInput !== "none"
@@ -110,12 +123,75 @@ const Camera = () => {
         }
       );
     });
-  }, [videoRef.current]); // Will run once when videoRef is set
+  };
 
-  // After the camera stream is ready, check if we should re-enter PiP.
-  // This handles the case where the user navigated while recording a monitor —
-  // the old PiP was destroyed with the old page, so we need to re-enter it
-  // once the new camera iframe has a live stream.
+  useEffect(() => {
+    // Acquire the stream only when camera is enabled AND a recording is
+    // pending or active. Mounting alone must not trigger getUserMedia.
+    chrome.storage.local.get(
+      ["recording", "pendingRecording", "cameraActive"],
+      (result) => {
+        if (
+          result.cameraActive &&
+          (result.recording || result.pendingRecording)
+        ) {
+          acquireStream();
+        }
+      },
+    );
+  }, [videoRef.current]);
+
+  // Release the camera light when no recording is active. The iframe stays
+  // mounted to cache OS permissions, but holding getUserMedia keeps the
+  // camera indicator on with no visible UI.
+  useEffect(() => {
+    let inflightAcquire = false;
+    const evaluate = async () => {
+      const { recording, pendingRecording, cameraActive } =
+        await chrome.storage.local.get([
+          "recording",
+          "pendingRecording",
+          "cameraActive",
+        ]);
+      // Hold the stream only when cameraActive AND a recording is
+      // active/pending. Without the gate, tab recordings without camera
+      // would re-acquire and surface camera-denied errors.
+      const wantStream = Boolean(
+        cameraActive && (recording || pendingRecording),
+      );
+      const hasStream = Boolean(streamRef.current?.active);
+      if (!wantStream && hasStream) {
+        stopCameraStream(streamRef, videoRef);
+      } else if (wantStream && !hasStream && !inflightAcquire) {
+        inflightAcquire = true;
+        try {
+          acquireStream();
+        } finally {
+          // getCameraStream's onFinish flips loading off async; the
+          // boolean flag here is just a re-entry guard, not a true lock.
+          setTimeout(() => {
+            inflightAcquire = false;
+          }, 500);
+        }
+      }
+    };
+    const listener = (changes, area) => {
+      if (area !== "local") return;
+      if (
+        "recording" in changes ||
+        "pendingRecording" in changes ||
+        "cameraActive" in changes
+      ) {
+        evaluate();
+      }
+    };
+    chrome.storage.onChanged.addListener(listener);
+    return () => chrome.storage.onChanged.removeListener(listener);
+  }, []);
+
+  // re-enter PiP if needed after camera stream is ready. user navigated while
+  // recording a monitor, old PiP was destroyed with old page, re-enter once the
+  // new camera iframe has a live stream.
   useEffect(() => {
     if (!videoRef.current || !streamRef.current?.active) return;
 
@@ -129,7 +205,6 @@ const Camera = () => {
     );
   }, [videoRef.current, streamRef.current?.active]);
 
-  // Handle PiP events
   const handleEnterPip = () => {
     setPipMode(true);
     chrome.runtime.sendMessage({ type: "pip-started" });

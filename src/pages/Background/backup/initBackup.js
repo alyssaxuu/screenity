@@ -14,16 +14,30 @@ export const initBackup = async (request, id) => {
       },
       (tab) => {
         chrome.storage.local.set({ backupTab: tab.id });
-        chrome.tabs.onUpdated.addListener(function listener(tabId, changeInfo) {
+        let settled = false;
+        const safetyId = setTimeout(() => {
+          if (settled) return;
+          settled = true;
+          chrome.tabs.onUpdated.removeListener(listener);
+          console.warn(
+            "[Screenity][BG] backup tab load timed out",
+            tab.id,
+          );
+        }, 30000);
+        function listener(tabId, changeInfo) {
           if (tabId === tab.id && changeInfo.status === "complete") {
+            if (settled) return;
+            settled = true;
+            clearTimeout(safetyId);
+            chrome.tabs.onUpdated.removeListener(listener);
             sendMessageTab(tab.id, {
               type: "init-backup",
               request: request,
               tabId: id,
             });
-            chrome.tabs.onUpdated.removeListener(listener);
           }
-        });
+        }
+        chrome.tabs.onUpdated.addListener(listener);
       }
     );
   };

@@ -6,11 +6,35 @@ export function startClickTracking(
   regionY = 0,
   contentStateRef = null // <- optional
 ) {
-  const handleClick = async (e) => {
-    // Skip if blur mode is active
+  // Refreshed on storage change: a restart can swap recordingType
+  // (camera ↔ screen) and we'd otherwise dispatch against the prior mode.
+  let cachedSurface = "unknown";
+  let cachedRecordingWindowId = null;
+  let cachedRecordingType = null;
+  chrome.storage.local
+    .get(["surface", "recordingWindowId", "recordingType"])
+    .then((vals) => {
+      cachedSurface = vals.surface || "unknown";
+      cachedRecordingWindowId = vals.recordingWindowId ?? null;
+      cachedRecordingType = vals.recordingType ?? null;
+    })
+    .catch(() => {});
+
+  const onStorageChanged = (changes, area) => {
+    if (area !== "local") return;
+    if (changes.surface) cachedSurface = changes.surface.newValue || "unknown";
+    if (changes.recordingWindowId)
+      cachedRecordingWindowId = changes.recordingWindowId.newValue ?? null;
+    if (changes.recordingType)
+      cachedRecordingType = changes.recordingType.newValue ?? null;
+  };
+  try {
+    chrome.storage.onChanged.addListener(onStorageChanged);
+  } catch {}
+
+  const handleClick = (e) => {
     if (contentStateRef?.current?.blurMode) return;
 
-    // Ignore clicks inside the toolbar
     if (
       e.target.closest(".ToolbarRoot") ||
       e.target.closest(".ToolbarRecordingControls") ||
@@ -27,14 +51,7 @@ export function startClickTracking(
       return;
     }
 
-    const { surface, recordingWindowId, recordingType } =
-      await chrome.storage.local.get([
-        "surface",
-        "recordingWindowId",
-        "recordingType",
-      ]);
-
-    if (recordingType === "camera") {
+    if (cachedRecordingType === "camera") {
       return;
     }
 
@@ -42,7 +59,6 @@ export function startClickTracking(
     let clickY = e.clientY;
 
     if (isRegion) {
-      // Check if click is inside region bounds
       const inRegion =
         clickX >= regionX &&
         clickX <= regionX + regionWidth &&
@@ -53,7 +69,6 @@ export function startClickTracking(
         return;
       }
 
-      // Normalize to region-relative coordinates
       clickX = clickX - regionX;
       clickY = clickY - regionY;
     }
@@ -64,15 +79,20 @@ export function startClickTracking(
         x: clickX,
         y: clickY,
         relativeToRegion: isRegion,
-        surface: surface || "unknown",
-        recordingWindowId,
+        surface: cachedSurface,
+        recordingWindowId: cachedRecordingWindowId,
         timestamp: Date.now(),
         region: isRegion,
-        isTab: recordingType === "region",
+        isTab: cachedRecordingType === "region",
       },
     });
   };
 
   window.addEventListener("mousedown", handleClick, true);
-  return () => window.removeEventListener("mousedown", handleClick, true);
+  return () => {
+    window.removeEventListener("mousedown", handleClick, true);
+    try {
+      chrome.storage.onChanged.removeListener(onStorageChanged);
+    } catch {}
+  };
 }

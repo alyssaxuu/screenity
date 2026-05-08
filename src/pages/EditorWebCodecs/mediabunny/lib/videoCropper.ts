@@ -66,12 +66,15 @@ export class VideoCropper {
     const originalWidth = videoTrack.displayWidth;
     const originalHeight = videoTrack.displayHeight;
 
-    if (left + width > originalWidth || top + height > originalHeight) {
-      const clampedWidth = Math.min(width, originalWidth - left);
-      const clampedHeight = Math.min(height, originalHeight - top);
-      options.width = clampedWidth;
-      options.height = clampedHeight;
-    }
+    let cropWidth = width;
+    let cropHeight = height;
+    if (left + cropWidth > originalWidth) cropWidth = originalWidth - left;
+    if (top + cropHeight > originalHeight) cropHeight = originalHeight - top;
+    // H.264/HEVC require even dimensions.
+    cropWidth = Math.max(2, cropWidth - (cropWidth % 2));
+    cropHeight = Math.max(2, cropHeight - (cropHeight % 2));
+    options.width = cropWidth;
+    options.height = cropHeight;
 
     let format: OutputFormat;
     const targetFormat =
@@ -80,7 +83,7 @@ export class VideoCropper {
 
     format =
       targetFormat === "mp4"
-        ? new Mp4OutputFormat({ fastStart: "in-memory" })
+        ? new Mp4OutputFormat({ fastStart: false })
         : new WebMOutputFormat();
 
     const target = new BufferTarget();
@@ -90,7 +93,7 @@ export class VideoCropper {
       input,
       output,
       video: {
-        crop: { left, top, width, height },
+        crop: { left, top, width: cropWidth, height: cropHeight },
         ...(videoBitrate && { bitrate: videoBitrate }),
       },
       ...(audioBitrate && { audio: { bitrate: audioBitrate } }),

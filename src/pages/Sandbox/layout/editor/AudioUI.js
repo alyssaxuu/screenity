@@ -1,21 +1,18 @@
 import React, { useState, useEffect, useContext, useRef } from "react";
 import styles from "../../styles/player/_RightPanel.module.scss";
 
-// Components
 import Dropdown from "../../components/editor/Dropdown";
 import * as Slider from "@radix-ui/react-slider";
 import Switch from "../../components/editor/Switch";
 
-// Icons
 const URL = "/assets/";
 
 import { ReactSVG } from "react-svg";
 
-// Context
-import { ContentStateContext } from "../../context/ContentState"; // Import the ContentState context
+import { ContentStateContext } from "../../context/ContentState";
 
 const AudioUI = (props) => {
-  const [contentState, setContentState] = useContext(ContentStateContext); // Access the ContentState context
+  const [contentState, setContentState] = useContext(ContentStateContext);
   const [audio, setAudio] = useState(null);
   const prevBlob = useRef(null);
   const inputRef = useRef(null);
@@ -33,15 +30,13 @@ const AudioUI = (props) => {
 
   const handleAudio = async (e) => {
     const file = e.target.files[0];
-    // Check if the file is an audio file
     if (!file.type.includes("audio") || file.size === 0) {
       return;
     }
 
-    // Use rawBlob (webm from recovery) if blob (mp4) is not available yet
+    // Fall back to rawBlob (webm from recovery) if mp4 blob isn't ready.
     const videoBlob =
       contentState.blob || contentState.rawBlob || contentState.webm;
-    //contentState.addAudio(videoBlob, file, contentState.volume);
     setAudio(file);
     setContentState((prev) => ({
       ...prev,
@@ -69,6 +64,29 @@ const AudioUI = (props) => {
 
   return (
     <div>
+      {contentState.editErrorType === "audio-too-large" && (
+        <div className={styles.alert}>
+          <div className={styles.buttonLeft}>
+            <ReactSVG src={URL + "editor/icons/alert.svg"} />
+          </div>
+          <div className={styles.buttonMiddle}>
+            <div className={styles.buttonTitle}>
+              {chrome.i18n.getMessage("editAudioTooLargeTitle")}
+            </div>
+            <div className={styles.buttonDescription}>
+              {chrome.i18n.getMessage("editAudioTooLargeDescription")}
+            </div>
+          </div>
+          <div
+            className={styles.buttonRight}
+            onClick={() =>
+              setContentState((prev) => ({ ...prev, editErrorType: null }))
+            }
+          >
+            {chrome.i18n.getMessage("permissionsModalDismiss")}
+          </div>
+        </div>
+      )}
       <div className={styles.section}>
         <div className={styles.sectionTitle}>Audio upload</div>
         <input
@@ -150,7 +168,6 @@ const AudioUI = (props) => {
             onValueChange={(newValue) => {
               setContentState((prevContentState) => ({
                 ...prevContentState,
-                // Round to the nearest integer
                 volume: Math.round(newValue) / 100,
               }));
             }}
@@ -163,13 +180,6 @@ const AudioUI = (props) => {
           </Slider.Root>
         </div>
         <Switch />
-        {/* <button
-          className={["button", "primaryButton", styles.updateButton].join(" ")}
-          onClick={updateAudio}
-          disabled={contentState.isFfmpegRunning || !audio}
-        >
-          {chrome.i18n.getMessage("sandboxAudioUpdateButton")}
-        </button> */}
       </div>
     </div>
   );

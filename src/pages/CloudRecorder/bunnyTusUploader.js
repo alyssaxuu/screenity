@@ -56,7 +56,7 @@ export async function getThumbnailFromBlob(blob, seekTo = 0.1) {
 
 export default class BunnyTusUploader {
   constructor(options = {}) {
-    this.CHUNK_SIZE = options.chunkSize || 512 * 1024; // 512KB default
+    this.CHUNK_SIZE = options.chunkSize || 512 * 1024;
     this.MAX_RETRIES = options.maxRetries || 5;
     this.RETRY_DELAY = options.retryDelay || 1000;
     this.UPLOAD_TIMEOUT_MS = options.uploadTimeoutMs || 20000;
@@ -69,6 +69,13 @@ export default class BunnyTusUploader {
     this.onTelemetry = options.onTelemetry || null;
     this.onStateChange = options.onStateChange || null;
     this.trackType = options.trackType || null;
+    // Container declared in TUS Upload-Metadata. Defaults to webm for
+    // back-compat with pre-WebCodecs callers; cloud's WebCodecs path
+    // overrides to "video/mp4" for screen + camera tracks. Audio always
+    // stays on webm.
+    this.container = options.container || "video/webm";
+    this.codec = options.codec || null;
+    this.encoderKind = options.encoderKind || null;
 
     this.totalBytes = 0;
     this.uploadUrl = null;
@@ -94,7 +101,7 @@ export default class BunnyTusUploader {
     this.isProcessingQueue = false;
     this.queueProcessingPromise = null;
     this.queuedBytes = 0;
-    this._hasExtractedMeta = true; // Skip in-flight thumbnail extraction to avoid timeouts/noise
+    this._hasExtractedMeta = true;
     this.sessionId = options.sessionId || null;
     this.journalKey = null;
     this.journalLookupKey = null;
@@ -120,6 +127,11 @@ export default class BunnyTusUploader {
     this.hasEmittedFirstByte = false;
     this.lastProgressEventAt = 0;
     this.initializedFromResume = false;
+    // Bytes from write() calls that arrived after finalize() locked us
+    // out. Tracked so finalize() can refuse to mark the upload completed
+    // instead of silently truncating; the throw inside write() is
+    // unobserved because MediaRecorder.ondataavailable is fire-and-forget.
+    this.bytesLostAfterFinalize = 0;
   }
 
   debugLog(message, payload = null) {
@@ -138,7 +150,7 @@ export default class BunnyTusUploader {
   emitTelemetry(event, payload = {}) {
     if (typeof this.onTelemetry !== "function") return;
     try {
-      this.onTelemetry(event, {
+      const body = {
         projectId: this.projectId || null,
         sceneId: this.sceneId || null,
         recordingSessionId: this.sessionId || null,
@@ -150,11 +162,25 @@ export default class BunnyTusUploader {
         offset: this.offset || 0,
         totalBytes: this.totalBytes || 0,
         queuedBytes: this.queuedBytes || 0,
+        codec: this.codec || null,
+        container: this.container || null,
+        encoderKind: this.encoderKind || null,
         ...payload,
-      });
+      };
+      this.onTelemetry(event, body);
     } catch (err) {
       console.warn("Upload telemetry callback failed:", err);
     }
+  }
+
+  // The encoder's emitted codec can differ from what was requested at
+  // construction (HW encoders re-derive profile/level from the SPS).
+  // Call after the first chunk so telemetry and /bunny/save-upload-meta
+  // carry the actual values.
+  updateEncoderInfo({ codec, container, encoderKind } = {}) {
+    if (typeof codec === "string" && codec) this.codec = codec;
+    if (typeof container === "string" && container) this.container = container;
+    if (typeof encoderKind === "string" && encoderKind) this.encoderKind = encoderKind;
   }
 
   notifyStateChange(reason = null, extra = {}) {
@@ -175,6 +201,8 @@ export default class BunnyTusUploader {
     this.error = errorCode || err?.message || "upload-error";
     this.lastErrorAt = Date.now();
     this.lastErrorCode = errorCode || null;
+    // resume() restarts.
+    this.stopHeartbeat();
     this.emitTelemetry("upload_error", {
       errorCode: errorCode || null,
       message: err?.message || this.error || "upload-error",
@@ -415,6 +443,18 @@ export default class BunnyTusUploader {
         error: err?.message || err,
         mediaId: this.mediaId,
       });
+      // Journal write failure (quota, transient I/O). Halt the uploader so
+      // a crash+resume doesn't replay bytes from the stale on-disk offset.
+      this.stalled = true;
+      this.lastErrorAt = Date.now();
+      this.lastErrorCode = "JOURNAL_PERSIST_FAILED";
+      this.error = String(err?.message || err).slice(0, 200);
+      try {
+        this.notifyStateChange("journal-persist-failed");
+      } catch {
+        // notifyStateChange itself shouldn't fail, but if it does the
+        // stalled flag above is the load-bearing signal.
+      }
     }
   }
 
@@ -613,7 +653,6 @@ export default class BunnyTusUploader {
       this.lastErrorCode = null;
       this.initializedFromResume = false;
 
-      // Build fingerprint for resume journal matching
       const fingerprint = this.buildFingerprint({
         projectId,
         sceneId,
@@ -623,7 +662,6 @@ export default class BunnyTusUploader {
       });
       this.fingerprint = fingerprint;
 
-      // Attempt to locate a resume journal candidate from storage
       const resumeJournal = await this.getResumeJournal({
         projectId,
         sceneId,
@@ -632,7 +670,6 @@ export default class BunnyTusUploader {
         reuse,
       });
 
-      // Validate reuse object if provided
       if (reuse) {
         if (!reuse.videoId || !reuse.mediaId) {
           throw new Error(
@@ -785,14 +822,13 @@ export default class BunnyTusUploader {
   }
 
   async refreshTusAuth() {
-    // Prefer stored screenityToken for auth
     const token = this.userToken || (await chrome.storage.local.get(["screenityToken"]).then(r => r.screenityToken));
     const headers = token ? { Authorization: `Bearer ${token}` } : {};
     const url = `${API_BASE}/bunny/videos/tus-auth?videoId=${this.videoId}`;
 
     // Internal retry absorbs short backend blips (5xx/408/429/network) so they
     // don't burn the outer uploadChunk retry budget. Fatal auth errors
-    // (400/401/403) are surfaced immediately — no recovery possible.
+    // (400/401/403) are surfaced immediately, no recovery possible.
     const MAX_ATTEMPTS = 4;
     let lastStatus = null;
     let lastErr = null;
@@ -863,7 +899,7 @@ export default class BunnyTusUploader {
         AuthorizationExpire: String(this.expires),
         LibraryId: String(this.libraryId),
         VideoId: this.videoId,
-        "Upload-Metadata": `filetype ${btoa("video/webm")},title ${btoa(
+        "Upload-Metadata": `filetype ${btoa(this.container || "video/webm")},title ${btoa(
           this.metadata.title,
         )}`,
       },
@@ -871,9 +907,25 @@ export default class BunnyTusUploader {
 
     if (!res.ok) throw new Error("Failed to start TUS upload session");
     const location = res.headers.get("location");
-    this.uploadUrl = location.startsWith("/")
+    const resolved = location.startsWith("/")
       ? `https://video.bunnycdn.com${location}`
       : location;
+    // Defense-in-depth: TUS Location header must stay on Bunny's host. Without
+    // this, a redirect to attacker.com would receive subsequent PATCHes
+    // carrying recording chunks plus the AuthorizationSignature header.
+    try {
+      const parsed = new URL(resolved);
+      if (parsed.host !== "video.bunnycdn.com") {
+        throw new Error(`Untrusted TUS location host: ${parsed.host}`);
+      }
+    } catch (err) {
+      throw new Error(`Invalid TUS location: ${err?.message || err}`);
+    }
+    this.uploadUrl = resolved;
+
+    // Persist BEFORE save-upload-meta: the local journal is the only recovery
+    // path if the extension crashes before the backend records the URL.
+    await this.persistUploadJournal({ force: true });
 
     if (this.userToken) {
       fetch(`${API_BASE}/bunny/videos/save-upload-meta`, {
@@ -903,15 +955,17 @@ export default class BunnyTusUploader {
         expires: this.expires,
       });
     }
-    await this.persistUploadJournal({ force: true });
   }
 
   async write(chunk) {
-    if (this.isFinalizing) throw new Error("Cannot write during finalization");
+    if (this.isFinalizing) {
+      this.bytesLostAfterFinalize += chunk?.size || 0;
+      this.setUploaderError("write-after-finalize");
+      throw new Error("Cannot write during finalization");
+    }
     if (this.isPaused) throw new Error("Uploader paused");
     if (!this.uploadUrl) throw new Error("Uploader not initialized");
 
-    // Check if we're in error state
     if (this.status === "error") {
       throw new Error(`Uploader in error state: ${this.error}`);
     }
@@ -932,17 +986,14 @@ export default class BunnyTusUploader {
     this.lastChunkQueuedAt = Date.now();
     this.scheduleJournalPersist();
 
-    // Always ensure queue is processing
     if (!this.isProcessingQueue) {
       this.queueProcessingPromise = this.processQueue();
     }
 
-    // Wait for current queue to finish processing these chunks
     if (this.queuedBytes > 10 * 1024 * 1024) {
       await this.waitForPendingUploads();
     }
 
-    // Thumbnail extraction disabled in-flight to reduce timeouts/noise.
     this._hasExtractedMeta = true;
   }
 
@@ -995,14 +1046,34 @@ export default class BunnyTusUploader {
         this.currentPatchAbort = null;
 
         if (res.ok || res.status === 204) {
-          // Server is the source of truth
           const serverOffsetHeader = res.headers.get("Upload-Offset");
+          let nextOffset;
           if (serverOffsetHeader) {
-            this.offset = parseInt(serverOffsetHeader, 10);
+            const parsed = parseInt(serverOffsetHeader, 10);
+            // Validate the parsed offset. parseInt("0x100", 10) returns 0,
+            // which would silently reset the upload. Require a finite value
+            // at least equal to what was sent.
+            const expectedMin = currentOffset + data.length;
+            if (
+              !Number.isFinite(parsed) ||
+              parsed < currentOffset ||
+              parsed > expectedMin
+            ) {
+              this.setUploaderError("invalid-server-offset", {
+                serverOffsetHeader,
+                parsed,
+                currentOffset,
+                expectedMin,
+              });
+              throw new Error(
+                `Invalid Upload-Offset from server: "${serverOffsetHeader}"`,
+              );
+            }
+            nextOffset = parsed;
           } else {
-            // Fallback if Bunny doesn't return it for some reason
-            this.offset = currentOffset + data.length;
+            nextOffset = currentOffset + data.length;
           }
+          this.offset = nextOffset;
           this.lastServerOffset = this.offset;
 
           this.recordProgress(data.length);
@@ -1010,7 +1081,7 @@ export default class BunnyTusUploader {
         } else {
           const errorText = await res.text();
 
-          // If the TUS session was invalidated (404), flag as fatal so callers can fall back.
+          // Session invalidated; fatal so callers can fall back.
           if (res.status === 404) {
             this.status = "error";
             this.error = "tus-session-missing";
@@ -1034,7 +1105,6 @@ export default class BunnyTusUploader {
             throw new Error("TUS session missing (404).");
           }
 
-          // Handle offset mismatch errors (409 Conflict)
           if (
             res.status === 409 ||
             errorText.toLowerCase().includes("offset")
@@ -1043,10 +1113,23 @@ export default class BunnyTusUploader {
               `⚠️ Offset conflict detected (status ${res.status}), fetching current offset from server`,
             );
 
-            // Query server for current offset using HEAD request
+            // Query server offset via HEAD. If it fails or returns garbage,
+            // mark fatal: retrying with a stale offset loops on 409.
             try {
               const serverOffset = await this.getServerOffset();
               if (Number.isFinite(serverOffset) && serverOffset >= 0) {
+                // Server offset must not be lower than what was sent;
+                // if it is, server state is corrupted. Fail loudly.
+                const priorOffset = this.offset;
+                if (serverOffset < priorOffset - data.length) {
+                  this.setUploaderError("server-offset-regressed", {
+                    serverOffset,
+                    priorOffset,
+                  });
+                  throw new Error(
+                    `Server offset regressed (${serverOffset} < ${priorOffset})`,
+                  );
+                }
                 this.lastServerOffset = serverOffset;
                 this.offset = serverOffset;
                 this.totalBytes = Math.max(this.totalBytes || 0, serverOffset);
@@ -1056,11 +1139,22 @@ export default class BunnyTusUploader {
                 });
                 this.scheduleJournalPersist({ force: true });
 
-                // Retry with corrected offset
                 continue;
               }
+              // serverOffset null/NaN: HEAD response unparseable.
+              this.setUploaderError("offset-conflict-head-unparseable", {
+                priorOffset: this.offset,
+              });
+              throw new Error(
+                "409 offset conflict but HEAD returned unparseable offset",
+              );
             } catch (headErr) {
-              console.error("Failed to fetch server offset:", headErr);
+              console.error(
+                "Failed to fetch server offset during 409 recovery:",
+                headErr,
+              );
+              this.setUploaderError("offset-conflict-head-failed", headErr);
+              throw headErr;
             }
           }
 
@@ -1068,7 +1162,7 @@ export default class BunnyTusUploader {
         }
       } catch (err) {
         this.currentPatchAbort = null;
-        // Transient errors (network, timeout, stall-abort, 5xx, 408, 429) retry forever with capped backoff.
+        // Transient errors (network/timeout/stall-abort/5xx/408/429) retry forever with capped backoff.
         const isExplicitAbort =
           this.status === "aborted" || this.isPaused === true;
         if (isExplicitAbort) {
@@ -1077,8 +1171,8 @@ export default class BunnyTusUploader {
         const msg = String(err?.message || "");
         const status = typeof err?.status === "number" ? err.status : null;
         const isTransient =
-          err?.name === "AbortError" || // timeout / stall-recovery
-          err?.name === "TypeError" || // fetch network failure
+          err?.name === "AbortError" ||
+          err?.name === "TypeError" ||
           (status !== null && (status >= 500 || status === 408 || status === 429)) ||
           /Upload failed \((?:5\d\d|408|429)\b/.test(msg) ||
           /network|Failed to fetch|timeout/i.test(msg);
@@ -1097,14 +1191,50 @@ export default class BunnyTusUploader {
           ? `transient retry #${attempt + 1}`
           : `attempt ${attempt + 1}/${this.MAX_RETRIES + 1}`;
         console.warn(`⚠️ Upload ${attemptLabel} failed, retrying...`, err.message);
+        // Wait for online event before retrying so we don't burn retries
+        // during the offline window. 5min cap ensures permanently
+        // disconnected machines still surface a stall.
+        if (typeof navigator !== "undefined" && navigator.onLine === false) {
+          this.emitTelemetry("upload_offline_wait", {
+            attempt,
+            errorCode: msg.slice(0, 100),
+          });
+          await new Promise((resolve) => {
+            const ONLINE_WAIT_CAP_MS = 5 * 60 * 1000;
+            const onOnline = () => {
+              cleanup();
+              resolve();
+            };
+            const cap = setTimeout(() => {
+              cleanup();
+              resolve();
+            }, ONLINE_WAIT_CAP_MS);
+            const cleanup = () => {
+              clearTimeout(cap);
+              try {
+                window.removeEventListener("online", onOnline);
+              } catch {}
+            };
+            try {
+              window.addEventListener("online", onOnline, { once: true });
+            } catch {
+              // Worker context: fall through to backoff.
+              cleanup();
+              resolve();
+            }
+          });
+          if (typeof navigator !== "undefined" && navigator.onLine) {
+            this.emitTelemetry("upload_back_online", { attempt });
+          }
+        }
         const jitter = Math.random() * 300;
-        // Cap backoff at 60s so offline→online reconnects retry within a minute.
+        // 60s cap so offline→online reconnects retry within a minute.
         const baseDelay = Math.min(
           this.RETRY_DELAY * Math.pow(2, Math.min(attempt, 7)),
           60_000,
         );
         await new Promise((r) => setTimeout(r, baseDelay + jitter));
-        // Never trip the permanent-failure branch for transient errors.
+        // Never let transient errors trip the permanent-failure branch.
         if (isTransient && attempt >= this.MAX_RETRIES) {
           attempt = this.MAX_RETRIES - 1;
         }
@@ -1121,20 +1251,26 @@ export default class BunnyTusUploader {
         const chunk = this.chunkQueue.shift();
         this.queuedBytes -= chunk.size;
 
-        // Serialize uploads: wait for each chunk to complete before starting next
         try {
           await this.uploadChunk(chunk);
         } catch (err) {
           console.error("❌ Chunk upload failed in queue:", err);
 
-          // Put chunk back at front of queue for potential retry
           this.chunkQueue.unshift(chunk);
           this.queuedBytes += chunk.size;
 
-          // Set error state
-          this.setUploaderError("queue-upload-failed", err);
+          // Don't clobber a non-recoverable code that uploadChunk already
+          // set (e.g. "offset-conflict-head-failed", "invalid-server-offset"),
+          // otherwise resume() sees the recoverable "queue-upload-failed"
+          // and loops forever.
+          const nonRecoverableInner =
+            this.lastErrorCode &&
+            this.lastErrorCode !== "queue-upload-failed" &&
+            this.lastErrorCode !== "chunk-upload-retries-exhausted";
+          if (!nonRecoverableInner) {
+            this.setUploaderError("queue-upload-failed", err);
+          }
 
-          // Stop processing queue on error
           break;
         }
       }
@@ -1145,7 +1281,6 @@ export default class BunnyTusUploader {
   }
 
   async waitForPendingUploads() {
-    // Temporarily unpause to ensure all chunks are processed
     const wasPaused = this.isPaused;
     if (wasPaused) {
       this.isPaused = false;
@@ -1171,11 +1306,9 @@ export default class BunnyTusUploader {
       if (this.pendingUploads.length) {
         await Promise.all(this.pendingUploads);
       }
-      // Small delay to catch any race conditions
       await new Promise((r) => setTimeout(r, 100));
     }
 
-    // Restore pause state if it was paused
     if (wasPaused) {
       this.isPaused = true;
     }
@@ -1190,9 +1323,26 @@ export default class BunnyTusUploader {
     this.scheduleJournalPersist({ force: true });
     try {
       await this.waitForPendingUploads();
+
+      if (this.bytesLostAfterFinalize > 0) {
+        this.status = "error";
+        this.error = `bytes-lost-during-finalize=${this.bytesLostAfterFinalize}`;
+        this.lastErrorAt = Date.now();
+        this.lastErrorCode = "finalize-bytes-lost";
+        this.emitTelemetry("upload_error", {
+          errorCode: "finalize-bytes-lost",
+          bytesLost: this.bytesLostAfterFinalize,
+          totalBytes: this.totalBytes,
+        });
+        this.scheduleJournalPersist({ force: true });
+        throw new Error(
+          `Finalize blocked: ${this.bytesLostAfterFinalize} bytes lost after finalize started.`,
+        );
+      }
+
       await this.checkAuthExpiration();
 
-      // Re-validate offset with server to avoid partial finalization
+      // Re-validate offset to avoid partial finalization.
       let serverOffset = null;
       try {
         const headRes = await fetch(this.uploadUrl, {
@@ -1217,7 +1367,7 @@ export default class BunnyTusUploader {
         console.warn("⚠️ Failed HEAD before finalize:", err);
       }
 
-      // If server didn't receive everything, don't "finalize" into a ghost upload.
+      // Don't finalize into a ghost upload if the server is short.
       if (serverOffset === null) {
         this.setUploaderError("finalize-offset-unverified");
         throw new Error("Finalize failed: could not verify server offset.");
@@ -1267,7 +1417,7 @@ export default class BunnyTusUploader {
         );
       }
 
-      // Now we can safely complete the tus upload by declaring the final length
+      // Complete the tus upload by declaring final length.
       const res = await fetch(this.uploadUrl, {
         method: "PATCH",
         headers: {
@@ -1298,11 +1448,10 @@ export default class BunnyTusUploader {
       await this.clearUploadJournal();
       this.notifyStateChange("finalize-completed");
     } catch (err) {
-      // Reset the lock so a subsequent retry call can attempt finalize again.
-      // Without this reset, isFinalizing stays true permanently after any error,
-      // and every retry immediately throws "Already finalizing".
+      // Reset the lock so retries can attempt finalize again. Without
+      // this, every retry immediately throws "Already finalizing".
       this.isFinalizing = false;
-      console.warn("[BunnyTusUploader] finalize failed — isFinalizing reset for retry", {
+      console.warn("[BunnyTusUploader] finalize failed, isFinalizing reset for retry", {
         trackType: this.trackType,
         error: err?.message || String(err),
         offset: this.offset,
@@ -1343,23 +1492,39 @@ export default class BunnyTusUploader {
   }
 
   resume() {
-    if (this.isPaused) {
-      this.isPaused = false;
-      if (
-        this.status !== "completed" &&
-        this.status !== "error" &&
-        this.status !== "finalizing"
-      ) {
-        this.status = "uploading";
-      }
-      if (!this.isProcessingQueue && this.chunkQueue.length > 0) {
-        this.queueProcessingPromise = this.processQueue();
-      }
-      this.emitTelemetry("upload_resumed", {
-        reason: "client-resume",
-      });
-      this.scheduleJournalPersist();
+    // Excludes codes that need re-init (tus-session-missing, finalize-*,
+    // server-offset-0); those don't recover from a plain resume.
+    const RECOVERABLE_ERROR_CODES = new Set([
+      "queue-upload-failed",
+      "chunk-upload-retries-exhausted",
+    ]);
+    const canRecoverFromError =
+      this.status === "error" &&
+      RECOVERABLE_ERROR_CODES.has(this.lastErrorCode);
+    if (!this.isPaused && !canRecoverFromError) return;
+
+    if (canRecoverFromError) {
+      this.error = null;
+      this.stalled = false;
+      // Restart heartbeat (stopped by setUploaderError); idempotent.
+      this.startHeartbeat();
     }
+    this.isPaused = false;
+    // Don't mask a non-recoverable error when isPaused + status="error" coexist.
+    if (
+      this.status !== "completed" &&
+      this.status !== "finalizing" &&
+      (this.status !== "error" || canRecoverFromError)
+    ) {
+      this.status = "uploading";
+    }
+    if (!this.isProcessingQueue && this.chunkQueue.length > 0) {
+      this.queueProcessingPromise = this.processQueue();
+    }
+    this.emitTelemetry("upload_resumed", {
+      reason: canRecoverFromError ? "error-recovery" : "client-resume",
+    });
+    this.scheduleJournalPersist();
   }
 
   async abort() {
@@ -1383,10 +1548,42 @@ export default class BunnyTusUploader {
   startHeartbeat() {
     this.stopHeartbeat();
     this.lastProgressAt = Date.now();
+    this.lastHeartbeatTickAt = Date.now();
     this.stalled = false;
     this.stallRecoveryInFlight = false;
     this.heartbeatTimer = setInterval(() => {
       const now = Date.now();
+      // Sleep/wake: timers don't fire while asleep, but on wake fire
+      // missed ticks back-to-back. Skip ticks whose wall-clock gap is
+      // much shorter than HEARTBEAT_INTERVAL_MS, otherwise an 8hr sleep
+      // stacks ~2880 ticks and each runs stall recovery, flooding
+      // the network on wake.
+      const sinceLastTick = now - (this.lastHeartbeatTickAt || 0);
+      this.lastHeartbeatTickAt = now;
+      if (sinceLastTick < Math.floor(this.HEARTBEAT_INTERVAL_MS * 0.5)) {
+        return;
+      }
+      // Wake-jump: if tick-to-tick gap is dramatically larger than
+      // expected, abort any in-flight PATCH hanging on a dead connection.
+      // Without this, PATCH stays pending until UPLOAD_TIMEOUT_MS, delaying
+      // recovery.
+      if (
+        sinceLastTick >
+        Math.max(this.HEARTBEAT_INTERVAL_MS * 6, 60_000)
+      ) {
+        try {
+          this.emitTelemetry("upload_wake_detected", {
+            sinceLastTickMs: sinceLastTick,
+          });
+        } catch {}
+        if (this.currentPatchAbort) {
+          try {
+            this.currentPatchAbort.abort("wake-jump");
+          } catch {}
+          this.currentPatchAbort = null;
+        }
+      }
+
       const diff = now - this.lastProgressAt;
       if (diff > this.HEARTBEAT_LAG_MS) {
         this.stalled = true;
@@ -1419,7 +1616,7 @@ export default class BunnyTusUploader {
         } catch {}
         this.currentPatchAbort = null;
       }
-      // Resync offset from server via HEAD so a partially-applied PATCH doesn't cause duplicate bytes.
+      // Resync via HEAD so a partially-applied PATCH doesn't dup bytes.
       try {
         const res = await fetch(this.uploadUrl, {
           method: "HEAD",

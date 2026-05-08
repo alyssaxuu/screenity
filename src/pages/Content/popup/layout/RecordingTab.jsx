@@ -90,7 +90,11 @@ const RecordingTab = (props) => {
         className="TabsRoot"
         defaultValue="screen"
         onValueChange={onValueChange}
-        value={contentState.recordingType}
+        value={
+          contentState.recordingType === "tab"
+            ? "region"
+            : contentState.recordingType
+        }
       >
         {contentState.recordingToScene && (
           <div className="projectActiveBanner">
