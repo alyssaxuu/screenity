@@ -323,6 +323,24 @@ export class WebCodecsRecorder {
         this._startAlignTimer = setTimeout(() => {
           this._startAlignTimer = null;
           if (!this.running) return;
+
+          // E2E hook: simulate a runtime encoder failure before any chunk
+          // lands so tests can exercise the in-session swap to
+          // MediaRecorder. Resolves start() with success first so the
+          // caller treats this as a normal post-start error.
+          if (globalThis.__screenityForceWebCodecsError) {
+            if (this._startResolve) {
+              this._startResolve(true);
+              this._startResolve = null;
+            }
+            setTimeout(() => {
+              this.options.onError?.(
+                new Error("e2e-forced-webcodecs-error"),
+              );
+            }, 0);
+            return;
+          }
+
           // Launch loops together so t=0 aligns.
           this._videoLoopPromise = this.readVideoLoop();
           if (this.audioReader && this.options.enableAudio) {

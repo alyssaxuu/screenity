@@ -1586,6 +1586,7 @@ const Recorder = () => {
       return;
     }
 
+    let webcodecsFallbackTriggered = false;
     try {
       if (canUseWebCodecs) {
         useWebCodecs.current = true;
@@ -1795,6 +1796,56 @@ const Recorder = () => {
             if (!transient) persisted.useWebCodecsRecorder = false;
             chrome.storage.local.set(persisted);
             updateFreeFinalizeStatus("failed", 100, errStr);
+
+            // Same-session fallback: if WebCodecs blew up before any chunk
+            // landed and the capture track is still live, swap to
+            // MediaRecorder via a recursive startRecording() so the user
+            // doesn't have to re-pick the screen / re-grant prompts.
+            const liveVideoTrack =
+              liveStream.current?.getVideoTracks?.()[0] || null;
+            const trackLive = liveVideoTrack?.readyState === "live";
+            const noChunksYet =
+              savedCount.current === 0 && !hasChunks.current;
+            if (
+              !transient &&
+              !webcodecsFallbackTriggered &&
+              noChunksYet &&
+              trackLive
+            ) {
+              webcodecsFallbackTriggered = true;
+              debugWarn(
+                "WebCodecs onError: attempting in-session MediaRecorder swap",
+              );
+              (async () => {
+                const prev = recorder.current;
+                recorder.current = null;
+                useWebCodecs.current = false;
+                try {
+                  await chrome.storage.local.set({
+                    fastRecorderInUse: false,
+                  });
+                } catch {}
+                try {
+                  prev?.cleanup?.();
+                } catch {}
+                // Re-enter startRecording (guard at top requires both
+                // recorder.current null and isStarting.current false).
+                isStarting.current = false;
+                try {
+                  await startRecording();
+                } catch (e) {
+                  debugError("In-session swap startRecording threw", e);
+                  chrome.runtime.sendMessage({
+                    type: "show-toast",
+                    message:
+                      chrome.i18n.getMessage("webcodecsFailedOffToast"),
+                  });
+                  sendRecordingError(errStr);
+                }
+              })();
+              return;
+            }
+
             if (!transient) {
               chrome.runtime.sendMessage({
                 type: "show-toast",
@@ -1847,6 +1898,9 @@ const Recorder = () => {
             message: chrome.i18n.getMessage("webcodecsFailedOffToast"),
           });
           recorder.current = null;
+          // Top-of-startRecording guard requires both recorder null AND
+          // isStarting false; without this reset the recursive call bails.
+          isStarting.current = false;
           return await startRecording();
         }
         await chrome.storage.local.set({ fastRecorderInUse: true });

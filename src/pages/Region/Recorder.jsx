@@ -801,6 +801,7 @@ const Recorder = () => {
         probeResult?.details?.selectedVideoConfig || null;
       let recorderToken = 0;
       let codecFallbackTriggered = false;
+      let webcodecsFallbackTriggered = false;
       let mediaRecorderStartAt = Date.now();
       let recdbgChunkCount = 0;
       let recdbgTotalBytes = 0;
@@ -1125,6 +1126,82 @@ const Recorder = () => {
             if (!transient) persisted.useWebCodecsRecorder = false;
             chrome.storage.local.set(persisted);
             updateFreeFinalizeStatus("failed", 100, errStr);
+
+            // Same-session fallback: encoder errored before any chunk landed
+            // and the capture track is still live. Swap to MediaRecorder so
+            // the user doesn't have to re-pick the region / re-grant prompts.
+            // Skip on transient errors (WebCodecs may recover) and on repeat
+            // calls (VideoEncoder.error can fire more than once).
+            const liveVideoTrack =
+              liveStream.current?.getVideoTracks?.()[0] || null;
+            const trackLive = liveVideoTrack?.readyState === "live";
+            const noChunksYet =
+              savedCount.current === 0 && !hasChunks.current;
+            if (
+              !transient &&
+              !webcodecsFallbackTriggered &&
+              noChunksYet &&
+              trackLive
+            ) {
+              webcodecsFallbackTriggered = true;
+              persistRegionStartDebug({
+                stage: "webcodecs-onerror-swap",
+                why: errStr.slice(0, 200),
+              });
+              (async () => {
+                const prev = recorder.current;
+                recorder.current = null;
+                useWebCodecs.current = false;
+                try {
+                  await chrome.storage.local.set({
+                    fastRecorderInUse: false,
+                  });
+                } catch {}
+                try {
+                  prev?.cleanup?.();
+                } catch {}
+                let swapped = false;
+                try {
+                  swapped = await startMediaRecorderWithCodec("vp9");
+                } catch (e) {
+                  swapped = false;
+                }
+                if (
+                  swapped &&
+                  recorder.current instanceof MediaRecorder
+                ) {
+                  try {
+                    recorder.current.start(5000);
+                    setTimeout(() => {
+                      try {
+                        recorder.current?.requestData?.();
+                      } catch {}
+                    }, 250);
+                    persistRegionStartDebug({
+                      stage: "webcodecs-onerror-swap-ok",
+                    });
+                    return;
+                  } catch (startErr) {
+                    persistRegionStartDebug({
+                      stage: "webcodecs-onerror-swap-start-throw",
+                      why: String(startErr),
+                    });
+                  }
+                }
+                // Fallback failed too — surface the original failure.
+                chrome.runtime.sendMessage({
+                  type: "show-toast",
+                  message: chrome.i18n.getMessage("webcodecsFailedOffToast"),
+                });
+                chrome.runtime.sendMessage({
+                  type: "recording-error",
+                  error: "stream-error",
+                  why: "Fast recorder failed. Please try compatibility mode.",
+                });
+              })();
+              return;
+            }
+
             if (!transient) {
               chrome.runtime.sendMessage({
                 type: "show-toast",
