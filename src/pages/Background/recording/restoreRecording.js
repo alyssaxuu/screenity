@@ -77,10 +77,6 @@ export const checkRestore = async () => {
 };
 
 export const restoreRecording = async () => {
-  const { fastRecorderInUse } = await chrome.storage.local.get([
-    "fastRecorderInUse",
-  ]);
-
   // capture trigger tab now; restore can take 30s+ and the user may switch
   let triggerTabId = null;
   try {
@@ -138,10 +134,12 @@ export const restoreRecording = async () => {
     return;
   }
 
-  // IDB fallback: MediaRecorder + pre-4.4.0 WebCodecs.
-  // Duration estimate routes between editor.html (short, ffmpeg) and viewer (long).
-  // Priority: recordingDuration (clean stop) > lastChunkAt-firstChunkAt (survives SW death).
-  const hasWebCodecs = Boolean(fastRecorderInUse);
+  // IDB fallback: MediaRecorder produces IDB chunks. WebCodecs (4.4.0+) writes
+  // OPFS, which was already handled above. Routing here is purely IDB:
+  // editor.html for short, editorviewer.html for long. Reading fastRecorderInUse
+  // here was a stale-flag hazard — a crashed WebCodecs session can leave it
+  // true while no OPFS file ever made it to disk, which would route to
+  // editorwebcodecs.html and find nothing.
   const {
     recordingDuration,
     firstChunkAt,
@@ -159,10 +157,7 @@ export const restoreRecording = async () => {
   const FFMPEG_MAX_DURATION_MS = 7 * 60 * 1000;
 
   let editorUrl, messageType;
-  if (hasWebCodecs) {
-    editorUrl = "editorwebcodecs.html?mode=recover";
-    messageType = "restore-recording";
-  } else if (durationMs > 0 && durationMs <= FFMPEG_MAX_DURATION_MS) {
+  if (durationMs > 0 && durationMs <= FFMPEG_MAX_DURATION_MS) {
     // ffmpeg-wasm cap: editLimit:600
     editorUrl = "editor.html?mode=recover";
     messageType = "fallback-recording";

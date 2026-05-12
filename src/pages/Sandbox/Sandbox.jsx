@@ -12,11 +12,14 @@ import HelpButton from "./components/player/HelpButton";
 import { ContentStateContext } from "./context/ContentState";
 import { diagForward } from "../utils/diagForward";
 import { perfMark } from "../utils/perfMarks";
+import { triggerSupportDownload } from "../utils/triggerSupportDownload";
 
 const Sandbox = () => {
   const [contentState, setContentState] = useContext(ContentStateContext);
   const parentRef = useRef(null);
   const progress = useRef("");
+  // ref so the stuck-timer closure (deps=[]) can read current state
+  const loadStateRef = useRef({ ready: false, hasBlob: false });
 
   const getChromeVersion = () => {
     var raw = navigator.userAgent.match(/Chrom(e|ium)\/([0-9]+)\./);
@@ -97,6 +100,11 @@ const Sandbox = () => {
   }, [contentState.chunkIndex, contentState.chunkCount]);
 
   useEffect(() => {
+    loadStateRef.current.ready = Boolean(contentState.ready);
+    loadStateRef.current.hasBlob = Boolean(contentState.blob);
+  }, [contentState.ready, contentState.blob]);
+
+  useEffect(() => {
     chrome.runtime.sendMessage({ type: "check-banner-support" }, (response) => {
       if (response && response.bannerSupport) {
         setContentState((prev) => ({
@@ -155,8 +163,23 @@ const Sandbox = () => {
     const stuckTimer = setTimeout(() => {
       try {
         if (cancelled) return;
-        // editorRecordingError's own filter (ready=true → suppress) makes
-        // a stale write harmless if the editor already loaded.
+        // Skip the write if the editor finished. A bogus
+        // EDITOR_STUCK_TIMEOUT in diag zips makes the signal useless for
+        // telling real hangs from slow-but-fine.
+        if (loadStateRef.current.ready || loadStateRef.current.hasBlob) {
+          chrome.runtime
+            .sendMessage({
+              type: "diag-forward",
+              event: "sandbox-stuck-timeout-suppressed",
+              data: {
+                afterMs: STUCK_TIMEOUT_MS,
+                ready: loadStateRef.current.ready,
+                hasBlob: loadStateRef.current.hasBlob,
+              },
+            })
+            .catch(() => {});
+          return;
+        }
         chrome.runtime
           .sendMessage({
             type: "diag-forward",
@@ -241,7 +264,8 @@ const Sandbox = () => {
                       chrome.runtime.sendMessage({ type: "restore-recording" });
                     },
                     () => {
-                      chrome.runtime.sendMessage({ type: "report-bug" });
+                      triggerSupportDownload({ source: "sandbox-report-bug" });
+                      chrome.runtime.sendMessage({ type: "report-bug", zipBundled: true });
                     },
                     null,
                     null,
@@ -249,9 +273,11 @@ const Sandbox = () => {
                     false,
                     chrome.i18n.getMessage("getHelpButton"),
                     () => {
+                      triggerSupportDownload({ source: "processing-stuck" });
                       chrome.runtime.sendMessage({
                         type: "report-error",
                         source: "processing-stuck",
+                        zipBundled: true,
                       });
                     },
                   );

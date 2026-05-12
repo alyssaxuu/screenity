@@ -118,6 +118,26 @@ export const diagEvent = (eventType, data) => {
     "drive-save-fail",
     "drive-auth-fail",
     "editor-load-ready",
+    // OPFS load + video element handoff: critical for diagnosing
+    // editor-stuck-at-90% reports. If any of these is the last event
+    // before a hang, that's the step that hung.
+    "sandbox-opfs-reader-open-done",
+    "sandbox-opfs-readblob-start",
+    "sandbox-opfs-readblob-done",
+    "sandbox-opfs-readblob-slow-finalize",
+    "sandbox-opfs-materialize-start",
+    "sandbox-opfs-materialize-done",
+    "sandbox-opfs-materialize-fail",
+    "sandbox-opfs-arraybuffer-done",
+    "sandbox-opfs-materialize-skipped",
+    "sandbox-video-src-set",
+    "sandbox-video-loadedmetadata",
+    "sandbox-video-load-error",
+    "sandbox-opfs-wait-finalize-timeout",
+    "sandbox-opfs-writer-dead-detected",
+    "sandbox-opfs-materialize-deferred",
+    "session-deferred-end",
+    "editor-route-decision",
   ];
   if (ALWAYS_FLUSH.includes(eventType)) {
     flush();

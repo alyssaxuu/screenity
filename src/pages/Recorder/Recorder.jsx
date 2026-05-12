@@ -1176,29 +1176,39 @@ const Recorder = () => {
     });
     endActiveSet();
 
-    // Chunk backend: fall back to IDB if OPFS open() fails. Prefer IDB up-front
-    // when WebCodecs is skipped: the legacy editor's sandboxed iframe lacks
-    // allow-same-origin and can't read OPFS.
-    const endStickyRead = perfSpan("Recorder.preflight getStickyState");
-    const earlyStickyState = await getFastRecorderStickyState();
-    endStickyRead();
-    const willLikelyUseFast =
-      prefUseWebCodecs !== false &&
-      !(earlyStickyState?.disabled && prefUseWebCodecs !== true);
+    // Decide encoder BEFORE opening the writer. The previous code used an
+    // optimistic guess (willLikelyUseFast) based on user pref + sticky state
+    // only; when the actual probe disagreed (e.g. Linux Chrome with broken
+    // VideoEncoder coverage), MediaRecorder ran but bytes had already started
+    // flowing into the OPFS writer that was opened against the guess. The
+    // sandboxed editor.html then couldn't read OPFS. Backend choice is now
+    // a function of shouldUseFast, the ground truth.
+    const { useWebCodecsRecorder } = await chrome.storage.local.get([
+      "useWebCodecsRecorder",
+    ]);
+    // Default-on: undefined means enabled; only explicit `false` opts out.
+    const userSetting = useWebCodecsRecorder === false ? false : true;
+    const stickyState = await getFastRecorderStickyState();
+    const probeResult = await probeFastRecorderSupport();
+    const shouldUseFast = shouldUseFastRecorder(
+      userSetting,
+      probeResult,
+      stickyState,
+    );
 
     chunkWriter.current = null;
     chunkWriterBackend.current = null;
     if (process.env.SCREENITY_DEV_MODE === "true") {
       console.log("[recorder-opfs][recorder] chooseWriter entry", {
         recordingId,
-        willLikelyUseFast,
+        shouldUseFast,
       });
     }
     try {
       const endChoose = perfSpan("Recorder.preflight chooseWriter");
       let selection;
       let openResult = null;
-      const wantBackend = willLikelyUseFast ? "opfs" : "idb";
+      const wantBackend = shouldUseFast ? "opfs" : "idb";
       const prewarmedMatches =
         prewarmedWriter && prewarmedWriter.selection.backend === wantBackend;
       if (prewarmedMatches) {
@@ -1208,7 +1218,7 @@ const Recorder = () => {
         if (prewarmedWriter?.selection?.writer?.abort) {
           prewarmedWriter.selection.writer.abort().catch(() => {});
         }
-        selection = await chooseWriter({ preferOpfs: willLikelyUseFast });
+        selection = await chooseWriter({ preferOpfs: shouldUseFast });
       }
       endChoose({ backend: selection?.backend, prewarmed: prewarmedMatches });
       if (process.env.SCREENITY_DEV_MODE === "true") {
@@ -1276,19 +1286,6 @@ const Recorder = () => {
         });
       } catch {}
     }
-
-    const { useWebCodecsRecorder } = await chrome.storage.local.get([
-      "useWebCodecsRecorder",
-    ]);
-    // Default-on: undefined means enabled; only explicit `false` opts out.
-    const userSetting = useWebCodecsRecorder === false ? false : true;
-    const stickyState = await getFastRecorderStickyState();
-    const probeResult = await probeFastRecorderSupport();
-    const shouldUseFast = shouldUseFastRecorder(
-      userSetting,
-      probeResult,
-      stickyState,
-    );
     const selectedVideoConfig =
       probeResult?.details?.selectedVideoConfig || null;
 
@@ -1828,6 +1825,16 @@ const Recorder = () => {
                 try {
                   prev?.cleanup?.();
                 } catch {}
+                // Abort the OPFS writer so the re-entered startRecording opens
+                // a fresh IDB one. Without this, MR bytes would stream into
+                // OPFS and the editor.html sandbox couldn't read them.
+                if (chunkWriter.current) {
+                  try {
+                    await chunkWriter.current.abort();
+                  } catch {}
+                  chunkWriter.current = null;
+                  chunkBackendRef.current = null;
+                }
                 // Re-enter startRecording (guard at top requires both
                 // recorder.current null and isStarting.current false).
                 isStarting.current = false;
@@ -1898,6 +1905,17 @@ const Recorder = () => {
             message: chrome.i18n.getMessage("webcodecsFailedOffToast"),
           });
           recorder.current = null;
+          // Abort the OPFS writer opened for the WebCodecs path. The recursive
+          // startRecording() will pick IDB (userSetting=false now), but it
+          // also nulls chunkWriter.current without closing — leaving the OPFS
+          // file handle dangling.
+          if (chunkWriter.current) {
+            try {
+              await chunkWriter.current.abort();
+            } catch {}
+            chunkWriter.current = null;
+            chunkBackendRef.current = null;
+          }
           // Top-of-startRecording guard requires both recorder null AND
           // isStarting false; without this reset the recursive call bails.
           isStarting.current = false;

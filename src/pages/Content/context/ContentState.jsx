@@ -22,6 +22,7 @@ import {
   traceStep,
   setStartFlowOutcome,
 } from "../../utils/startFlowTrace";
+import { triggerSupportDownload } from "../../utils/triggerSupportDownload";
 
 export const contentStateContext = createContext();
 export const contentStateRef = { current: null };
@@ -627,10 +628,12 @@ const ContentState = (props) => {
           false,
           chrome.i18n.getMessage("getHelpButton"),
           () => {
+            triggerSupportDownload({ source: "not-enough-space" });
             chrome.runtime.sendMessage({
               type: "report-error",
               errorCode: "REC_RUN_MEMORY",
               source: "not-enough-space",
+              zipBundled: true,
             });
           },
         );

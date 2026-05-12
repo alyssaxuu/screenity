@@ -142,6 +142,8 @@ const _startRecordingInner = async (caller) => {
     memoryError: false,
     cloudRecorderDegradedMode: null,
     editorRecordingError: null,
+    editorReadyAt: null,
+    editorReadyPath: null,
     // prior sandboxTab would route this attempt's errors to the wrong editor
     sandboxTab: null,
     // paused leak from a prior errored recording would mis-account duration

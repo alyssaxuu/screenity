@@ -1234,6 +1234,18 @@ const Recorder = () => {
             lastWebCodecsFailureAt: Date.now(),
             lastWebCodecsFailureCode: "start-failed",
           });
+          // The OPFS writer was opened for the WebCodecs path. If we let it
+          // hang around, startMediaRecorderWithCodec's no-existing-writer guard
+          // would reuse it, sending MediaRecorder bytes into OPFS where the
+          // sandboxed editor can't read them. Abort here so the MR path opens
+          // a fresh IDB writer.
+          if (chunkWriter.current) {
+            try {
+              await chunkWriter.current.abort();
+            } catch {}
+            chunkWriter.current = null;
+            chunkBackendRef.current = null;
+          }
           chrome.runtime.sendMessage({
             type: "show-toast",
             message: chrome.i18n.getMessage("webcodecsFailedOffToast"),
@@ -1284,28 +1296,37 @@ const Recorder = () => {
           videoBitsPerSecond: videoBitsPerSecond,
         });
 
-        // Force IDB: MediaRecorder chunks must relay to null-origin sandbox.
-        if (!chunkWriter.current) {
+        // Force IDB: MediaRecorder chunks must relay to the null-origin sandbox
+        // editor, which cannot read OPFS. Always replace whatever is in
+        // chunkWriter.current — if WebCodecs opened an OPFS writer earlier and
+        // then fell back to us, leaving the OPFS writer in place would silently
+        // route MR bytes into OPFS and strand them.
+        if (chunkWriter.current) {
           try {
-            const selection = await chooseWriter({ preferOpfs: false });
-            chunkWriter.current = selection.writer;
-            const openResult = await chunkWriter.current.open(
-              `region-mr-${Date.now()}-${Math.random()
-                .toString(36)
-                .slice(2, 8)}`,
-            );
-            const backendRefAtOpen = openResult?.backendRef || {
-              backend: "idb",
-            };
-            chunkBackendRef.current = backendRefAtOpen;
-            try {
-              await chrome.storage.local.set({
-                lastRecordingBackendRef: backendRefAtOpen,
-              });
-            } catch {}
-          } catch (err) {
-            chunkWriter.current = null;
-          }
+            await chunkWriter.current.abort();
+          } catch {}
+          chunkWriter.current = null;
+          chunkBackendRef.current = null;
+        }
+        try {
+          const selection = await chooseWriter({ preferOpfs: false });
+          chunkWriter.current = selection.writer;
+          const openResult = await chunkWriter.current.open(
+            `region-mr-${Date.now()}-${Math.random()
+              .toString(36)
+              .slice(2, 8)}`,
+          );
+          const backendRefAtOpen = openResult?.backendRef || {
+            backend: "idb",
+          };
+          chunkBackendRef.current = backendRefAtOpen;
+          try {
+            await chrome.storage.local.set({
+              lastRecordingBackendRef: backendRefAtOpen,
+            });
+          } catch {}
+        } catch (err) {
+          chunkWriter.current = null;
         }
         debug("MediaRecorder config", {
           mimeType: recorder.current?.mimeType,

@@ -148,10 +148,12 @@ export const stopRecording = async () => {
     fastRecorderInUse,
     fastRecorderActiveRecordingId,
     fastRecorderValidation,
+    lastRecordingBackendRef,
   } = await chrome.storage.local.get([
     "fastRecorderInUse",
     "fastRecorderActiveRecordingId",
     "fastRecorderValidation",
+    "lastRecordingBackendRef",
   ]);
   const validation =
     fastRecorderValidation && typeof fastRecorderValidation === "object"
@@ -161,7 +163,19 @@ export const stopRecording = async () => {
     validation?.details?.recordingId &&
     validation.details.recordingId === fastRecorderActiveRecordingId;
   const hardFailForCurrent = Boolean(validationMatches && validation?.hardFail);
-  const hasWebCodecs = Boolean(fastRecorderInUse) && !hardFailForCurrent;
+  // Route by where the bytes actually live: editor.html is sandboxed and
+  // can't read OPFS, so OPFS-backed recordings MUST go to editorwebcodecs.html
+  // regardless of which encoder produced them. fastRecorderInUse is the encoder
+  // flag, not a storage flag, and the two can diverge on probe/validation
+  // fallback. Backend is ground truth.
+  const bytesInOpfs = lastRecordingBackendRef?.backend === "opfs";
+  const hasWebCodecs = bytesInOpfs;
+  diagEvent("editor-route-decision", {
+    backend: lastRecordingBackendRef?.backend || null,
+    fastRecorderInUse: Boolean(fastRecorderInUse),
+    hardFailForCurrent,
+    route: hasWebCodecs ? "webcodecs" : "ffmpeg",
+  });
 
   const {
     postStopEditorOpened,
@@ -339,9 +353,53 @@ export const stopRecording = async () => {
     chrome.runtime.sendMessage({ type: "turn-off-pip" });
   }
 
+  // Hold the diag session open until editorReadyAt lands or 90s passes
+  // so sandbox-side events from the editor load make it into the zip.
+  // Closing here used to drop everything past stop+~17ms.
   // never clear recordingTab here; cleanup runs in handleRecordingComplete /
   // onTabRemoved / openRecorderTab safety net
-  endDiagSession("ok");
+  (async () => {
+    const SESSION_DEFER_TIMEOUT_MS = 90_000;
+    const POLL_INTERVAL_MS = 500;
+    // Snapshot baseline so a stale editorReadyAt from a prior session
+    // doesn't immediately satisfy the wait.
+    const baseline = await chrome.storage.local
+      .get(["editorReadyAt"])
+      .catch(() => ({}));
+    const baselineAt = baseline?.editorReadyAt || 0;
+    const start = Date.now();
+    while (Date.now() - start < SESSION_DEFER_TIMEOUT_MS) {
+      try {
+        const r = await chrome.storage.local.get([
+          "editorReadyAt",
+          "editorRecordingError",
+        ]);
+        const readyAt = r?.editorReadyAt || 0;
+        if (readyAt > baselineAt) {
+          diagEvent("session-deferred-end", {
+            reason: "editor-ready",
+            waitedMs: Date.now() - start,
+          });
+          break;
+        }
+        if (r?.editorRecordingError) {
+          diagEvent("session-deferred-end", {
+            reason: "editor-error",
+            waitedMs: Date.now() - start,
+          });
+          break;
+        }
+      } catch {}
+      await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
+    }
+    if (Date.now() - start >= SESSION_DEFER_TIMEOUT_MS) {
+      diagEvent("session-deferred-end", {
+        reason: "timeout",
+        waitedMs: SESSION_DEFER_TIMEOUT_MS,
+      });
+    }
+    endDiagSession("ok");
+  })();
 
   const { wasRegion } = await chrome.storage.local.get(["wasRegion"]);
   if (wasRegion) {
@@ -385,6 +443,7 @@ export const handleStopRecordingTab = async (request) => {
     totalPausedMs,
     fastRecorderInUse,
     fastRecorderActiveRecordingId,
+    lastRecordingBackendRef,
   } = await chrome.storage.local.get([
     "isSubscribed",
     "recordingStartTime",
@@ -393,8 +452,19 @@ export const handleStopRecordingTab = async (request) => {
     "totalPausedMs",
     "fastRecorderInUse",
     "fastRecorderActiveRecordingId",
+    "lastRecordingBackendRef",
   ]);
   endStorageGet1();
+  // Same rule as handleRecordingComplete: route by backend, not by the
+  // encoder flag. fastRecorderInUse can lie when WebCodecs fell back to MR
+  // mid-pipeline (probe disagreement, in-session swap). Bytes location wins.
+  const bytesInOpfs = lastRecordingBackendRef?.backend === "opfs";
+  diagEvent("editor-route-decision", {
+    via: "stop-tab",
+    backend: lastRecordingBackendRef?.backend || null,
+    fastRecorderInUse: Boolean(fastRecorderInUse),
+    route: bytesInOpfs ? "webcodecs" : "ffmpeg",
+  });
   const stopTabNow = Date.now();
   const stopTabStartTime = Number(recordingStartTime);
   const stopTabBasePaused = Number(totalPausedMs) || 0;
@@ -442,7 +512,7 @@ export const handleStopRecordingTab = async (request) => {
       return;
     }
 
-    if (fastRecorderInUse) {
+    if (bytesInOpfs) {
       diagEvent("editor-open", { type: "editorwebcodecs", via: "stop-tab" });
       const editorUrl = "editorwebcodecs.html";
       // Open editor immediately in postStop mode (WebCodecs only)

@@ -67,6 +67,13 @@ export const buildSupportContext = async (opts = {}) => {
         "isSubscribed",
         "diagnosticLog",
         "recordingAttemptId",
+        "lastRecordingBackendRef",
+        "lastRecordingFinalizedFileName",
+        "freeRecorderSession",
+        "fastRecorderValidation",
+        "editorReadyAt",
+        "lastTrackEndEvent",
+        "editorRecordingError",
       ];
       const store = await chrome.storage.local.get(keys);
 
@@ -88,6 +95,71 @@ export const buildSupportContext = async (opts = {}) => {
       if (store.recordingAttemptId)
         ctx.attemptId = store.recordingAttemptId;
 
+      // Distinguishes writer-hung from writer-ok-editor-failed for
+      // triaging stuck-at-90% reports.
+      if (store.lastRecordingBackendRef?.backend) {
+        ctx.backend = store.lastRecordingBackendRef.backend;
+      }
+      if (store.lastRecordingBackendRef?.fileName) {
+        ctx.finalized =
+          store.lastRecordingFinalizedFileName ===
+          store.lastRecordingBackendRef.fileName
+            ? "1"
+            : "0";
+      }
+
+      if (store.freeRecorderSession) {
+        if (store.freeRecorderSession.chunkCount != null)
+          ctx.chunks = String(store.freeRecorderSession.chunkCount);
+        if (store.freeRecorderSession.status)
+          ctx.recSessStatus = String(store.freeRecorderSession.status).slice(
+            0,
+            30,
+          );
+      }
+
+      if (store.fastRecorderValidation) {
+        ctx.validationOk = store.fastRecorderValidation.ok ? "1" : "0";
+        if (store.fastRecorderValidation.hardFail) ctx.validationHardFail = "1";
+        if (
+          !store.fastRecorderValidation.ok &&
+          Array.isArray(store.fastRecorderValidation.reasons)
+        ) {
+          ctx.validationReason = String(
+            store.fastRecorderValidation.reasons[0] || "",
+          ).slice(0, 60);
+        }
+        if (store.fastRecorderValidation.details?.size) {
+          // MB rounded; keeps the URL short.
+          ctx.fileMb = String(
+            Math.round(store.fastRecorderValidation.details.size / (1024 * 1024)),
+          );
+        }
+      }
+
+      // Editor reached ready (new instrumentation; storage mirror of
+      // contentState.ready). Absence means the editor never loaded.
+      if (store.editorReadyAt) ctx.editorReady = "1";
+
+      // Track-end reason: distinguishes graceful stop from stream-end
+      // teardown (display sleep, Chrome native Stop sharing, source-tab
+      // close). Both bug-reporters had REC_RUN_STREAM_END so this is
+      // critical for matching.
+      if (store.lastTrackEndEvent?.reason) {
+        ctx.trackEndReason = String(store.lastTrackEndEvent.reason).slice(
+          0,
+          60,
+        );
+      }
+
+      // Editor-side error if surfaced. Differentiates types of stuck.
+      if (store.editorRecordingError?.errorCode) {
+        ctx.editorErr = String(store.editorRecordingError.errorCode).slice(
+          0,
+          60,
+        );
+      }
+
       if (store.diagnosticLog?.sessions?.length) {
         const last =
           store.diagnosticLog.sessions[
@@ -102,6 +174,20 @@ export const buildSupportContext = async (opts = {}) => {
             (ev) => ev.e === "editor-load-ready",
           );
           if (hasEditorOpen && !hasEditorReady) ctx.editorHandoff = "incomplete";
+
+          // Last 30 events as "name@msFromSessionStart". Just the
+          // sequence, no payloads.
+          const recent = last.events.slice(-30);
+          const compact = recent
+            .map((ev) => `${ev.e}@${ev.t}`)
+            .join(",");
+          // Cap so a runaway log doesn't blow past Tally URL limits.
+          if (compact && compact.length <= 3000) {
+            ctx.diagEvents = compact;
+          } else if (compact) {
+            // Keep the most recent.
+            ctx.diagEvents = compact.slice(-3000);
+          }
         }
       }
     } catch {}

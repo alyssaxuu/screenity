@@ -23,6 +23,7 @@ import {
 } from "../../utils/recordingDebug";
 import { diagForward } from "../../utils/diagForward";
 import { perfMark, perfSpan } from "../../utils/perfMarks";
+import { triggerSupportDownload } from "../../utils/triggerSupportDownload";
 import { chooseReader } from "../recorderStorage/chooseReader";
 import {
   Input,
@@ -262,6 +263,14 @@ const ContentState = (props) => {
     chrome.runtime
       .sendMessage({ type: "diag-editor-ready", path })
       .catch(() => {});
+    // Mirror to storage so BG's deferred endDiagSession watcher can see
+    // ready without depending on the diag session being open.
+    try {
+      chrome.storage.local.set({
+        editorReadyAt: Date.now(),
+        editorReadyPath: path,
+      });
+    } catch {}
   }, [contentState.ready]);
 
   useEffect(() => {
@@ -774,11 +783,19 @@ const ContentState = (props) => {
 
       const video = document.createElement("video");
       video.preload = "metadata";
+      const videoLoadStart = Date.now();
       video.onloadedmetadata = () => {
         perfMark("Sandbox video-loadedmetadata", {
           duration: video.duration,
           w: video.videoWidth,
           h: video.videoHeight,
+        });
+        diagForward("sandbox-video-loadedmetadata", {
+          elapsedMs: Date.now() - videoLoadStart,
+          duration: Number.isFinite(video.duration) ? video.duration : null,
+          width: video.videoWidth,
+          height: video.videoHeight,
+          blobBytes: blob?.size ?? 0,
         });
         setContentState((prev) => ({
           ...prev,
@@ -790,6 +807,14 @@ const ContentState = (props) => {
         URL.revokeObjectURL(video.src);
       };
       video.onerror = () => {
+        const errCode = video.error?.code ?? null;
+        const errMessage = video.error?.message ?? null;
+        diagForward("sandbox-video-load-error", {
+          elapsedMs: Date.now() - videoLoadStart,
+          code: errCode,
+          message: errMessage ? String(errMessage).slice(0, 200) : null,
+          blobBytes: blob?.size ?? 0,
+        });
         diagForward("sandbox-reconstruct-error", {
           error: "video-element-error",
           phase: "video-load",
@@ -799,6 +824,9 @@ const ContentState = (props) => {
       };
       try {
         video.src = URL.createObjectURL(blob);
+        diagForward("sandbox-video-src-set", {
+          blobBytes: blob?.size ?? 0,
+        });
       } catch (err) {
         diagForward("sandbox-reconstruct-error", {
           error: String(err?.message || err).slice(0, 200),
@@ -1030,10 +1058,12 @@ const ContentState = (props) => {
             false, // colorSafe
             chrome.i18n.getMessage("getHelpButton"),
             () => {
+              triggerSupportDownload({ source: "memory-limit" });
               chrome.runtime.sendMessage({
                 type: "report-error",
                 errorCode: "REC_RUN_MEMORY",
                 source: "memory-limit",
+                zipBundled: true,
               });
             },
           );
@@ -1153,28 +1183,71 @@ const ContentState = (props) => {
       }));
       if (lastRecordingBackendRef?.backend === "opfs") {
         const reader = chooseReader(lastRecordingBackendRef);
+        const readerOpenStart = Date.now();
         await reader.open(lastRecordingBackendRef);
+        diagForward("sandbox-opfs-reader-open-done", {
+          elapsedMs: Date.now() - readerOpenStart,
+          fileName: lastRecordingBackendRef?.fileName || null,
+        });
+        const readBlobStart = Date.now();
+        diagForward("sandbox-opfs-readblob-start", {});
         const { blob: rawBlob } = await reader.readBlob({
           // OPFS file isn't ready yet, recorder still flushing under load.
           // Surface a labeled loading state so the user knows it's progressing.
           onSlowFinalize: () => {
+            diagForward("sandbox-opfs-readblob-slow-finalize", {
+              elapsedMs: Date.now() - readBlobStart,
+            });
             setContentState((prev) =>
               prev.finalizingRecording ? prev : { ...prev, finalizingRecording: true },
             );
           },
         });
+        diagForward("sandbox-opfs-readblob-done", {
+          elapsedMs: Date.now() - readBlobStart,
+          rawBlobBytes: rawBlob?.size ?? 0,
+        });
         setContentState((prev) =>
           prev.finalizingRecording ? { ...prev, finalizingRecording: false } : prev,
         );
         await reader.close().catch(() => {});
-        // materialize so Blob URL doesn't break when mtime changes
-        let blob = rawBlob;
-        if (rawBlob && rawBlob.size <= 1_500_000_000) {
-          try {
-            const buf = await rawBlob.arrayBuffer();
-            blob = new Blob([buf], { type: rawBlob.type || "video/mp4" });
-          } catch {
-            blob = rawBlob;
+        // Use the OPFS-backed Blob on the critical path. The previous
+        // arrayBuffer copy was defensive against mtime/deletion but
+        // could take 30-60s on slow disks for 100MB+ files (the "stuck
+        // at 90%" reports). Materialize in the background instead, so a
+        // later recording that deletes the OPFS file doesn't strand the
+        // editor.
+        const blob = rawBlob;
+        if (rawBlob) {
+          diagForward("sandbox-opfs-materialize-deferred", {
+            bytes: rawBlob.size,
+          });
+          // Fire-and-forget materialize. Swaps in once done; the video
+          // element keeps the original src so playback isn't disrupted.
+          if (rawBlob.size <= 1_500_000_000) {
+            const materializeStart = Date.now();
+            (async () => {
+              try {
+                const buf = await rawBlob.arrayBuffer();
+                const materialized = new Blob([buf], {
+                  type: rawBlob.type || "video/mp4",
+                });
+                diagForward("sandbox-opfs-materialize-done", {
+                  elapsedMs: Date.now() - materializeStart,
+                  outputBytes: materialized.size,
+                });
+                setContentState((prev) => ({
+                  ...prev,
+                  blob: materialized,
+                  rawBlob: prev.rawBlob || materialized,
+                }));
+              } catch (err) {
+                diagForward("sandbox-opfs-materialize-fail", {
+                  elapsedMs: Date.now() - materializeStart,
+                  err: String(err?.message || err).slice(0, 200),
+                });
+              }
+            })();
           }
         }
         if (blob) {
@@ -1231,7 +1304,16 @@ const ContentState = (props) => {
             null,
             null,
             true,
-            false,
+            chrome.i18n.getMessage("getHelpButton"),
+            () => {
+              triggerSupportDownload({ source: "opfs-load-failed" });
+              chrome.runtime.sendMessage({
+                type: "report-error",
+                source: "opfs-load-failed",
+                errorCode: "OPFS_LOAD_FAILED",
+                zipBundled: true,
+              });
+            },
           );
         }
         diagForward("sandbox-recording-load-failed", {
@@ -1375,6 +1457,7 @@ const ContentState = (props) => {
           typeof contentStateRef.current?.openModal === "function"
         ) {
           editorErrorShownRef.current = true;
+          const errCode = message?.errorCode || "OPFS_LOAD_FAILED";
           contentStateRef.current.openModal(
             chrome.i18n.getMessage("opfsLoadErrorTitle"),
             message?.why || chrome.i18n.getMessage("opfsLoadErrorDescription"),
@@ -1386,7 +1469,16 @@ const ContentState = (props) => {
             null,
             null,
             true,
-            false,
+            chrome.i18n.getMessage("getHelpButton"),
+            () => {
+              triggerSupportDownload({ source: "opfs-load-failed" });
+              chrome.runtime.sendMessage({
+                type: "report-error",
+                source: "opfs-load-failed",
+                errorCode: errCode,
+                zipBundled: true,
+              });
+            },
           );
         }
         setContentState((prev) => ({
@@ -1760,10 +1852,12 @@ const ContentState = (props) => {
                 chrome.i18n.getMessage("editorStuckGetHelp"),
                 () => {
                   try {
+                    triggerSupportDownload({ source: "editor-recovery-failed" });
                     chrome.runtime.sendMessage({
                       type: "report-error",
                       source: "editor-recovery-failed",
                       errorCode: payload?.errorCode || null,
+                      zipBundled: true,
                     });
                   } catch {}
                 },
@@ -1857,6 +1951,7 @@ const ContentState = (props) => {
         typeof contentStateRef.current?.openModal === "function"
       ) {
         editorErrorShownRef.current = true;
+        const errCode = payload?.errorCode || "OPFS_LOAD_FAILED";
         contentStateRef.current.openModal(
           chrome.i18n.getMessage("opfsLoadErrorTitle"),
           payload?.why || chrome.i18n.getMessage("opfsLoadErrorDescription"),
@@ -1868,7 +1963,16 @@ const ContentState = (props) => {
           null,
           null,
           true,
-          false,
+          chrome.i18n.getMessage("getHelpButton"),
+          () => {
+            triggerSupportDownload({ source: "opfs-load-failed" });
+            chrome.runtime.sendMessage({
+              type: "report-error",
+              source: "opfs-load-failed",
+              errorCode: errCode,
+              zipBundled: true,
+            });
+          },
         );
         setContentState((prev) => ({
           ...prev,

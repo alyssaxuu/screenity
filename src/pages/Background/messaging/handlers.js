@@ -1469,12 +1469,13 @@ export const setupHandlers = () => {
   registerMessage("open-home", () =>
     createTab("https://screenity.io/", false, true),
   );
-  registerMessage("report-bug", async () => {
+  registerMessage("report-bug", async (message) => {
     const qs = await supportContextQuery({
       includeRecordingState: true,
       source: "settings",
     });
-    createTab(`https://tally.so/r/3ElpXq?${qs}`, false, true);
+    const zipParam = message?.zipBundled ? "&zipBundled=1" : "";
+    createTab(`https://tally.so/r/3ElpXq?${qs}${zipParam}`, false, true);
   });
   registerMessage("report-error", async (message) => {
     const errorCode = message?.errorCode || null;
@@ -1501,10 +1502,11 @@ export const setupHandlers = () => {
       user: isLoggedIn ? { name: user.name, email: user.email } : undefined,
     });
 
+    const zipParam = message?.zipBundled ? "&zipBundled=1" : "";
     if (isLoggedIn) {
       createTab(`https://tally.so/r/310MNg?extension=true&${qs}`, false, true);
     } else {
-      createTab(`https://tally.so/r/3ElpXq?feedbackType=Bug&${qs}`, false, true);
+      createTab(`https://tally.so/r/3ElpXq?feedbackType=Bug&${qs}${zipParam}`, false, true);
     }
   });
   registerMessage("clear-recordings", () => clearAllRecordings());

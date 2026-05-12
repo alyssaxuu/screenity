@@ -19,3 +19,6 @@ tests/
 test-results/
 playwright-report/
 tools/diagnostics-viewer/
+scripts/cws-preflight.mjs
+scripts/cws-get-refresh-token.mjs
+scripts/cws-baseline.json

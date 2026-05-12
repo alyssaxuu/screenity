@@ -191,11 +191,10 @@ export class OpfsChunkWriter {
         byteSize: this._byteSize,
         chunkCount: this._chunkCount,
       });
-      // signal "file is fully flushed" to the sandbox reader. kept as its
-      // own key because stop cleanup rewrites lastRecordingBackendRef from
-      // a few different paths and would clobber a finalized flag stored
-      // there. without this signal the editor reads mid-flush and ends up
-      // with a truncated blob.
+    } finally {
+      // Always set the finalized flag, even if close() timed out or
+      // threw. Writing it only on success left the editor's wait-finalize
+      // loop spinning 60s on slow disks (AV scan, hung worker).
       if (this._fileName) {
         try {
           await chrome.storage.local.set({
@@ -203,7 +202,6 @@ export class OpfsChunkWriter {
           });
         } catch {}
       }
-    } finally {
       this._closed = true;
       this._teardown();
     }

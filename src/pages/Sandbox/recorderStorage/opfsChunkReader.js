@@ -56,12 +56,26 @@ export class OpfsChunkReader {
 
     // !sameFile means a newer recording replaced the ref (our writer is
     // gone, or we're opening an orphan file). sameFile && finalized means
-    // the writer closed cleanly. otherwise wait for one of those.
+    // the writer closed cleanly. otherwise wait for one of those — but
+    // also watch the file size: if the writer dies without emitting the
+    // finalized marker (recorder tab killed, SW restart mid-flush, track
+    // ended mid-write), polling will time out at 60s for no reason. When
+    // size has been stable for SIZE_STABLE_MS, treat the writer as gone
+    // and read what's on disk.
     if (sameFile && !finalized) {
       const startedAt = Date.now();
       let notified = false;
+      let timedOut = false;
+      let lastSize = -1;
+      let sizeStableSince = 0;
+      const SIZE_STABLE_MS = 3000;
+      const SIZE_STABLE_MIN_WAIT_MS = 1500;
+      let writerDead = false;
       while (true) {
-        if (Date.now() - startedAt > FINALIZE_HARD_TIMEOUT_MS) break;
+        if (Date.now() - startedAt > FINALIZE_HARD_TIMEOUT_MS) {
+          timedOut = true;
+          break;
+        }
         if (!notified && Date.now() - startedAt > SLOW_FINALIZE_NOTIFY_MS) {
           try {
             onSlowFinalize?.();
@@ -71,6 +85,40 @@ export class OpfsChunkReader {
         await wait(FINALIZE_POLL_INTERVAL_MS);
         ({ sameFile, finalized } = await this._readRefState());
         if (finalized || !sameFile) break;
+        // Size-stability check. Probing the file inside the poll loop is
+        // cheap — getFile is metadata only on chromium.
+        try {
+          const probe = await handle.getFile();
+          if (probe.size !== lastSize) {
+            lastSize = probe.size;
+            sizeStableSince = Date.now();
+          } else if (
+            sizeStableSince > 0 &&
+            Date.now() - sizeStableSince >= SIZE_STABLE_MS &&
+            Date.now() - startedAt >= SIZE_STABLE_MIN_WAIT_MS &&
+            probe.size >= MIN_VALID_RECORDING_BYTES
+          ) {
+            writerDead = true;
+            break;
+          }
+        } catch {}
+      }
+      if (timedOut || writerDead) {
+        try {
+          chrome.runtime
+            .sendMessage({
+              type: "diag-forward",
+              event: writerDead
+                ? "sandbox-opfs-writer-dead-detected"
+                : "sandbox-opfs-wait-finalize-timeout",
+              data: {
+                fileName: this._fileName,
+                waitedMs: Date.now() - startedAt,
+                fileBytes: lastSize >= 0 ? lastSize : null,
+              },
+            })
+            .catch(() => {});
+        } catch {}
       }
     }
 

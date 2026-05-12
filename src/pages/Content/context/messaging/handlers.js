@@ -8,6 +8,7 @@ import { updateFromStorage } from "../utils/updateFromStorage";
 import { checkAuthStatus } from "../utils/checkAuthStatus";
 import { traceStep, setStartFlowOutcome } from "../../../utils/startFlowTrace";
 import { perfMark } from "../../../utils/perfMarks";
+import { triggerSupportDownload } from "../../../utils/triggerSupportDownload";
 import JSZip from "jszip";
 
 const CLOUD_FEATURES_ENABLED =
@@ -622,6 +623,20 @@ export const setupHandlers = () => {
         null,
         () => {},
         () => {},
+        null,
+        null,
+        null,
+        false,
+        chrome.i18n.getMessage("getHelpButton"),
+        () => {
+          triggerSupportDownload({ source: "recording-failed" });
+          chrome.runtime.sendMessage({
+            type: "report-error",
+            source: "recording-failed",
+            errorCode: "REC_START_FAILED",
+            zipBundled: true,
+          });
+        },
       );
     }
   });
@@ -764,11 +779,13 @@ export const setupHandlers = () => {
       false,
       chrome.i18n.getMessage("getHelpButton"),
       () => {
+        triggerSupportDownload({ source: "stream-error" });
         chrome.runtime.sendMessage({
           type: "report-error",
           errorCode,
           errorWhy,
           source: "stream-error",
+          zipBundled: true,
         });
       },
     );
@@ -804,6 +821,20 @@ export const setupHandlers = () => {
       },
       () => {
         state.dismissRecording();
+      },
+      null,
+      null,
+      null,
+      false,
+      chrome.i18n.getMessage("getHelpButton"),
+      () => {
+        triggerSupportDownload({ source: "backup-error" });
+        chrome.runtime.sendMessage({
+          type: "report-error",
+          source: "backup-error",
+          errorCode: "BACKUP_PERMISSION_FAILED",
+          zipBundled: true,
+        });
       },
     );
   });
@@ -895,8 +926,16 @@ export const setupHandlers = () => {
       null,
       null,
       true,
-      false,
-      () => {},
+      chrome.i18n.getMessage("getHelpButton"),
+      () => {
+        triggerSupportDownload({ source: "fast-recorder-hard-fail" });
+        chrome.runtime.sendMessage({
+          type: "report-error",
+          source: "fast-recorder-hard-fail",
+          errorCode: "FAST_RECORDER_HARD_FAIL",
+          zipBundled: true,
+        });
+      },
     );
   });
 
