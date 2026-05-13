@@ -322,6 +322,7 @@ const Recorder = () => {
 
   const isTab = useRef(false);
   const tabID = useRef(null);
+  const tabIDError = useRef(null);
   // Numeric chrome tab id (tabID holds the chromeMediaSourceId from
   // tabCapture). Used to query the tab's viewport for aspect-correct
   // capture constraints.
@@ -1195,6 +1196,8 @@ const Recorder = () => {
       probeResult,
       stickyState,
     );
+    const recordingExtension =
+      probeResult?.details?.containerKind === "webm" ? "webm" : "mp4";
 
     chunkWriter.current = null;
     chunkWriterBackend.current = null;
@@ -1210,7 +1213,10 @@ const Recorder = () => {
       let openResult = null;
       const wantBackend = shouldUseFast ? "opfs" : "idb";
       const prewarmedMatches =
-        prewarmedWriter && prewarmedWriter.selection.backend === wantBackend;
+        prewarmedWriter &&
+        prewarmedWriter.selection.backend === wantBackend &&
+        (prewarmedWriter.selection.backend !== "opfs" ||
+          (prewarmedWriter.extension || "mp4") === recordingExtension);
       if (prewarmedMatches) {
         selection = prewarmedWriter.selection;
         openResult = prewarmedWriter.openResult;
@@ -1230,7 +1236,9 @@ const Recorder = () => {
       const endOpen = perfSpan("Recorder.preflight writer.open");
       try {
         if (!openResult) {
-          openResult = await selection.writer.open(recordingId);
+          openResult = await selection.writer.open(recordingId, {
+            extension: recordingExtension,
+          });
         }
         endOpen({ backend: selection.backend, prewarmed: prewarmedMatches });
       } catch (openErr) {
@@ -1247,7 +1255,9 @@ const Recorder = () => {
             await selection.writer.abort();
           } catch {}
           selection = await chooseWriter({ preferOpfs: false });
-          openResult = await selection.writer.open(recordingId);
+          openResult = await selection.writer.open(recordingId, {
+            extension: recordingExtension,
+          });
         } else {
           throw openErr;
         }
@@ -1288,6 +1298,7 @@ const Recorder = () => {
     }
     const selectedVideoConfig =
       probeResult?.details?.selectedVideoConfig || null;
+    const containerKind = recordingExtension;
 
     await chrome.storage.local.set({
       fastRecorderDecision: {
@@ -1639,6 +1650,7 @@ const Recorder = () => {
           audioBitrate: hasAudioTrack ? audioBitsPerSecond : undefined,
           enableAudio: hasAudioTrack,
           videoEncoderConfig: selectedVideoConfig,
+          containerKind,
           debug: DEBUG_RECORDER,
           onFinalized: async () => {
             debug("WebCodecsRecorder onFinalized()");
@@ -2506,8 +2518,17 @@ const Recorder = () => {
       prewarmedWriterRef.current = (async () => {
         try {
           const selection = await chooseWriter({ preferOpfs: true });
-          const openResult = await selection.writer.open(recordingId);
-          return { selection, openResult, recordingId };
+          let prewarmExt = "mp4";
+          try {
+            const stored = await chrome.storage.local.get(["fastRecorderProbe"]);
+            if (stored?.fastRecorderProbe?.details?.containerKind === "webm") {
+              prewarmExt = "webm";
+            }
+          } catch {}
+          const openResult = await selection.writer.open(recordingId, {
+            extension: prewarmExt,
+          });
+          return { selection, openResult, recordingId, extension: prewarmExt };
         } catch {
           return null;
         }
@@ -3578,7 +3599,13 @@ const Recorder = () => {
         debug("Streaming with pre-resolved tabID", tabStreamId);
         if (!tabStreamId) {
           resetGateState();
-          sendRecordingError("Unable to resolve tab stream id", true);
+          const underlying = tabIDError.current
+            ? `: ${tabIDError.current}`
+            : "";
+          sendRecordingError(
+            `Unable to resolve tab stream id${underlying}`,
+            false,
+          );
           return;
         }
         startStream(data, tabStreamId, null, permissions, permissions2);
@@ -3600,33 +3627,54 @@ const Recorder = () => {
   const getStreamID = async (id) => {
     perfMark("Recorder getStreamID.enter", { tabId: id });
     debug("getStreamID()", id);
+    tabIDError.current = null;
     let streamId;
-    if (IS_OFFSCREEN_HOST) {
-      // chrome.tabCapture isn't callable from offscreen; delegate to SW.
-      const endOff = perfSpan("Recorder offscreen-request-stream(tab)");
-      const response = await chrome.runtime
-        .sendMessage({
-          type: "offscreen-request-stream",
-          mode: "tab",
+    try {
+      if (IS_OFFSCREEN_HOST) {
+        // chrome.tabCapture isn't callable from offscreen; delegate to SW.
+        const endOff = perfSpan("Recorder offscreen-request-stream(tab)");
+        const response = await chrome.runtime
+          .sendMessage({
+            type: "offscreen-request-stream",
+            mode: "tab",
+            targetTabId: id,
+          })
+          .catch((err) => ({ ok: false, error: String(err) }));
+        endOff({ ok: Boolean(response?.ok) });
+        if (!response?.ok || !response.streamId) {
+          debug("Offscreen tab stream acquisition failed", response);
+          tabIDError.current =
+            response?.error || "offscreen-tab-stream-empty-response";
+          return;
+        }
+        streamId = response.streamId;
+      } else {
+        if (!chrome?.tabCapture?.getMediaStreamId) {
+          tabIDError.current = "chrome.tabCapture.getMediaStreamId unavailable";
+          return;
+        }
+        const endTc = perfSpan("Recorder tabCapture.getMediaStreamId");
+        streamId = await chrome.tabCapture.getMediaStreamId({
           targetTabId: id,
-        })
-        .catch((err) => ({ ok: false, error: String(err) }));
-      endOff({ ok: Boolean(response?.ok) });
-      if (!response?.ok || !response.streamId) {
-        debug("Offscreen tab stream acquisition failed", response);
-        return;
+        });
+        endTc({ hasStreamId: Boolean(streamId) });
+        if (!streamId) {
+          tabIDError.current = "tabCapture.getMediaStreamId returned empty";
+          return;
+        }
       }
-      streamId = response.streamId;
-    } else {
-      const endTc = perfSpan("Recorder tabCapture.getMediaStreamId");
-      streamId = await chrome.tabCapture.getMediaStreamId({
-        targetTabId: id,
+      debug("Resolved tabCapture streamId", streamId);
+      tabID.current = streamId;
+    } catch (err) {
+      const errStr = String(err?.message || err);
+      debugWarn("getStreamID failed", errStr);
+      tabIDError.current = errStr;
+    } finally {
+      perfMark("Recorder getStreamID.done", {
+        ok: Boolean(tabID.current),
+        error: tabIDError.current,
       });
-      endTc({ hasStreamId: Boolean(streamId) });
     }
-    debug("Resolved tabCapture streamId", streamId);
-    tabID.current = streamId;
-    perfMark("Recorder getStreamID.done");
   };
 
   // chromeMediaSource constraints have no "no padding" knob: any combo
@@ -3674,6 +3722,10 @@ const Recorder = () => {
       if (tabID.current) {
         endWait({ attempts, hasId: true });
         return tabID.current;
+      }
+      if (tabIDError.current) {
+        endWait({ attempts, hasId: false, error: tabIDError.current });
+        return null;
       }
     }
     endWait({ attempts, hasId: false });
@@ -3733,7 +3785,9 @@ const Recorder = () => {
         isTab.current = request.isTab;
         if (request.isTab) {
           recordedTabId.current = request.tabID ?? null;
-          getStreamID(request.tabID);
+          getStreamID(request.tabID).catch((err) => {
+            tabIDError.current = String(err?.message || err);
+          });
         }
       } else {
         isTab.current = false;

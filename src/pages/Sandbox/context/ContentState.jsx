@@ -763,15 +763,28 @@ const ContentState = (props) => {
       elapsedMs: Date.now() - reconstructStartedAt,
       type: blob?.type || null,
     });
-    if (blob.type === "video/mp4") {
+    let isFastWebm = false;
+    if (blob.type === "video/webm") {
+      try {
+        const { lastRecordingBackendRef } = await chrome.storage.local.get([
+          "lastRecordingBackendRef",
+        ]);
+        isFastWebm =
+          lastRecordingBackendRef?.backend === "opfs" &&
+          /\.webm$/i.test(lastRecordingBackendRef?.fileName || "");
+      } catch {}
+    }
+    if (blob.type === "video/mp4" || isFastWebm) {
       if (DEBUG_RECORDER)
-        console.log("[Screenity][Sandbox] reconstructVideo: fast MP4 path taken", {
+        console.log("[Screenity][Sandbox] reconstructVideo: fast path taken", {
           size: blob.size,
+          type: blob.type,
+          isFastWebm,
         });
       setContentState((prev) => ({
         ...prev,
         blob: blob,
-        webm: null,
+        webm: isFastWebm ? blob : null,
         mp4ready: true,
         ready: true,
         rawBlob: blob,
@@ -2899,7 +2912,9 @@ const ContentState = (props) => {
   const download = async () => {
     // ref: rapid clicks fire before state propagates
     const latest = contentStateRef.current || contentState;
-    if (latest.isFfmpegRunning || latest.downloading) return;
+    // isFfmpegRunning leaks from background poll handlers and would
+    // intermittently swallow real user clicks; downloading is the real lock.
+    if (latest.downloading) return;
 
     setContentState((prev) => ({
       ...prev,
@@ -3014,7 +3029,7 @@ const ContentState = (props) => {
   };
 
   const downloadWEBM = async () => {
-    if (contentState.isFfmpegRunning || contentState.downloadingWEBM) return;
+    if (contentState.downloadingWEBM) return;
 
     const sourceBlob = contentState.blob || contentState.webm;
 

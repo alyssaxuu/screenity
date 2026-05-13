@@ -130,7 +130,10 @@ export class OpfsChunkReader {
       err.code = "opfs-file-too-small";
       throw err;
     }
-    const blob = new Blob([file], { type: "video/mp4" });
+    const isWebm = /\.webm$/i.test(this._fileName || "");
+    const blob = new Blob([file], {
+      type: isWebm ? "video/webm" : "video/mp4",
+    });
     return {
       blob,
       byteSize: blob.size,

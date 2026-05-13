@@ -121,18 +121,22 @@ export class OpfsChunkWriter {
     });
   }
 
-  async open(recordingId) {
+  async open(recordingId, opts = {}) {
     if (this._closed || this._aborted) {
       throw new Error("opfs-chunk-writer-reused");
     }
+    const extension = opts.extension === "webm" ? "webm" : "mp4";
     const resp = await this._request(
-      { type: "open", recordingId },
+      { type: "open", recordingId, extension },
       OPEN_TIMEOUT_MS,
     );
+    if (this._aborted || this._closed) {
+      // open reply lands after abort; skip storage write so it doesn't
+      // overwrite a real recording's backendRef.
+      return { backendRef: { backend: "opfs", fileName: resp.fileName || null } };
+    }
     this._fileName = resp.fileName || null;
     opfsDiag("open-ok", { fileName: this._fileName });
-    // Persist immediately so a crash before chunkBackendRef.current syncs
-    // still leaves the editor a pointer to the partial OPFS file.
     if (this._fileName) {
       try {
         await chrome.storage.local.set({
@@ -215,6 +219,19 @@ export class OpfsChunkWriter {
   async abort() {
     if (this._aborted) return;
     this._aborted = true;
+    // Clear storage only if it still points at this writer's file; the
+    // next recording may have already claimed it.
+    try {
+      const { lastRecordingBackendRef } = await chrome.storage.local.get([
+        "lastRecordingBackendRef",
+      ]);
+      if (
+        lastRecordingBackendRef?.backend === "opfs" &&
+        lastRecordingBackendRef.fileName === this._fileName
+      ) {
+        await chrome.storage.local.set({ lastRecordingBackendRef: null });
+      }
+    } catch {}
     try {
       await this._request({ type: "abort" }, ABORT_TIMEOUT_MS);
     } catch {} finally {

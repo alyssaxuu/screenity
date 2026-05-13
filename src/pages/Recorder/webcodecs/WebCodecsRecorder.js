@@ -22,16 +22,28 @@ const loadMp4MuxerWrapper = () => {
   return _mp4MuxerWrapperPromise;
 };
 
+let _mkvMuxerWrapperPromise = null;
+const loadMkvMuxerWrapper = () => {
+  if (!_mkvMuxerWrapperPromise) {
+    _mkvMuxerWrapperPromise = import("./MkvMuxerWrapper").then(
+      (m) => m.MkvMuxerWrapper,
+    );
+  }
+  return _mkvMuxerWrapperPromise;
+};
+
 // Warm the mediabunny muxer chunk before start() so its first import doesn't
 // add latency between the countdown ending and the recorder firing.
 export function preloadWebCodecsModules() {
   loadMp4MuxerWrapper().catch(() => {});
+  loadMkvMuxerWrapper().catch(() => {});
 }
 
 export class WebCodecsRecorder {
   constructor(stream, options) {
     this.stream = stream;
     this.options = options;
+    this.containerKind = options.containerKind === "webm" ? "webm" : "mp4";
 
     this.debug = options.debug ?? false;
     this.log = (...args) => this.debug && console.log(...args);
@@ -234,10 +246,17 @@ export class WebCodecsRecorder {
           try {
             const support = await VideoEncoder.isConfigSupported(config);
             if (support?.supported) {
+              const effectiveCodec =
+                (support.config || config).codec || overrideConfig.codec || "";
+              let cc;
+              if (/^vp09|^vp9/i.test(effectiveCodec)) cc = "vp9";
+              else if (/^vp08|^vp8/i.test(effectiveCodec)) cc = "vp8";
+              else if (/^av01|^av1/i.test(effectiveCodec)) cc = "av1";
+              else cc = "avc";
               videoConfig = {
                 config: support.config || config,
-                codec: (support.config || config).codec || overrideConfig.codec,
-                containerCodec: "avc",
+                codec: effectiveCodec,
+                containerCodec: cc,
               };
             }
           } catch (err) {
@@ -292,20 +311,41 @@ export class WebCodecsRecorder {
         });
         this.videoReader = this.videoProcessor.readable.getReader();
 
-        this.log("[WCR] creating muxer...");
-        const endLoadMuxer = perfSpan("WCR.loadMp4MuxerWrapper");
-        const Mp4MuxerWrapper = await loadMp4MuxerWrapper();
-        endLoadMuxer();
-        this.muxer = new Mp4MuxerWrapper({
-          width: this.targetWidth,
-          height: this.targetHeight,
-          fps,
-          videoBitrate: this.options.videoBitrate,
-          audioBitrate: this.options.audioBitrate,
-          videoCodec: videoConfig.containerCodec,
-          audioCodec: this.options.enableAudio ? "aac" : undefined,
-          onChunk: this.options.onChunk,
-        });
+        this.log("[WCR] creating muxer...", this.containerKind);
+        const muxerAudioCodec = this.options.enableAudio
+          ? this.containerKind === "webm"
+            ? "opus"
+            : "aac"
+          : undefined;
+        if (this.containerKind === "webm") {
+          const endLoadMuxer = perfSpan("WCR.loadMkvMuxerWrapper");
+          const MkvMuxerWrapper = await loadMkvMuxerWrapper();
+          endLoadMuxer();
+          this.muxer = new MkvMuxerWrapper({
+            width: this.targetWidth,
+            height: this.targetHeight,
+            fps,
+            videoBitrate: this.options.videoBitrate,
+            audioBitrate: this.options.audioBitrate,
+            videoCodec: videoConfig.containerCodec,
+            audioCodec: muxerAudioCodec,
+            onChunk: this.options.onChunk,
+          });
+        } else {
+          const endLoadMuxer = perfSpan("WCR.loadMp4MuxerWrapper");
+          const Mp4MuxerWrapper = await loadMp4MuxerWrapper();
+          endLoadMuxer();
+          this.muxer = new Mp4MuxerWrapper({
+            width: this.targetWidth,
+            height: this.targetHeight,
+            fps,
+            videoBitrate: this.options.videoBitrate,
+            audioBitrate: this.options.audioBitrate,
+            videoCodec: videoConfig.containerCodec,
+            audioCodec: muxerAudioCodec,
+            onChunk: this.options.onChunk,
+          });
+        }
 
         if (this.options.enableAudio) {
           this.muxer.enableAudio();
@@ -717,7 +757,7 @@ export class WebCodecsRecorder {
     } catch {}
 
     const candidateConfig = {
-      codec: "mp4a.40.2",
+      codec: this.containerKind === "webm" ? "opus" : "mp4a.40.2",
       sampleRate,
       numberOfChannels,
       bitrate: this.options.audioBitrate || 128000,
@@ -726,14 +766,14 @@ export class WebCodecsRecorder {
     try {
       const support = await AudioEncoder.isConfigSupported(candidateConfig);
       if (!support.supported) {
-        this.warn("[WCR] AAC unsupported");
+        this.warn("[WCR] audio codec unsupported", candidateConfig.codec);
         return null;
       }
       this.audioSampleRate = support.config?.sampleRate || candidateConfig.sampleRate;
       this.audioChannelCount = support.config?.numberOfChannels || numberOfChannels;
       return support.config || candidateConfig;
     } catch {
-      this.warn("[WCR] AAC probe failed");
+      this.warn("[WCR] audio probe failed", candidateConfig.codec);
       return null;
     }
   }
@@ -748,14 +788,21 @@ export class WebCodecsRecorder {
       latencyMode: "realtime",
     };
 
-    const candidates = [
-      { codec: "avc1.64002A", containerCodec: "avc", hw: "prefer-hardware" },
-      { codec: "avc1.4D401F", containerCodec: "avc", hw: "prefer-hardware" },
-      { codec: "avc1.42E01E", containerCodec: "avc", hw: "prefer-hardware" },
-      { codec: "avc1.64002A", containerCodec: "avc", hw: "prefer-software" },
-      { codec: "avc1.4D401F", containerCodec: "avc", hw: "prefer-software" },
-      { codec: "avc1.42E01E", containerCodec: "avc", hw: "prefer-software" },
-    ];
+    const candidates =
+      this.containerKind === "webm"
+        ? [
+            { codec: "vp09.00.10.08", containerCodec: "vp9", hw: "prefer-hardware" },
+            { codec: "vp09.00.10.08", containerCodec: "vp9", hw: "prefer-software" },
+            { codec: "vp8", containerCodec: "vp8", hw: "prefer-software" },
+          ]
+        : [
+            { codec: "avc1.64002A", containerCodec: "avc", hw: "prefer-hardware" },
+            { codec: "avc1.4D401F", containerCodec: "avc", hw: "prefer-hardware" },
+            { codec: "avc1.42E01E", containerCodec: "avc", hw: "prefer-hardware" },
+            { codec: "avc1.64002A", containerCodec: "avc", hw: "prefer-software" },
+            { codec: "avc1.4D401F", containerCodec: "avc", hw: "prefer-software" },
+            { codec: "avc1.42E01E", containerCodec: "avc", hw: "prefer-software" },
+          ];
 
     for (const c of candidates) {
       const config = { ...base, codec: c.codec, hardwareAcceleration: c.hw };

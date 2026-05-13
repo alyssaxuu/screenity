@@ -799,6 +799,8 @@ const Recorder = () => {
       );
       const selectedVideoConfig =
         probeResult?.details?.selectedVideoConfig || null;
+      const containerKind =
+        probeResult?.details?.containerKind === "webm" ? "webm" : "mp4";
       let recorderToken = 0;
       let codecFallbackTriggered = false;
       let webcodecsFallbackTriggered = false;
@@ -925,17 +927,23 @@ const Recorder = () => {
           .toString(36)
           .slice(2, 8)}`;
         try {
+          const regionExt =
+            probeResult?.details?.containerKind === "webm" ? "webm" : "mp4";
           let selection = await chooseWriter({ preferOpfs: true });
           let openResult = null;
           try {
-            openResult = await selection.writer.open(writerRecordingId);
+            openResult = await selection.writer.open(writerRecordingId, {
+              extension: regionExt,
+            });
           } catch (openErr) {
             if (selection.backend === "opfs") {
               try {
                 await selection.writer.abort();
               } catch {}
               selection = await chooseWriter({ preferOpfs: false });
-              openResult = await selection.writer.open(writerRecordingId);
+              openResult = await selection.writer.open(writerRecordingId, {
+                extension: regionExt,
+              });
             } else {
               throw openErr;
             }
@@ -978,6 +986,7 @@ const Recorder = () => {
           audioBitrate: hasAudioTrack ? audioBitsPerSecond : undefined,
           enableAudio: hasAudioTrack,
           videoEncoderConfig: selectedVideoConfig,
+          containerKind,
           debug: DEBUG_RECORDER,
           onFinalized: async () => {
             await waitForDrain();

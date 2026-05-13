@@ -35,12 +35,13 @@ const post = (payload) => {
   self.postMessage(payload);
 };
 
-const openFile = async (recordingId) => {
+const openFile = async (recordingId, extension) => {
   // Create NEW before deleting old: if creation fails, the previous
   // recording remains intact for recovery, and a recovery editor
   // already loading the old file doesn't lose it mid-load.
   const dir = await navigator.storage.getDirectory();
-  const name = `${FILE_PREFIX}${recordingId}.mp4`;
+  const ext = extension === "webm" ? "webm" : "mp4";
+  const name = `${FILE_PREFIX}${recordingId}.${ext}`;
   const handle = await dir.getFileHandle(name, { create: true });
   const sync = await handle.createSyncAccessHandle();
   sync.truncate(0);
@@ -127,7 +128,7 @@ self.onmessage = (e) => {
   if (msg.type === "open") {
     enqueue(async () => {
       try {
-        const { fileName: fn } = await openFile(msg.recordingId);
+        const { fileName: fn } = await openFile(msg.recordingId, msg.extension);
         post({ type: "ready", requestId: msg.requestId, ok: true, fileName: fn });
       } catch (err) {
         post({

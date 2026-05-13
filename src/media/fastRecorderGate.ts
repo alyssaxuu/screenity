@@ -326,6 +326,74 @@ export const probeFastRecorderSupport = async (): Promise<FastRecorderProbeResul
       reasons.push("linux-missing-codecs");
     }
 
+    let containerKind: "mp4" | "webm" = "mp4";
+    const mp4Reasons = [...reasons];
+    const mp4Ok = mp4Reasons.length === 0;
+
+    if (!mp4Ok && hasVideoEncoder && hasAudioEncoder) {
+      const webmAudioConfig = {
+        codec: "opus",
+        sampleRate: 48000,
+        numberOfChannels: 2,
+        bitrate: 128000,
+      } as AudioEncoderConfig;
+      const webmVideoBase = {
+        codec: "vp09.00.10.08",
+        width: 1280,
+        height: 720,
+        bitrate: 4_000_000,
+        framerate: 30,
+        bitrateMode: "constant",
+        latencyMode: "realtime",
+      } as VideoEncoderConfig;
+
+      let webmAudioSupport: any = null;
+      try {
+        webmAudioSupport = await AudioEncoder.isConfigSupported(webmAudioConfig);
+      } catch (err) {
+        details.webmAudioError = String(err);
+      }
+
+      let selectedWebmVideo: VideoEncoderConfig | null = null;
+      const webmHwOptions: Array<VideoEncoderConfig["hardwareAcceleration"]> = [
+        "prefer-hardware",
+        "prefer-software",
+      ];
+      for (const hw of webmHwOptions) {
+        try {
+          const candidate: any = { ...webmVideoBase, hardwareAcceleration: hw };
+          const support = await VideoEncoder.isConfigSupported(candidate);
+          if (support?.supported) {
+            selectedWebmVideo = support.config || candidate;
+            break;
+          }
+        } catch {}
+      }
+
+      if (selectedWebmVideo && webmAudioSupport?.supported) {
+        containerKind = "webm";
+        details.containerKind = "webm";
+        details.webmSelectedVideoConfig = selectedWebmVideo;
+        details.webmAudioConfig = webmAudioSupport.config || webmAudioConfig;
+        details.selectedVideoConfig = selectedWebmVideo;
+        details.audioConfig = webmAudioSupport.config || webmAudioConfig;
+        details.videoConfigSupported = true;
+        details.audioConfigSupported = true;
+        details.mp4FallbackReasons = mp4Reasons;
+        const carryOver = new Set([
+          "no-video-encoder",
+          "no-audio-encoder",
+          "no-track-processor",
+          "probe_exception",
+        ]);
+        for (let i = reasons.length - 1; i >= 0; i--) {
+          if (!carryOver.has(reasons[i])) reasons.splice(i, 1);
+        }
+      }
+    }
+
+    if (containerKind === "mp4") details.containerKind = "mp4";
+
     const ok = reasons.length === 0;
     const at = Date.now();
     debugLog("probe result", { ok, reasons, details, at });
@@ -394,7 +462,7 @@ export const validateFastRecorderOutputBlob = async (
     reasons.push("blob-too-small");
   }
 
-  if (!blob.type || !blob.type.includes("mp4")) {
+  if (!blob.type || !(blob.type.includes("mp4") || blob.type.includes("webm"))) {
     reasons.push("unexpected-mime");
   }
 
@@ -436,15 +504,22 @@ export const validateFastRecorderOutputBlob = async (
     reasons.push("demuxer-error");
   }
 
-  const videoCodec = opts.videoCodec || "avc1.42E01E";
+  const containerKind = blob.type.includes("webm") ? "webm" : "mp4";
+  const defaultVideoCodec = containerKind === "webm" ? "vp9" : "avc1.42E01E";
+  const defaultAudioCodec = containerKind === "webm" ? "opus" : "mp4a.40.2";
+  const videoCodec = opts.videoCodec || defaultVideoCodec;
   const audioCodec =
-    opts.audioCodec === undefined ? "mp4a.40.2" : opts.audioCodec;
+    opts.audioCodec === undefined ? defaultAudioCodec : opts.audioCodec;
   const codecSuffix = audioCodec ? `, ${audioCodec}` : "";
-  const mp4Mime = `video/mp4; codecs="${videoCodec}${codecSuffix}"`;
+  const playMime =
+    containerKind === "webm"
+      ? `video/webm; codecs="${videoCodec}${codecSuffix}"`
+      : `video/mp4; codecs="${videoCodec}${codecSuffix}"`;
+  details.containerKind = containerKind;
   details.expectedVideoCodec = videoCodec;
   details.expectedAudioCodec = audioCodec;
-  details.canPlayType = safeCanPlayType(mp4Mime);
-  details.mediaSourceSupported = safeMseSupport(mp4Mime);
+  details.canPlayType = safeCanPlayType(playMime);
+  details.mediaSourceSupported = safeMseSupport(playMime);
 
   const hardFail =
     reasons.includes("no-blob") ||
