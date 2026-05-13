@@ -74,6 +74,8 @@ export class WebCodecsRecorder {
 
     this.audioSamplesWritten = 0;
     this.audioSampleRate = null;
+    this.audioChannelCount = null;
+    this._firstAudioFrameSampleRate = null;
 
     this.resizeCanvas = null;
     this.resizeCtx = null;
@@ -596,6 +598,8 @@ export class WebCodecsRecorder {
     this._lastKeyFrameIndex = 0;
     this.audioSamplesWritten = 0;
     this.audioSampleRate = null;
+    this.audioChannelCount = null;
+    this._firstAudioFrameSampleRate = null;
 
     this.resizeCanvas = null;
     this.resizeCtx = null;
@@ -694,6 +698,24 @@ export class WebCodecsRecorder {
     const sampleRate = settings.sampleRate || 48000;
     const numberOfChannels = settings.channelCount || 2;
 
+    try {
+      chrome.storage.local.set({
+        lastRecordingAudioSnapshot: {
+          at: Date.now(),
+          trackSettings: {
+            sampleRate: settings.sampleRate ?? null,
+            channelCount: settings.channelCount ?? null,
+            deviceId: settings.deviceId ?? null,
+            autoGainControl: settings.autoGainControl ?? null,
+            echoCancellation: settings.echoCancellation ?? null,
+            noiseSuppression: settings.noiseSuppression ?? null,
+          },
+          encoderSampleRate: sampleRate,
+          encoderChannelCount: numberOfChannels,
+        },
+      });
+    } catch {}
+
     const candidateConfig = {
       codec: "mp4a.40.2",
       sampleRate,
@@ -708,6 +730,7 @@ export class WebCodecsRecorder {
         return null;
       }
       this.audioSampleRate = support.config?.sampleRate || candidateConfig.sampleRate;
+      this.audioChannelCount = support.config?.numberOfChannels || numberOfChannels;
       return support.config || candidateConfig;
     } catch {
       this.warn("[WCR] AAC probe failed");
@@ -926,17 +949,114 @@ export class WebCodecsRecorder {
       }
     };
 
+    // Windows WASAPI loopback stops yielding frames when system audio is
+    // silent, leaving audioReader.read() pending forever while video keeps
+    // recording. Pad with silence so the audio track stays aligned to the
+    // full video duration.
+    const SILENCE_TIMEOUT_MS = 500;
+    const SILENCE_CHUNK_MS = 500;
+    let paddedSilenceCount = 0;
+
+    const makeSilentAudioData = (durationMs) => {
+      const sampleRate = this.audioSampleRate || 48000;
+      const channels = this.audioChannelCount || 2;
+      const frames = Math.max(
+        1,
+        Math.round((sampleRate * durationMs) / 1000),
+      );
+      const data = new Float32Array(frames * channels);
+      return new AudioData({
+        format: "f32-planar",
+        sampleRate,
+        numberOfFrames: frames,
+        numberOfChannels: channels,
+        timestamp: Math.round(
+          (this.audioSamplesWritten * 1_000_000) / sampleRate,
+        ),
+        data,
+      });
+    };
+
     try {
       while (this.running) {
-        const { value: audioData, done } = await this.audioReader
-          .read()
-          .catch(() => ({ done: true }));
+        const readResult = await Promise.race([
+          this.audioReader
+            .read()
+            .then((v) => ({ ...v, timedOut: false }))
+            .catch(() => ({ done: true, timedOut: false })),
+          new Promise((r) =>
+            setTimeout(
+              () => r({ value: null, done: false, timedOut: true }),
+              SILENCE_TIMEOUT_MS,
+            ),
+          ),
+        ]);
 
+        if (readResult.timedOut) {
+          const trackEnded =
+            !this.audioTrack || this.audioTrack.readyState === "ended";
+          if (
+            !this._audioReady ||
+            this.paused ||
+            trackEnded ||
+            !this.audioEncoder ||
+            this.audioEncoder.state === "closed"
+          ) {
+            continue;
+          }
+          try {
+            const silent = makeSilentAudioData(SILENCE_CHUNK_MS);
+            try {
+              encodeAudioData(silent);
+            } finally {
+              silent.close?.();
+            }
+            paddedSilenceCount += 1;
+            if (paddedSilenceCount === 1 || paddedSilenceCount % 20 === 0) {
+              this.log(
+                "[WCR] audio source quiet, padding silence",
+                paddedSilenceCount,
+              );
+            }
+          } catch (err) {
+            // Encoder unhealthy; break to avoid spinning on every timeout.
+            this.warn("[WCR] silence padding failed", err);
+            break;
+          }
+          continue;
+        }
+
+        const { value: audioData, done } = readResult;
         if (done || !audioData) break;
         if (!this.audioTrack || this.audioTrack.readyState === "ended") {
           this.warn("[WCR] audio lost");
           this.options.onError?.({ type: "audio-lost" });
           break;
+        }
+
+        if (
+          this._firstAudioFrameSampleRate == null &&
+          typeof audioData.sampleRate === "number"
+        ) {
+          this._firstAudioFrameSampleRate = audioData.sampleRate;
+          try {
+            chrome.storage.local.get(
+              ["lastRecordingAudioSnapshot"],
+              (res) => {
+                const prev = res?.lastRecordingAudioSnapshot || {};
+                chrome.storage.local.set({
+                  lastRecordingAudioSnapshot: {
+                    ...prev,
+                    firstFrameSampleRate: audioData.sampleRate,
+                    firstFrameChannels:
+                      audioData.numberOfChannels ?? null,
+                    firstFrameFormat: audioData.format ?? null,
+                    firstFrameAt: Date.now(),
+                  },
+                });
+              },
+            );
+          } catch {}
         }
 
         if (!this._audioReady) {
@@ -976,6 +1096,24 @@ export class WebCodecsRecorder {
       this.err("[WCR] audio loop error:", err);
     }
 
-    this.log("[WCR] audio loop exit");
+    if (paddedSilenceCount > 0) {
+      this.log(
+        "[WCR] audio loop exit, total silence chunks padded:",
+        paddedSilenceCount,
+      );
+      try {
+        chrome.storage.local.get(["lastRecordingAudioSnapshot"], (res) => {
+          const prev = res?.lastRecordingAudioSnapshot || {};
+          chrome.storage.local.set({
+            lastRecordingAudioSnapshot: {
+              ...prev,
+              paddedSilenceCount,
+            },
+          });
+        });
+      } catch {}
+    } else {
+      this.log("[WCR] audio loop exit");
+    }
   }
 }
