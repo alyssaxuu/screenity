@@ -248,6 +248,8 @@ const Recorder = () => {
   const startRequestedAt = useRef(null);
   // Null after a start-gate timeout marks SW-to-tab handoff failure.
   const streamingDataReceivedAt = useRef(null);
+  const streamingDataTimeout = useRef(null);
+  const loadedAt = useRef(0);
   const startGateTimeout = useRef(null);
   // 12s: cold SW wake-ups on Windows Chrome can take several seconds; 8s was too tight.
   const START_GATE_TIMEOUT_MS = 12000;
@@ -3794,6 +3796,25 @@ const Recorder = () => {
         recordedTabId.current = null;
       }
       requestStreamingDataWithRetry();
+      // If the SW never wakes to deliver streaming-data, the start-gate
+      // timeout never arms (it depends on startRequested, which depends
+      // on streaming-data). Surface an error after 15s.
+      if (streamingDataTimeout.current) {
+        clearTimeout(streamingDataTimeout.current);
+      }
+      streamingDataTimeout.current = setTimeout(() => {
+        if (streamingDataReceivedAt.current != null) return;
+        const diagInfo = {
+          tabIDError: tabIDError.current,
+          isTab: isTab.current,
+          msSinceLoaded: Date.now() - loadedAt.current,
+        };
+        slLog("streaming-data-watchdog-fire", diagInfo);
+        sendRecordingError(
+          "Recording not ready: streaming-data never arrived from background",
+        );
+      }, 15000);
+      loadedAt.current = Date.now();
     } else if (request.type === "streaming-data") {
       // Streaming-data may arrive twice (SW push + tab pull, or retries).
       if (streamingDataReceivedAt.current != null) {
@@ -3803,6 +3824,10 @@ const Recorder = () => {
       slLog("msg-streaming-data");
       perfMark("Recorder streaming-data.received");
       streamingDataReceivedAt.current = Date.now();
+      if (streamingDataTimeout.current) {
+        clearTimeout(streamingDataTimeout.current);
+        streamingDataTimeout.current = null;
+      }
       startStreaming(JSON.parse(request.data));
     } else if (request.type === "start-recording-tab") {
       slLog("msg-start-recording-tab", {

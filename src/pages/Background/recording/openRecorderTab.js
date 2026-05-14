@@ -43,18 +43,29 @@ const openRecorderTab = async (
     switchTab = true;
   }
 
-  // URL-guard: region recordings point recordingTab at the user's tab, never close that
-  const { recordingTab: prevRecTab } = await chrome.storage.local.get([
-    "recordingTab",
-  ]);
+  // Region recordings point recordingTab at the user's tab; never close that.
+  // For cloudrecorder.html, also skip removal while the previous session is
+  // still uploading: killing it mid-TUS-upload corrupts scene data. It
+  // closes itself via window.close() when finalize lands.
+  const {
+    recordingTab: prevRecTab,
+    recorderSession: prevSession,
+  } = await chrome.storage.local.get(["recordingTab", "recorderSession"]);
   if (prevRecTab != null) {
     try {
       const prevTab = await chrome.tabs.get(prevRecTab);
       const prevUrl = prevTab?.url || "";
-      if (
-        prevUrl.includes("recorder.html") ||
-        prevUrl.includes("cloudrecorder.html")
-      ) {
+      const isCloudRecorderTab = prevUrl.includes("cloudrecorder.html");
+      const isFreeRecorderTab =
+        prevUrl.includes("recorder.html") && !isCloudRecorderTab;
+      const prevSessionStatus = prevSession?.status || null;
+      const stillFinalizing =
+        prevSessionStatus === "recording" ||
+        prevSessionStatus === "stopping" ||
+        prevSessionStatus === "finishing";
+      if (isFreeRecorderTab) {
+        await removeTab(prevRecTab);
+      } else if (isCloudRecorderTab && !stillFinalizing) {
         await removeTab(prevRecTab);
       }
     } catch {}

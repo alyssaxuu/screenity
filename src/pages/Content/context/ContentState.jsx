@@ -1505,6 +1505,19 @@ const ContentState = (props) => {
       if (changes.recordingNow) {
         shouldUpdateTimer = true;
       }
+      // Without this sync, the record button stays stuck on "Starting
+      // recording..." after a teardown the React state didn't observe
+      // (e.g. native Stop-sharing, SW-cleared start-fail).
+      if (changes.pendingRecording) {
+        const next = Boolean(changes.pendingRecording.newValue);
+        if (!next) {
+          setContentState((prev) => ({
+            ...prev,
+            pendingRecording: false,
+            preparingRecording: false,
+          }));
+        }
+      }
       if (changes.paused) {
         setContentState((prev) => ({
           ...prev,

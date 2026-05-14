@@ -11,6 +11,7 @@ import {
   listSessionDirs,
   destroySessionDir,
 } from "../CloudRecorder/recorderStorage/opfsKvStore";
+import { handleGetStreamingData } from "./recording/recordingHelpers";
 
 // Must run before any message/alarm handler can bail on a stale lock.
 const clearStaleLocks = async () => {
@@ -167,6 +168,76 @@ const clearStaleLocks = async () => {
   }
 };
 
+// SW death between opening the recorder tab and pushing streaming-data
+// leaves the recorder stuck at "Starting recording...". Re-deliver
+// `loaded` + streaming-data on next SW boot so it can complete the handshake.
+const recoverInFlightRecording = async () => {
+  try {
+    const { pendingRecording, recording, recordingTab } =
+      await chrome.storage.local.get([
+        "pendingRecording",
+        "recording",
+        "recordingTab",
+      ]);
+    // Only the pre-active window needs recovery. Once recording=true the
+    // streaming-data handshake already landed.
+    if (!pendingRecording || recording || !recordingTab) return;
+    let tab = null;
+    try {
+      tab = await chrome.tabs.get(recordingTab);
+    } catch {
+      return;
+    }
+    // Exact pathname match so "recorder.html" doesn't also match
+    // "cloudrecorder.html" via substring inclusion.
+    let recoveryTabUrl = null;
+    try {
+      recoveryTabUrl = tab?.url ? new URL(tab.url) : null;
+    } catch {}
+    const extOrigin = chrome.runtime.getURL("").replace(/\/$/, "");
+    const recoveryPath = recoveryTabUrl?.pathname;
+    const isRecoverableRecorder =
+      recoveryTabUrl?.origin === extOrigin &&
+      (recoveryPath === "/recorder.html" ||
+        recoveryPath === "/cloudrecorder.html");
+    if (!isRecoverableRecorder) return;
+    diagEvent("sw-restart-recovery-redeliver-streaming-data", {
+      recordingTab,
+      tabUrl: tab?.url,
+      status: tab?.status,
+    });
+    const { region, customRegion, tabRecordedID, backup, recordingType } =
+      await chrome.storage.local.get([
+        "region",
+        "customRegion",
+        "tabRecordedID",
+        "backup",
+        "recordingType",
+      ]);
+    const isRegion = Boolean(region) && !customRegion;
+    try {
+      await chrome.tabs.sendMessage(recordingTab, {
+        type: "loaded",
+        request: { recordingType, region, customRegion },
+        backup: Boolean(backup),
+        tabPreferred: false,
+        ...(isRegion && tabRecordedID
+          ? { isTab: true, tabID: tabRecordedID }
+          : {}),
+      });
+    } catch (err) {
+      console.warn("[Screenity][BG] redeliver loaded failed:", err);
+    }
+    // Both recorder pages dedup streaming-data via streamingDataReceivedAt,
+    // so a duplicate push is safe.
+    handleGetStreamingData().catch((err) => {
+      console.warn("[Screenity][BG] redeliver streaming-data failed:", err);
+    });
+  } catch (err) {
+    console.warn("[Screenity][BG] recoverInFlightRecording threw:", err);
+  }
+};
+
 // reaps cloud-chunks/ session dirs not referenced by any
 // cloudRecorderSession:* snapshot or the latest recorderSession.
 // without this, an SW kill mid-recording leaks chunks forever.
@@ -224,8 +295,13 @@ setupHandlers();
 initCountdownFallback();
 initLifecycleObserver();
 
-// runs after listener registration, before queued events dispatch
-clearStaleLocks();
+// Recovery must run AFTER clearStaleLocks: if the recorder tab died
+// with the SW, clearStaleLocks clears pendingRecording and recovery
+// no-ops.
+(async () => {
+  await clearStaleLocks();
+  await recoverInFlightRecording();
+})();
 cleanupOrphanOpfsSessions();
 
 // 4.3.7 finalize-hang bug sticky-disabled WebCodecs for many users; clear once.

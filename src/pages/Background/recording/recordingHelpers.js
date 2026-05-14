@@ -349,10 +349,13 @@ export const handleGetStreamingData = async () => {
 
 export const videoReady = async () => {
   perfMark("BG.recordingHelpers videoReady.enter");
-  const { backupTab, recordingDuration } = await chrome.storage.local.get([
-    "backupTab",
-    "recordingDuration",
-  ]);
+  const { backupTab, recordingDuration, recordingTab, lastRecordingBackendRef } =
+    await chrome.storage.local.get([
+      "backupTab",
+      "recordingDuration",
+      "recordingTab",
+      "lastRecordingBackendRef",
+    ]);
   diagEvent("sw-received-video-ready", {
     recordingDurationMs: Number(recordingDuration) || 0,
     backupTabPresent: Boolean(backupTab),
@@ -368,6 +371,33 @@ export const videoReady = async () => {
     .catch((err) => {
       diagEvent("warning", { note: "clear-session-safe undelivered (video-ready)", err: String(err).slice(0, 80) });
     });
+  // For OPFS the editor reads chunks directly, so the recorder tab can
+  // close as soon as video-ready fires. Keeping it alive holds Chrome's
+  // tab-capture binding, which makes the next getMediaStreamId reject
+  // with "Cannot capture a tab with an active stream" until Chrome
+  // restarts. Cloudrecorder runs its own close on finalize, so skip it.
+  if (lastRecordingBackendRef?.backend === "opfs" && recordingTab) {
+    try {
+      const tab = await chrome.tabs.get(recordingTab).catch(() => null);
+      const tabUrl = tab?.url ? new URL(tab.url) : null;
+      const isFreeRecorder =
+        tabUrl?.pathname === "/recorder.html" &&
+        tabUrl?.origin === chrome.runtime.getURL("").replace(/\/$/, "");
+      if (isFreeRecorder) {
+        diagEvent("eager-recorder-close", {
+          recordingTab,
+          reason: "video-ready-opfs",
+        });
+        await chrome.tabs.remove(recordingTab).catch(() => {});
+        chrome.storage.local.set({ recordingTab: null });
+      }
+    } catch (closeErr) {
+      diagEvent("warning", {
+        note: "eager-recorder-close failed",
+        err: String(closeErr?.message || closeErr).slice(0, 120),
+      });
+    }
+  }
   await stopRecording();
 };
 

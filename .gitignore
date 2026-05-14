@@ -13,6 +13,7 @@ node_modules/
 .env.*.local
 build/
 *.zip
+*.tsbuildinfo
 .cws-credentials.json
 docs/
 tests/

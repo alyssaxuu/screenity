@@ -5869,6 +5869,13 @@ const CloudRecorder = () => {
 
   const onMessage = useCallback((request, sender, sendResponse) => {
     if (request.type === "loaded") {
+      // BG redelivers `loaded` after an SW restart. Skip re-init if it
+      // already ran: re-calling getStreamID would invalidate the active
+      // tabCapture token (single-use). Just re-pull streaming-data.
+      if (isInit.current) {
+        chrome.runtime.sendMessage({ type: "get-streaming-data" });
+        return;
+      }
       setInitProject(false);
       backupRef.current = request.backup;
       if (IS_IFRAME_CONTEXT) {
