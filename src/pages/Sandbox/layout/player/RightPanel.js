@@ -916,8 +916,11 @@ const RightPanel = () => {
                 className={styles.button}
                 onClick={() => {
                   // disabled on a div is meaningless; gate click manually.
+                  // Not gated on isFfmpegRunning: it leaks from background
+                  // poll handlers and would intermittently swallow the
+                  // click. downloadGIF self-locks via downloadingGIF.
                   if (
-                    contentState.isFfmpegRunning ||
+                    contentState.downloadingGIF ||
                     contentState.duration > 30 ||
                     !contentState.mp4ready ||
                     contentState.noffmpeg
@@ -927,7 +930,7 @@ const RightPanel = () => {
                   contentState.downloadGIF();
                 }}
                 disabled={
-                  contentState.isFfmpegRunning ||
+                  contentState.downloadingGIF ||
                   contentState.duration > 30 ||
                   !contentState.mp4ready ||
                   contentState.noffmpeg

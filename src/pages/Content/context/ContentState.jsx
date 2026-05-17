@@ -343,7 +343,7 @@ const ContentState = (props) => {
     }));
   });
 
-  const dismissRecording = useCallback(() => {
+  const dismissRecording = useCallback((reason = "user-dismiss") => {
     setStartFlowOutcome("cancelled");
     suppressStopBeepRef.current = true;
     chrome.runtime.sendMessage({ type: "clear-recording-alarm" });
@@ -355,7 +355,15 @@ const ContentState = (props) => {
       cursorMode: "none",
       cursorEffects: [],
     });
-    chrome.runtime.sendMessage({ type: "dismiss-recording-tab" });
+    // Stamp the dismiss with the project it is meant for, so a stale dismiss
+    // can't tear down a different (back-to-back) recording.
+    chrome.storage.local.get(["projectId"], (res) => {
+      chrome.runtime.sendMessage({
+        type: "dismiss-recording-tab",
+        reason: typeof reason === "string" ? reason : "user-dismiss",
+        projectId: res?.projectId || null,
+      });
+    });
     setContentState((prevContentState) => ({
       ...prevContentState,
       recording: false,
@@ -767,14 +775,14 @@ const ContentState = (props) => {
         chrome.i18n.getMessage("discardModalDiscard"),
         chrome.i18n.getMessage("discardModalResume"),
         () => {
-          contentStateRef.current.dismissRecording();
+          contentStateRef.current.dismissRecording("user-discard-confirmed");
         },
         () => {
           contentStateRef.current.resumeRecording();
         },
       );
     } else {
-      contentStateRef.current.dismissRecording();
+      contentStateRef.current.dismissRecording("user-discard");
     }
   }, [contentStateRef]);
 
@@ -1097,7 +1105,7 @@ const ContentState = (props) => {
         showPopup: true,
         showExtension: true,
       }));
-      contentStateRef.current.dismissRecording();
+      contentStateRef.current.dismissRecording("countdown-cancelled");
     },
     resetCountdown: () => {
       setContentState((prev) => ({

@@ -739,23 +739,40 @@ export default class BunnyTusUploader {
           throw new Error("Missing user token for saving upload metadata");
         }
 
-        const res = await fetch(`${API_BASE}/bunny/videos`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${screenityToken}`,
-          },
-          body: JSON.stringify({
-            title,
-            projectId,
-            type,
-            linkedMediaId,
-            sceneId,
-            recordingSessionId: this.sessionId || null,
-          }),
-        });
+        // Retry transient failures so a backend blip doesn't abort the
+        // recording. A 4xx is a real rejection, so don't retry it.
+        let res = null;
+        for (let attempt = 0; attempt < 3; attempt += 1) {
+          if (attempt > 0) {
+            await new Promise((r) => setTimeout(r, 500 * attempt));
+          }
+          try {
+            res = await fetch(`${API_BASE}/bunny/videos`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${screenityToken}`,
+              },
+              body: JSON.stringify({
+                title,
+                projectId,
+                type,
+                linkedMediaId,
+                sceneId,
+                recordingSessionId: this.sessionId || null,
+              }),
+            });
+          } catch (err) {
+            // Network failure; retry.
+            res = null;
+            continue;
+          }
+          if (res.ok) break;
+          const transient = res.status >= 500 || res.status === 429;
+          if (!transient) break;
+        }
 
-        if (!res.ok) throw new Error("Failed to create Bunny video");
+        if (!res || !res.ok) throw new Error("Failed to create Bunny video");
         const data = await res.json();
         this.videoId = data.videoId;
         this.mediaId = data.mediaId;
@@ -1527,7 +1544,7 @@ export default class BunnyTusUploader {
     this.scheduleJournalPersist();
   }
 
-  async abort() {
+  async abort(reason = null) {
     this.pause();
     this.status = "aborted";
     this.uploadUrl = null;
@@ -1536,7 +1553,9 @@ export default class BunnyTusUploader {
     this.totalBytes = 0;
     this.pendingUploads = [];
     this.stopHeartbeat();
-    this.emitTelemetry("upload_cancelled");
+    this.emitTelemetry("upload_cancelled", {
+      reason: reason || "uploader-abort",
+    });
     if (this.journalPersistTimer) {
       clearTimeout(this.journalPersistTimer);
       this.journalPersistTimer = null;

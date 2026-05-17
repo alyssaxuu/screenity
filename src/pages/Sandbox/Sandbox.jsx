@@ -19,7 +19,12 @@ const Sandbox = () => {
   const parentRef = useRef(null);
   const progress = useRef("");
   // ref so the stuck-timer closure (deps=[]) can read current state
-  const loadStateRef = useRef({ ready: false, hasBlob: false });
+  const loadStateRef = useRef({
+    ready: false,
+    hasBlob: false,
+    chunkIndex: 0,
+    chunkCount: 0,
+  });
 
   const getChromeVersion = () => {
     var raw = navigator.userAgent.match(/Chrom(e|ium)\/([0-9]+)\./);
@@ -102,7 +107,14 @@ const Sandbox = () => {
   useEffect(() => {
     loadStateRef.current.ready = Boolean(contentState.ready);
     loadStateRef.current.hasBlob = Boolean(contentState.blob);
-  }, [contentState.ready, contentState.blob]);
+    loadStateRef.current.chunkIndex = contentState.chunkIndex || 0;
+    loadStateRef.current.chunkCount = contentState.chunkCount || 0;
+  }, [
+    contentState.ready,
+    contentState.blob,
+    contentState.chunkIndex,
+    contentState.chunkCount,
+  ]);
 
   useEffect(() => {
     chrome.runtime.sendMessage({ type: "check-banner-support" }, (response) => {
@@ -156,23 +168,27 @@ const Sandbox = () => {
       timers.push(setTimeout(() => tryRequest(i), ms));
     });
 
-    // Surface recovery modal if "Preparing recording..." sits 60s with no
-    // blob/ready/editorRecordingError; writing editorRecordingError reuses
-    // the ContentState consumer.
-    const STUCK_TIMEOUT_MS = 60_000;
-    const stuckTimer = setTimeout(() => {
+    // Long IDB-backed recordings can take minutes to transfer from SW
+    // to sandbox (chunks are base64-encoded and batched). A flat 60s
+    // timeout would fire on healthy slow loads. Re-arm while chunks
+    // keep arriving; only fire when nothing has progressed for 30s.
+    const STUCK_FIRST_CHECK_MS = 60_000;
+    const STUCK_RECHECK_MS = 15_000;
+    const STUCK_NO_PROGRESS_MS = 30_000;
+    const STUCK_MAX_TOTAL_MS = 10 * 60_000;
+    const startAt = Date.now();
+    let lastChunkIndex = 0;
+    let lastProgressAt = startAt;
+    const checkStuck = () => {
       try {
         if (cancelled) return;
-        // Skip the write if the editor finished. A bogus
-        // EDITOR_STUCK_TIMEOUT in diag zips makes the signal useless for
-        // telling real hangs from slow-but-fine.
         if (loadStateRef.current.ready || loadStateRef.current.hasBlob) {
           chrome.runtime
             .sendMessage({
               type: "diag-forward",
               event: "sandbox-stuck-timeout-suppressed",
               data: {
-                afterMs: STUCK_TIMEOUT_MS,
+                afterMs: Date.now() - startAt,
                 ready: loadStateRef.current.ready,
                 hasBlob: loadStateRef.current.hasBlob,
               },
@@ -180,11 +196,38 @@ const Sandbox = () => {
             .catch(() => {});
           return;
         }
+        const now = Date.now();
+        const idx = loadStateRef.current.chunkIndex || 0;
+        const count = loadStateRef.current.chunkCount || 0;
+        if (idx > lastChunkIndex) {
+          lastChunkIndex = idx;
+          lastProgressAt = now;
+        }
+        const sinceProgress = now - lastProgressAt;
+        const totalWaited = now - startAt;
+        const chunksFlowing =
+          count > 0 && idx < count && sinceProgress < STUCK_NO_PROGRESS_MS;
+        // After the last chunk lands the sandbox still has to assemble
+        // the blob; give it longer before declaring stuck.
+        const assemblingBlob =
+          count > 0 && idx >= count && sinceProgress < 90_000;
+        if (
+          (chunksFlowing || assemblingBlob) &&
+          totalWaited < STUCK_MAX_TOTAL_MS
+        ) {
+          timers.push(setTimeout(checkStuck, STUCK_RECHECK_MS));
+          return;
+        }
         chrome.runtime
           .sendMessage({
             type: "diag-forward",
             event: "sandbox-stuck-timeout",
-            data: { afterMs: STUCK_TIMEOUT_MS },
+            data: {
+              afterMs: totalWaited,
+              chunkIndex: idx,
+              chunkCount: count,
+              sinceProgressMs: sinceProgress,
+            },
           })
           .catch(() => {});
         chrome.storage.local.set({
@@ -197,8 +240,8 @@ const Sandbox = () => {
           },
         });
       } catch {}
-    }, STUCK_TIMEOUT_MS);
-    timers.push(stuckTimer);
+    };
+    timers.push(setTimeout(checkStuck, STUCK_FIRST_CHECK_MS));
 
     return () => {
       cancelled = true;

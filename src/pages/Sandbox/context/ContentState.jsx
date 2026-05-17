@@ -3090,10 +3090,15 @@ const ContentState = (props) => {
   };
 
   const downloadGIF = async () => {
-    if (contentState.isFfmpegRunning || contentState.downloading) {
+    // ref: rapid clicks fire before state propagates
+    const latest = contentStateRef.current || contentState;
+    // Don't gate on isFfmpegRunning — it leaks from background poll
+    // handlers and would intermittently swallow the click. downloadingGIF
+    // is the real lock (mirrors the `download` MP4 path).
+    if (latest.downloadingGIF || latest.downloading) {
       return;
     }
-    if (contentState.duration > 30) {
+    if (latest.duration > 30) {
       try {
         chrome.runtime.sendMessage({
           type: "show-toast",
@@ -3112,7 +3117,7 @@ const ContentState = (props) => {
 
     sendMessage({
       type: "to-gif",
-      blob: contentState.blob,
+      blob: latest.blob,
     });
   };
 

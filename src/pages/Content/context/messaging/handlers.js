@@ -702,7 +702,7 @@ export const setupHandlers = () => {
 
   registerMessage("cancel-recording", () => {
     const state = getState();
-    state.dismissRecording();
+    state.dismissRecording("cancel-recording-cmd");
   });
 
   registerMessage("pause-recording", () => {
@@ -768,10 +768,10 @@ export const setupHandlers = () => {
       chrome.i18n.getMessage("permissionsModalDismiss"),
       null,
       () => {
-        state.dismissRecording();
+        state.dismissRecording("stream-error");
       },
       () => {
-        state.dismissRecording();
+        state.dismissRecording("stream-error");
       },
       null,
       null,
@@ -817,10 +817,10 @@ export const setupHandlers = () => {
       chrome.i18n.getMessage("permissionsModalDismiss"),
       null,
       () => {
-        state.dismissRecording();
+        state.dismissRecording("backup-error");
       },
       () => {
-        state.dismissRecording();
+        state.dismissRecording("backup-error");
       },
       null,
       null,

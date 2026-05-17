@@ -4,6 +4,7 @@ import { discardOffscreenDocuments } from "../offscreen/discardOffscreenDocument
 import { initDiagSession, diagEvent } from "../../utils/diagnosticLog";
 import { makeRecordingAttemptId } from "../../utils/errorCodes";
 import { lifecycle } from "../../utils/lifecycleLog";
+import { sweepRecorderTabs } from "./sweepRecorderTabs";
 
 // `recording` flag isn't set until the recorder iframe inits (seconds later),
 // so countdown-finished + 8s fallback can both fire and open two recorder tabs
@@ -161,6 +162,29 @@ const _startRecordingInner = async (caller) => {
     lastStartRecordingCaller: { caller, stack, ts: Date.now() },
   });
 
+  // A standalone (non-scene, non-multi) recording must not inherit a sceneId
+  // from a previous recording. The cloudrecorder reads chrome.storage sceneId
+  // at start; a leaked value tags the new recording's telemetry and upload
+  // sessions with the prior recording's identity (the back-to-back sceneId
+  // leak). Scene and multi-scene recordings legitimately carry sceneId across
+  // the boundary. NOTE: only sceneId/sceneIdStatus are cleared — never
+  // pendingSceneIndex: it is an array consumed via a `= []` destructuring
+  // default (upsertPendingScene), and a default only covers `undefined`, not
+  // `null`. Setting it null makes `pendingSceneIndex.includes()` throw and
+  // crashes the next recorder. Its own upsert/remove lifecycle manages it.
+  try {
+    const { recordingToScene, multiMode } = await chrome.storage.local.get([
+      "recordingToScene",
+      "multiMode",
+    ]);
+    if (!recordingToScene && !multiMode) {
+      await chrome.storage.local.set({
+        sceneId: null,
+        sceneIdStatus: null,
+      });
+    }
+  } catch {}
+
   const { activeTab, recordingUiTabId } = await chrome.storage.local.get([
     "activeTab",
     "recordingUiTabId",
@@ -297,6 +321,9 @@ const _startRecordingInner = async (caller) => {
       });
       // releases the desktopCapture stream so Chrome's "Stop sharing" bar goes away
       discardOffscreenDocuments({ reason: "start-fail" }).catch(() => {});
+      // a recorder tab may have been created before the start failed;
+      // sweep it so it can't keep capturing unattended
+      sweepRecorderTabs().catch(() => {});
       chrome.action.setIcon({ path: "assets/icon-34.png" });
     }, 2500);
   });

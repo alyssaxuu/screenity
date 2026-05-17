@@ -6,6 +6,7 @@ import { loginWithWebsite } from "../auth/loginWithWebsite.js";
 import { traceStep } from "../../utils/startFlowTrace.js";
 import { handleGetStreamingData } from "./recordingHelpers.js";
 import { perfMark, perfSpan } from "../../utils/perfMarks";
+import { sweepRecorderTabs } from "./sweepRecorderTabs";
 
 const openRecorderTab = async (
   activeTab,
@@ -130,6 +131,11 @@ const openRecorderTab = async (
     ...(isRegion ? { tabRecordedID: activeTab.id } : {}),
   });
 
+  // Remove any earlier recorder tab the prevRecTab check above could not
+  // see (a second tab from a countdown/fallback race). Spare the tab we
+  // just created.
+  await sweepRecorderTabs({ exceptTabId: tab.id });
+
   // under memory pressure the set can succeed silently while the property stays true;
   // verify via tabs.get roundtrip and retry with backoff
   let autoDiscardableApplied = false;
@@ -182,7 +188,12 @@ const openRecorderTab = async (
         chrome.runtime.getURL("playground.html")
       );
       perfMark("BG.openRecorderTab loaded.sent");
-      sendMessageRecord({
+      // `loaded` is sent at status:complete, before the recorder's React
+      // app has mounted its message listener, so the first send is
+      // routinely lost. It carries isTab/tabID for region recordings, so
+      // retry until the recorder is listening. (streaming-data no longer
+      // depends on `loaded` — the recorder pulls it on mount.)
+      const loadedMsg = {
         type: "loaded",
         request: request,
         backup: backup,
@@ -193,8 +204,23 @@ const openRecorderTab = async (
               tabID: activeTab.id,
             }
           : {}),
-      });
-      // push streaming-data; tab also pulls but pull can drop on cold-SW/late-mount
+      };
+      (async () => {
+        const backoffMs = [0, 200, 500, 1000, 2000];
+        for (let attempt = 0; attempt < backoffMs.length; attempt += 1) {
+          if (backoffMs[attempt] > 0) {
+            await new Promise((r) => setTimeout(r, backoffMs[attempt]));
+          }
+          try {
+            await sendMessageRecord(loadedMsg);
+            return;
+          } catch {
+            // recorder tab not ready yet; retry
+          }
+        }
+      })();
+      // Belt-and-suspenders push; the recorder's own pull is the primary
+      // path now.
       setTimeout(() => {
         handleGetStreamingData().catch(() => {});
       }, 300);

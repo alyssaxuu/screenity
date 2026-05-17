@@ -302,10 +302,22 @@ const ensureDriverStyles = () => {
       box-shadow: 0px 4px 30px rgba(30, 31, 37, 0.12) !important;
       padding: 20px !important;
       font-size: 14px !important;
+      /* Popover renders in the host page's light DOM; pin inheritable
+         text properties so host typography (e.g. a large html
+         font-size) can't distort it. */
+      line-height: normal !important;
+      font-weight: 400 !important;
+      font-style: normal !important;
+      letter-spacing: normal !important;
+      word-spacing: normal !important;
+      text-transform: none !important;
+      text-indent: 0 !important;
+      text-align: left !important;
+      text-shadow: none !important;
     }
     .driver-popover.ScreenityOnboardingPopover .driver-popover-title,
     .ScreenityOnboardingPopover .driver-popover-title {
-      font-size: 1rem !important;
+      font-size: 16px !important;
       font-family: "Satoshi-Medium", sans-serif !important;
       font-weight: 500 !important;
       margin-bottom: 12px !important;

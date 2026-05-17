@@ -2551,9 +2551,9 @@ const CloudRecorder = () => {
     );
 
     await Promise.allSettled([
-      screenUploader.current?.abort?.(),
-      cameraUploader.current?.abort?.(),
-      audioUploader.current?.abort?.(),
+      screenUploader.current?.abort?.(`empty-cleanup-${reason}`),
+      cameraUploader.current?.abort?.(`empty-cleanup-${reason}`),
+      audioUploader.current?.abort?.(`empty-cleanup-${reason}`),
     ]);
 
     try {
@@ -2587,7 +2587,7 @@ const CloudRecorder = () => {
     sendRecordingErrorBase(why, cancel);
   };
 
-  const dismissRecording = async (restarting = false) => {
+  const dismissRecording = async (restarting = false, reason = "dismiss") => {
     clearPendingStart();
     setInitProject(false);
     await cleanupIfEmptyUploads(restarting ? "restart" : "dismiss");
@@ -2617,9 +2617,9 @@ const CloudRecorder = () => {
 
     if (restarting) {
       await Promise.allSettled([
-        screenUploader.current?.abort?.(),
-        cameraUploader.current?.abort?.(),
-        audioUploader.current?.abort?.(),
+        screenUploader.current?.abort?.(`restart-${reason}`),
+        cameraUploader.current?.abort?.(`restart-${reason}`),
+        audioUploader.current?.abort?.(`restart-${reason}`),
       ]);
       if (!recordingToScene) {
         try {
@@ -2651,12 +2651,12 @@ const CloudRecorder = () => {
     isRestarting.current = true;
 
     await Promise.allSettled([
-      screenUploader.current?.abort?.(),
-      cameraUploader.current?.abort?.(),
-      audioUploader.current?.abort?.(),
+      screenUploader.current?.abort?.(`dismiss-${reason}`),
+      cameraUploader.current?.abort?.(`dismiss-${reason}`),
+      audioUploader.current?.abort?.(`dismiss-${reason}`),
     ]);
 
-    await stopRecording(false);
+    await stopRecording(false, `dismiss-${reason}`);
 
     const uploadMeta = uploadMetaRef.current;
     if (!uploadMeta) {
@@ -2725,7 +2725,7 @@ const CloudRecorder = () => {
       hadRegionMode: Boolean(regionRef.current),
     });
     isRestarting.current = true;
-    await dismissRecording(true);
+    await dismissRecording(true, "restart");
     await setCloudRestartPhase("restart-dismissed");
     // Keep capture streams; only stop recorder instances.
     await stopAllRecorders({ stopStreams: false });
@@ -6101,7 +6101,27 @@ const CloudRecorder = () => {
       })();
     } else if (request.type === "dismiss-recording") {
       if (!isInit.current) return;
-      dismissRecording();
+      const dismissReason = request.reason || "dismiss-recording-msg";
+      // Back-to-back cross-talk guard: a dismiss issued for a previous
+      // recording can reach this (newer) recorder because dismiss-recording
+      // is routed by a single global recordingTab pointer. If the dismiss
+      // provably targets a different project than the one this recorder is
+      // actively capturing, ignore it — honoring it would discard a healthy
+      // recording. Unknown ids (no session yet / legacy sender) are honored.
+      const myProjectId = recorderSession.current?.projectId || null;
+      const targetProjectId = request.projectId || null;
+      if (myProjectId && targetProjectId && myProjectId !== targetProjectId) {
+        console.warn(
+          "[CloudRecorder] dismiss-recording ignored: project mismatch",
+          { myProjectId, targetProjectId, reason: dismissReason },
+        );
+        void emitUploadTelemetry("dismiss_ignored_project_mismatch", {
+          reason: dismissReason,
+          targetProjectId,
+        });
+        return;
+      }
+      dismissRecording(false, dismissReason);
     }
   }, []);
 

@@ -261,13 +261,19 @@ export const getCameraStream = async (
     // 2. tab+camera with bubble failure mid-recording: stay silent;
     //    propagating a recording-error tears down the live recording.
     try {
-      const { recording, pendingRecording } = await chrome.storage.local.get([
-        "recording",
-        "pendingRecording",
-      ]);
+      const { recording, pendingRecording, recordingType } =
+        await chrome.storage.local.get([
+          "recording",
+          "pendingRecording",
+          "recordingType",
+        ]);
       const isPermissionDenial =
         err?.name === "NotAllowedError" ||
         err?.name === "PermissionDeniedError";
+      // For camera-only recordings the webcam is the recording, so a
+      // setup failure is fatal. For screen/tab/region it's just a PIP
+      // bubble; its failure must not tear down the recording.
+      const isCameraOnlyRecording = recordingType === "camera";
       // Diag fires regardless of fatality; "clicked record and got nothing"
       // reports need to distinguish permission denials from device-not-found
       // and getUserMedia hangs.
@@ -280,12 +286,17 @@ export const getCameraStream = async (
             isPermissionDenial,
             duringSetup: pendingRecording === true && recording !== true,
             recordingActive: recording === true,
+            cameraOnly: isCameraOnlyRecording,
             message: String(err?.message || err).slice(0, 200),
           },
         });
       } catch {}
-      if (pendingRecording === true && recording !== true) {
-        // Setup-time failure: fatal. BG must clear pendingRecording.
+      if (
+        isCameraOnlyRecording &&
+        pendingRecording === true &&
+        recording !== true
+      ) {
+        // Camera-only setup failure: fatal. BG must clear pendingRecording.
         chrome.runtime.sendMessage({
           type: "recording-error",
           error: isPermissionDenial
@@ -293,9 +304,9 @@ export const getCameraStream = async (
             : "camera-stream-error",
           why: String(err?.message || err),
         });
-      } else if (recording === true) {
-        // Recording is live: don't tear down for a cosmetic camera issue.
-        // Surface a non-fatal toast via BG -> recorded tab's content script.
+      } else if (recording === true || pendingRecording === true) {
+        // Screen/tab/region recording: the webcam is just a PIP bubble.
+        // Don't tear down the recording; surface a non-fatal toast.
         chrome.runtime.sendMessage({
           type: "camera-bubble-unavailable",
           error: isPermissionDenial

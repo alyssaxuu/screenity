@@ -13,6 +13,7 @@ import { diagEvent, endDiagSession } from "../../utils/diagnosticLog";
 import { perfMark, perfSpan } from "../../utils/perfMarks";
 import { classifyError } from "../../utils/errorCodes";
 import { resetWatchdogState } from "./resetWatchdogState";
+import { sweepRecorderTabs } from "./sweepRecorderTabs";
 
 // Mirrors CloudRecorder.appendUploadTelemetryEvent so BG-side projectId mutations
 // land in the same `cloudUploadTelemetryEvents` storage key surfaced by
@@ -302,6 +303,9 @@ export const handleRecordingError = async (request) => {
       }
     } catch {}
   }
+  // recordingTab names at most one recorder tab; sweep catches any other
+  // recorder tab a racing start may have spawned and orphaned.
+  await sweepRecorderTabs();
   chrome.storage.local.set({ recordingTab: null });
   try {
     await discardOffscreenDocuments();
@@ -309,42 +313,47 @@ export const handleRecordingError = async (request) => {
   await resetWatchdogState();
 };
 
-export const handleGetStreamingData = async () => {
-  perfMark("BG.handleGetStreamingData.enter");
-  const data = await getStreamingData();
-  const payload = { type: "streaming-data", data: JSON.stringify(data) };
-
-  // dropped delivery causes REC_START_NO_STREAM_MSG at the tab's 12s gate;
-  // tab-side is idempotent so retries are safe
+// Push streaming-data to the recorder tab. Used for the SW-initiated
+// path (openRecorderTab). Dropped delivery causes REC_START_NO_STREAM_MSG
+// at the tab's 12s gate; the tab side is idempotent so retries are safe.
+const pushStreamingData = async (dataStr) => {
+  const payload = { type: "streaming-data", data: dataStr };
   const backoffMs = [0, 300, 800];
   for (let attempt = 0; attempt < backoffMs.length; attempt++) {
     if (backoffMs[attempt] > 0) {
       await new Promise((r) => setTimeout(r, backoffMs[attempt]));
     }
-    const endSend = perfSpan("BG.handleGetStreamingData sendMessageRecord", {
-      attempt,
-    });
     try {
       await sendMessageRecord(payload);
-      endSend({ ok: true });
       if (attempt > 0) {
         diagEvent("sw-streaming-data-send-ok", { attempt });
       }
       return;
     } catch (err) {
-      endSend({ ok: false, err: String(err?.message || err).slice(0, 80) });
       diagEvent("sw-streaming-data-send-fail", {
         attempt,
         err: String(err?.message || err).slice(0, 120),
       });
       if (attempt === backoffMs.length - 1) {
-        console.warn(
-          "handleGetStreamingData: all delivery attempts failed",
-          err,
-        );
+        console.warn("handleGetStreamingData: all push attempts failed", err);
       }
     }
   }
+};
+
+export const handleGetStreamingData = async () => {
+  perfMark("BG.handleGetStreamingData.enter");
+  const data = await getStreamingData();
+  const dataStr = JSON.stringify(data);
+  // Fire-and-forget push (SW-initiated openRecorderTab path). Not awaited:
+  // a `get-streaming-data` pull must get its response immediately, not
+  // after the push retry loop.
+  void pushStreamingData(dataStr);
+  // Returned to a `get-streaming-data` pull as the direct response. This
+  // is the robust delivery path — it does not depend on the recorder
+  // tab's onMessage listener being registered yet, nor on `recordingTab`
+  // routing being correct.
+  return { ok: true, data: dataStr };
 };
 
 export const videoReady = async () => {

@@ -255,13 +255,39 @@ const Recorder = () => {
   const START_GATE_TIMEOUT_MS = 12000;
   const streamingDataRetryTimer = useRef(null);
 
-  // Retry get-streaming-data: an initial sendMessage during SW wake-up can fail
-  // with "Receiving end does not exist" and silently drop. The SW also pushes
-  // streaming-data proactively, so the handler must remain idempotent.
+  // Apply streaming-data once. Shared by the `get-streaming-data` pull
+  // response and the `streaming-data` push message — whichever arrives
+  // first wins; the rest is deduped via streamingDataReceivedAt.
+  const applyStreamingData = (dataStr) => {
+    if (streamingDataReceivedAt.current != null) {
+      slLog("msg-streaming-data-duplicate");
+      return;
+    }
+    slLog("msg-streaming-data");
+    perfMark("Recorder streaming-data.received");
+    streamingDataReceivedAt.current = Date.now();
+    if (streamingDataTimeout.current) {
+      clearTimeout(streamingDataTimeout.current);
+      streamingDataTimeout.current = null;
+    }
+    try {
+      startStreaming(JSON.parse(dataStr));
+    } catch (e) {
+      slLog("apply-streaming-data-error", {
+        err: String(e?.message || e).slice(0, 120),
+      });
+    }
+  };
+
+  // Pull get-streaming-data from the SW. The SW answers the pull *directly*
+  // with the payload (response.data), so delivery does not depend on the
+  // tab's onMessage listener being registered yet, nor on the SW's
+  // separate push landing in a timing window. An initial sendMessage
+  // during SW wake-up can fail with "Receiving end does not exist"; retry.
   const requestStreamingDataWithRetry = (attempt = 0) => {
     if (streamingDataReceivedAt.current != null) return;
-    const maxAttempts = 5;
-    const backoffMs = [0, 250, 500, 1000, 2000];
+    const maxAttempts = 6;
+    const backoffMs = [0, 250, 500, 1000, 2000, 3000];
     const delay = backoffMs[Math.min(attempt, backoffMs.length - 1)];
     if (streamingDataRetryTimer.current) {
       clearTimeout(streamingDataRetryTimer.current);
@@ -270,34 +296,41 @@ const Recorder = () => {
       streamingDataRetryTimer.current = null;
       if (streamingDataReceivedAt.current != null) return;
       slLog("get-streaming-data-send", { attempt });
-      try {
-        chrome.runtime.sendMessage({ type: "get-streaming-data" }, () => {
-          const err = chrome.runtime.lastError;
-          if (err) {
-            slLog("get-streaming-data-send-error", {
-              attempt,
-              err: String(err.message || err).slice(0, 120),
-            });
-          }
-          if (
-            err &&
-            streamingDataReceivedAt.current == null &&
-            attempt + 1 < maxAttempts
-          ) {
-            requestStreamingDataWithRetry(attempt + 1);
-          }
-        });
-      } catch (e) {
-        slLog("get-streaming-data-throw", {
-          attempt,
-          err: String(e?.message || e).slice(0, 120),
-        });
+      const retryIfNeeded = () => {
         if (
           streamingDataReceivedAt.current == null &&
           attempt + 1 < maxAttempts
         ) {
           requestStreamingDataWithRetry(attempt + 1);
         }
+      };
+      try {
+        chrome.runtime.sendMessage({ type: "get-streaming-data" }, (response) => {
+          const err = chrome.runtime.lastError;
+          if (err) {
+            slLog("get-streaming-data-send-error", {
+              attempt,
+              err: String(err.message || err).slice(0, 120),
+            });
+            retryIfNeeded();
+            return;
+          }
+          // SW answered the pull directly with the payload — robust path.
+          if (response && response.data) {
+            slLog("get-streaming-data-response-applied", { attempt });
+            applyStreamingData(response.data);
+            return;
+          }
+          // No payload (e.g. older SW): fall back to the push; retry the
+          // pull if it never lands.
+          retryIfNeeded();
+        });
+      } catch (e) {
+        slLog("get-streaming-data-throw", {
+          attempt,
+          err: String(e?.message || e).slice(0, 120),
+        });
+        retryIfNeeded();
       }
     }, delay);
   };
@@ -356,6 +389,11 @@ const Recorder = () => {
   const pausedStateRef = useRef(false);
   const pausedAtRef = useRef(null);
   const stopSignalSent = useRef(false);
+  // True once a stop/restart/dismiss was initiated locally (by this tab).
+  // The abandonment listener uses it to tell a real stop apart from the
+  // background tearing the session down without telling this tab.
+  const localStopInitiated = useRef(false);
+  const abandonHandled = useRef(false);
 
   const keepAliveAudioCtx = useRef(null);
   const keepAliveOscillator = useRef(null);
@@ -657,6 +695,9 @@ const Recorder = () => {
 
   // At most one stop emission per recording session.
   const requestStop = (reason = "generic", extra = {}) => {
+    // Any local stop intent suppresses the abandonment listener, even if
+    // the guards below reject this particular call as redundant.
+    localStopInitiated.current = true;
     if (stopSignalSent.current) {
       debugWarn("requestStop() ignored; already sent", { reason });
       return false;
@@ -892,6 +933,103 @@ const Recorder = () => {
       startTabKeepAlive();
       perfMark("Recorder mount.startTabKeepAlive-done");
     } catch (err) {}
+  }, []);
+
+  // Grace before acting on a recording=false flag flip: a normal stop
+  // flips storage a beat before its stop-recording-tab message reaches
+  // this tab, so wait that window out before declaring abandonment.
+  const ABANDON_GRACE_MS = 1500;
+
+  // The session was torn down (recording flipped false) without this tab
+  // being told to stop. Halt capture and discard quietly — the user has
+  // already seen the failure, so resurrecting an editor would confuse.
+  // Without this the MediaRecorder runs until the tab is closed by hand
+  // (the ~8h orphan, support code SCR-AKJJ).
+  const abortAbandonedRecording = (detail) => {
+    if (abandonHandled.current) return;
+    abandonHandled.current = true;
+    localStopInitiated.current = true;
+    isRecording.current = false;
+    // Invalidate the run so any late ondataavailable is dropped.
+    recordingGeneration.current += 1;
+    lifecycle("Recorder", "self-stop-abandoned", {
+      ...detail,
+      savedCount: savedCount.current,
+      recorderType: useWebCodecs.current ? "webcodecs" : "mediarecorder",
+    });
+    try {
+      slLog("self-stop-abandoned", detail);
+    } catch {}
+    // Halt capture immediately; don't depend on window.close() timing.
+    try {
+      const r = recorder.current;
+      if (r instanceof MediaRecorder) {
+        r.ondataavailable = null;
+        r.onstop = null;
+        r.onerror = null;
+        if (r.state !== "inactive") r.stop();
+      } else if (r instanceof WebCodecsRecorder) {
+        r.running = false;
+        r.paused = false;
+        Promise.resolve(r.cleanup?.()).catch(() => {});
+      }
+    } catch (err) {
+      debugError("abortAbandonedRecording: recorder teardown failed", err);
+    }
+    [
+      liveStream.current,
+      helperVideoStream.current,
+      helperAudioStream.current,
+    ].forEach((s) => {
+      try {
+        s?.getTracks?.().forEach((t) => t.stop());
+      } catch {}
+    });
+    // dismissRecording aborts the chunk writer, clears timing state and
+    // closes the tab — the same quiet teardown path as a user dismiss.
+    dismissRecording().catch(() => {});
+  };
+
+  // Abandonment watchdog: if `recording` flips true→false in storage
+  // while this tab is still capturing and nothing local asked for a
+  // stop, the background tore the session down behind our back.
+  useEffect(() => {
+    const onStorageChanged = (changes, area) => {
+      if (area !== "local") return;
+      const rec = changes.recording;
+      if (!rec || rec.oldValue !== true || rec.newValue !== false) return;
+      if (
+        abandonHandled.current ||
+        !isRecording.current ||
+        isFinishing.current ||
+        isRestarting.current ||
+        uiClosing.current ||
+        localStopInitiated.current
+      ) {
+        return;
+      }
+      try {
+        slLog("abandon-signal-detected", { savedCount: savedCount.current });
+      } catch {}
+      setTimeout(() => {
+        if (
+          abandonHandled.current ||
+          !isRecording.current ||
+          isFinishing.current ||
+          isRestarting.current ||
+          uiClosing.current ||
+          localStopInitiated.current
+        ) {
+          try {
+            slLog("abandon-signal-cleared");
+          } catch {}
+          return;
+        }
+        abortAbandonedRecording({ reason: "recording-flag-cleared" });
+      }, ABANDON_GRACE_MS);
+    };
+    chrome.storage.onChanged.addListener(onStorageChanged);
+    return () => chrome.storage.onChanged.removeListener(onStorageChanged);
   }, []);
 
   function getStreamReadiness() {
@@ -1137,6 +1275,10 @@ const Recorder = () => {
     sentLast.current = false;
     isFinishing.current = false;
     stopSignalSent.current = false;
+    // Fresh recording (incl. restart, which reuses this tab): clear the
+    // abandonment signals so a later teardown is detected correctly.
+    localStopInitiated.current = false;
+    abandonHandled.current = false;
 
     const endCapsRead = perfSpan("Recorder.preflight storage+caps");
     const [
@@ -2610,6 +2752,7 @@ const Recorder = () => {
   };
 
   async function stopRecording() {
+    localStopInitiated.current = true;
     if (isFinishing.current) {
       debugWarn("stopRecording() called while already finishing");
       return;
@@ -2724,6 +2867,7 @@ const Recorder = () => {
 
   const dismissRecording = async () => {
     debug("dismissRecording()");
+    localStopInitiated.current = true;
     resetGateState();
     uiClosing.current = true;
     isRecording.current = false;
@@ -2762,6 +2906,7 @@ const Recorder = () => {
   };
 
   const restartRecording = async () => {
+    localStopInitiated.current = true;
     if (isRestarting.current) {
       debugWarn("restartRecording() called while already restarting");
       return false;
@@ -3795,40 +3940,13 @@ const Recorder = () => {
         isTab.current = false;
         recordedTabId.current = null;
       }
-      requestStreamingDataWithRetry();
-      // If the SW never wakes to deliver streaming-data, the start-gate
-      // timeout never arms (it depends on startRequested, which depends
-      // on streaming-data). Surface an error after 15s.
-      if (streamingDataTimeout.current) {
-        clearTimeout(streamingDataTimeout.current);
-      }
-      streamingDataTimeout.current = setTimeout(() => {
-        if (streamingDataReceivedAt.current != null) return;
-        const diagInfo = {
-          tabIDError: tabIDError.current,
-          isTab: isTab.current,
-          msSinceLoaded: Date.now() - loadedAt.current,
-        };
-        slLog("streaming-data-watchdog-fire", diagInfo);
-        sendRecordingError(
-          "Recording not ready: streaming-data never arrived from background",
-        );
-      }, 15000);
-      loadedAt.current = Date.now();
+      // streaming-data is pulled on mount (see the mount effect), not
+      // here — `loaded` can be lost to the cold-start race and must not
+      // be the sole trigger for the pull.
     } else if (request.type === "streaming-data") {
-      // Streaming-data may arrive twice (SW push + tab pull, or retries).
-      if (streamingDataReceivedAt.current != null) {
-        slLog("msg-streaming-data-duplicate");
-        return;
-      }
-      slLog("msg-streaming-data");
-      perfMark("Recorder streaming-data.received");
-      streamingDataReceivedAt.current = Date.now();
-      if (streamingDataTimeout.current) {
-        clearTimeout(streamingDataTimeout.current);
-        streamingDataTimeout.current = null;
-      }
-      startStreaming(JSON.parse(request.data));
+      // Push path; the pull response usually wins. applyStreamingData
+      // dedupes whichever arrives second.
+      applyStreamingData(request.data);
     } else if (request.type === "start-recording-tab") {
       slLog("msg-start-recording-tab", {
         hasStream: !!helperVideoStream.current,
@@ -4104,6 +4222,41 @@ const Recorder = () => {
       debug("Removing chrome.runtime.onMessage listener (stable)");
       slLog("listener-remove");
       chrome.runtime.onMessage.removeListener(stableHandler);
+    };
+  }, []);
+
+  // Pull streaming-data as soon as the recorder is mounted — do not wait
+  // for the SW's `loaded` push, which is fire-and-forget at tab
+  // status:complete and is routinely lost to the cold-start race (the
+  // SW→tab handoff failure, support codes SCR-AKJJ / SCR-8LC2). The pull
+  // is answered directly in its own sendMessage response, so it does not
+  // depend on a push landing in a timing window. The 15s watchdog is
+  // armed here too, independent of `loaded`, so a lost `loaded` can't
+  // leave the recorder hanging without an error path.
+  useEffect(() => {
+    loadedAt.current = Date.now();
+    requestStreamingDataWithRetry();
+    if (streamingDataTimeout.current) {
+      clearTimeout(streamingDataTimeout.current);
+    }
+    streamingDataTimeout.current = setTimeout(() => {
+      if (streamingDataReceivedAt.current != null) return;
+      slLog("streaming-data-watchdog-fire", {
+        msSinceMount: Date.now() - loadedAt.current,
+      });
+      sendRecordingError(
+        "Recording not ready: streaming-data never arrived from background",
+      );
+    }, 15000);
+    return () => {
+      if (streamingDataRetryTimer.current) {
+        clearTimeout(streamingDataRetryTimer.current);
+        streamingDataRetryTimer.current = null;
+      }
+      if (streamingDataTimeout.current) {
+        clearTimeout(streamingDataTimeout.current);
+        streamingDataTimeout.current = null;
+      }
     };
   }, []);
 

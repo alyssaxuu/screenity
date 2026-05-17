@@ -2,6 +2,7 @@ import { stopRecording } from "../recording/stopRecording.js";
 import { sendMessageTab } from "../tabManagement";
 import { sendMessageRecord } from "../recording/sendMessageRecord.js";
 import { handleRecordingError } from "../recording/recordingHelpers.js";
+import { sweepRecorderTabs } from "../recording/sweepRecorderTabs.js";
 import { diagEvent } from "../../utils/diagnosticLog";
 import { lifecycle } from "../../utils/lifecycleLog";
 import { chunksStore } from "../recording/chunkHandler";
@@ -103,6 +104,21 @@ export const handleAlarm = async (alarm) => {
         firstChunkAt: null,
         lastChunkAt: null,
       });
+      // Backstop: the session is over. Remove any recorder tab still
+      // alive — a final guard if both the recorder's own abandonment
+      // listener and the teardown sweep somehow missed it. Gated on no
+      // active or in-flight recording so a fresh start is never killed.
+      if (!snap.recording && !snap.pendingRecording) {
+        const { recordingStartingAt } = await chrome.storage.local.get([
+          "recordingStartingAt",
+        ]);
+        const startInFlight =
+          typeof recordingStartingAt === "number" &&
+          Date.now() - recordingStartingAt < 30_000;
+        if (!startInFlight) {
+          await sweepRecorderTabs();
+        }
+      }
       return;
     }
 

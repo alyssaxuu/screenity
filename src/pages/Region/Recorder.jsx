@@ -150,18 +150,68 @@ const Recorder = () => {
   const lowStorageAbort = useRef(false);
   const savedCount = useRef(0);
 
+  // True once streaming-data has been received (applied OR deferred) —
+  // used to stop the pull retries.
   const streamingDataHandled = useRef(false);
   const streamingDataRetryTimer = useRef(null);
+  // streaming-data can arrive before the `crop-target` message that sets
+  // regionRef. startStreaming needs regionRef, so stash the payload here
+  // and replay it via flushPendingStreamingData once regionRef flips true.
+  const pendingStreamingData = useRef(null);
 
   const chunkWriter = useRef(null);
   const chunkBackendRef = useRef(null);
 
-  // Retry with backoff: SW mid-wakeup can drop the initial sendMessage
-  // silently. Combined with SW-side retry and handler idempotency, this
-  // covers slow Windows cold-starts.
+  // Apply streaming-data once. Shared by the `get-streaming-data` pull
+  // response and the `streaming-data` push message. Idempotent. If the
+  // crop target hasn't landed yet (regionRef not set), the payload is
+  // deferred — flushPendingStreamingData replays it.
+  const applyStreamingData = (dataStr) => {
+    if (streamingDataHandled.current) return;
+    streamingDataHandled.current = true;
+    if (regionRef.current) {
+      pendingStreamingData.current = null;
+      try {
+        startStreaming(JSON.parse(dataStr));
+      } catch (e) {
+        persistRegionStartDebug({
+          stage: "apply-streaming-data-error",
+          err: String(e?.message || e).slice(0, 120),
+        });
+      }
+    } else {
+      // crop-target not here yet; replayed by flushPendingStreamingData.
+      pendingStreamingData.current = dataStr;
+      perfMark("Region.Recorder streaming-data.deferred");
+    }
+  };
+
+  // Replay deferred streaming-data once regionRef is set (called from the
+  // crop-target and start-recording-tab paths).
+  const flushPendingStreamingData = () => {
+    if (!regionRef.current) return;
+    const dataStr = pendingStreamingData.current;
+    if (dataStr == null) return;
+    pendingStreamingData.current = null;
+    perfMark("Region.Recorder streaming-data.flushed");
+    try {
+      startStreaming(JSON.parse(dataStr));
+    } catch (e) {
+      persistRegionStartDebug({
+        stage: "flush-streaming-data-error",
+        err: String(e?.message || e).slice(0, 120),
+      });
+    }
+  };
+
+  // Pull get-streaming-data from the SW. The SW answers the pull directly
+  // with the payload (response.data), so delivery does not depend on the
+  // `loaded` push landing — `loaded` is routinely lost to the cold-start
+  // race (the SW→tab handoff failure). SW mid-wakeup can still drop the
+  // initial sendMessage; retry with backoff.
   const requestStreamingDataWithRetry = (attempt = 0) => {
     if (streamingDataHandled.current) return;
-    const backoffMs = [0, 250, 500, 1000, 2000];
+    const backoffMs = [0, 250, 500, 1000, 2000, 3000];
     const delay = backoffMs[Math.min(attempt, backoffMs.length - 1)];
     if (streamingDataRetryTimer.current) {
       clearTimeout(streamingDataRetryTimer.current);
@@ -173,8 +223,13 @@ const Recorder = () => {
         stage: "get-streaming-data-send",
         attempt,
       });
+      const retryIfNeeded = () => {
+        if (!streamingDataHandled.current && attempt + 1 < backoffMs.length) {
+          requestStreamingDataWithRetry(attempt + 1);
+        }
+      };
       try {
-        chrome.runtime.sendMessage({ type: "get-streaming-data" }, () => {
+        chrome.runtime.sendMessage({ type: "get-streaming-data" }, (response) => {
           const err = chrome.runtime.lastError;
           if (err) {
             persistRegionStartDebug({
@@ -182,14 +237,20 @@ const Recorder = () => {
               attempt,
               err: String(err.message || err).slice(0, 120),
             });
+            retryIfNeeded();
+            return;
           }
-          if (
-            err &&
-            !streamingDataHandled.current &&
-            attempt + 1 < backoffMs.length
-          ) {
-            requestStreamingDataWithRetry(attempt + 1);
+          // SW answered the pull directly with the payload — robust path.
+          if (response && response.data) {
+            persistRegionStartDebug({
+              stage: "get-streaming-data-response-applied",
+              attempt,
+            });
+            applyStreamingData(response.data);
+            return;
           }
+          // No payload: fall back to the push; retry if it never lands.
+          retryIfNeeded();
         });
       } catch (e) {
         persistRegionStartDebug({
@@ -197,12 +258,7 @@ const Recorder = () => {
           attempt,
           err: String(e?.message || e).slice(0, 120),
         });
-        if (
-          !streamingDataHandled.current &&
-          attempt + 1 < backoffMs.length
-        ) {
-          requestStreamingDataWithRetry(attempt + 1);
-        }
+        retryIfNeeded();
       }
     }, delay);
   };
@@ -572,6 +628,9 @@ const Recorder = () => {
       if (event.data.type === "crop-target") {
         target.current = event.data.target;
         regionRef.current = true;
+        // regionRef is now set — apply any streaming-data that arrived
+        // before the crop target did.
+        flushPendingStreamingData();
       } else if (event.data.type === "restart-recording") {
         restartRecording();
       }
@@ -1794,6 +1853,7 @@ const Recorder = () => {
     // recorder tab) hits "Capture stream is not ready yet" at 5s.
     target.current = null;
     streamingDataHandled.current = false;
+    pendingStreamingData.current = null;
     await updateFreeFinalizeStatus("stopping", 0);
     await setRecordingTimingState({
       recording: false,
@@ -1900,6 +1960,7 @@ const Recorder = () => {
     regionRef.current = false;
     target.current = null;
     streamingDataHandled.current = false;
+    pendingStreamingData.current = null;
     useWebCodecs.current = false;
     await setRecordingTimingState({
       recording: false,
@@ -2351,9 +2412,9 @@ const Recorder = () => {
           isRegion: Boolean(request.region),
         });
         backupRef.current = request.backup;
-        if (request.region) {
-          requestStreamingDataWithRetry();
-        }
+        // streaming-data is pulled on mount (see the mount effect), not
+        // here — `loaded` can be lost to the cold-start race and must not
+        // be the sole trigger for the pull.
         // Ack so BG's sendMessageRecord doesn't reject + trigger retries.
         try { sendResponse?.({ ok: true }); } catch {}
         return true;
@@ -2364,12 +2425,9 @@ const Recorder = () => {
           regionMode: Boolean(regionRef.current),
         });
         const wasDuplicate = streamingDataHandled.current;
-        if (!wasDuplicate) {
-          streamingDataHandled.current = true;
-          if (regionRef.current) {
-            startStreaming(JSON.parse(request.data));
-          }
-        }
+        // Push path; the pull response usually wins. applyStreamingData
+        // dedupes, and defers if the crop target hasn't arrived yet.
+        applyStreamingData(request.data);
         try { sendResponse?.({ ok: true, duplicate: wasDuplicate }); } catch {}
         return true;
       } else if (request.type === "start-recording-tab") {
@@ -2379,6 +2437,9 @@ const Recorder = () => {
         });
         if (regionRef.current || target.current) {
           regionRef.current = true;
+          // regionRef is set — apply any streaming-data that was deferred
+          // because it arrived before the crop target.
+          flushPendingStreamingData();
           setRegionRestartPhase("restart-started");
           startRecording();
         }
@@ -2517,9 +2578,19 @@ const Recorder = () => {
     lifecycle("Region.Recorder", "iframe-mount", {
       href: typeof window !== "undefined" ? window.location?.href?.slice(0, 200) : null,
     });
+    // Pull streaming-data as soon as the iframe is mounted — do not wait
+    // for the SW's `loaded` push, which is routinely lost to the
+    // cold-start race (the SW→tab handoff failure). The pull is answered
+    // directly in its own response; if the crop target hasn't landed yet
+    // the payload is deferred and replayed by flushPendingStreamingData.
+    requestStreamingDataWithRetry();
 
     return () => {
       clearStartRetry();
+      if (streamingDataRetryTimer.current) {
+        clearTimeout(streamingDataRetryTimer.current);
+        streamingDataRetryTimer.current = null;
+      }
       chrome.runtime.onMessage.removeListener(onMessage);
       lifecycle("Region.Recorder", "iframe-unmount", {
         regionRef: regionRef.current,
