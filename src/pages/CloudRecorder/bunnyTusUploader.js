@@ -776,6 +776,18 @@ export default class BunnyTusUploader {
         const data = await res.json();
         this.videoId = data.videoId;
         this.mediaId = data.mediaId;
+        // The server now inlines the TUS upload signature in this
+        // response (data.tusAuth). When present, stash it so the
+        // immediate-next refreshTusAuth() can skip its GET round-trip.
+        // Saves ~300-1000ms per uploader in dev. Falls back to the
+        // GET path when tusAuth is missing (older server / resume).
+        if (data?.tusAuth?.signature && data.tusAuth.expires && data.tusAuth.libraryId) {
+          this._inlinedTusAuth = {
+            signature: data.tusAuth.signature,
+            expires: data.tusAuth.expires,
+            libraryId: data.tusAuth.libraryId,
+          };
+        }
         await this.persistVideoMap({
           projectId,
           sceneId,
@@ -796,7 +808,34 @@ export default class BunnyTusUploader {
       }
 
       this.journalKey = this.journalKey || this.getJournalKey(this.mediaId);
-      await this.refreshTusAuth();
+      try {
+        await this.refreshTusAuth();
+      } catch (refreshErr) {
+        // 404 from tus-auth means the Bunny video is gone (orphan
+        // reaper, manual cleanup) but local resume state lingered.
+        // Clear it so the retry creates a fresh video instead of
+        // looping on identical 404s.
+        if (refreshErr?.status === 404) {
+          this.debugLog("Clearing stale resume state after tus-auth 404", {
+            mediaId: String(this.mediaId || ""),
+            videoId: String(this.videoId || ""),
+          });
+          try {
+            await this.clearUploadJournal();
+          } catch {}
+          try {
+            const mapKey = this.getVideoMapKey(
+              this.projectId,
+              this.sceneId,
+              this.metadata?.type,
+            );
+            if (mapKey) {
+              await chrome.storage.local.remove([mapKey]);
+            }
+          } catch {}
+        }
+        throw refreshErr;
+      }
 
       if (this.uploadUrl) {
         const serverOffset = await this.getServerOffset();
@@ -839,6 +878,25 @@ export default class BunnyTusUploader {
   }
 
   async refreshTusAuth() {
+    // Fast path: /api/bunny/videos inlines the TUS signature on the
+    // create response. Use it once to skip a round-trip; subsequent
+    // calls (expiry, journal resume) fall through to the GET.
+    if (this._inlinedTusAuth) {
+      const { signature, expires, libraryId } = this._inlinedTusAuth;
+      this._inlinedTusAuth = null;
+      // Only use it if it's still well within its validity window.
+      // generateBunnyUploadSignature returns `expires` as a unix
+      // seconds timestamp; require at least 30s of headroom.
+      const nowSec = Math.floor(Date.now() / 1000);
+      if (typeof expires === "number" && expires - nowSec > 30) {
+        this.signature = signature;
+        this.expires = expires;
+        this.libraryId = libraryId;
+        this.scheduleJournalPersist();
+        return;
+      }
+    }
+
     const token = this.userToken || (await chrome.storage.local.get(["screenityToken"]).then(r => r.screenityToken));
     const headers = token ? { Authorization: `Bearer ${token}` } : {};
     const url = `${API_BASE}/bunny/videos/tus-auth?videoId=${this.videoId}`;
@@ -887,12 +945,15 @@ export default class BunnyTusUploader {
       await this._sleepWithJitter(500 * Math.pow(2, attempt));
     }
 
-    // Build a structured error whose message matches the outer transient regex
-    // (/network/i) for 5xx/blip cases, and stays non-transient for 401/403.
+    // Classify so the outer retry loop's /network/i regex matches
+    // 5xx (transient) but not 401/403 (auth) or 404 (missing). 404
+    // means the backing video is gone; retrying never recovers it.
     const classification =
       lastStatus === 400 || lastStatus === 401 || lastStatus === 403
         ? "unauthorized"
-        : "network";
+        : lastStatus === 404
+          ? "missing"
+          : "network";
     const err = new Error(
       `Failed to refresh TUS auth (${classification} ${lastStatus ?? "offline"})`,
     );

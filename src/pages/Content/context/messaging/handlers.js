@@ -9,8 +9,6 @@ import { checkAuthStatus } from "../utils/checkAuthStatus";
 import { traceStep, setStartFlowOutcome } from "../../../utils/startFlowTrace";
 import { perfMark } from "../../../utils/perfMarks";
 import { triggerSupportDownload } from "../../../utils/triggerSupportDownload";
-import JSZip from "jszip";
-
 const CLOUD_FEATURES_ENABLED =
   process.env.SCREENITY_ENABLE_CLOUD_FEATURES === "true";
 
@@ -434,12 +432,35 @@ export const setupHandlers = () => {
     // ignore external pushes to avoid jitter/skips.
   });
 
-  registerMessage("toggle-popup", () => {
+  registerMessage("toggle-popup", async () => {
+    // Reconcile stale recording-flow state against storage before
+    // showing the popup. The tab may have been suspended during a
+    // recording handoff and missed the storage events that clear
+    // finalizingRecording / pendingRecording locally; without this,
+    // the post-stop loader briefly renders on reopen.
+    let storageReconcile = null;
+    try {
+      const snap = await chrome.storage.local.get([
+        "recording",
+        "restarting",
+      ]);
+      if (!snap.recording && !snap.restarting) {
+        storageReconcile = {
+          finalizingRecording: false,
+          preparingRecording: false,
+          pendingRecording: false,
+          restartingRecording: false,
+          recording: false,
+        };
+        chrome.storage.local.set({ pendingRecording: false }).catch(() => {});
+      }
+    } catch {}
     setContentState((prev) => ({
       ...prev,
       showExtension: !prev.showExtension,
       hasOpenedBefore: true,
       showPopup: true,
+      ...(storageReconcile || {}),
     }));
     setTimer(0);
     updateFromStorage();
@@ -472,6 +493,12 @@ export const setupHandlers = () => {
         countdownActive: true,
         isCountdownVisible: true,
         countdownCancelled: false,
+        // Latching gate: once the countdown is up, the pre-countdown
+        // loader can never re-show in this session (even during the
+        // brief countdown-end → recording=true storage flip window).
+        // Otherwise the loader bleeds into the captured frame for
+        // region/desktop captures where the stream is already live.
+        countdownEverShown: true,
       }));
       chrome.runtime.sendMessage({ type: "diag-countdown-started" }).catch(() => {});
     } else {
@@ -899,16 +926,32 @@ export const setupHandlers = () => {
         fastRecorder: fastRecorderData,
       };
 
-      const zip = new JSZip();
-      zip.file("troubleshooting.json", JSON.stringify(data));
-      const blob = await zip.generateAsync({ type: "blob" });
+      // Hand the zip step off to BG (see Background `make-zip` handler).
+      // No JSZip in content; content collects fields, BG runs JSZip,
+      // content downloads the resulting ArrayBuffer.
+      const filename = "screenity-troubleshooting.zip";
+      const resp = await chrome.runtime.sendMessage({
+        type: "make-zip",
+        files: { "troubleshooting.json": JSON.stringify(data) },
+        filename,
+      });
+      if (!resp?.ok || typeof resp.base64 !== "string") {
+        console.warn("[Screenity] troubleshooting zip failed:", resp?.error);
+        return;
+      }
+      const bin = atob(resp.base64);
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      const blob = new Blob([bytes], { type: "application/zip" });
       const url = window.URL.createObjectURL(blob);
 
       const a = document.createElement("a");
       a.href = url;
-      a.download = "screenity-troubleshooting.zip";
+      a.download = filename;
+      document.body.appendChild(a);
       a.click();
-      window.URL.revokeObjectURL(url);
+      a.remove();
+      setTimeout(() => window.URL.revokeObjectURL(url), 1000);
 
       chrome.runtime.sendMessage({ type: "indexed-db-download" });
     };
@@ -970,21 +1013,76 @@ export const setupHandlers = () => {
     }));
   });
 
-  registerMessage("reopen-popup-multi", (message) => {
+  registerMessage("reopen-popup-multi", async (message) => {
+    // Read multi-state from storage before setContentState so the
+    // popup renders with multiMode/multiSceneCount correct on first
+    // paint. The old fire-and-forget updateFromStorage() ran AFTER
+    // setContentState, which raced and could leave the popup
+    // showing the "Multi recording" switch instead of "Done" (stale
+    // for hundreds of ms, or persistent across tabs).
+    let storedMulti = {};
+    try {
+      storedMulti = await chrome.storage.local.get([
+        "multiMode",
+        "multiSceneCount",
+        "multiProjectId",
+        "multiLastSceneId",
+        "projectId",
+      ]);
+    } catch {}
+    // Multi-scene stop choreography. Scene-create is already done
+    // server-side by now. Order: clear loader + recording state
+    // (including finalizingRecording, or the loader sticks until the
+    // 30s watchdog), toast immediately, popup ~700ms later so the
+    // toast settles first. Read multi state from storage; contentState
+    // can be stale on a tab that didn't run the recording.
+    const isMulti = Boolean(storedMulti.multiMode);
     setContentState((prev) => ({
       ...prev,
       showExtension: true,
       showPopup: true,
+      finalizingRecording: false,
       preparingRecording: false,
+      pendingRecording: false,
+      recording: false,
+      paused: false,
+      time: 0,
+      timer: 0,
+      timeWarning: false,
+      tabCaptureFrame: false,
+      pipEnded: false,
+      // Seed multi-mode + scene count + project id from storage. This
+      // is the field set that gates the popup's "Done" button (uses
+      // multiMode + multiSceneCount > 0); if either is stale, the
+      // user sees the "Multi recording" switch instead of "Done".
+      multiMode: isMulti,
+      multiSceneCount: storedMulti.multiSceneCount || 0,
+      multiProjectId: storedMulti.multiProjectId || null,
+      multiLastSceneId: storedMulti.multiLastSceneId || null,
+      projectId: storedMulti.projectId || prev.projectId,
+      drawingMode: isMulti ? prev.drawingMode : false,
+      blurMode: isMulti ? prev.blurMode : false,
+      toolbarMode: isMulti ? prev.toolbarMode : "",
+      cursorMode: isMulti ? prev.cursorMode : "none",
+      cursorEffects: isMulti ? prev.cursorEffects : [],
+      cameraActive: false,
     }));
+    setTimer(0);
+    try {
+      const elements = document.querySelectorAll(".screenity-blur");
+      elements.forEach((el) => el.classList.remove("screenity-blur"));
+    } catch {}
     updateFromStorage(false, message.senderId);
 
-    setTimeout(() => {
-      const state = getState();
-      if (state.openToast) {
-        state.openToast(chrome.i18n.getMessage("addedToMultiToast"), () => {});
-      }
-    }, 1000);
+    // Toast on top; auto-dismisses in 5s.
+    const state = getState();
+    if (state.openToast) {
+      state.openToast(
+        chrome.i18n.getMessage("addedToMultiToast"),
+        () => {},
+        5000,
+      );
+    }
   });
 
   registerMessage("open-popup-project", (message) => {
@@ -1003,9 +1101,11 @@ export const setupHandlers = () => {
     setTimeout(() => {
       const state = getState();
       if (state.openToast) {
+        // Explicit 5s lifetime; see addedToMultiToast above.
         state.openToast(
           chrome.i18n.getMessage("readyRecordSceneToast"),
           () => {},
+          5000,
         );
       }
     }, 1000);
@@ -1116,8 +1216,14 @@ export const setupHandlers = () => {
     }
   });
   registerMessage("update-project-loading", (message, sender) => {
+    // Editor listeners gate on projectId; drop it and the handoff
+    // loader never surfaces.
     window.postMessage(
-      { source: "update-project-loading", multiMode: message.multiMode },
+      {
+        source: "update-project-loading",
+        multiMode: message.multiMode,
+        projectId: message.projectId || null,
+      },
       "*",
     );
 

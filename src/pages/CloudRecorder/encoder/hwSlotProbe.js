@@ -1,23 +1,14 @@
-// probes HW H.264 slot availability via VideoEncoder.isConfigSupported.
-// screen + camera each want a slot. Intel Quick Sync usually has 2,
-// Apple Silicon many more, Linux often 0-1, VMs often 0.
-// returned separately so chooseEncoder can fall the camera back to
-// MediaRecorder/VP9 when only the screen slot is free (mixing HW H.264
-// for screen + SW H.264 for camera trashes the main thread).
+// Probes HW H.264 slot availability via isConfigSupported. Screen +
+// camera each want a slot; returned separately so chooseEncoder can
+// fall camera back to MediaRecorder/VP9 when only one slot is free.
 
-// Probe at a conservative bitrate baseline (4 Mbps). The real encoder
-// runs later at the desired bitrate; isConfigSupported gates codec /
-// profile / dimensions / HW availability, and some HW reports false on
-// aggressive bitrates that it actually handles fine in practice.
+// 4 Mbps baseline; real encoder uses the configured bitrate later.
 const PROBE_BITRATE = 4_000_000;
 
-// Codec candidates ordered by preference. Trying multiple lets the probe
-// succeed on machines where the highest profile isn't supported but a
-// lower one (e.g. Baseline L3.0) is. Mirrors fastRecorderGate's approach.
-//   avc1.64002A = High Profile L4.2 (up to 1080p high bitrate)
-//   avc1.4D0028 = Main L4.0 (up to 1080p)
-//   avc1.4D401F = Main L3.1 (up to 720p high bitrate)
-//   avc1.42E01E = Baseline L3.0 (universal compatibility)
+// Candidates ordered High → Baseline so machines without the top
+// profile still probe successfully.
+//   64002A = High L4.2, 4D0028 = Main L4.0,
+//   4D401F = Main L3.1,  42E01E = Baseline L3.0
 const CODEC_CANDIDATES = [
   "avc1.64002A",
   "avc1.4D0028",
@@ -38,11 +29,9 @@ const buildVideoConfig = ({ codec, width, height, framerate, hwOption }) => ({
   hardwareAcceleration: hwOption,
 });
 
-// Try (codec × hw-option) combinations until one reports supported. A
-// machine that supports plain H.264 software but not hardware still gets
-// WebCodecs (better encoder reliability than MediaRecorder VP9, which is
-// also software). The "all-mr" fallback only triggers when every codec
-// + hw option fails.
+// Try codec × hw-option until one reports supported. SW-only H.264
+// still gets WebCodecs (more reliable than MediaRecorder VP9, also SW).
+// "all-mr" triggers only when every combo fails.
 const probeOne = async (label, { width, height, framerate }) => {
   if (typeof VideoEncoder === "undefined") {
     return { label, supported: false, reason: "VideoEncoder unavailable" };
@@ -85,17 +74,144 @@ const probeOne = async (label, { width, height, framerate }) => {
   return { label, supported: false, attempts };
 };
 
+// Two-encoder concurrency probe. isConfigSupported reports each
+// encoder independently; both can return supported on a one-slot HW
+// (macOS especially), where the second silently falls back to
+// software and runs at ~4fps. Open two real encoders and check both
+// emit at rate; if the second is >2x slower, force camera onto
+// MediaRecorder. 30 frames (~1s) because 8 missed it (keyframe
+// buffering hides asymmetry until ~500ms in). 2s cap, memoized.
+const CONCURRENT_FRAME_COUNT = 30;
+const CONCURRENT_TIMEOUT_MS = 2500;
+
+const probeConcurrentHw = async ({ codec, framerate }) => {
+  if (
+    typeof VideoEncoder === "undefined" ||
+    typeof VideoFrame === "undefined" ||
+    typeof OffscreenCanvas === "undefined"
+  ) {
+    return { ran: false, reason: "no-webcodecs" };
+  }
+  const width = 1280;
+  const height = 720;
+  const config = {
+    codec,
+    width,
+    height,
+    bitrate: PROBE_BITRATE,
+    framerate,
+    bitrateMode: "constant",
+    latencyMode: "realtime",
+    hardwareAcceleration: "prefer-hardware",
+  };
+  const makeEncoder = () => {
+    let chunks = 0;
+    let error = null;
+    const encoder = new VideoEncoder({
+      output: () => {
+        chunks += 1;
+      },
+      error: (err) => {
+        error = String(err?.message || err);
+      },
+    });
+    try {
+      encoder.configure(config);
+    } catch (err) {
+      try {
+        encoder.close();
+      } catch {}
+      return null;
+    }
+    return {
+      encoder,
+      getChunks: () => chunks,
+      getError: () => error,
+      close: () => {
+        try {
+          encoder.close();
+        } catch {}
+      },
+    };
+  };
+
+  const a = makeEncoder();
+  const b = makeEncoder();
+  if (!a || !b) {
+    a?.close();
+    b?.close();
+    return { ran: false, reason: "configure-failed" };
+  }
+
+  const canvas = new OffscreenCanvas(width, height);
+  const ctx = canvas.getContext("2d");
+  if (!ctx) {
+    a.close();
+    b.close();
+    return { ran: false, reason: "no-2d-context" };
+  }
+  const started =
+    typeof performance !== "undefined" ? performance.now() : Date.now();
+  for (let i = 0; i < CONCURRENT_FRAME_COUNT; i++) {
+    ctx.fillStyle = `hsl(${(i * 31) % 360}, 50%, 40%)`;
+    ctx.fillRect(0, 0, width, height);
+    const ts = Math.round((i * 1_000_000) / framerate);
+    const dur = Math.round(1_000_000 / framerate);
+    try {
+      const frameA = new VideoFrame(canvas, {
+        timestamp: ts,
+        duration: dur,
+      });
+      a.encoder.encode(frameA, { keyFrame: i === 0 });
+      frameA.close();
+    } catch {}
+    try {
+      const frameB = new VideoFrame(canvas, {
+        timestamp: ts,
+        duration: dur,
+      });
+      b.encoder.encode(frameB, { keyFrame: i === 0 });
+      frameB.close();
+    } catch {}
+  }
+  try {
+    await Promise.race([
+      Promise.allSettled([a.encoder.flush(), b.encoder.flush()]),
+      new Promise((r) => setTimeout(r, CONCURRENT_TIMEOUT_MS)),
+    ]);
+  } catch {}
+  const elapsed =
+    (typeof performance !== "undefined" ? performance.now() : Date.now()) -
+    started;
+  const aChunks = a.getChunks();
+  const bChunks = b.getChunks();
+  a.close();
+  b.close();
+  // Healthy dual-HW: both encoders emit close to the input frame count.
+  // We require at least 4 chunks from each (allowing for encoder
+  // buffering of the last keyframe close-out). A 2x ratio is the
+  // tripwire: anything worse means the second encoder is starved.
+  const minPerEncoder = 4;
+  const concurrent =
+    aChunks >= minPerEncoder &&
+    bChunks >= minPerEncoder &&
+    Math.max(aChunks, bChunks) / Math.max(1, Math.min(aChunks, bChunks)) < 2;
+  return {
+    ran: true,
+    concurrent,
+    aChunks,
+    bChunks,
+    elapsedMs: Math.round(elapsed),
+  };
+};
+
 export const probeHwSlots = async ({
   framerate = 30,
 } = {}) => {
-  // Probe at a universal 720p baseline regardless of the actual stream
-  // dimensions. isConfigSupported is a feasibility check for this codec
-  // family on this hardware. modern HW that can encode 720p H.264
-  // can encode any resolution we'd realistically capture (Bunny caps at
-  // 1080p tier anyway). Probing at the actual resolution is risky:
-  // getSettings() can return inaccurate values during track warmup, and
-  // some Chromium builds (Playwright's headless variant) reject 1080p
-  // configs even though the real encoder handles them once started.
+  // Probe at 720p baseline; modern HW that encodes 720p H.264 handles
+  // anything we'd capture. Probing at the real resolution is flaky:
+  // getSettings() lies during track warmup, and headless Chromium
+  // rejects 1080p that the real encoder accepts once started.
   const screenProbe = await probeOne("screen", {
     width: 1280,
     height: 720,
@@ -106,17 +222,71 @@ export const probeHwSlots = async ({
     height: 720,
     framerate,
   });
+
+  // Second stage: both probes can claim supported while only one HW
+  // slot exists per process (macOS especially). Diag showed camera
+  // at 4fps SW fallback in this case.
+  let concurrentProbe = null;
+  if (screenProbe.supported && cameraProbe.supported) {
+    const codec =
+      screenProbe.configResolved?.codec ||
+      cameraProbe.configResolved?.codec ||
+      CODEC_CANDIDATES[0];
+    try {
+      concurrentProbe = await probeConcurrentHw({ codec, framerate });
+    } catch {
+      concurrentProbe = { ran: false, reason: "exception" };
+    }
+  }
+
+  // macOS VideoToolbox h264 serializes per process; a second concurrent
+  // prefer-hardware silently falls back to SW at unpredictable fps.
+  // Route camera to explicit SW (below) to avoid contending the slot.
+  const ua = typeof navigator !== "undefined" ? navigator.userAgent : "";
+  const isMacUA = /Mac OS X|Macintosh/i.test(ua);
+
+  // cameraHw=false still records via WebCodecs SW (same h264 MP4).
+  // Only flip to MediaRecorder when isConfigSupported itself fails.
+  const cameraHwAvailable =
+    cameraProbe.supported &&
+    (!concurrentProbe || !concurrentProbe.ran || concurrentProbe.concurrent);
+
+  // Force SW h264 for camera on macOS or when the concurrent probe
+  // showed HW starvation. Same h264 MP4 output, just SW backend.
+  const cameraPreferSoftware =
+    isMacUA ||
+    Boolean(concurrentProbe?.ran && concurrentProbe.concurrent === false);
+
+  // cameraHw is "viable for WebCodecs encoding". Software h264 still
+  // counts; server only cares about the bitstream, not the backend.
+  // The only way cameraHw becomes false is if isConfigSupported itself
+  // rejected every codec candidate at the individual probe step.
+  const cameraHwViable = cameraProbe.supported;
+
   return {
     screen: screenProbe,
     camera: cameraProbe,
+    concurrentProbe,
     summary: {
       screenHw: screenProbe.supported,
-      cameraHw: cameraProbe.supported,
-      // Both supported = dual-hw. Only screen = degrade camera. Neither
-      // (or only camera, which we don't optimize for) = all-mr.
+      cameraHw: cameraHwViable,
+      cameraHwAvailable,
+      cameraHwAdvertised: cameraProbe.supported,
+      cameraPreferSoftware,
+      concurrent: concurrentProbe?.concurrent ?? null,
+      concurrentRan: Boolean(concurrentProbe?.ran),
+      isMacUA,
+      // - dual-hw                    → both encoders WebCodecs, both HW
+      // - dual-webcodecs-camera-sw   → both encoders WebCodecs, camera SW
+      //                                (Mac or HW-contended hardware)
+      // - screen-hw-camera-mr        → only screen can use h264; camera
+      //                                falls back to MediaRecorder VP9
+      // - all-mr                     → no WebCodecs h264 support at all
       mode: screenProbe.supported
-        ? cameraProbe.supported
-          ? "dual-hw"
+        ? cameraHwViable
+          ? cameraPreferSoftware
+            ? "dual-webcodecs-camera-sw"
+            : "dual-hw"
           : "screen-hw-camera-mr"
         : "all-mr",
     },

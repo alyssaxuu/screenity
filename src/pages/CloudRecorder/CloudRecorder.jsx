@@ -31,8 +31,15 @@ localforage.config({
 });
 
 const API_BASE = process.env.SCREENITY_API_BASE_URL;
+// Enable the start-flow logs unconditionally for dev builds so the
+// startup timeline is visible in the cloudrecorder tab console without
+// needing to set `window.SCREENITY_DEBUG_RECORDER = true` first. Prod
+// builds keep the original flag.
 const DEBUG_START_FLOW =
-  typeof window !== "undefined" ? !!window.SCREENITY_DEBUG_RECORDER : false;
+  typeof window !== "undefined"
+    ? !!window.SCREENITY_DEBUG_RECORDER ||
+      process.env.NODE_ENV !== "production"
+    : false;
 const SCREEN_CHUNK_MEMORY_WINDOW = 8;
 const CAMERA_CHUNK_MEMORY_WINDOW = 8;
 const AUDIO_CHUNK_MEMORY_WINDOW = 8;
@@ -99,6 +106,10 @@ const CloudRecorder = () => {
   const [finalizeFailure, setFinalizeFailure] = useState(null);
   const finalizeFailureRef = useRef(null);
   const finalizeContextRef = useRef(null);
+  // Timing trace for the stop→finalize→scene-create→close pipeline.
+  // Populated when stopRecording fires; ticked at each milestone so
+  // dead time is visible in the console.
+  const stopFlowRef = useRef(null);
   const simulateFinalizeFailureConsumedRef = useRef(false);
   const [retryingFinalize, setRetryingFinalize] = useState(false);
 
@@ -349,7 +360,20 @@ const CloudRecorder = () => {
   const logStartFlow = (event, data = {}) => {
     if (!DEBUG_START_FLOW) return;
     const payload = { ts: Date.now(), event, ...data };
-    console.info("[Screenity][StartFlow]", payload);
+    // console.warn (not console.info); Terser drop_console removes
+    // info/log/debug in prod builds.
+    console.warn("[Screenity][StartFlow]", payload);
+    // Mirror to BG so the timeline is visible even if the cloud
+    // recorder tab closes mid-sequence (e.g. an unhandled error
+    // tearing the tab down before the user can read the console).
+    try {
+      chrome.runtime.sendMessage({
+        type: "start-flow-tick",
+        event,
+        data,
+        ts: payload.ts,
+      });
+    } catch {}
     try {
       const update = {
         startFlowDebug: {
@@ -450,20 +474,38 @@ const CloudRecorder = () => {
     return telemetryRuntimeRef.current;
   };
 
+  // Route telemetry writes through BG. window.close() races the
+  // storage IPC when written from this tab and the event drops; BG
+  // outlives the tab. Counter so the pre-close flush can await sends.
+  const inflightTelemetryWritesRef = useRef(new Set());
   const appendUploadTelemetryEvent = async (eventPayload) => {
+    const p = (async () => {
+      try {
+        await chrome.runtime.sendMessage({
+          type: "cloud-telemetry-event",
+          event: eventPayload,
+        });
+      } catch (err) {
+        console.warn("Failed to forward upload telemetry event:", err);
+      }
+    })();
+    inflightTelemetryWritesRef.current.add(p);
+    p.finally(() => inflightTelemetryWritesRef.current.delete(p));
+    return p;
+  };
+
+  // Called by the close paths just before window.close() so any
+  // event emitted in the last microtask actually lands in BG storage.
+  const flushInflightTelemetry = async () => {
+    const writes = Array.from(inflightTelemetryWritesRef.current);
+    if (writes.length === 0) return;
     try {
-      const existing = await chrome.storage.local.get([UPLOAD_TELEMETRY_KEY]);
-      const current = Array.isArray(existing?.[UPLOAD_TELEMETRY_KEY])
-        ? existing[UPLOAD_TELEMETRY_KEY]
-        : [];
-      const next = [...current, eventPayload].slice(-MAX_UPLOAD_TELEMETRY_EVENTS);
-      await chrome.storage.local.set({
-        [UPLOAD_TELEMETRY_KEY]: next,
-        lastUploadTelemetryEvent: eventPayload,
-      });
-    } catch (err) {
-      console.warn("Failed to persist upload telemetry event:", err);
-    }
+      await Promise.race([
+        Promise.allSettled(writes),
+        // Hard cap so a wedged BG SW can't block tab close forever.
+        new Promise((r) => setTimeout(r, 1500)),
+      ]);
+    } catch {}
   };
 
   const resolveUploadTelemetryToken = async () => {
@@ -841,9 +883,12 @@ const CloudRecorder = () => {
     if (!sceneId) return;
     const indexKey = "pendingSceneIndex";
     const sceneKey = `pendingScene:${sceneId}`;
-    const { pendingSceneIndex = [] } = await chrome.storage.local.get([
-      indexKey,
-    ]);
+    const raw = await chrome.storage.local.get([indexKey]);
+    // Destructure default doesn't trigger when the stored value is
+    // explicitly null (vs. undefined); a previous teardown path could
+    // have set it to null and the next .includes() throws. Coerce
+    // defensively.
+    const pendingSceneIndex = Array.isArray(raw?.[indexKey]) ? raw[indexKey] : [];
     const nextIndex = pendingSceneIndex.includes(sceneId)
       ? pendingSceneIndex
       : [...pendingSceneIndex, sceneId];
@@ -857,9 +902,8 @@ const CloudRecorder = () => {
     if (!sceneId) return;
     const indexKey = "pendingSceneIndex";
     const sceneKey = `pendingScene:${sceneId}`;
-    const { pendingSceneIndex = [] } = await chrome.storage.local.get([
-      indexKey,
-    ]);
+    const raw = await chrome.storage.local.get([indexKey]);
+    const pendingSceneIndex = Array.isArray(raw?.[indexKey]) ? raw[indexKey] : [];
     const nextIndex = pendingSceneIndex.filter((id) => id !== sceneId);
     await chrome.storage.local.remove([sceneKey]);
     await chrome.storage.local.set({ [indexKey]: nextIndex });
@@ -926,6 +970,8 @@ const CloudRecorder = () => {
     screenMediaId,
     cameraMediaId,
     audioMediaId,
+    durations = null,
+    dimensions = null,
   }) => {
     if (!projectId || !sceneId) return { ok: false, error: "missing-ids" };
     const mediaIds = [screenMediaId, cameraMediaId, audioMediaId].filter(
@@ -944,6 +990,10 @@ const CloudRecorder = () => {
         screenMediaId: screenMediaId || null,
         cameraMediaId: cameraMediaId || null,
         audioMediaId: audioMediaId || null,
+        // Server stamps these onto media docs so scenes land with the
+        // real length instead of waiting for Bunny's encoded webhook.
+        durations: durations || undefined,
+        dimensions: dimensions || undefined,
       }),
     });
     if (!res.ok) {
@@ -972,6 +1022,13 @@ const CloudRecorder = () => {
         gainNode.connect(ctx.destination);
         oscillator.start();
         keepAliveOscillator.current = oscillator;
+      }
+      // AudioContext starts suspended without a user gesture; without
+      // resume() the oscillator emits nothing and Chrome throttles
+      // the tab (camera + screen drop to ~5fps for the first 15s).
+      const aCtx = keepAliveAudioCtx.current;
+      if (aCtx && aCtx.state !== "running" && typeof aCtx.resume === "function") {
+        aCtx.resume().catch(() => {});
       }
     } catch (err) {
       console.warn("[CloudRecorder] keepalive: audio layer failed:", err);
@@ -1760,16 +1817,10 @@ const CloudRecorder = () => {
       // Re-probe HW slots + sticky-disabled state on the next recording
       // (encoders chosen per session, not per component-mount).
       resetEncoderProbeCache();
-      // Reap the OPFS session directory once chunks have been cleared by the
-      // various callers' .clear() calls. Awaited because the success path
-      // calls window.close() right after finalize, and a fire-and-forget
-      // delete races with tab teardown, leaving half-deleted dirs across
-      // sessions and confuse the orphan reaper.
-      //
-      // Skipped when a local-playback offer is still holding the screen
-      // chunks: the editor reads them via cloud-local-playback-read-chunk
-      // and clears+destroys via cloud-local-playback-clear when done. The
-      // offer's TTL alarm cleans up if the editor never gets to it.
+      // Reap the OPFS session dir; awaited because window.close()
+      // follows and fire-and-forget delete races teardown. Skipped
+      // when a local-playback offer is still holding chunks (editor
+      // clears via cloud-local-playback-clear; TTL alarm is the safety).
       if (usedOpfs && opfsSessionId && !keepOpfsSession) {
         try {
           await destroySessionDir(opfsSessionId);
@@ -2248,9 +2299,10 @@ const CloudRecorder = () => {
 
   const recoverPendingScenes = useCallback(async () => {
     try {
-      const { pendingSceneIndex = [] } = await chrome.storage.local.get([
-        "pendingSceneIndex",
-      ]);
+      const raw = await chrome.storage.local.get(["pendingSceneIndex"]);
+      const pendingSceneIndex = Array.isArray(raw?.pendingSceneIndex)
+        ? raw.pendingSceneIndex
+        : [];
       if (!pendingSceneIndex.length) return;
 
       for (const sceneId of pendingSceneIndex) {
@@ -2707,6 +2759,7 @@ const CloudRecorder = () => {
     uploadMetaRef.current = null;
     isInit.current = false;
 
+    await flushInflightTelemetry();
     if (!IS_IFRAME_CONTEXT) {
       try {
         window.close();
@@ -2824,12 +2877,16 @@ const CloudRecorder = () => {
         }
       };
 
-      // Decide encoder kind (and therefore container) per track BEFORE
-      // constructing the uploaders. The TUS Upload-Metadata `filetype` is
-      // set at upload-create time and isn't re-declarable on PATCH, so the
-      // uploader needs to know the right container up front. The plan is
-      // cached; chooseTrackEncoder during startRecording reads the same
-      // probe result and returns the same kind.
+      // Stashed init options; all three /api/bunny/videos POSTs fire
+      // in parallel below. Partners are discovered by shared sceneId
+      // server-side, so camera/audio no longer need screen's mediaId.
+      let screenInitOpts = null;
+      let cameraInitOpts = null;
+      let audioInitOpts = null;
+
+      // Pick encoder/container per track before constructing uploaders.
+      // TUS Upload-Metadata filetype is fixed at create time and can't
+      // be re-declared on PATCH. Plan is cached.
       const screenSettings = screenStream.current?.getVideoTracks?.()?.[0]
         ?.getSettings?.() || {};
       const cameraSettings = cameraStream.current?.getVideoTracks?.()?.[0]
@@ -2847,9 +2904,14 @@ const CloudRecorder = () => {
       const { inspectTrackPlan } = await import(
         "./encoder/chooseEncoder"
       );
-      const screenPlan = await inspectTrackPlan({ track: "screen", probeOptions });
-      const cameraPlan = await inspectTrackPlan({ track: "camera", probeOptions });
-      const audioPlan = await inspectTrackPlan({ track: "audio" });
+      // Parallel: probeHwSlots inside chooseEncoder is memoized
+      // (_hwSlotsPromise) so concurrent calls share the same probe;
+      // the three inspectTrackPlan calls don't conflict.
+      const [screenPlan, cameraPlan, audioPlan] = await Promise.all([
+        inspectTrackPlan({ track: "screen", probeOptions }),
+        inspectTrackPlan({ track: "camera", probeOptions }),
+        inspectTrackPlan({ track: "audio" }),
+      ]);
       encoderKinds.screen = screenPlan.kind;
       encoderKinds.camera = cameraPlan.kind;
       encoderKinds.audio = audioPlan.kind;
@@ -2943,21 +3005,15 @@ const CloudRecorder = () => {
             height = downscaled.height;
           }
         }
-        await screenUploader.current.initialize(projectId, {
+        // Stash options; fire all 3 inits in parallel below.
+        screenInitOpts = {
           title: "Screen Recording",
           type: "screen",
           width,
           height,
           sceneId,
           sessionId,
-        });
-        logDebugEvent("uploader-ready", {
-          type: "screen",
-          projectId,
-          sceneId,
-          mediaId: screenUploader.current?.getMeta()?.mediaId || null,
-          videoId: screenUploader.current?.getMeta()?.videoId || null,
-        });
+        };
       }
 
       if (cameraStream.current) {
@@ -2999,30 +3055,24 @@ const CloudRecorder = () => {
             height = downscaled.height;
           }
         }
-        await cameraUploader.current.initialize(projectId, {
+        // Omit linkedMediaId; server groups partners by shared sceneId
+        // in usedIn now. Lifts the serial wait on screen's mediaId
+        // (~3s dev, 500ms-1s prod).
+        cameraInitOpts = {
           title: "Camera Recording",
           type: "camera",
-          linkedMediaId: screenUploader.current?.getMeta()?.mediaId || null,
+          linkedMediaId: null,
           width,
           height,
           sceneId,
           sessionId,
-        });
-        logDebugEvent("uploader-ready", {
-          type: "camera",
-          projectId,
-          sceneId,
-          mediaId: cameraUploader.current?.getMeta()?.mediaId || null,
-          videoId: cameraUploader.current?.getMeta()?.videoId || null,
-        });
+        };
       }
 
       const { micActive } = await chrome.storage.local.get(["micActive"]);
-      // Only spin up the audio TUS uploader when the user actually has
-      // mic on. The cloudrecorder always attaches a mic stream (then
-      // gain-mutes it when micActive=false) for system-audio mixing
-      // routing, so a non-empty getAudioTracks() isn't a strong signal
-      // on its own.
+      // Only init the audio uploader when mic is actually on; a non-
+      // empty getAudioTracks() isn't enough since we attach a muted
+      // mic stream for system-audio mixing.
       if (micActive === true && rawMicStream.current?.getAudioTracks?.().length) {
         // Audio uploader failures are non-fatal; recording proceeds
         // without an audio track if init fails (mic supplementary).
@@ -3044,23 +3094,16 @@ const CloudRecorder = () => {
             onTelemetry: onUploaderTelemetry("audio"),
             onStateChange: onUploaderStateChange("audio"),
           });
-          await audioUploader.current.initialize(projectId, {
+          audioInitOpts = {
             title: "Audio Recording",
             type: "audio",
-            linkedMediaId:
-              screenUploader.current?.getMeta()?.mediaId ||
-              cameraUploader.current?.getMeta()?.mediaId ||
-              null,
+            // See comment above for cameraInitOpts; sceneId-based
+            // partner discovery makes linkedMediaId optional and lets
+            // this fire in parallel with the screen + camera inits.
+            linkedMediaId: null,
             sceneId,
             sessionId,
-          });
-          logDebugEvent("uploader-ready", {
-            type: "audio",
-            projectId,
-            sceneId,
-            mediaId: audioUploader.current?.getMeta()?.mediaId || null,
-            videoId: audioUploader.current?.getMeta()?.videoId || null,
-          });
+          };
         } catch (audioErr) {
           console.warn(
             "⚠️ Audio uploader init failed; recording will continue without an audio track:",
@@ -3072,6 +3115,67 @@ const CloudRecorder = () => {
           audioUploader.current = null;
         }
       }
+
+      // All 3 TUS inits in parallel. No serial dependency anymore -
+      // sceneId-based partner discovery on the server side replaces
+      // the old screen.mediaId → linkedMediaId chain.
+      const parallelInits = [];
+      if (screenUploader.current && screenInitOpts) {
+        parallelInits.push(
+          screenUploader.current
+            .initialize(projectId, screenInitOpts)
+            .then(() => {
+              logDebugEvent("uploader-ready", {
+                type: "screen",
+                projectId,
+                sceneId,
+                mediaId: screenUploader.current?.getMeta()?.mediaId || null,
+                videoId: screenUploader.current?.getMeta()?.videoId || null,
+              });
+            }),
+        );
+      }
+      if (cameraUploader.current && cameraInitOpts) {
+        parallelInits.push(
+          cameraUploader.current
+            .initialize(projectId, cameraInitOpts)
+            .then(() => {
+              logDebugEvent("uploader-ready", {
+                type: "camera",
+                projectId,
+                sceneId,
+                mediaId: cameraUploader.current?.getMeta()?.mediaId || null,
+                videoId: cameraUploader.current?.getMeta()?.videoId || null,
+              });
+            }),
+        );
+      }
+      if (audioUploader.current && audioInitOpts) {
+        parallelInits.push(
+          audioUploader.current
+            .initialize(projectId, audioInitOpts)
+            .then(() => {
+              logDebugEvent("uploader-ready", {
+                type: "audio",
+                projectId,
+                sceneId,
+                mediaId: audioUploader.current?.getMeta()?.mediaId || null,
+                videoId: audioUploader.current?.getMeta()?.videoId || null,
+              });
+            })
+            .catch((audioErr) => {
+              console.warn(
+                "⚠️ Audio uploader init failed; recording will continue without an audio track:",
+                audioErr,
+              );
+              logDebugEvent("audio-uploader-init-failed", {
+                error: audioErr?.message || String(audioErr),
+              });
+              audioUploader.current = null;
+            }),
+        );
+      }
+      if (parallelInits.length) await Promise.all(parallelInits);
 
       await setPipelineState("uploaders-ready", {
         projectId,
@@ -3099,11 +3203,9 @@ const CloudRecorder = () => {
   const createMediaRecorder = (stream, options, onDataAvailable) => {
     try {
       const recorder = new MediaRecorder(stream, options);
-      // Track in-flight write() promises so stopAllRecorders can drain them
-      // before finalize() runs. Without this, a late ondataavailable that
-      // fires after onstop (or whose write() promise hasn't resolved yet)
-      // can race finalize and get rejected by the isFinalizing guard,
-      // silently truncating the upload.
+      // Track in-flight write() promises so stopAllRecorders can
+      // drain them before finalize(); a late ondataavailable would
+      // otherwise race finalize and silently truncate the upload.
       recorder._pendingWrites = new Set();
 
       recorder.ondataavailable = (event) => {
@@ -3163,14 +3265,58 @@ const CloudRecorder = () => {
       return;
     }
 
+    // Pre-flight OPFS quota; otherwise we start and checkMaxMemory
+    // stops us within ~1s of the first chunk.
+    try {
+      const { quota = 0, usage = 0 } = await navigator.storage.estimate();
+      const headroom = Math.max(0, quota - usage);
+      const minQuota = 25 * 1024 * 1024;
+      if (quota > 0 && quota < minQuota) {
+        void emitUploadTelemetry("upload_storage_pressure", {
+          severity: "preflight-quota-too-low",
+          quota,
+          usage,
+          headroom,
+        });
+        sendRecordingError(
+          "Not enough browser storage available to record. Free up disk space and try again.",
+        );
+        logStartFlow("recording_error", {
+          reason: "preflight-low-quota",
+          quota,
+          headroom,
+        });
+        return;
+      }
+      if (headroom > 0 && headroom < STORAGE_CRITICAL_HEADROOM_BYTES) {
+        void emitUploadTelemetry("upload_storage_pressure", {
+          severity: "preflight-critical-headroom",
+          quota,
+          usage,
+          headroom,
+        });
+        sendRecordingError(
+          "Your browser is almost out of storage. Free up space and try again to avoid losing the recording.",
+        );
+        logStartFlow("recording_error", {
+          reason: "preflight-critical-headroom",
+          headroom,
+        });
+        return;
+      }
+    } catch (err) {
+      // Best-effort: if the API throws, fall through and let the
+      // during-recording checkMaxMemory pick it up. Don't block recording
+      // on a failed estimate.
+      console.warn("[CloudRecorder] preflight storage estimate failed:", err);
+    }
+
     const { projectId } = await chrome.storage.local.get(["projectId"]);
 
     if (!projectId) {
-      // Diagnostic: capture co-resident state so we can see how the cloudrecorder
-      // reached startRecording without a project. The most common path is a BG
-      // recording-error firing during attempt N (which clears projectId) followed
-      // by a retry that reaches us via `start-recording-tab` without going back
-      // through openRecorderTab → createVideoProject.
+      // Diagnostic for how we reached startRecording without a project.
+      // Most common path: BG recording-error clears projectId, then a
+      // retry hits start-recording-tab without re-creating it.
       let danglingState = null;
       try {
         danglingState = await chrome.storage.local.get([
@@ -3311,12 +3457,10 @@ const CloudRecorder = () => {
         hasMic: Boolean(micStream.current),
       });
       if (screenStream.current) {
-        // micStream is always attached when a mic device exists (it's the
-        // AudioContext mix point for system audio too) and gain-muted to 0
-        // when micActive=false, so stream-track presence isn't reliable.
-        // audioIntent comes from BG's getStreamingData payload, which reads
-        // before the content-script ContentState's fresh-state auto-default
-        // can race-flip micActive false back to true.
+        // Stream-track presence isn't reliable: micStream is always
+        // attached when a mic exists (the mix point for system audio)
+        // and gain-muted when micActive=false. audioIntent reads from
+        // BG before contentState's fresh-state auto-default can race.
         const { micActive, systemAudio } = audioIntent.current;
         const screenHasAudio = micActive === true || systemAudio === true;
         const stream = screenHasAudio
@@ -4050,7 +4194,7 @@ const CloudRecorder = () => {
       ) {
         unloadGuardRef.current.stopTriggeredFromUnload = true;
         emitAbandonedOnUnloadOnce("pagehide");
-        console.warn("⚠️ Recorder page unloading — finalizing");
+        console.warn("⚠️ Recorder page unloading; finalizing");
         navigator.sendBeacon?.(
           `${API_BASE}/log/recorder-unload`,
           JSON.stringify({ reason: "pagehide", ts: Date.now() }),
@@ -4063,6 +4207,37 @@ const CloudRecorder = () => {
 
     window.addEventListener("pagehide", onHide);
     return () => window.removeEventListener("pagehide", onHide);
+  }, []);
+
+  // Prewarm the WebCodecs hw-slot probe on mount so it's resolved by
+  // the time inspectTrackPlan runs (saves 300-500ms cold-start).
+  useEffect(() => {
+    if (IS_OFFSCREEN_HOST) return undefined;
+    let cancelled = false;
+    (async () => {
+      try {
+        const { inspectTrackPlan } = await import("./encoder/chooseEncoder");
+        if (cancelled) return;
+        // Default probe options; the real probe is shape-invariant
+        // because chooseEncoder caches the first promise it created
+        // regardless of probeOptions.
+        await inspectTrackPlan({
+          track: "screen",
+          probeOptions: {
+            screenWidth: 1920,
+            screenHeight: 1080,
+            cameraWidth: 1280,
+            cameraHeight: 720,
+            framerate: 30,
+          },
+        });
+      } catch {
+        // Best-effort prewarm; the real init still runs the probe.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -4399,21 +4574,50 @@ const CloudRecorder = () => {
         domain: recordedTabDomain || null,
       };
 
-      // Forward to the editor tab via BG; editor performs the POST itself
-      // (same-origin cookie auth, no CORS, no SW lifecycle race). MV3 SW
-      // fetches hang indefinitely when dispatched from the cloud recorder
-      // during its post-stop teardown; the editor's tab outlives it.
-      let swRes;
-      try {
-        swRes = await chrome.runtime.sendMessage({
-          type: "forward-create-scene",
-          projectId,
-          payload,
+      // Scene-create via BG (POSTs directly, editor-tab proxy fallback).
+      // 30s cap because keepalive doesn't keep the JS context alive.
+      stopFlowRef.current?.tick?.("scene-create-dispatched", { sceneId });
+      const sendOnce = () =>
+        new Promise((resolve) => {
+          let settled = false;
+          const timer = setTimeout(() => {
+            if (settled) return;
+            settled = true;
+            resolve({ ok: false, error: "bg-timeout" });
+          }, 30_000);
+          chrome.runtime
+            .sendMessage({ type: "forward-create-scene", projectId, payload })
+            .then((reply) => {
+              if (settled) return;
+              settled = true;
+              clearTimeout(timer);
+              resolve(reply || { ok: false, error: "no-bg-response" });
+            })
+            .catch((err) => {
+              if (settled) return;
+              settled = true;
+              clearTimeout(timer);
+              resolve({ ok: false, error: err?.message || String(err) });
+            });
         });
-      } catch (err) {
-        swRes = { ok: false, error: err?.message || String(err) };
+      let swRes = await sendOnce();
+      // One retry if BG didn't respond (SW was restarting). Any other
+      // error is forwarded as-is; the outer block already has the
+      // /recover-scene fallback path that catches it.
+      if (
+        !swRes?.ok &&
+        (swRes?.error === "no-bg-response" || swRes?.error === "bg-timeout")
+      ) {
+        stopFlowRef.current?.tick?.("scene-create-retry", {
+          reason: swRes?.error,
+        });
+        swRes = await sendOnce();
       }
-      if (!swRes) swRes = { ok: false, error: "no-bg-response" };
+      stopFlowRef.current?.tick?.("scene-create-replied", {
+        ok: !!swRes?.ok,
+        status: swRes?.status,
+        error: swRes?.error,
+      });
       const res = {
         ok: !!swRes?.ok,
         status: swRes?.status ?? 0,
@@ -4429,6 +4633,11 @@ const CloudRecorder = () => {
           screenMediaId: uploadMeta.screen?.mediaId || null,
           cameraMediaId: uploadMeta.camera?.mediaId || null,
           audioMediaId: uploadMeta.audio?.mediaId || null,
+          // Pass the duration + capture dims so the server can stamp
+          // them onto the media docs (and therefore the scene) right
+          // away, instead of waiting for the Bunny encoded webhook.
+          durations: payload?.durations || null,
+          dimensions: payload?.dimensions || null,
         });
 
         if (recoverResult.ok) {
@@ -4468,24 +4677,45 @@ const CloudRecorder = () => {
           throw new Error(`Failed to create scene: ${errorText}`);
         }
       } else {
-        await setSceneCreateStatus(sceneId, "created");
-        // No ensureMediaLinked call here: /api/bunny/videos already
-        // stamped each media's `usedIn` at TUS init time, and the
-        // /scenes/ POST that just succeeded already cleared
-        // `recoveryState`. PATCH was a no-op + a post-stop hang risk
-        // in the dying cloudrecorder tab.
-        await removePendingScene(sceneId);
-        await markSceneComplete(sceneId);
-        await setPipelineState("scene-created", {
-          projectId,
-          sceneId,
-        });
-        logDebugEvent("scene-create-complete", {
-          projectId,
-          sceneId,
-        });
+        // Dispatch editor-ready right after the 201; housekeeping
+        // (setSceneCreateStatus / removePendingScene / etc.) runs in
+        // parallel below since nothing in the handoff reads it.
         sceneOutcome = "created";
         shouldIncrementMultiSceneCount = true;
+
+        if (multiMode && shouldIncrementMultiSceneCount) {
+          // Multi needs count + lastSceneId persisted before
+          // reopen-popup-multi fires; that handler reads them.
+          // reads them. Keep this awaited path for multi.
+          await chrome.storage.local.set({
+            multiSceneCount: multiSceneCount + 1,
+            multiLastSceneId: sceneId,
+          });
+          chrome.runtime.sendMessage({
+            type: "reopen-popup-multi",
+          });
+        }
+
+        sendEditorReady({
+          projectId,
+          sceneId,
+          recordingToScene,
+          multiMode,
+        });
+
+        // Housekeeping in parallel (editor's already moving).
+        await setSceneCreateStatus(sceneId, "created");
+        Promise.all([
+          removePendingScene(sceneId).catch(() => {}),
+          markSceneComplete(sceneId).catch(() => {}),
+          setPipelineState("scene-created", { projectId, sceneId }).catch(
+            () => {},
+          ),
+          chrome.storage.local.remove("clickEvents").catch(() => {}),
+        ]).then(() => {
+          logDebugEvent("scene-create-complete", { projectId, sceneId });
+        });
+        return { created: true };
       }
     }
 
@@ -4531,6 +4761,32 @@ const CloudRecorder = () => {
     // Lock immediately: prevents duplicate stop/finalize races under unload pressure.
     isFinishing.current = true;
     clearPendingStart();
+
+    // Timing trace for stop → scene-create → close. T+0 stop pressed,
+    // recorders drained, last TUS chunk, /scenes dispatched,
+    // /scenes replied, tab close requested. Same shape as
+    // startFlowTrace but for the post-stop pipeline.
+    stopFlowRef.current = { startedAt: performance.now(), steps: [] };
+    const stopTick = (label, extra = {}) => {
+      const t = Math.round(performance.now() - stopFlowRef.current.startedAt);
+      if (DEBUG_START_FLOW) {
+        console.warn(`[stop-flow T+${t}ms] ${label}`, extra);
+      }
+      stopFlowRef.current.steps.push({ t, label, extra });
+      // Mirror to BG service worker so the timeline survives this
+      // tab's window.close(). BG console (chrome://extensions →
+      // service worker) keeps the full sequence visible.
+      try {
+        chrome.runtime.sendMessage({
+          type: "stop-flow-tick",
+          t,
+          label,
+          extra,
+        });
+      } catch {}
+    };
+    stopFlowRef.current.tick = stopTick;
+    stopTick("stop-pressed", { reason, shouldFinalize });
 
     if (DEBUG_START_FLOW) {
       console.debug("[Screenity] stopRecording invoked", {
@@ -4608,6 +4864,7 @@ const CloudRecorder = () => {
     stopAllIntervals();
 
     await stopAllRecorders();
+    stopFlowRef.current?.tick?.("recorders-drained");
 
     const { sceneId } = await chrome.storage.local.get(["sceneId"]);
     const uploadMeta = {
@@ -4671,15 +4928,17 @@ const CloudRecorder = () => {
     }
 
     const settledResults = await Promise.allSettled(finalizeCalls);
+    stopFlowRef.current?.tick?.("video-uploaders-finalized", {
+      count: finalizeCalls.length,
+      rejected: settledResults.filter((r) => r.status === "rejected").length,
+    });
     const rejectedResults = settledResults.filter(
       (result) => result.status === "rejected",
     );
 
-    // Audio is supplementary: a dead mic mid-recording shouldn't block
-    // scene creation. Finalize separately, never feed into
-    // incompleteUploaders. On failure, clear uploadMeta.audio so the
-    // scene isn't wired to a half-uploaded audio doc (which would
-    // break playback and 400 the transcription queue precondition).
+    // Audio is supplementary; a dead mic shouldn't block scene
+    // creation. Finalize separately; on failure, clear uploadMeta.audio
+    // so the scene isn't wired to a half-uploaded doc.
     if (audioUploader.current) {
       let audioFinalizeOk = true;
       try {
@@ -4936,6 +5195,12 @@ const CloudRecorder = () => {
           mediaId: uploadMeta.screen?.mediaId || uploadMeta.camera?.mediaId || null,
         });
 
+        // Flush any pending telemetry IPCs to BG so events landed by
+        // the previous emit calls don't get torn off by window.close()
+        // below. 1.5s hard cap.
+        await flushInflightTelemetry();
+        stopFlowRef.current?.tick?.("tab-closing");
+
         if (!IS_IFRAME_CONTEXT) {
           try {
             window.close();
@@ -4991,7 +5256,10 @@ const CloudRecorder = () => {
         });
 
         // Close anyway to prevent stuck tabs; delay so user sees the error.
-        setTimeout(() => {
+        setTimeout(async () => {
+          // Same flush as the success path; error telemetry is
+          // exactly what we DON'T want to lose, so wait for BG writes.
+          await flushInflightTelemetry();
           if (!IS_IFRAME_CONTEXT) {
             try {
               window.close();
@@ -5199,7 +5467,10 @@ const CloudRecorder = () => {
           bindScreenTrack(screenStream.current.getVideoTracks()[0]);
         } catch (err) {
           if (isUserCaptureCancel(err)) {
-            sendRecordingError("User cancelled stream selection", true);
+            sendRecordingError(
+              `User cancelled stream selection [region-iframe gDM ${err?.name || "?"}]`,
+              true,
+            );
             return;
           }
           sendRecordingError("Failed to access region stream: " + err.message);
@@ -5230,7 +5501,7 @@ const CloudRecorder = () => {
             );
           } catch (err) {
             console.warn(
-              "⚠️ Camera permission denied — continuing without camera:",
+              "⚠️ Camera permission denied; continuing without camera:",
               err,
             );
             cameraStream.current = null;
@@ -5381,6 +5652,37 @@ const CloudRecorder = () => {
             );
             console.log("[CloudRecorder] offscreen getDisplayMedia OK");
           } else {
+            if (!id) {
+              console.error(
+                "[CloudRecorder] gUM path reached with no streamId; dispatch bug",
+                {
+                  isTab: isTab.current,
+                  tabID: tabID.current,
+                  IS_OFFSCREEN_HOST,
+                  IS_IFRAME_CONTEXT,
+                  recordingType: recordingType.current,
+                  useDisplayMedia,
+                  prewarmedStream: !!prewarmedStream,
+                },
+              );
+              chrome.runtime
+                .sendMessage({
+                  type: "offscreen-diag",
+                  source: "gUM-no-streamId",
+                  payload: {
+                    isTab: !!isTab.current,
+                    tabIDpresent: !!tabID.current,
+                    IS_OFFSCREEN_HOST,
+                    IS_IFRAME_CONTEXT,
+                    recordingType: recordingType.current,
+                  },
+                })
+                .catch(() => {});
+              sendRecordingError(
+                "No screen stream id available [gUM-no-streamId]",
+              );
+              return;
+            }
             console.log("[CloudRecorder] desktop getUserMedia constraints", {
               audioEnabled: !!desktopConstraints.audio,
               videoMandatory: desktopConstraints.video?.mandatory,
@@ -5510,7 +5812,10 @@ const CloudRecorder = () => {
               bindScreenTrack(screenStream.current.getVideoTracks()[0]);
             } catch (fallbackErr) {
               if (isUserCaptureCancel(fallbackErr)) {
-                sendRecordingError("User cancelled stream selection", true);
+                sendRecordingError(
+                  `User cancelled stream selection [offscreen-tab gDM fallback ${fallbackErr?.name || "?"}]`,
+                  true,
+                );
                 return;
               }
               sendRecordingError(
@@ -5519,7 +5824,10 @@ const CloudRecorder = () => {
               return;
             }
           } else if (isUserCaptureCancel(err)) {
-            sendRecordingError("User cancelled stream selection", true);
+            sendRecordingError(
+              `User cancelled stream selection [tab-streamId-consume ${err?.name || "?"}]`,
+              true,
+            );
             return;
           } else {
             sendRecordingError("Failed to access screen stream: " + err.message);
@@ -5551,7 +5859,7 @@ const CloudRecorder = () => {
             );
           } catch (err) {
             console.warn(
-              "⚠️ Camera permission denied — continuing without camera:",
+              "⚠️ Camera permission denied; continuing without camera:",
               err,
             );
             cameraStream.current = null;
@@ -5600,7 +5908,15 @@ const CloudRecorder = () => {
         }
       } catch {}
 
-      aCtx.current = new AudioContext();
+      // Force 48 kHz: Opus is fixed at 48k, AAC accepts it natively.
+      // System default (often 44.1k) makes the encoder mismatch the
+      // AudioData stream and throw on first encode.
+      try {
+        aCtx.current = new AudioContext({ sampleRate: 48000 });
+      } catch {
+        // Some platforms reject hint sampleRates; fall back to default.
+        aCtx.current = new AudioContext();
+      }
       destination.current = aCtx.current.createMediaStreamDestination();
 
       if (micStream.current?.getAudioTracks().length) {
@@ -5693,6 +6009,12 @@ const CloudRecorder = () => {
           multiMode: Boolean(multiMode),
         });
 
+        // Run countdown + uploader-init in parallel. maybeStartRecording
+        // polls uploadersInitialized.current at countdown-end (200ms ×
+        // 75). Saves ~2-3s vs awaiting init before the countdown.
+        traceStep("resetActiveTabSent");
+        chrome.runtime.sendMessage({ type: "reset-active-tab" });
+
         uploadersInitialized.current = await initializeUploaders();
         if (!uploadersInitialized.current) {
           throw new Error("Failed to initialize uploaders");
@@ -5706,8 +6028,6 @@ const CloudRecorder = () => {
           prewarmRef.current = startPrewarm(screenStream.current);
           preloadWebCodecsModules();
         }
-        traceStep("resetActiveTabSent");
-        chrome.runtime.sendMessage({ type: "reset-active-tab" });
         if (pendingStartRef.current) {
           maybeStartRecording("uploaders-ready");
         }
@@ -5738,10 +6058,12 @@ const CloudRecorder = () => {
     }
 
     try {
-      const permissions = await navigator.permissions.query({ name: "camera" });
-      const permissions2 = await navigator.permissions.query({
-        name: "microphone",
-      });
+      // Parallel; they're independent queries against different
+      // PermissionDescriptors and each typically takes ~50-100ms.
+      const [permissions, permissions2] = await Promise.all([
+        navigator.permissions.query({ name: "camera" }),
+        navigator.permissions.query({ name: "microphone" }),
+      ]);
 
       if (isTab.current) {
         // Wait for getStreamID across all recordingTypes: an earlier guard skipped
@@ -5758,17 +6080,53 @@ const CloudRecorder = () => {
         }
       }
 
+      const _dispatchPayload = {
+        recordingType: data.recordingType,
+        isTab: !!isTab.current,
+        tabIDpresent: !!tabID.current,
+        tabIDprefix: String(tabID.current || "").slice(0, 16),
+        IS_OFFSCREEN_HOST,
+        IS_IFRAME_CONTEXT,
+        tabPreferred: !!tabPreferred.current,
+        recordingTabId: recordingTabId.current || null,
+      };
+      if (DEBUG_START_FLOW) {
+        console.warn("[CloudRecorder][start-dispatch]", _dispatchPayload);
+        chrome.runtime
+          .sendMessage({
+            type: "offscreen-diag",
+            source: "start-dispatch",
+            payload: _dispatchPayload,
+          })
+          .catch(() => {});
+      }
+      const _diagBranch = (branch) => {
+        chrome.runtime
+          .sendMessage({
+            type: "offscreen-diag",
+            source: "start-dispatch-branch",
+            payload: { branch },
+          })
+          .catch(() => {});
+      };
       if (data.recordingType === "camera") {
+        _diagBranch("camera");
         startStream(data, null, permissions, permissions2);
       } else if (IS_OFFSCREEN_HOST && isTab.current && tabID.current) {
         // Pre-acquired tab streamId from action-icon click; picker fallback in catch.
+        _diagBranch("offscreen-pre-acquired-tab");
         console.log("[CloudRecorder][offscreen] using pre-acquired tab streamId");
         startStream(data, tabID.current, permissions, permissions2);
       } else if (IS_OFFSCREEN_HOST) {
+        _diagBranch("offscreen-useDisplayMedia");
         startStream(data, null, permissions, permissions2, {
           useDisplayMedia: true,
         });
-      } else if (!isTab.current && (data.recordingType != "region" || tabPreferred.current)) {
+      } else if (
+        !isTab.current &&
+        (data.recordingType != "region" || tabPreferred.current)
+      ) {
+        _diagBranch("desktop-picker");
         // Desktop picker path: non-tab mode without region, or tabPreferred forced
         // isTab=false (playground) so there's no pre-obtained streamId.
         {
@@ -5776,8 +6134,22 @@ const CloudRecorder = () => {
             ["screen", "window", "tab", "audio"],
             null,
             (streamId) => {
+              chrome.runtime
+                .sendMessage({
+                  type: "offscreen-diag",
+                  source: "desktop-picker-callback",
+                  payload: {
+                    streamIdPresent: !!streamId,
+                    streamIdPrefix: String(streamId || "").slice(0, 16),
+                    lastError: chrome.runtime.lastError?.message || null,
+                  },
+                })
+                .catch(() => {});
               if (!streamId) {
-                sendRecordingError("User cancelled stream selection", true);
+                sendRecordingError(
+                  "User cancelled stream selection [desktop-picker null streamId]",
+                  true,
+                );
               } else {
                 startStream(data, streamId, permissions, permissions2);
               }
@@ -5785,6 +6157,7 @@ const CloudRecorder = () => {
           );
         }
       } else {
+        _diagBranch("final-else-tabID");
         startStream(data, tabID.current, permissions, permissions2);
       }
     } catch (err) {
@@ -6102,12 +6475,9 @@ const CloudRecorder = () => {
     } else if (request.type === "dismiss-recording") {
       if (!isInit.current) return;
       const dismissReason = request.reason || "dismiss-recording-msg";
-      // Back-to-back cross-talk guard: a dismiss issued for a previous
-      // recording can reach this (newer) recorder because dismiss-recording
-      // is routed by a single global recordingTab pointer. If the dismiss
-      // provably targets a different project than the one this recorder is
-      // actively capturing, ignore it — honoring it would discard a healthy
-      // recording. Unknown ids (no session yet / legacy sender) are honored.
+      // Cross-talk guard: a dismiss for a previous recording can
+      // reach this recorder via the global recordingTab pointer.
+      // Ignore when projectIds disagree; unknown ids are honored.
       const myProjectId = recorderSession.current?.projectId || null;
       const targetProjectId = request.projectId || null;
       if (myProjectId && targetProjectId && myProjectId !== targetProjectId) {

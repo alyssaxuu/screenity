@@ -184,10 +184,12 @@ export const handleRecordingError = async (request) => {
   ]);
   const preserveMultiProject =
     Boolean(multiMode) && Number(multiSceneCount) > 0;
-  // sceneId/sceneIdStatus/pendingSceneIndex must clear with projectId. Otherwise a
-  // retry attempt inherits a sceneId tied to a project that no longer exists, and
-  // the cloudrecorder reaches startRecording with projectId=null while sceneIdStatus
-  // still says "recording". See the no-project-id failure pattern in diagnostics.
+  // Clear sceneId/sceneIdStatus/pendingSceneIndex when projectId
+  // clears; a retry inheriting a stale sceneId reaches the
+  // cloudrecorder with projectId=null and sceneIdStatus="recording".
+  // pendingSceneIndex must clear to `[]`, not null: it's consumed
+  // via destructuring defaults that don't fire for null, and a null
+  // value crashes the next .includes() in CloudRecorder.
   const multiState = preserveMultiProject
     ? {}
     : {
@@ -200,11 +202,15 @@ export const handleRecordingError = async (request) => {
         activeSceneId: null,
         sceneId: null,
         sceneIdStatus: null,
-        pendingSceneIndex: null,
+        pendingSceneIndex: [],
       };
 
   await chrome.storage.local.set({
     recording: false,
+    // Clear pendingRecording at stop. countdownEverShown is per-tab
+    // React state, so a tab that wasn't the recorder reads stale
+    // pendingRecording:true and the "Preparing…" loader sticks.
+    pendingRecording: false,
     recordingUiTabId: null,
     tabRecordedID: null,
     offscreen: false,
@@ -350,7 +356,7 @@ export const handleGetStreamingData = async () => {
   // after the push retry loop.
   void pushStreamingData(dataStr);
   // Returned to a `get-streaming-data` pull as the direct response. This
-  // is the robust delivery path — it does not depend on the recorder
+  // is the robust delivery path; it does not depend on the recorder
   // tab's onMessage listener being registered yet, nor on `recordingTab`
   // routing being correct.
   return { ok: true, data: dataStr };

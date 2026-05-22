@@ -1,13 +1,10 @@
-/**
- * Builds a diagnostic ZIP for troubleshooting. Returns { blob, filename }.
- * Used by the popup settings menu and the editor "Get help" button.
- */
-import JSZip from "jszip";
+// Builds a diagnostic ZIP. Returns { blob, filename }. JSZip lives in
+// the BG (make-zip handler) so the ~100 KB dep doesn't ship into every
+// content script.
 import { getStartFlowTrace } from "./startFlowTrace";
 
-// Last line of defense before the diag zip leaves the user's machine:
-// strip user-home paths and URL query strings/fragments (recording IDs,
-// signed-URL tokens, OAuth tokens).
+// Strip user-home paths and URL query/fragments (recording IDs,
+// signed-URL tokens) before the zip leaves the machine.
 const PII_REPLACEMENTS = [
   [/\/Users\/[^/\s"]+/g, "/Users/[redacted]"],
   [/\/home\/[^/\s"]+/g, "/home/[redacted]"],
@@ -55,6 +52,17 @@ const FAST_RECORDER_KEYS = [
   "useWebCodecsRecorder",
   "lastWebCodecsFailureAt",
   "lastWebCodecsFailureCode",
+  // Detailed WebCodecs failure payload (framesEncoded, firstChunkSeen,
+  // queue/flush stats). Key for diagnosing zero-frame / 28-byte-ftyp bugs.
+  "lastWebCodecsFailureDetail",
+  // HW→SW retry succeeded mid-session (Teams/Zoom/NVIDIA contention).
+  "lastWebCodecsSwRetry",
+  // Stop classification: separates low-storage from generic chunk-save-failed.
+  "lastRecorderStopReason",
+  "lastRecorderStopAt",
+  // Mid-stream track-end (monitor unplug, tab close, "Stop sharing").
+  // Includes savedChunks/duration/label/readyState to reconstruct from zip.
+  "lastTrackEndEvent",
   "lastFailedValidation",
   "webcodecsConstructSnapshot",
   "recorderStartTimings",
@@ -89,8 +97,7 @@ export const buildDiagnosticZip = async ({
         ),
       ),
       new Promise((resolve) =>
-        // perfMarks writes per-context (perfTimeline.BG, etc) to avoid
-        // write races; read all and merge by timestamp.
+        // Merge per-context perfTimeline.* keys by timestamp.
         chrome.storage.local.get(null, (all) => {
           const merged = [];
           for (const k of Object.keys(all || {})) {
@@ -104,7 +111,6 @@ export const buildDiagnosticZip = async ({
         }),
       ),
       new Promise((resolve) =>
-        // CloudRecorder writes locally before posting; captures state when offline.
         chrome.storage.local.get(["cloudUploadTelemetryEvents"], (r) =>
           resolve(
             Array.isArray(r?.cloudUploadTelemetryEvents)
@@ -119,43 +125,33 @@ export const buildDiagnosticZip = async ({
   const now = new Date();
   const ts = now.toISOString().replace(/[:.]/g, "-").slice(0, 19);
 
-  const zip = new JSZip();
+  const files = {};
 
-  zip.file(
-    "manifest.json",
-    JSON.stringify({
-      extensionVersion: manifestVersion,
-      schemaVersion: 1,
-      exportedAt: now.toISOString(),
-      chromeVersion: /Chrome\/([\d.]+)/.exec(userAgent)?.[1] || null,
-      source,
-    }),
-  );
+  files["manifest.json"] = JSON.stringify({
+    extensionVersion: manifestVersion,
+    schemaVersion: 1,
+    exportedAt: now.toISOString(),
+    chromeVersion: /Chrome\/([\d.]+)/.exec(userAgent)?.[1] || null,
+    source,
+  });
 
-  zip.file(
-    "environment.json",
-    JSON.stringify({
-      userAgent,
-      platformInfo,
-      screen: {
-        width: window.screen.availWidth,
-        height: window.screen.availHeight,
-        devicePixelRatio: window.devicePixelRatio,
-      },
-      deviceMemory: navigator.deviceMemory || null,
-    }),
-  );
+  files["environment.json"] = JSON.stringify({
+    userAgent,
+    platformInfo,
+    screen: {
+      width: window.screen.availWidth,
+      height: window.screen.availHeight,
+      devicePixelRatio: window.devicePixelRatio,
+    },
+    deviceMemory: navigator.deviceMemory || null,
+  });
 
-  zip.file(
-    "config.json",
-    JSON.stringify({
-      fastRecorder: fastRecorderData,
-      ...extraConfig,
-    }),
-  );
+  files["config.json"] = JSON.stringify({
+    fastRecorder: fastRecorderData,
+    ...extraConfig,
+  });
 
   if (diagData?.log) {
-    // structuredClone avoids the stringification round-trip on large logs.
     const annotated =
       typeof structuredClone === "function"
         ? structuredClone(diagData.log)
@@ -176,41 +172,53 @@ export const buildDiagnosticZip = async ({
         if (hints.length > 0) session.hints = hints;
       }
     }
-    zip.file("sessions.json", JSON.stringify(redactPii(annotated)));
+    files["sessions.json"] = JSON.stringify(redactPii(annotated));
   }
 
   if (diagData?.errors) {
-    zip.file("errors.json", JSON.stringify(redactPii(diagData.errors)));
+    files["errors.json"] = JSON.stringify(redactPii(diagData.errors));
   }
 
   if (diagData?.flags) {
-    zip.file("storage-flags.json", JSON.stringify(redactPii(diagData.flags)));
+    files["storage-flags.json"] = JSON.stringify(redactPii(diagData.flags));
   }
 
   try {
     const trace = await getStartFlowTrace();
     if (trace) {
-      zip.file("start-flow-trace.json", JSON.stringify(trace));
+      files["start-flow-trace.json"] = JSON.stringify(trace);
     }
   } catch {}
 
   if (Array.isArray(lifecycleData) && lifecycleData.length > 0) {
-    zip.file("lifecycle-log.json", JSON.stringify(lifecycleData));
+    files["lifecycle-log.json"] = JSON.stringify(lifecycleData);
   }
 
   if (Array.isArray(perfTimeline) && perfTimeline.length > 0) {
-    zip.file("perf-timeline.json", JSON.stringify(perfTimeline));
+    files["perf-timeline.json"] = JSON.stringify(perfTimeline);
   }
 
   if (Array.isArray(uploadTelemetry) && uploadTelemetry.length > 0) {
-    zip.file(
-      "upload-telemetry.json",
-      JSON.stringify(redactPii(uploadTelemetry)),
-    );
+    files["upload-telemetry.json"] = JSON.stringify(redactPii(uploadTelemetry));
   }
 
-  const blob = await zip.generateAsync({ type: "blob" });
   const filename = `screenity-diagnostics-${ts}.zip`;
 
-  return { blob, filename };
+  const resp = await chrome.runtime.sendMessage({
+    type: "make-zip",
+    files,
+    filename,
+  });
+  if (!resp?.ok || typeof resp.base64 !== "string") {
+    throw new Error(
+      `make-zip failed: ${resp?.error || "no response from background"}`,
+    );
+  }
+  // base64 over the message channel; structured-clone of ArrayBuffer
+  // is unreliable across MV3 contexts.
+  const bin = atob(resp.base64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  const blob = new Blob([bytes], { type: "application/zip" });
+  return { blob, filename: resp.filename || filename };
 };

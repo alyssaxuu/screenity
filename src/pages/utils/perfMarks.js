@@ -1,8 +1,9 @@
-// dev-only perf instrumentation; DCE'd to a no-op in prod via DefinePlugin.
-// usage: perfMark("name", { ... }) or const end = perfSpan("name"); end({ ... })
-// read via console "[perf]" lines, dumpPerf() in BG devtools, or perf-timeline.json.
-
+// Perf instrumentation; enabled in prod too (300-event-per-context
+// cap, 250ms debounced flush) so user diag zips have the full
+// stop→editor timing. Labels are hardcoded; payloads are caller ints/
+// strings. Console "[perf]" lines stay dev-only.
 const DEV = process.env.SCREENITY_DEV_MODE === "true";
+const ENABLED = true;
 
 const noop = () => {};
 const noopSpan = () => () => {};
@@ -106,14 +107,16 @@ const buildDevImpl = () => {
       }
     }
     localBuf.push(entry);
-    try {
-      const tag = delta !== null ? `+${delta}ms` : "";
-      if (meta) {
-        console.debug("[perf]", CTX, label, tag, meta);
-      } else {
-        console.debug("[perf]", CTX, label, tag);
-      }
-    } catch {}
+    if (DEV) {
+      try {
+        const tag = delta !== null ? `+${delta}ms` : "";
+        if (meta) {
+          console.debug("[perf]", CTX, label, tag, meta);
+        } else {
+          console.debug("[perf]", CTX, label, tag);
+        }
+      } catch {}
+    }
     scheduleFlush();
   };
 
@@ -222,6 +225,54 @@ const buildDevImpl = () => {
 
   refreshSessionId();
 
+  // Flush localBuf on pagehide so the last ~250ms of marks survive
+  // tab teardown. Also forward to BG since pagehide storage.set is
+  // racey; BG outlives the tab and appends to perfTimeline.<ctx>.
+  const forwardBatchToBg = (batch) => {
+    if (!batch || !batch.length) return;
+    try {
+      if (
+        typeof chrome !== "undefined" &&
+        chrome.runtime &&
+        typeof chrome.runtime.sendMessage === "function"
+      ) {
+        // Fire-and-forget; the SW receives and persists. Wrapped because
+        // sendMessage rejects on no-receiver, which we don't care about
+        // (BG SW may be momentarily asleep on a perf-only message).
+        chrome.runtime
+          .sendMessage({ type: "perf-forward", ctx: CTX, entries: batch })
+          .catch(() => {});
+      }
+    } catch {}
+  };
+  try {
+    if (
+      typeof self !== "undefined" &&
+      typeof self.addEventListener === "function" &&
+      CTX !== "BG"
+    ) {
+      const finalFlush = () => {
+        if (pendingFlush) {
+          clearTimeout(pendingFlush);
+          pendingFlush = null;
+        }
+        // Take a copy of the buffer for BG forwarding *before* flushNow
+        // drains it; otherwise the local in-flight write and the BG
+        // forward compete and one loses.
+        if (localBuf.length) {
+          forwardBatchToBg(localBuf.slice());
+        }
+        flushNow();
+      };
+      self.addEventListener("pagehide", finalFlush);
+      if (typeof document !== "undefined" && document.addEventListener) {
+        document.addEventListener("visibilitychange", () => {
+          if (document.visibilityState === "hidden") finalFlush();
+        });
+      }
+    }
+  } catch {}
+
   return {
     perfMark: perfMarkImpl,
     perfSpan: perfSpanImpl,
@@ -230,9 +281,9 @@ const buildDevImpl = () => {
   };
 };
 
-const impl = DEV ? buildDevImpl() : null;
+const impl = ENABLED ? buildDevImpl() : null;
 
-export const perfMark = DEV ? impl.perfMark : noop;
-export const perfSpan = DEV ? impl.perfSpan : noopSpan;
-export const perfReset = DEV ? impl.perfReset : noop;
-export const getPerfTimeline = DEV ? impl.getPerfTimeline : noopAsyncArr;
+export const perfMark = ENABLED ? impl.perfMark : noop;
+export const perfSpan = ENABLED ? impl.perfSpan : noopSpan;
+export const perfReset = ENABLED ? impl.perfReset : noop;
+export const getPerfTimeline = ENABLED ? impl.getPerfTimeline : noopAsyncArr;

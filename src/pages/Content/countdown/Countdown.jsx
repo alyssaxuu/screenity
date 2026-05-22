@@ -13,8 +13,11 @@ const Countdown = () => {
   const [isTransforming, setIsTransforming] = useState(false);
   const [isRotating, setIsRotating] = useState(false);
 
-  const END_HOLD_MS = 1000;
-  const POST_HIDE_START_DELAY_MS = 150;
+  // Post-zero hold so "GO" registers and BG can start the encoder
+  // before the overlay vanishes. 250ms felt snappy but exposed dead
+  // time; 600ms is the sweet spot.
+  const END_HOLD_MS = 600;
+  const POST_HIDE_START_DELAY_MS = 100;
   const HIDE_AFTER_END_MS = 0;
 
   const intervalRef = useRef(null);

@@ -7,6 +7,7 @@ import { diagEvent } from "../../utils/diagnosticLog";
 import { lifecycle } from "../../utils/lifecycleLog";
 import { chunksStore } from "../recording/chunkHandler";
 import { emitRecordingTelemetry } from "../recording/emitRecordingTelemetry";
+import { markFastRecorderFailure } from "../../../media/fastRecorderGate";
 import {
   CLOUD_LOCAL_PLAYBACK_KEY,
   CLOUD_LOCAL_PLAYBACK_EVENT_KEY,
@@ -105,7 +106,7 @@ export const handleAlarm = async (alarm) => {
         lastChunkAt: null,
       });
       // Backstop: the session is over. Remove any recorder tab still
-      // alive — a final guard if both the recorder's own abandonment
+      // alive; a final guard if both the recorder's own abandonment
       // listener and the teardown sweep somehow missed it. Gated on no
       // active or in-flight recording so a fresh start is never killed.
       if (!snap.recording && !snap.pendingRecording) {
@@ -231,6 +232,24 @@ export const handleAlarm = async (alarm) => {
     const { recording } = await chrome.storage.local.get(["recording"]);
     if (recording) {
       diagEvent("error", { note: "first-chunk-watchdog-fired" });
+      // If the fast (WebCodecs) recorder was in use, a missing first chunk
+      // is almost always a silently-failed WebCodecs encoder (the
+      // "28-byte ftyp" stall). Sticky-disable it now so the user's retry
+      // falls back to MediaRecorder and succeeds, instead of hitting
+      // WebCodecs again and failing identically. (markFastRecorderFailure
+      // ignores transient stream errors via its own pattern list.)
+      try {
+        const { fastRecorderInUse } = await chrome.storage.local.get([
+          "fastRecorderInUse",
+        ]);
+        if (fastRecorderInUse) {
+          await markFastRecorderFailure("webcodecs-no-first-chunk", {
+            error: "WebCodecs produced no first chunk within 8s (watchdog)",
+          });
+        }
+      } catch (err) {
+        console.warn("[Screenity][BG] watchdog sticky-disable failed", err);
+      }
       // 1500ms cap so a wedged tab can't delay the user-facing error
       let snapshot = null;
       let snapshotError = null;

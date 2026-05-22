@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useContext } from "react";
-import { fabric } from "fabric";
+import { fabric } from "../fabricCompat";
 
 import { contentStateContext } from "../../context/ContentState";
 
@@ -93,6 +93,12 @@ const CanvasWrap = (props) => {
       contentState.drawingMode && (tool === "pen" || tool === "highlighter");
 
     canvas.isDrawingMode = shouldDraw;
+
+    // Suppress fabric's marquee rubber-band for any non-select tool
+    // so dragging mid-tool doesn't paint the blue selection box.
+    // Tool modules toggle this too; the central gate closes the
+    // activation-gap window.
+    canvas.selection = !contentState.drawingMode || tool === "select";
 
     // Important: when leaving pen/highlighter, clear any in-progress brush stroke
     if (!shouldDraw && canvas.freeDrawingBrush) {

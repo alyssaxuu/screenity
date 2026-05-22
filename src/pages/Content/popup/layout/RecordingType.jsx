@@ -286,6 +286,10 @@ const RecordingType = (props) => {
       )}
       {contentState.isLoggedIn &&
         !contentState.recordingToScene &&
+        // Instant mode bakes the whole recording into one non-editable
+        // video, incompatible with multi-scene composition. Hide the
+        // toggle while multi is on.
+        !contentState.multiMode &&
         CLOUD_FEATURES_ENABLED && (
           <>
             <div className="popup-content-divider"></div>

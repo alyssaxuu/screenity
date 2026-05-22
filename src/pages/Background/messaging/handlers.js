@@ -1,3 +1,4 @@
+import JSZip from "jszip";
 import { registerMessage } from "../../../messaging/messageRouter";
 import { perfMark, perfSpan } from "../../utils/perfMarks";
 import {
@@ -86,7 +87,7 @@ const API_BASE = process.env.SCREENITY_API_BASE_URL;
 const APP_BASE = process.env.SCREENITY_APP_BASE;
 
 // Flip a project to isPublic:true after recording finishes. v2 removed
-// the publish system, so isPublic is the only access gate — without
+// the publish system, so isPublic is the only access gate; without
 // this PATCH the share URL we copy to clipboard would 404 for viewers.
 // Fire-and-forget; clipboard/toast UX is identical on success or failure.
 const markProjectPublic = async (projectId) => {
@@ -109,6 +110,11 @@ const markProjectPublic = async (projectId) => {
 const CLOUD_FEATURES_ENABLED =
   process.env.SCREENITY_ENABLE_CLOUD_FEATURES === "true";
 const DEBUG_POSTSTOP = false;
+// Gate for the start-flow / stop-flow / offscreen-diag console mirrors.
+// Off in prod by default; set globalThis.SCREENITY_DEBUG_RECORDER for support.
+const DEBUG_FLOW =
+  process.env.NODE_ENV !== "production" ||
+  (typeof globalThis !== "undefined" && !!globalThis.SCREENITY_DEBUG_RECORDER);
 const STOP_RECORDING_TAB_DEBOUNCE_MS = 1200;
 const CLOUD_LOCAL_PLAYBACK_MAX_BYTES = 250 * 1024 * 1024;
 const CLOUD_LOCAL_PLAYBACK_MAX_CHUNKS = 4000;
@@ -809,35 +815,107 @@ export const setupHandlers = () => {
       return { ok: false, error: err?.message || String(err) };
     }
   });
-  // Forward a scene-create payload to the editor tab, which does the
-  // POST itself (same-origin cookie auth). Sidesteps the MV3 SW-fetch
-  // hang we hit when the cloud recorder tab tears down right after
-  // dispatching the request. The editor confirms via reply message.
+  // CloudRecorder mirrors each step of its stop→finalize→close
+  // sequence here so the timeline survives the tab's window.close().
+  // Read the BG service worker console (chrome://extensions → service
+  // worker → inspect) to see the full sequence end-to-end.
+  registerMessage("stop-flow-tick", (message) => {
+    if (!DEBUG_FLOW) return { ok: true };
+    const t = message?.t ?? "?";
+    const label = message?.label || "?";
+    const extra = message?.extra || {};
+    console.warn(`[stop-flow T+${t}ms] ${label}`, extra);
+    return { ok: true };
+  });
+
+  // Mirror of start-flow events from the cloud recorder tab. Same
+  // rationale as stop-flow-tick: visible in BG console even when the
+  // recorder tab closed before the user could read it.
+  registerMessage("start-flow-tick", (message) => {
+    if (!DEBUG_FLOW) return { ok: true };
+    const event = message?.event || "?";
+    const data = message?.data || {};
+    const ts = message?.ts ? new Date(message.ts).toISOString().slice(11, 23) : "??:??:??";
+    console.warn(`[start-flow ${ts}] ${event}`, data);
+    return { ok: true };
+  });
+
+  // Forward scene-create direct from BG; the editor-tab proxy added
+  // ~3-6s of cold-start. Uses getPlatformInfo() as the SW heartbeat.
+  // Falls back to editor-tab proxy on non-transient failure.
   registerMessage("forward-create-scene", async (message) => {
     const { projectId, payload } = message || {};
     if (!projectId || !payload) {
       return { ok: false, error: "missing-projectId-or-payload" };
     }
+    if (!API_BASE) {
+      return { ok: false, error: "no-api-base" };
+    }
+
+    const ping = () => {
+      try {
+        chrome.runtime.getPlatformInfo(() => void chrome.runtime.lastError);
+      } catch {}
+    };
+    ping();
+    const keepAlive = setInterval(ping, 10_000);
+
+    try {
+      const { screenityToken } = await chrome.storage.local.get([
+        "screenityToken",
+      ]);
+      const headers = { "Content-Type": "application/json" };
+      if (screenityToken) headers.Authorization = `Bearer ${screenityToken}`;
+      // No keepalive:true (MV3 SW fetches with it can hang forever).
+      // 1s abort then fall through to editor-tab proxy; healthy is
+      // <500ms, >1s means BG-direct is wedged.
+      const controller = new AbortController();
+      const abortTimer = setTimeout(() => controller.abort(), 1_000);
+      let res;
+      try {
+        res = await fetch(`${API_BASE}/videos/${projectId}/scenes/`, {
+          method: "POST",
+          headers,
+          body: JSON.stringify(payload),
+          signal: controller.signal,
+        });
+      } finally {
+        clearTimeout(abortTimer);
+      }
+      const text = await res.text();
+      let body = null;
+      try {
+        body = text ? JSON.parse(text) : null;
+      } catch {}
+      if (res.ok) {
+        return { ok: true, status: res.status, body, text };
+      }
+      // Fall through to editor-tab proxy on non-2xx; same-origin
+      // cookie auth is a different code path and may succeed where
+      // bearer-auth doesn't (e.g. token rotation).
+      console.warn(
+        `[forward-create-scene] BG POST returned ${res.status}; falling back to editor-tab proxy`,
+      );
+    } catch (err) {
+      console.warn(
+        `[forward-create-scene] BG POST threw, falling back to editor-tab proxy:`,
+        err?.message || err,
+      );
+    } finally {
+      clearInterval(keepAlive);
+    }
+
+    // Editor-tab proxy fallback (the original path).
     let validated = await getValidatedEditorTab({
       expectedProjectId: projectId,
       expectedKind: "editor",
       reason: "forward-create-scene",
     });
-    let openedTabId = null;
     if (!validated.ok || !validated.tab?.id) {
-      // No editor tab; happens in multi-mode between scenes. Open one
-      // in the background as a same-origin proxy: same-origin POST is
-      // immune to the MV3 SW-fetch lifecycle hang we hit when posting
-      // bearer-auth from the SW alone. The tab stays open to serve
-      // subsequent scenes; finish-multi-recording will reuse/focus it.
       const targetUrl = `${process.env.SCREENITY_APP_BASE}/editor/${projectId}/edit?load=true`;
       try {
-        const tab = await chrome.tabs.create({
-          url: targetUrl,
-          active: false,
-        });
+        const tab = await chrome.tabs.create({ url: targetUrl, active: false });
         if (tab?.id) {
-          openedTabId = tab.id;
           await setEditorTabReference({
             tabId: tab.id,
             tabUrl: targetUrl,
@@ -859,34 +937,20 @@ export const setupHandlers = () => {
     const requestId =
       (typeof crypto !== "undefined" && crypto.randomUUID?.()) ||
       `scene-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
-    // Editor tab was just opened by prepare-open-editor; the content
-    // script may not have mounted yet. Retry with backoff until it can
-    // receive messages, capped at ~10s total.
     const backoffsMs = [0, 200, 400, 800, 1200, 1600, 2000, 2400, 2800];
     let lastErr = null;
     for (const wait of backoffsMs) {
-      if (wait > 0) {
-        await new Promise((r) => setTimeout(r, wait));
-      }
+      if (wait > 0) await new Promise((r) => setTimeout(r, wait));
       try {
         const reply = await chrome.tabs.sendMessage(
           validated.tab.id,
-          {
-            type: "proxy-create-scene",
-            projectId,
-            requestId,
-            payload,
-          },
-          // Target top frame only: content script also runs in any
-          // sub-iframes (manifest matches <all_urls>), and a postMessage
-          // from a sub-iframe doesn't bubble to the editor's top window.
+          { type: "proxy-create-scene", projectId, requestId, payload },
           { frameId: 0 },
         );
         return reply || { ok: false, error: "no-reply-from-editor" };
       } catch (err) {
         lastErr = err?.message || String(err);
         if (!/Receiving end does not exist|Could not establish/i.test(lastErr)) {
-          // Different error; don't keep retrying.
           break;
         }
       }
@@ -939,7 +1003,14 @@ export const setupHandlers = () => {
   });
 
   registerMessage("offscreen-diag", async (message) => {
-    console.warn("[Screenity][OffscreenDiag]", message.source, message.payload);
+    if (!DEBUG_FLOW) return { ok: true };
+    let payloadStr;
+    try {
+      payloadStr = JSON.stringify(message.payload);
+    } catch {
+      payloadStr = String(message.payload);
+    }
+    console.warn("[Screenity][OffscreenDiag]", message.source, payloadStr);
     return { ok: true };
   });
   registerMessage("offscreen-ready", async () => {
@@ -1158,7 +1229,11 @@ export const setupHandlers = () => {
     }
     diagEvent("countdown-finished", { skipped: false });
     const decisionAt = Date.now();
-    await chrome.storage.local.set({
+    // Don't block startAfterCountdown on the diagnostic write; the
+    // Recorder doesn't read countdownFinishedAt until well after stream
+    // setup (~hundreds of ms later), so fire-and-forget shaves a
+    // storage IPC off the countdown→record critical path.
+    chrome.storage.local.set({
       countdownFinishedAt: message?.endedAt || decisionAt,
       lastCountdownFinishedDecision: {
         ts: decisionAt,
@@ -2036,14 +2111,18 @@ export const setupHandlers = () => {
       return;
     }
     let messageTab = null;
+    let activeProjectId = null;
 
     if (message.multiMode) {
       messageTab = (await getCurrentTab())?.id || null;
+      activeProjectId = (await chrome.storage.local.get(["projectId"]))
+        .projectId;
     } else {
       const { projectId, instantMode } = await chrome.storage.local.get([
         "projectId",
         "instantMode",
       ]);
+      activeProjectId = projectId;
       const targetUrl = getEditorTargetUrl({
         projectId,
         instantMode: Boolean(instantMode),
@@ -2058,9 +2137,14 @@ export const setupHandlers = () => {
     }
 
     if (messageTab) {
+      // Editor listeners (VideoEditorPage + EditorLayout) gate this
+      // message on projectId matching the active project. Without
+      // it they silently drop the event and the SceneLoader never
+      // surfaces during the upload window.
       await sendMessageTab(messageTab, {
         type: "update-project-loading",
         multiMode: message.multiMode,
+        projectId: activeProjectId || null,
       }).catch((err) =>
         console.warn(
           "[Screenity][BG] Failed to send update-project-loading",
@@ -2584,5 +2668,79 @@ export const setupHandlers = () => {
 
   registerMessage("cancel-first-chunk-watchdog", async () => {
     await chrome.alarms.clear(FIRST_CHUNK_WATCHDOG_ALARM).catch(() => {});
+  });
+
+  // Zip in BG so jszip stays out of contentScript.bundle.js (~100KB).
+  registerMessage("make-zip", async (message) => {
+    try {
+      const files = (message && message.files) || {};
+      const filename =
+        (message && typeof message.filename === "string"
+          ? message.filename
+          : null) || "screenity-bundle.zip";
+      const zip = new JSZip();
+      for (const [name, content] of Object.entries(files)) {
+        if (typeof content === "string") {
+          zip.file(name, content);
+        } else if (content instanceof Uint8Array) {
+          zip.file(name, content);
+        } else if (content && typeof content === "object") {
+          // Convenience: stringify plain objects so callers can pass
+          // structured payloads directly.
+          zip.file(name, JSON.stringify(content));
+        }
+      }
+      // base64 because ArrayBuffer/Uint8Array structured-clone is
+      // unreliable across MV3 SW → content (lands as empty {}).
+      const base64 = await zip.generateAsync({ type: "base64" });
+      return { ok: true, base64, filename };
+    } catch (err) {
+      console.warn("[make-zip] failed", err);
+      return {
+        ok: false,
+        error: String((err && err.message) || err).slice(0, 200),
+      };
+    }
+  });
+
+  // Receive perf entries from page contexts at pagehide; routed via
+  // BG so the storage IPC completes (a dying page racing storage.set
+  // drops the last few marks). Cloud upload telemetry routes here too.
+  const UPLOAD_TELEMETRY_KEY = "cloudUploadTelemetryEvents";
+  const MAX_UPLOAD_TELEMETRY_EVENTS = 200;
+  registerMessage("cloud-telemetry-event", async (message) => {
+    try {
+      const event = message?.event;
+      if (!event || typeof event !== "object") return { ok: false };
+      const existing = await chrome.storage.local.get([UPLOAD_TELEMETRY_KEY]);
+      const current = Array.isArray(existing?.[UPLOAD_TELEMETRY_KEY])
+        ? existing[UPLOAD_TELEMETRY_KEY]
+        : [];
+      const next = [...current, event].slice(-MAX_UPLOAD_TELEMETRY_EVENTS);
+      await chrome.storage.local.set({
+        [UPLOAD_TELEMETRY_KEY]: next,
+        lastUploadTelemetryEvent: event,
+      });
+      return { ok: true };
+    } catch (err) {
+      // Best-effort: telemetry isn't user-facing functionality.
+      return { ok: false, error: String(err?.message || err).slice(0, 200) };
+    }
+  });
+
+  registerMessage("perf-forward", async (message) => {
+    try {
+      const ctx = typeof message?.ctx === "string" ? message.ctx : "unknown";
+      const entries = Array.isArray(message?.entries) ? message.entries : [];
+      if (!entries.length) return;
+      const key = `perfTimeline.${ctx}`;
+      const r = await chrome.storage.local.get([key]);
+      const cur = Array.isArray(r[key]) ? r[key] : [];
+      for (const e of entries) cur.push(e);
+      while (cur.length > 300) cur.shift();
+      await chrome.storage.local.set({ [key]: cur });
+    } catch {
+      // Best-effort; perf data isn't user-facing functionality.
+    }
   });
 };

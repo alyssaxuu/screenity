@@ -1,6 +1,8 @@
 import React, { useEffect, useContext, useRef } from "react";
 
 import { contentStateContext } from "../context/ContentState";
+// Static import; see Wrapper.jsx for why content scripts can't
+// dynamic-import on strict-CSP pages.
 import { undoCanvas, redoCanvas, saveCanvas } from "../canvas/modules/History";
 
 const Shortcuts = ({ shortcuts }) => {

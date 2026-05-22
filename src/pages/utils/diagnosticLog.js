@@ -176,6 +176,20 @@ export const getErrorSnapshot = async () => {
     "fastRecorderDisabledAt",
     "memoryError",
     "recordingAttemptId",
+    // WebCodecs failure/retry telemetry; the rich payload that turns
+    // "my recording failed" into a precise diagnosis (zero-frame vs
+    // configure-failed vs flush-timeout vs HW-encoder-quota).
+    "lastWebCodecsFailureCode",
+    "lastWebCodecsFailureDetail",
+    "lastWebCodecsSwRetry",
+    "lastWebCodecsFailureAt",
+    // Recorder-level stop classification + mid-stream source-end
+    // diagnostic. Cover the non-WebCodecs and "encoder ran fine but
+    // source disappeared" failure shapes.
+    "lastRecorderStopReason",
+    "lastRecorderStopAt",
+    "lastTrackEndEvent",
+    "lastTrackEndedEvent",
   ];
   try {
     return await chrome.storage.local.get(keys);

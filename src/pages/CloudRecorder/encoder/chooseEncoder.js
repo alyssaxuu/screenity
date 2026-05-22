@@ -11,15 +11,10 @@ import {
 import { WebCodecsTrackRecorder } from "./WebCodecsTrackRecorder";
 import { probeHwSlots } from "./hwSlotProbe";
 
-// Mirrors WebCodecsRecorder's resize-canvas dimension math (Recorder/
-// webcodecs/WebCodecsRecorder.js ~line 199-209). Cloud calls this so
-// the per-track uploader + persisted scene.{screen,camera} record the
-// actual encoded dimensions instead of the source track's native
-// dimensions, which can be retina-scale (e.g. 2200x1440) on macOS
-// while the encoded video is capped at 1080p.
-//
-// MediaRecorder paths don't downscale (they record at native), so
-// callers must skip this when kind === "mediarecorder".
+// Mirrors WebCodecsRecorder's resize-canvas math. Cloud uploaders
+// and scene.{screen,camera} need encoded dims, not the source
+// track's native (retina-scale on macOS while encode caps at 1080p).
+// MediaRecorder records native, so callers skip this for it.
 export const WEBCODECS_CAP_WIDTH = 1920;
 export const WEBCODECS_CAP_HEIGHT = 1080;
 const HARD_CAP = 3840;
@@ -123,12 +118,19 @@ export const inspectTrackPlan = async ({ track, probeOptions }) => {
       reason: "screen-hw-camera-mr-mode",
     };
   }
+  // Camera on WebCodecs but with software encoder so it doesn't fight
+  // the screen's HW slot. Same MP4 h264 container as the dual-hw mode,
+  // just a different backend selection inside WebCodecsRecorder.
+  const cameraPreferSoftware =
+    track === "camera" &&
+    hwSlots.summary.mode === "dual-webcodecs-camera-sw";
   return {
     kind: "webcodecs",
     container: "video/mp4",
     codec: "avc1.4D0028",
     hwSlots: hwSlots.summary,
-    reason: "ok",
+    cameraPreferSoftware,
+    reason: cameraPreferSoftware ? "dual-webcodecs-camera-sw-mode" : "ok",
   };
 };
 
@@ -159,6 +161,7 @@ export const chooseTrackEncoder = async ({
     videoBitsPerSecond,
     audioBitsPerSecond,
     enableAudio,
+    preferSoftware: Boolean(plan.cameraPreferSoftware),
   });
   recorder.ondataavailable = (event) => {
     if (event.data && event.data.size > 0) {
@@ -186,6 +189,7 @@ export const chooseTrackEncoder = async ({
     // gate's marker function distinguishes via its own pattern list.
     void markFastRecorderFailure(`cloud-${track}-runtime`, {
       error: String(err?.message || err),
+      detail: err?.detail || null,
       track,
     });
   };

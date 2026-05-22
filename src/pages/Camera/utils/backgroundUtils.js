@@ -1,7 +1,14 @@
-import {
-  FilesetResolver,
-  ImageSegmenter,
-} from "@mediapipe/tasks-vision";
+// Lazy-load @mediapipe/tasks-vision; ~133KB of code only needed when
+// the user enables background effects on the camera. Eager import was
+// adding the cost to every camera-bubble mount even for users who
+// never touch effects.
+let _mpPromise = null;
+const loadMediapipe = () => {
+  if (!_mpPromise) {
+    _mpPromise = import("@mediapipe/tasks-vision");
+  }
+  return _mpPromise;
+};
 
 // Reused across frames to avoid GC pressure.
 let _frameCanvas = null;
@@ -63,6 +70,7 @@ const withTimeout = (promise, ms, label) =>
   ]);
 
 const tryCreateSegmenter = async (vision, delegate) => {
+  const { ImageSegmenter } = await loadMediapipe();
   return ImageSegmenter.createFromOptions(vision, {
     baseOptions: {
       modelAssetPath: "./assets/mediapipeVision/selfie_segmenter.tflite",
@@ -76,6 +84,7 @@ const tryCreateSegmenter = async (vision, delegate) => {
 
 export const loadSegmentationModel = async () => {
   try {
+    const { FilesetResolver } = await loadMediapipe();
     const vision = await withTimeout(
       FilesetResolver.forVisionTasks("./assets/mediapipeVision"),
       MODEL_LOAD_TIMEOUT_MS,

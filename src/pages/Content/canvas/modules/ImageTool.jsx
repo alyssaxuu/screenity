@@ -1,4 +1,4 @@
-import { fabric } from "fabric";
+import { fabric } from "../fabricCompat";
 
 const ImageTool = (
   canvas,

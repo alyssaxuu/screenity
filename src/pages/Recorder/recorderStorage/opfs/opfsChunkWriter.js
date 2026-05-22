@@ -1,10 +1,7 @@
-// main-thread ChunkWriter delegating to a worker that holds a
-// FileSystemSyncAccessHandle. requestId correlates post/response and
-// awaiting each write is the backpressure.
-// on worker crash / timeout / quota: pending writes reject with a tagged
-// error, writer marks dead, fileName kept so callers can find partial
-// content. recorder stops and opens the editor on the partial; backends
-// don't swap mid-recording (would orphan written chunks).
+// Main-thread ChunkWriter delegating to a worker that holds a
+// FileSystemSyncAccessHandle. On worker crash/timeout/quota, pending
+// writes reject and the writer marks dead; recorder stops and opens
+// the editor on the partial (no mid-recording backend swap).
 
 const WORKER_URL = () =>
   chrome.runtime.getURL("recorderopfsworker.bundle.js");
@@ -186,22 +183,38 @@ export class OpfsChunkWriter {
       chunkCount: this._chunkCount,
       timeoutMs: closeTimeoutMs,
     });
+    const tBeforeReq = (typeof performance !== "undefined" ? performance.now() : Date.now());
     try {
       const resp = await this._request({ type: "close" }, closeTimeoutMs);
+      const tAfterReq = (typeof performance !== "undefined" ? performance.now() : Date.now());
       this._byteSize = resp.byteSize ?? this._byteSize;
       this._chunkCount = resp.chunkCount ?? this._chunkCount;
       this._fileName = resp.fileName || this._fileName;
+      // Surface per-phase timings so a diag can attribute the 10s
+      // close-stall we've seen on macOS: flush vs handle.close vs
+      // worker round-trip overhead.
+      try {
+        const { perfMark } = await import("../../../utils/perfMarks");
+        perfMark("OPFSWriter.close.detail", {
+          byteSize: this._byteSize,
+          chunkCount: this._chunkCount,
+          requestRoundTripMs: Math.round(tAfterReq - tBeforeReq),
+          workerFlushMs: resp.timings?.flushMs ?? null,
+          workerGetSizeMs: resp.timings?.getSizeMs ?? null,
+          workerCloseHandleMs: resp.timings?.closeHandleMs ?? null,
+        });
+      } catch {}
       opfsDiag("close-ok", {
         byteSize: this._byteSize,
         chunkCount: this._chunkCount,
       });
     } finally {
-      // Always set the finalized flag, even if close() timed out or
-      // threw. Writing it only on success left the editor's wait-finalize
-      // loop spinning 60s on slow disks (AV scan, hung worker).
+      // Fire-and-forget; the storage.set under SW contention added 2s
+      // to close() and delayed the editor open. The editor reads this
+      // key seconds later, so async lands in time.
       if (this._fileName) {
         try {
-          await chrome.storage.local.set({
+          chrome.storage.local.set({
             lastRecordingFinalizedFileName: this._fileName,
           });
         } catch {}

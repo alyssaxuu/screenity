@@ -9,6 +9,11 @@ import * as Toolbar from "@radix-ui/react-toolbar";
 
 import { Rnd } from "react-rnd";
 
+// Drawing toolbar; was previously React.lazy'd to keep fabric out of
+// the content-script hot bundle, but lazy chunks can't be loaded from
+// a content script on strict-CSP pages (host's script-src blocks
+// chrome-extension:// <script> injection even with
+// web_accessible_resources). Static import is the only working option.
 import DrawingToolbar from "./DrawingToolbar";
 import CursorToolbar from "./CursorToolbar";
 import BlurToolbar from "./BlurToolbar";
@@ -476,7 +481,7 @@ const ToolbarWrap = () => {
             <ToolTrigger
               type="button"
               content={chrome.i18n.getMessage("finishRecordingTooltip")}
-              disabled={!contentState.recording}
+              disabled={!contentState.recording || contentState.finalizingRecording}
               onClick={() => {
                 contentState.stopRecording();
               }}
@@ -494,7 +499,7 @@ const ToolbarWrap = () => {
             <ToolTrigger
               type="button"
               content={chrome.i18n.getMessage("restartRecordingTooltip")}
-              disabled={!contentState.recording}
+              disabled={!contentState.recording || contentState.finalizingRecording}
               onClick={() => {
                 contentState.tryRestartRecording();
               }}
@@ -505,7 +510,7 @@ const ToolbarWrap = () => {
               <ToolTrigger
                 type="button"
                 content={chrome.i18n.getMessage("pauseRecordingTooltip")}
-                disabled={!contentState.recording}
+                disabled={!contentState.recording || contentState.finalizingRecording}
                 onClick={() => {
                   contentState.pauseRecording();
                 }}
@@ -518,7 +523,7 @@ const ToolbarWrap = () => {
                 type="button"
                 resume
                 content={chrome.i18n.getMessage("resumeRecordingTooltip")}
-                disabled={!contentState.recording}
+                disabled={!contentState.recording || contentState.finalizingRecording}
                 onClick={() => {
                   contentState.resumeRecording();
                 }}
@@ -529,7 +534,7 @@ const ToolbarWrap = () => {
             <ToolTrigger
               type="button"
               content={chrome.i18n.getMessage("cancelRecordingTooltip")}
-              disabled={!contentState.recording}
+              disabled={!contentState.recording || contentState.finalizingRecording}
               onClick={() => {
                 if (contentState.tryDismissRecording !== undefined) {
                   contentState.tryDismissRecording();

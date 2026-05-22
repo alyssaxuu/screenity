@@ -1,5 +1,5 @@
 import React from "react";
-import { fabric } from "fabric";
+import { fabric } from "../fabricCompat";
 
 import {
   HandleControl,
@@ -85,6 +85,12 @@ const CustomControls = (canvas) => {
     ctx.rotate(fabric.util.degreesToRadians(fabricObject.angle));
     ctx.drawImage(img4, -size / 2, -(size + 14) / 2, size, size + 14);
     ctx.restore();
+  }
+
+  // fabric v6 leaves prototype.controls undefined; initialize it so
+  // the v5 `controls.tl = …` pattern below doesn't throw.
+  if (!fabric.Object.prototype.controls) {
+    fabric.Object.prototype.controls = {};
   }
 
   fabric.Object.prototype.controls.tl = new fabric.Control({
@@ -178,7 +184,11 @@ const CustomControls = (canvas) => {
     render: renderIconRotate,
   });
 
-  // Also use same controls for Textbox
+  // Also use same controls for Textbox. v6 has the same undefined-by-
+  // default behavior on Textbox.prototype.controls.
+  if (!fabric.Textbox.prototype.controls) {
+    fabric.Textbox.prototype.controls = {};
+  }
   fabric.Textbox.prototype.controls.tl = new fabric.Control({
     x: -0.5,
     y: -0.5,

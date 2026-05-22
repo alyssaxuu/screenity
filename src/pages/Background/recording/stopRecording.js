@@ -52,17 +52,53 @@ const markEditorStartFailed = async (tabId, errorCode, why) => {
   } catch {}
 };
 
+// Bound lock acquisition: storage.get + storage.set both block on
+// contended IPC and can stall multi-second on many-tab Chrome. The
+// lock suppresses duplicate stops racing with editor-open; under
+// contention fail-open beats making the user wait. Worst case on
+// fail-open is one extra editor tab.
+const LOCK_ACQUIRE_TIMEOUT_MS = 500;
 const acquirePostStopEditorLock = async (recordingId = null) => {
-  const { postStopEditorOpening } = await chrome.storage.local.get([
-    "postStopEditorOpening",
-  ]);
-  if (postStopEditorOpening) return false;
-  await chrome.storage.local.set({
-    postStopEditorOpening: true,
-    postStopEditorOpened: true,
-    postStopRecordingId: recordingId,
+  const timeoutSentinel = Symbol("acquire-lock-timeout");
+  let timer = null;
+  const timeoutPromise = new Promise((resolve) => {
+    timer = setTimeout(() => resolve(timeoutSentinel), LOCK_ACQUIRE_TIMEOUT_MS);
   });
-  return true;
+  try {
+    const result = await Promise.race([
+      (async () => {
+        const { postStopEditorOpening } = await chrome.storage.local.get([
+          "postStopEditorOpening",
+        ]);
+        if (postStopEditorOpening) return false;
+        await chrome.storage.local.set({
+          postStopEditorOpening: true,
+          postStopEditorOpened: true,
+          postStopRecordingId: recordingId,
+        });
+        return true;
+      })(),
+      timeoutPromise,
+    ]);
+    if (result === timeoutSentinel) {
+      console.warn(
+        "[Screenity][BG] acquirePostStopEditorLock timed out; failing open",
+      );
+      // Fire-and-forget the writes so the next stop sees the lock
+      // (without us blocking on it).
+      chrome.storage.local
+        .set({
+          postStopEditorOpening: true,
+          postStopEditorOpened: true,
+          postStopRecordingId: recordingId,
+        })
+        .catch(() => {});
+      return true;
+    }
+    return result;
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
 };
 
 const releasePostStopEditorLock = async (overrides = {}) => {
@@ -536,7 +572,7 @@ export const handleStopRecordingTab = async (request) => {
           const safetyTimer = setTimeout(() => {
             if (!settled) {
               settled = true;
-              console.warn("[Screenity][BG] Editor tab load timed out — releasing lock");
+              console.warn("[Screenity][BG] Editor tab load timed out; releasing lock");
               diagEvent("editor-open-timeout", { tabId: tab.id, type: "editorwebcodecs" });
               releasePostStopEditorLock();
               markEditorStartFailed(
@@ -595,7 +631,7 @@ export const handleStopRecordingTab = async (request) => {
         const safetyTimer = setTimeout(() => {
           if (!settled) {
             settled = true;
-            console.warn("[Screenity][BG] Editor tab load timed out — releasing lock");
+            console.warn("[Screenity][BG] Editor tab load timed out; releasing lock");
             diagEvent("editor-open-timeout", { tabId: tab.id, type: editorUrl });
             releasePostStopEditorLock({ postStopRecordingId: null });
             markEditorStartFailed(

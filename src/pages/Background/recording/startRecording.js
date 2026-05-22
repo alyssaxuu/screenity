@@ -75,33 +75,38 @@ export const startRecording = async (caller = "unknown") => {
 
 const _startRecordingInner = async (caller) => {
   const recordingAttemptId = makeRecordingAttemptId();
-  // snapshot residual state to spot leaked flags from prior recordings
-  try {
-    const residual = await chrome.storage.local.get([
-      "recordingTab",
-      "recordingUiTabId",
-      "tabRecordedID",
-      "sandboxTab",
-      "region",
-      "customRegion",
-      "recordingType",
-      "recording",
-      "pendingRecording",
-      "restarting",
-      "offscreen",
-      "useWebCodecsRecorder",
-      "fastRecorderInUse",
-      "backup",
-      "backupSetup",
-      "backupTab",
-      "memoryError",
-    ]);
-    lifecycle("BG.startRecording", "session-boundary", {
-      caller,
-      attemptId: recordingAttemptId,
-      residual,
-    });
-  } catch {}
+  // Diagnostic-only snapshot of residual state; runs async so it
+  // doesn't block the actual start path. ~17-key storage read can
+  // cost 30-80ms on a contended SW and there's no consumer that
+  // needs it before we send "start-recording" to the recorder.
+  (async () => {
+    try {
+      const residual = await chrome.storage.local.get([
+        "recordingTab",
+        "recordingUiTabId",
+        "tabRecordedID",
+        "sandboxTab",
+        "region",
+        "customRegion",
+        "recordingType",
+        "recording",
+        "pendingRecording",
+        "restarting",
+        "offscreen",
+        "useWebCodecsRecorder",
+        "fastRecorderInUse",
+        "backup",
+        "backupSetup",
+        "backupTab",
+        "memoryError",
+      ]);
+      lifecycle("BG.startRecording", "session-boundary", {
+        caller,
+        attemptId: recordingAttemptId,
+        residual,
+      });
+    } catch {}
+  })();
   let stack = null;
   try {
     stack = new Error().stack?.split("\n").slice(1, 6).join("\n") || null;
@@ -114,26 +119,57 @@ const _startRecordingInner = async (caller) => {
     recordingStartingAt: Date.now(),
   });
 
-  // Close any prior editor tab. The OPFS writer wipes the previous
-  // recording's file when a new one starts, so leaving the old editor
-  // open with stale backing data is worse than closing it. The
-  // editor-force-close message clears its beforeunload prompt first so
-  // the user doesn't get a confirm dialog. The recordingStartingAt guard
-  // above keeps the cascading cleanup off the new recorder tab.
+  // One batched read for every flag this function consumes below. The
+  // original code did six separate awaited gets (sandboxTab,
+  // recordingToScene+multiMode, activeTab+recordingUiTabId, customRegion,
+  // recordingType); under any storage contention that pile up to
+  // 150-300ms of pure round-trip overhead on the countdown→record path.
+  const _startReads = chrome.storage.local.get([
+    "sandboxTab",
+    "recordingToScene",
+    "multiMode",
+    "activeTab",
+    "recordingUiTabId",
+    "customRegion",
+    "recordingType",
+  ]);
+
+  // Close every prior editor tab. OPFS wipes the previous recording
+  // when a new one starts, so a stale editor on old backing data is
+  // worse than closing it. URL-based sweep (not cached `sandboxTab`)
+  // because sandboxTab only tracks the LAST editor; consecutive
+  // recordings would orphan earlier ones. recordingStartingAt above
+  // keeps the cascading close from sweeping the new recorder tab.
   try {
-    const { sandboxTab: priorSandboxTab } = await chrome.storage.local.get([
-      "sandboxTab",
-    ]);
-    if (Number.isInteger(priorSandboxTab)) {
-      try {
-        await Promise.race([
-          chrome.tabs.sendMessage(priorSandboxTab, {
-            type: "editor-force-close",
-          }),
-          new Promise((r) => setTimeout(r, 250)),
-        ]);
-      } catch {}
-      chrome.tabs.remove(priorSandboxTab).catch(() => {});
+    const editorUrls = [
+      chrome.runtime.getURL("editor.html"),
+      chrome.runtime.getURL("editorwebcodecs.html"),
+      chrome.runtime.getURL("editorviewer.html"),
+    ];
+    const allTabs = await chrome.tabs.query({});
+    const editorTabs = allTabs.filter(
+      (t) =>
+        t.id != null &&
+        t.url &&
+        editorUrls.some((prefix) => t.url.startsWith(prefix)),
+    );
+    if (editorTabs.length > 0) {
+      // Best-effort: tell each editor to clear its beforeunload.
+      // 100ms global race cap; we don't await per-tab so a single
+      // unresponsive tab can't block start.
+      await Promise.race([
+        Promise.allSettled(
+          editorTabs.map((t) =>
+            chrome.tabs.sendMessage(t.id, { type: "editor-force-close" }),
+          ),
+        ),
+        new Promise((r) => setTimeout(r, 100)),
+      ]);
+      // Fire all removes in parallel; failures are silent (tab may
+      // have closed in the interim).
+      for (const t of editorTabs) {
+        chrome.tabs.remove(t.id).catch(() => {});
+      }
     }
   } catch {}
 
@@ -162,42 +198,35 @@ const _startRecordingInner = async (caller) => {
     lastStartRecordingCaller: { caller, stack, ts: Date.now() },
   });
 
-  // A standalone (non-scene, non-multi) recording must not inherit a sceneId
-  // from a previous recording. The cloudrecorder reads chrome.storage sceneId
-  // at start; a leaked value tags the new recording's telemetry and upload
-  // sessions with the prior recording's identity (the back-to-back sceneId
-  // leak). Scene and multi-scene recordings legitimately carry sceneId across
-  // the boundary. NOTE: only sceneId/sceneIdStatus are cleared — never
-  // pendingSceneIndex: it is an array consumed via a `= []` destructuring
-  // default (upsertPendingScene), and a default only covers `undefined`, not
-  // `null`. Setting it null makes `pendingSceneIndex.includes()` throw and
-  // crashes the next recorder. Its own upsert/remove lifecycle manages it.
+  // Clear leaked sceneId from a prior standalone recording; the
+  // cloudrecorder reads storage at start and a stale value tags the
+  // new recording's telemetry. Only clear sceneId/sceneIdStatus, NOT
+  // pendingSceneIndex: it's an array with a `= []` destructuring
+  // default that only covers `undefined`; setting it null makes
+  // `.includes()` throw. Its own upsert/remove lifecycle owns it.
+  const {
+    recordingToScene,
+    multiMode,
+    activeTab,
+    recordingUiTabId,
+    customRegion,
+    recordingType,
+  } = await _startReads;
   try {
-    const { recordingToScene, multiMode } = await chrome.storage.local.get([
-      "recordingToScene",
-      "multiMode",
-    ]);
     if (!recordingToScene && !multiMode) {
-      await chrome.storage.local.set({
+      // Fire-and-forget: the clear doesn't gate the recorder-start
+      // message below; the recorder reads sceneId at its own preflight.
+      chrome.storage.local.set({
         sceneId: null,
         sceneIdStatus: null,
       });
     }
   } catch {}
-
-  const { activeTab, recordingUiTabId } = await chrome.storage.local.get([
-    "activeTab",
-    "recordingUiTabId",
-  ]);
   if (recordingUiTabId != null) {
     chrome.storage.local.set({ recordingUiTabId });
   } else if (activeTab != null) {
     chrome.storage.local.set({ recordingUiTabId: activeTab });
   }
-
-  const { customRegion } = await chrome.storage.local.get(["customRegion"]);
-
-  const { recordingType } = await chrome.storage.local.get(["recordingType"]);
 
   if (recordingType === "region" || recordingType === "tab") {
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {

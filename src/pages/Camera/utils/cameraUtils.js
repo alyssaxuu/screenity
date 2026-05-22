@@ -147,22 +147,13 @@ export const getCameraStream = async (
     const video = videoRef.current;
     video.srcObject = stream;
 
-    // Virtual cameras (OBS Virtual Camera, mmhmm, Snap Camera, etc.)
-    // trip up the naive `video.onloadedmetadata = ...` pattern in three
-    // ways:
-    //   1. Sync race: assigning srcObject can fire `loadedmetadata`
-    //      synchronously when the stream is already cached/active. By
-    //      the time we set `onloadedmetadata`, the event has already
-    //      fired and we hang forever.
-    //   2. Track muted: virtual cams often start with the video track
-    //      `muted=true` (the source app hasn't focused yet); they fire
-    //      `unmute` on the track before metadata.
-    //   3. Never fires: some virtual cams never fire `loadedmetadata`
-    //      until they receive their first real frame, which can take
-    //      arbitrarily long if the source app is paused.
-    //
-    // Check readyState, addEventListener (no clobber), listen on metadata
-    // and unmute, cap the wait at 12s so virtual cams don't hang the spinner.
+    // Virtual cams (OBS, mmhmm, Snap, etc.) break the naive
+    // `onloadedmetadata = ...` pattern three ways: loadedmetadata can
+    // fire synchronously on srcObject assign, the track can start
+    // muted (fires `unmute` before metadata), and some virtual cams
+    // never fire loadedmetadata until first frame. Check readyState
+    // up front, listen via addEventListener on both metadata and
+    // unmute, cap at 12s so paused source apps don't hang the spinner.
     const VIRTUAL_CAM_LOADED_TIMEOUT_MS = 12000;
     await new Promise((resolve) => {
       let settled = false;
@@ -384,6 +375,13 @@ export const surfaceHandler = async (request, videoRef) => {
     const isSubscribed = request.subscribed || false;
     const instantMode = request.instantMode || false;
 
+    // PiP rule: enter PiP when the bubble needs to be visible to the
+    // capture (free+monitor, pro+instant+monitor) or as a draggable
+    // preview when the camera is already a separate cloud track
+    // (pro+non-instant+non-monitor). Skip PiP when the on-page bubble
+    // is captured naturally (pro+instant+non-monitor) or would imply
+    // the camera's part of the screen recording when it isn't
+    // (pro+non-instant+monitor).
     const shouldEnterPip =
       (request.surface === "monitor" && (!isSubscribed || instantMode)) ||
       (request.surface !== "monitor" && isSubscribed && !instantMode);

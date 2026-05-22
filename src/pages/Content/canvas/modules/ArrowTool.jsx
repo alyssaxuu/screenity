@@ -1,4 +1,4 @@
-import { fabric } from "fabric";
+import { fabric } from "../fabricCompat";
 
 const createArrowLine = (x, y, color, strokeWidth) => {
   return new fabric.Line([x, y, x, y], {

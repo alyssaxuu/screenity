@@ -90,6 +90,25 @@ export const onTabRemovedListener = () => {
 
         if (recorderSession && recorderSession.status === "recording") {
           diagEvent("crash", { reason: "recorder-owner-tab-removed", tabId });
+          // Same multi-preserve guard as below; don't nuke
+          // multiProjectId when the user discarded scene N (N>1) of a
+          // multi-recording. The already-saved scenes' project must
+          // survive so the user's "Done" click reaches it.
+          const {
+            multiMode: preservedMultiMode,
+            multiSceneCount: preservedSceneCount,
+            multiProjectId: preservedProjectId,
+            multiLastSceneId: preservedLastSceneId,
+          } = await chrome.storage.local.get([
+            "multiMode",
+            "multiSceneCount",
+            "multiProjectId",
+            "multiLastSceneId",
+          ]);
+          const hasSavedMultiScenes =
+            preservedMultiMode &&
+            Number(preservedSceneCount) > 0 &&
+            preservedProjectId;
           await chrome.storage.local.set({
             recorderSession: {
               ...recorderSession,
@@ -97,10 +116,19 @@ export const onTabRemovedListener = () => {
               crashedAt: Date.now(),
             },
             recording: false,
-            multiMode: false,
-            multiSceneCount: 0,
-            multiProjectId: null,
-            multiLastSceneId: null,
+            ...(hasSavedMultiScenes
+              ? {
+                  multiMode: preservedMultiMode,
+                  multiSceneCount: preservedSceneCount,
+                  multiProjectId: preservedProjectId,
+                  multiLastSceneId: preservedLastSceneId,
+                }
+              : {
+                  multiMode: false,
+                  multiSceneCount: 0,
+                  multiProjectId: null,
+                  multiLastSceneId: null,
+                }),
           });
           endDiagSession("crashed");
         }
@@ -137,6 +165,27 @@ export const onTabRemovedListener = () => {
         diagEvent("crash", { reason: "recorder-tab-closed", tabId });
         endDiagSession("crashed");
         console.error("Recorder tab was closed during recording!");
+        // Preserve multi-project state when scenes are already saved.
+        // Without this, discarding scene N (N>1) wiped multiProjectId
+        // because the cloudrecorder tab close races BG's
+        // `recording:false` write and we'd see recorderSession.status
+        // still "recording". The user would then click "Done" on their
+        // scene 1 and hit "No project ID for multi recording".
+        const {
+          multiMode: preservedMultiMode,
+          multiSceneCount: preservedSceneCount,
+          multiProjectId: preservedProjectId,
+          multiLastSceneId: preservedLastSceneId,
+        } = await chrome.storage.local.get([
+          "multiMode",
+          "multiSceneCount",
+          "multiProjectId",
+          "multiLastSceneId",
+        ]);
+        const hasSavedMultiScenes =
+          preservedMultiMode &&
+          Number(preservedSceneCount) > 0 &&
+          preservedProjectId;
         chrome.storage.local.set({
           recording: false,
           recordingTab: null,
@@ -146,10 +195,19 @@ export const onTabRemovedListener = () => {
           recorderSession: recorderSession
             ? { ...recorderSession, status: "crashed", crashedAt: Date.now() }
             : null,
-          multiMode: false,
-          multiSceneCount: 0,
-          multiProjectId: null,
-          multiLastSceneId: null,
+          ...(hasSavedMultiScenes
+            ? {
+                multiMode: preservedMultiMode,
+                multiSceneCount: preservedSceneCount,
+                multiProjectId: preservedProjectId,
+                multiLastSceneId: preservedLastSceneId,
+              }
+            : {
+                multiMode: false,
+                multiSceneCount: 0,
+                multiProjectId: null,
+                multiLastSceneId: null,
+              }),
         });
         chrome.action.setIcon({ path: "assets/icon-34.png" });
       }

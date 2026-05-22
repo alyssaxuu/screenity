@@ -1,8 +1,10 @@
 import "./styles/edit/_VideoPlayer.scss";
 import "./styles/global/_app.scss";
 
-import React, { useEffect, useRef, useContext } from "react";
-import Editor from "./layout/editor/Editor";
+import React, { useEffect, useRef, useContext, Suspense, lazy } from "react";
+// Editor (trim/cut/timeline UI) only mounts when user enters edit mode.
+// Initial open is "player" mode; defer Editor + its TrimUI dependencies.
+const Editor = lazy(() => import("./layout/editor/Editor"));
 import Player from "./layout/player/Player";
 import Modal from "./components/global/Modal";
 import Toast from "./components/global/Toast";
@@ -270,7 +272,11 @@ const Sandbox = () => {
       <video></video>
       {contentState.ffmpeg &&
         contentState.ready &&
-        contentState.mode === "edit" && <Editor />}
+        contentState.mode === "edit" && (
+          <Suspense fallback={null}>
+            <Editor />
+          </Suspense>
+        )}
       {contentState.mode != "edit" && contentState.ready && <Player />}
       {!contentState.ready && (
         <div className="wrap">

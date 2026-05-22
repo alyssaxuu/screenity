@@ -1,10 +1,9 @@
-// keep-alive bootstrap, loaded from recorder.html before the main bundle.
-// region recordings open the tab with active:false, so chrome throttles
-// JS within ~1s and stretches bundle parse from ~300ms to 3-4.5s.
-// three signals (audio oscillator, navigator.locks, mediaSession) make
-// the tab look active before throttling kicks in.
-// external because MV3 CSP blocks inline <script>. handles stashed on
-// window.__SCREENITY_KEEPALIVE so React-side startTabKeepAlive() reuses.
+// Keep-alive bootstrap. Loaded from recorder.html before the main
+// bundle. Region recordings open the tab with active:false so Chrome
+// throttles JS within ~1s and bundle parse stretches from 300ms to
+// 3-4.5s. Audio oscillator + navigator.locks + mediaSession make the
+// tab look active before throttling. Handles on window.__SCREENITY_KEEPALIVE
+// so React's startTabKeepAlive() reuses them.
 (function () {
   try {
     var KA = (window.__SCREENITY_KEEPALIVE =
@@ -14,8 +13,7 @@
       performance.mark("screenity-keepalive-start");
     } catch (e) {}
 
-    // Silent ultrasonic sine wave; counts as "playing audio" to Chrome's
-    // freeze heuristic (looks at AudioContext.state + node wiring).
+    // Silent ultrasonic sine; counts as "playing audio" to Chrome.
     try {
       var Ctx = window.AudioContext || window.webkitAudioContext;
       if (Ctx && !KA.audioCtx) {
@@ -28,12 +26,18 @@
         osc.connect(gain);
         gain.connect(ctx.destination);
         osc.start();
+        // AudioContext starts suspended without a user gesture; without
+        // resume() the oscillator emits nothing and Chrome doesn't
+        // count it (diag showed 6.5s mid-recording freezes).
+        if (ctx.state !== "running") {
+          ctx.resume().catch(function () {});
+        }
         KA.audioCtx = ctx;
         KA.oscillator = osc;
       }
     } catch (e) {}
 
-    // Holding an exclusive lock signals "doing work".
+    // Hold an exclusive lock; signals "doing work" to Chrome.
     try {
       if (navigator.locks && !KA.lockAbort) {
         var ac = new AbortController();
@@ -50,7 +54,6 @@
       }
     } catch (e) {}
 
-    // Belt + braces with the audio oscillator above.
     try {
       if (navigator.mediaSession && !KA.mediaSession) {
         if (typeof window.MediaMetadata === "function") {

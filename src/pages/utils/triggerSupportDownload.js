@@ -1,7 +1,7 @@
 import { buildDiagnosticZip } from "./buildDiagnosticZip";
 
-// Anchor-tag download of the diag zip so the user can attach it to the
-// Tally form that opens right after. Fire-and-forget.
+// Anchor-tag download of the diag zip; user attaches it to the Tally
+// form that opens right after.
 export const triggerSupportDownload = async (opts = {}) => {
   try {
     const { blob, filename } = await buildDiagnosticZip(opts);

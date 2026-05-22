@@ -1,4 +1,4 @@
-import { fabric } from "fabric";
+import { fabric } from "../fabricCompat";
 
 const getState = (stateOrRef) =>
   stateOrRef && stateOrRef.current ? stateOrRef.current : stateOrRef;
@@ -27,7 +27,13 @@ const undoCanvas = (stateOrRef, setToolSettings) => {
     canvas.clear();
     canvas.renderAll();
 
-    canvas.loadFromJSON(penultimateItem, () => {
+    // v6 change: loadFromJSON's second arg is a per-object reviver
+    // (called for every deserialized object), NOT the load-complete
+    // callback. The function now returns a Promise that resolves when
+    // loading finishes. v5-style callback usage would either silently
+    // misfire (treating the callback as a reviver) or never run the
+    // post-load cleanup.
+    canvas.loadFromJSON(penultimateItem).then(() => {
       canvas.discardActiveObject();
       canvas.renderAll();
     });
@@ -49,7 +55,8 @@ const redoCanvas = (stateOrRef, setToolSettings) => {
     const lastItem = redoStack.pop();
     undoStack.push(lastItem);
 
-    canvas.loadFromJSON(lastItem, () => {
+    // v6: loadFromJSON returns a Promise. See undoCanvas comment above.
+    canvas.loadFromJSON(lastItem).then(() => {
       canvas.discardActiveObject();
       canvas.renderAll();
     });

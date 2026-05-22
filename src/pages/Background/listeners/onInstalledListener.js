@@ -74,8 +74,12 @@ export const onInstalledListener = () => {
       removeTab(backupTab);
     }
 
-    // update only; manifest auto-injects on page load. install would double-mount React on dev.
-    if (details.reason === "update") {
+    // Backfill content scripts into already-open tabs. manifest
+    // content_scripts only auto-inject on future loads; without this,
+    // a fresh install / update can't record on tabs that were already
+    // open. The `install` gate causes React double-mount under dev
+    // HMR; accepted tradeoff vs the prod break.
+    if (details.reason === "install" || details.reason === "update") {
       executeScripts();
     }
 

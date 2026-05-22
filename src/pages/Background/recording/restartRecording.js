@@ -63,10 +63,30 @@ export const handleRestart = async (message = {}, sender = null) => {
 
   // reset before round-trip so a mid-flight alarm can't fire tier-3 against stale keys
   await resetWatchdogState();
+  // Snapshot multi state before restart, re-pin after. Several
+  // paths during restart (offscreen discard cascade, watchdogs)
+  // write multiMode:false because they miss the recording-in-progress
+  // signals; without re-pin, restarting scene N (N>1) wipes everything.
+  const multiSnapshot = await chrome.storage.local.get([
+    "multiMode",
+    "multiSceneCount",
+    "multiProjectId",
+    "multiLastSceneId",
+  ]);
   await chrome.storage.local.set({
     restarting: true,
     ...(sourceTabId != null
       ? { activeTab: sourceTabId, recordingUiTabId: sourceTabId }
+      : {}),
+    // Re-pin in the same batch so anything reading immediately sees
+    // the preserved state.
+    ...(multiSnapshot.multiMode
+      ? {
+          multiMode: multiSnapshot.multiMode,
+          multiSceneCount: multiSnapshot.multiSceneCount,
+          multiProjectId: multiSnapshot.multiProjectId,
+          multiLastSceneId: multiSnapshot.multiLastSceneId,
+        }
       : {}),
   });
   await persistRestartFlow("requested", {
@@ -113,6 +133,38 @@ export const handleRestart = async (message = {}, sender = null) => {
       recorderState: response?.recorderState || null,
     });
     await resetActiveTabRestart({ sourceTabId });
+    // Second re-pin after the round-trip. If any handler reachable
+    // during the cloudrecorder dismissRecording → discardOffscreen
+    // path cleared the multi keys, restore them so the upcoming
+    // stop's preserveMultiProject check sees the correct count.
+    if (multiSnapshot.multiMode) {
+      try {
+        const afterRoundTrip = await chrome.storage.local.get([
+          "multiMode",
+          "multiSceneCount",
+          "multiProjectId",
+        ]);
+        const lostMulti =
+          !afterRoundTrip.multiMode ||
+          (multiSnapshot.multiSceneCount > 0 &&
+            !(afterRoundTrip.multiSceneCount > 0)) ||
+          (multiSnapshot.multiProjectId &&
+            !afterRoundTrip.multiProjectId);
+        if (lostMulti) {
+          await chrome.storage.local.set({
+            multiMode: multiSnapshot.multiMode,
+            multiSceneCount: multiSnapshot.multiSceneCount,
+            multiProjectId: multiSnapshot.multiProjectId,
+            multiLastSceneId: multiSnapshot.multiLastSceneId,
+          });
+          lifecycle("BG.restart", "multi-state-restored", {
+            attemptId,
+            before: multiSnapshot,
+            afterRoundTrip,
+          });
+        }
+      } catch {}
+    }
     await persistRestartFlow("countdown-dispatched", { attemptId, sourceTabId });
     lifecycle("BG.restart", "completed", { attemptId, sourceTabId });
     diagEvent("restart-completed", { attemptId });

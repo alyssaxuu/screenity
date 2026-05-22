@@ -1,13 +1,13 @@
-/**
- * Start-flow trace for recording diagnostics.
- *
- * Single bounded object in chrome.storage.local ("startFlowTrace"),
- * overwritten each attempt. No URLs, no page content, no user identity
- * beyond isPro boolean. Error text is truncated and URL-stripped.
- */
+// Start-flow trace for recording diagnostics. One bounded object in
+// chrome.storage.local, overwritten each attempt. No URLs, no page
+// content, no identity beyond isPro.
 
 const STORAGE_KEY = "startFlowTrace";
 const MAX_ERR_LEN = 120;
+// Off in prod by default; set globalThis.SCREENITY_DEBUG_RECORDER for support.
+const DEBUG_FLOW =
+  process.env.NODE_ENV !== "production" ||
+  (typeof globalThis !== "undefined" && !!globalThis.SCREENITY_DEBUG_RECORDER);
 
 const sanitize = (str) => {
   if (!str) return null;
@@ -66,13 +66,14 @@ export const initStartFlowTrace = async (attemptId, config = {}) => {
 
 /** Write a timestamp checkpoint. Merges extra fields without overwriting others. */
 export const traceStep = async (stepName, extra = {}) => {
+  const now = Date.now();
   try {
     const res = await chrome.storage.local.get(STORAGE_KEY);
     const trace = res?.[STORAGE_KEY];
     if (!trace) return;
 
     if (trace.t && stepName in trace.t) {
-      trace.t[stepName] = Date.now();
+      trace.t[stepName] = now;
     }
 
     // Merge extra fields (surface, routing, etc.)
@@ -85,6 +86,29 @@ export const traceStep = async (stepName, extra = {}) => {
     }
 
     await chrome.storage.local.set({ [STORAGE_KEY]: trace });
+
+    // Mirror every tick to BG so the unified timeline is visible on
+    // the SW console even when the originating tab is gone. Uses
+    // console.warn because Terser strips log/info/debug in prod.
+    const base = trace.t?.startStreaming;
+    const elapsedMs = base ? now - base : 0;
+    if (DEBUG_FLOW) {
+      try {
+        // eslint-disable-next-line no-console
+        console.warn(
+          `[start-flow T+${elapsedMs}ms] ${stepName}`,
+          Object.keys(extra).length ? extra : "",
+        );
+      } catch {}
+    }
+    try {
+      chrome.runtime.sendMessage({
+        type: "start-flow-tick",
+        event: stepName,
+        data: { ...extra, elapsedMs },
+        ts: now,
+      });
+    } catch {}
   } catch {
     // best effort
   }

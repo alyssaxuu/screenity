@@ -1,9 +1,13 @@
-import React, { useContext, useRef, useEffect } from "react";
+import React, { useContext, useRef, useEffect, useState } from "react";
 
 import PopupContainer from "./popup/PopupContainer";
 import Toolbar from "./toolbar/Toolbar";
 import Camera from "./camera/Camera";
 import CameraOnly from "./camera-only/CameraOnly";
+// Static import (fabric is ~313KB). React.lazy can't dynamic-import in
+// content scripts on strict-CSP pages: host script-src blocks the
+// chunk insertion even with web_accessible_resources. Verified
+// ChunkLoadError on google.com.
 import Canvas from "./canvas/Canvas";
 import Countdown from "./countdown/Countdown";
 import Modal from "./modal/Modal";
@@ -120,6 +124,80 @@ const Wrapper = () => {
   useEffect(() => {
     contentStateRef.current = contentState;
   }, [contentState]);
+
+  // Delayed loader: only show after 800ms in a wait window
+  // (pre-countdown setup or post-stop finalize), never during
+  // countdown or active recording. Skip the flash when start
+  // resolves in <500ms.
+  const LOADER_DELAY_MS = 800;
+  const inPreCountdownWait =
+    Boolean(contentState.pendingRecording) &&
+    !contentState.countdownActive &&
+    !contentState.isCountdownVisible &&
+    !contentState.recording &&
+    // Latched after first countdown appearance. Prevents re-show in
+    // the countdown-end → recording-true gap (capture is already
+    // live by then for region/desktop).
+    !contentState.countdownEverShown;
+  // Gate post-stop loader on encoderActive=false. Encoder can keep
+  // capturing several seconds after stop click on contended Chrome
+  // (seen up to 9s in diag); without this gate the loader gets baked
+  // into the recorded video.
+  const inPostStopWait =
+    Boolean(contentState.finalizingRecording) &&
+    contentState.encoderActive === false;
+  // Restart wait: streams are reused, no picker pop, so the
+  // visibility-hidden gate below never fires. Without this flag the
+  // toolbar would just freeze.
+  const inRestartWait = Boolean(contentState.restartingRecording);
+  const waitActive = inPreCountdownWait || inPostStopWait || inRestartWait;
+  const [showLoader, setShowLoader] = useState(false);
+  useEffect(() => {
+    if (!waitActive) {
+      setShowLoader(false);
+      return;
+    }
+    // Only show after a hide → show round-trip. If the tab never went
+    // hidden, the recorder tab's own loading state is what the user
+    // sees; our overlay would just flash on the source tab.
+    let timeoutId = null;
+    let wasHiddenThisWait = false;
+    const armTimer = () => {
+      if (document.hidden) return;
+      if (!wasHiddenThisWait) return;
+      timeoutId = setTimeout(() => {
+        if (!document.hidden) setShowLoader(true);
+      }, LOADER_DELAY_MS);
+    };
+    const onVisibility = () => {
+      if (document.hidden) {
+        wasHiddenThisWait = true;
+        if (timeoutId) clearTimeout(timeoutId);
+        timeoutId = null;
+        setShowLoader(false);
+      } else if (!timeoutId) {
+        armTimer();
+      }
+    };
+    // Post-stop skips the visibility gate (stop click is on the
+    // active tab; show feedback there immediately after 800ms).
+    if (inPostStopWait) {
+      wasHiddenThisWait = true;
+    }
+    // Same exemption for restart: the click is on the source tab and
+    // the recorder doesn't reopen a picker, so the tab never goes
+    // hidden. Without skipping the gate, the loader wouldn't fire and
+    // the user sees a frozen toolbar for the full restart window.
+    if (inRestartWait) {
+      wasHiddenThisWait = true;
+    }
+    armTimer();
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [waitActive, inPostStopWait, inRestartWait]);
 
   useEffect(() => {
     if (!parentRef.current) return;
@@ -288,7 +366,12 @@ const Wrapper = () => {
                 }}
               ></div>
             )}
-          <Canvas />
+          {(contentState.drawingMode || contentState.blurMode) && (
+            // Key on multiSceneCount only: fresh fabric per scene,
+            // but drawings persist through the pre-record → record
+            // transition within a scene.
+            <Canvas key={`canvas-${contentState.multiSceneCount || 0}`} />
+          )}
           <CursorModes />
           <root.div
             className="root-container"
@@ -326,9 +409,21 @@ const Wrapper = () => {
               {contentState.recordingType === "region" &&
                 contentState.customRegion && <Region />}
               {shadowRef.current && <Modal shadowRef={shadowRef} />}
-              {contentState.preparingRecording && (
-                <RecordingLoader />
-              )}
+              {/*
+                Render-time double-check: even if `showLoader` is true,
+                hide the pre-countdown loader the moment countdownActive
+                / isCountdownVisible flips on. The 800ms loader timer
+                can fire in the same scheduler tick as the
+                ready-to-record handler, producing a one-frame overlap
+                where both the "Processing your recording…" overlay and
+                the countdown render simultaneously. Tying visibility
+                to the live contentState here closes that frame -
+                showLoader still gets cleared by the useEffect cleanup
+                on the next tick, but the user never sees the overlap.
+              */}
+              {showLoader &&
+                !contentState.countdownActive &&
+                !contentState.isCountdownVisible && <RecordingLoader />}
               <Countdown />
               {contentState.recordingType != "camera" &&
                 !contentState.onboarding &&

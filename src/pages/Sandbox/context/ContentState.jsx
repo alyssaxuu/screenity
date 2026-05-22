@@ -25,15 +25,15 @@ import { diagForward } from "../../utils/diagForward";
 import { perfMark, perfSpan } from "../../utils/perfMarks";
 import { triggerSupportDownload } from "../../utils/triggerSupportDownload";
 import { chooseReader } from "../recorderStorage/chooseReader";
-import {
-  Input,
-  Output,
-  BlobSource,
-  BufferTarget,
-  Mp4OutputFormat,
-  ALL_FORMATS,
-  Conversion,
-} from "mediabunny";
+// mediabunny is ~630KB (the muxer/demuxer pipeline). Only used in
+// export/remux/conversion functions that fire on user action, not on
+// editor mount. Lazy-loading shifts that parse cost off the editor's
+// cold-load critical path. Cache promise; all call sites are async.
+let _mbPromise = null;
+const loadMb = () => {
+  if (!_mbPromise) _mbPromise = import("mediabunny");
+  return _mbPromise;
+};
 
 localforage.config({
   driver: localforage.INDEXEDDB,
@@ -493,7 +493,7 @@ const ContentState = (props) => {
           const timestamp = formatLocalTimestamp(recordingMeta.startedAt);
           setContentState((prevState) => ({
             ...prevState,
-            title: `${baseTitle} — ${timestamp}`,
+            title: `${baseTitle}; ${timestamp}`,
             recordingMeta,
           }));
           chrome.storage.local.remove(["recordingMeta"]);
@@ -1224,12 +1224,9 @@ const ContentState = (props) => {
           prev.finalizingRecording ? { ...prev, finalizingRecording: false } : prev,
         );
         await reader.close().catch(() => {});
-        // Use the OPFS-backed Blob on the critical path. The previous
-        // arrayBuffer copy was defensive against mtime/deletion but
-        // could take 30-60s on slow disks for 100MB+ files (the "stuck
-        // at 90%" reports). Materialize in the background instead, so a
-        // later recording that deletes the OPFS file doesn't strand the
-        // editor.
+        // OPFS Blob on the critical path; arrayBuffer copy was 30-60s
+        // on slow disks for 100MB+ ("stuck at 90%"). Materialize in
+        // the background.
         const blob = rawBlob;
         if (rawBlob) {
           diagForward("sandbox-opfs-materialize-deferred", {
@@ -1947,6 +1944,15 @@ const ContentState = (props) => {
   }, []);
 
   const onMessage = async (event) => {
+    // editor-force-close from the editorwebcodecs.html parent.
+    // sandbox.html can't use chrome.runtime, so accept it via
+    // postMessage and clear beforeunload to avoid the prompt.
+    if (event.data?.type === "editor-force-close") {
+      try {
+        window.onbeforeunload = null;
+      } catch {}
+      return;
+    }
     if (event.data.type === "recording-error-from-parent") {
       const payload = event.data.payload || {};
       // suppress when this editor already loaded; parent forwards every error
@@ -2772,6 +2778,15 @@ const ContentState = (props) => {
   // BufferTarget is required: fastStart:false patches the mdat size with a
   // positioned write at the end, which a stream-to-blob pipe would drop.
   const remuxFragmentedToStandardMp4 = async (fragmentedBlob, onProgress) => {
+    const {
+      Input,
+      Output,
+      BlobSource,
+      BufferTarget,
+      Mp4OutputFormat,
+      ALL_FORMATS,
+      Conversion,
+    } = await loadMb();
     const input = new Input({
       formats: ALL_FORMATS,
       source: new BlobSource(fragmentedBlob),
@@ -3092,7 +3107,7 @@ const ContentState = (props) => {
   const downloadGIF = async () => {
     // ref: rapid clicks fire before state propagates
     const latest = contentStateRef.current || contentState;
-    // Don't gate on isFfmpegRunning — it leaks from background poll
+    // Don't gate on isFfmpegRunning; it leaks from background poll
     // handlers and would intermittently swallow the click. downloadingGIF
     // is the real lock (mirrors the `download` MP4 path).
     if (latest.downloadingGIF || latest.downloading) {

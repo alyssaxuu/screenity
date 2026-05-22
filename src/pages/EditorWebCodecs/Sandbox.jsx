@@ -1,16 +1,21 @@
 import React, { useEffect, useRef } from "react";
 
-import addAudioToVideo from "./utils/addAudioToVideo";
-import convertWebmToMp4 from "./utils/convertWebmToMp4";
-import cropVideo from "./utils/cropVideo";
-import cutVideo from "./utils/cutVideo";
-import muteVideo from "./utils/muteVideo";
-import reencodeVideo from "./utils/reencodeVideo";
-import toGIF from "./utils/toGIF";
-import getFrame from "./utils/getFrame";
-import hasAudio from "./utils/hasAudio";
-import convertMp4ToWebm from "./utils/convertMp4ToWebm";
-import blobToArrayBuffer from "./utils/blobToArrayBuffer";
+// Lazy-load each video op so editorwebcodecs.html mounts without
+// pulling the ~630KB mediabunny chunk until the user invokes one.
+const lazyUtil = (importFn) =>
+  (...args) =>
+    importFn().then((m) => m.default(...args));
+const addAudioToVideo = lazyUtil(() => import("./utils/addAudioToVideo"));
+const convertWebmToMp4 = lazyUtil(() => import("./utils/convertWebmToMp4"));
+const cropVideo = lazyUtil(() => import("./utils/cropVideo"));
+const cutVideo = lazyUtil(() => import("./utils/cutVideo"));
+const muteVideo = lazyUtil(() => import("./utils/muteVideo"));
+const reencodeVideo = lazyUtil(() => import("./utils/reencodeVideo"));
+const toGIF = lazyUtil(() => import("./utils/toGIF"));
+const getFrame = lazyUtil(() => import("./utils/getFrame"));
+const hasAudio = lazyUtil(() => import("./utils/hasAudio"));
+const convertMp4ToWebm = lazyUtil(() => import("./utils/convertMp4ToWebm"));
+const blobToArrayBuffer = lazyUtil(() => import("./utils/blobToArrayBuffer"));
 
 const Sandbox = () => {
   const iframeRef = useRef(null);
@@ -312,6 +317,29 @@ const Sandbox = () => {
     const handler = (event) => onMessage(event.data);
     window.addEventListener("message", handler);
     return () => window.removeEventListener("message", handler);
+  }, []);
+
+  // Bridge editor-force-close from BG to the sandboxed iframe via
+  // postMessage; sandbox.html has no chrome.runtime access. Also
+  // clear the parent's beforeunload if set.
+  useEffect(() => {
+    const onRuntimeMessage = (message, _sender, sendResponse) => {
+      if (message?.type !== "editor-force-close") return;
+      try {
+        window.onbeforeunload = null;
+      } catch {}
+      try {
+        iframeRef.current?.contentWindow?.postMessage(
+          { type: "editor-force-close" },
+          "*",
+        );
+      } catch {}
+      try {
+        sendResponse?.({ ok: true });
+      } catch {}
+    };
+    chrome.runtime.onMessage.addListener(onRuntimeMessage);
+    return () => chrome.runtime.onMessage.removeListener(onRuntimeMessage);
   }, []);
 
   useEffect(() => {

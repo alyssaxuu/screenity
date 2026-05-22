@@ -76,23 +76,25 @@ const openRecorderTab = async (
   const finalUrl = isRegion ? `${recorderUrl}?tab=true` : recorderUrl;
 
   // Close leftover setup.html tabs to prevent them stealing focus from
-  // the editor after recording stops. Skip the active source tab: a
-  // freshly-installed user can click Record directly from setup.html,
-  // and closing the source tab mid-acquisition fires REC_START_SOURCE_TAB_GONE.
-  try {
-    const setupUrl = chrome.runtime.getURL("setup.html");
-    const allTabs = await chrome.tabs.query({});
-    const stale = allTabs.filter(
-      (t) =>
-        t.id != null &&
-        t.id !== activeTab?.id &&
-        t.url &&
-        t.url.startsWith(setupUrl),
-    );
-    if (stale.length > 0) {
-      await chrome.tabs.remove(stale.map((t) => t.id));
-    }
-  } catch {}
+  // the editor after recording stops. Fire-and-forget; the tab cleanup
+  // doesn't need to gate tabs.create below, and chrome.tabs.query({})
+  // can take 50-100ms on a tab-heavy browser.
+  (async () => {
+    try {
+      const setupUrl = chrome.runtime.getURL("setup.html");
+      const allTabs = await chrome.tabs.query({});
+      const stale = allTabs.filter(
+        (t) =>
+          t.id != null &&
+          t.id !== activeTab?.id &&
+          t.url &&
+          t.url.startsWith(setupUrl),
+      );
+      if (stale.length > 0) {
+        await chrome.tabs.remove(stale.map((t) => t.id));
+      }
+    } catch {}
+  })();
 
   const endTabCreate = perfSpan("BG.openRecorderTab tabs.create");
   const tab = await chrome.tabs.create({
@@ -192,7 +194,7 @@ const openRecorderTab = async (
       // app has mounted its message listener, so the first send is
       // routinely lost. It carries isTab/tabID for region recordings, so
       // retry until the recorder is listening. (streaming-data no longer
-      // depends on `loaded` — the recorder pulls it on mount.)
+      // depends on `loaded`; the recorder pulls it on mount.)
       const loadedMsg = {
         type: "loaded",
         request: request,
@@ -205,6 +207,20 @@ const openRecorderTab = async (
             }
           : {}),
       };
+      console.warn(
+        "[Screenity][openRecorderTab] loadedMsg",
+        JSON.stringify({
+          isRegion,
+          camera,
+          activeTabId: activeTab.id,
+          isPlayground,
+          requestRegion: !!request?.region,
+          requestCustomRegion: !!request?.customRegion,
+          requestRecordingType: request?.recordingType || null,
+          loadedHasIsTab: !!loadedMsg.isTab,
+          loadedTabID: loadedMsg.tabID || null,
+        }),
+      );
       (async () => {
         const backoffMs = [0, 200, 500, 1000, 2000];
         for (let attempt = 0; attempt < backoffMs.length; attempt += 1) {

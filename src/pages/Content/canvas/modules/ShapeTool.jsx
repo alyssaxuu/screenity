@@ -1,4 +1,4 @@
-import { fabric } from "fabric";
+import { fabric } from "../fabricCompat";
 
 const ShapeTool = (canvas, contentStateRef, setContentState, saveCanvas) => {
   const getState = () => contentStateRef.current;

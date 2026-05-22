@@ -1,9 +1,6 @@
 // MediaRecorder-shaped wrapper around WebCodecsRecorder so Cloud's
-// existing recorder lifecycle (start/stop/pause/resume, ondataavailable,
-// _pendingWrites drain) drives WebCodecs without a refactor. Muxer
-// fragments come out as fMP4 Blobs through ondataavailable; uploader
-// just sees Blobs. `state` mirrors the MediaRecorder string so existing
-// comparisons in CloudRecorder.jsx still work.
+// existing lifecycle drives WebCodecs without a refactor. fMP4
+// fragments come out as Blobs via ondataavailable.
 
 import { WebCodecsRecorder } from "../../Recorder/webcodecs/WebCodecsRecorder";
 
@@ -24,6 +21,9 @@ export class WebCodecsTrackRecorder {
       options.videoBitsPerSecond || 16_000_000;
     this.audioBitsPerSecond = options.audioBitsPerSecond || 128_000;
     this.enableAudio = options.enableAudio !== false; // default true
+    // Used by cloud's camera path on macOS to force a software h264
+    // encoder, sidestepping VideoToolbox's per-process HW-slot serialization.
+    this.preferSoftware = Boolean(options.preferSoftware);
     // MediaRecorder-shape fields used by callers.
     this._state = "inactive";
     this.ondataavailable = null;
@@ -109,13 +109,10 @@ export class WebCodecsTrackRecorder {
       enableAudio: this.enableAudio,
       videoBitrate: this.videoBitsPerSecond,
       audioBitrate: this.audioBitsPerSecond,
-      // Cap encoded resolution at 1080p. Without this, retina screen
-      // captures (often 2200x1440 or higher) exceed the AVC Level 4.2
-      // max coded area (~2.2 MP) and the encoder throws NotSupportedError
-      // on the first frame, leaving Bunny with only the 28-byte ftyp init.
-      // 1080p matches Bunny Stream's tier ceiling, so users can't play
-      // back at higher than 1080p anyway. WebCodecsRecorder downscales
-      // via its resize canvas; aspect ratio is preserved.
+      preferSoftware: this.preferSoftware,
+      // Cap at 1080p; retina captures exceed AVC L4.2 (~2.2MP) and
+      // throw on first frame, leaving Bunny with the 28-byte init.
+      // Bunny tier caps at 1080p anyway. WCR downscales via canvas.
       width: 1920,
       height: 1080,
     });

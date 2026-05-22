@@ -88,8 +88,10 @@ const SettingsMenu = (props) => {
             const a = document.createElement("a");
             a.href = url;
             a.download = filename;
+            document.body.appendChild(a);
             a.click();
-            window.URL.revokeObjectURL(url);
+            a.remove();
+            setTimeout(() => window.URL.revokeObjectURL(url), 1000);
           } catch (err) {
             console.error("[Screenity] Troubleshooting export failed:", err);
           }

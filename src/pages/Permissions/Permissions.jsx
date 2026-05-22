@@ -44,7 +44,8 @@ const Recorder = () => {
         checkPermissions();
       };
 
-      // If the permissions are granted, enumerate devices
+      // If `Permissions.query()` reports either granted, take the fast
+      // path and enumerate.
       if (
         cameraPermission.state === "granted" ||
         microphonePermission.state === "granted"
@@ -53,17 +54,36 @@ const Recorder = () => {
           cameraPermission.state === "granted",
           microphonePermission.state === "granted"
         );
-      } else {
-        // Post message to parent window
+        return;
+      }
+
+      // permissions.query() asks the iframe's own origin and reports
+      // "prompt"/"denied" even when getUserMedia would succeed via
+      // the parent's `allow="camera *; microphone *"`. Probe directly.
+      try {
+        const probeStream = await navigator.mediaDevices.getUserMedia({
+          audio: true,
+          video: true,
+        });
+        // It worked; clean up the probe tracks immediately. The
+        // subsequent enumerateDevices() call will request its own
+        // stream when it actually needs the data; this probe was just
+        // a permission test.
+        probeStream.getTracks().forEach((t) => t.stop());
+        enumerateDevices(true, true);
+        return;
+      } catch (probeErr) {
+        // Real permission failure (NotAllowedError, NotFoundError if
+        // no devices, NotReadableError if device in use). Surface
+        // the modal.
         window.parent.postMessage(
           {
             type: "screenity-permissions",
             success: false,
-            error: err.name,
+            error: probeErr?.name || "unknown",
           },
           "*"
         );
-        // sendResponse({ success: false, error: err.name });
       }
     } catch (err) {
       enumerateDevices();

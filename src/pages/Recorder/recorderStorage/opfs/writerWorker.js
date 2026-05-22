@@ -71,15 +71,31 @@ const closeFile = () => {
   if (!syncHandle) {
     return { byteSize: offset, chunkCount, fileName };
   }
+  // Granular timing; diag showed close taking ~10s on one user's
+  // macOS recording. Without splitting flush vs close we can't tell
+  // whether the cost is fsync or the handle release itself.
+  const tFlushStart = (typeof performance !== "undefined" ? performance.now() : Date.now());
   try {
     syncHandle.flush();
   } catch {}
+  const tFlushEnd = (typeof performance !== "undefined" ? performance.now() : Date.now());
   const byteSize = typeof syncHandle.getSize === "function" ? syncHandle.getSize() : offset;
+  const tGetSizeEnd = (typeof performance !== "undefined" ? performance.now() : Date.now());
   syncHandle.close();
+  const tCloseEnd = (typeof performance !== "undefined" ? performance.now() : Date.now());
   syncHandle = null;
   closed = true;
   devLog("close", { byteSize, chunkCount, fileName });
-  return { byteSize, chunkCount, fileName };
+  return {
+    byteSize,
+    chunkCount,
+    fileName,
+    timings: {
+      flushMs: Math.round(tFlushEnd - tFlushStart),
+      getSizeMs: Math.round(tGetSizeEnd - tFlushEnd),
+      closeHandleMs: Math.round(tCloseEnd - tGetSizeEnd),
+    },
+  };
 };
 
 const abortFile = async () => {
@@ -175,6 +191,7 @@ self.onmessage = (e) => {
           byteSize: result.byteSize,
           chunkCount: result.chunkCount,
           fileName: result.fileName,
+          timings: result.timings,
         });
       } catch (err) {
         post({

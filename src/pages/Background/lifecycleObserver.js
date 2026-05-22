@@ -55,5 +55,22 @@ export const initLifecycleObserver = () => {
         to: summarizeValue(newValue),
       });
     }
+
+    // Reactive icon sync. Anchors the action icon to storage.recording
+    // so it can never drift out of sync when an imperative
+    // chrome.action.setIcon call is missed (e.g. a stop path
+    // interrupted by SW teardown). Imperative setIcon calls in the
+    // start/stop sites still run; this is the safety net.
+    if (changes.recording && changes.recording.oldValue !== changes.recording.newValue) {
+      try {
+        chrome.action.setIcon({
+          path: changes.recording.newValue
+            ? "assets/recording-logo.png"
+            : "assets/icon-34.png",
+        });
+      } catch (err) {
+        console.warn("[Screenity][BG] reactive setIcon failed:", err);
+      }
+    }
   });
 };
