@@ -178,6 +178,8 @@ export const stopRecording = async () => {
     recordingUiTabId: null,
     pipForceClose: Date.now(),
     recordingStartTime: 0,
+    // marker for the start-path rapid-restart guard.
+    recordingStoppedAt: Date.now(),
   });
 
   const {
@@ -812,6 +814,7 @@ export const handleStopRecordingTabBackup = async (request) => {
     recording: false,
     restarting: false,
     tabRecordedID: null,
+    recordingStoppedAt: Date.now(),
     ...(isMemoryError ? { memoryError: true } : {}),
   });
   sendMessageRecord({ type: "stop-recording-tab" });

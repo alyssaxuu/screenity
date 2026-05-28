@@ -10,6 +10,7 @@
  * canvas resizing, pause/resume, and chunked output.
  */
 import { perfMark, perfSpan } from "../../utils/perfMarks";
+import { diagForward } from "../../utils/diagForward";
 // Lazy-load Mp4MuxerWrapper so its ~3MB mediabunny static import doesn't
 // drag into recorder.bundle.js cold start (dominates click-record latency).
 let _mp4MuxerWrapperPromise = null;
@@ -914,6 +915,16 @@ export class WebCodecsRecorder {
         deviceChanges: this._deviceChangeCount || 0,
       };
     }
+    // breadcrumb at the failure instant; onError alone doesn't land in the
+    // diag session log.
+    diagForward("recorder-webcodecs-failure", {
+      code: err.code || code || null,
+      framesEncoded: this.frameCount,
+      firstChunkSeen: this._firstChunkSeen,
+      swRetry: this._didSwRetry ? this._swRetryReason || true : false,
+      reclaims: this._encoderReclaimCount + this._audioEncoderReclaimCount,
+      visibilityChanges: this._visibilityChangeCount,
+    });
     try {
       this.options.onError?.(err);
     } catch (cbErr) {
@@ -933,6 +944,16 @@ export class WebCodecsRecorder {
         state: document.visibilityState,
         count: this._visibilityChangeCount,
       });
+      // tab came back to focus before we saw a first chunk; reset the
+      // watchdog so the encoder gets a fresh full window post-throttle.
+      if (
+        document.visibilityState === "visible" &&
+        this.running &&
+        !this._stopping &&
+        !this._firstChunkSeen
+      ) {
+        this._armFirstChunkWatchdog();
+      }
     };
     try {
       document.addEventListener(
@@ -1004,6 +1025,15 @@ export class WebCodecsRecorder {
     this._firstChunkWatchdog = setTimeout(() => {
       this._firstChunkWatchdog = null;
       if (!this.running || this._stopping || this._firstChunkSeen) return;
+      // tab is hidden so the encoder may be throttled; re-arm and let the
+      // visibilitychange handler restart the clock on return.
+      if (
+        typeof document !== "undefined" &&
+        document.visibilityState === "hidden"
+      ) {
+        this._armFirstChunkWatchdog();
+        return;
+      }
       this.warn(
         `[WCR] no encoded video chunk within ${this._firstChunkWatchdogMs}ms`,
       );
@@ -1187,16 +1217,16 @@ export class WebCodecsRecorder {
       error: videoEncoderError,
     });
 
-    // configure() can throw sync. On QuotaExceeded or generic failure
-    // with prefer-hardware, retry once with prefer-software (Teams/
-    // Zoom contention, NVIDIA 3-encoder cap). HW → SW → MR.
+    // configure() can throw sync. retry hardware→software on quota/contention
+    // (Teams/Zoom, NVIDIA 3-encoder cap); if SW also contends, cooldown and
+    // retry HW once (slot releases in a sec or two). HW → SW → cooldown → HW.
     const tryConfigureWith = (cfg) => {
       // E2E hook: force one HW configure() to throw QuotaExceededError so
-      // tests can exercise the prefer-software retry path. Mirrors
-      // __screenityForceZeroFrames; one-shot.
+      // tests can exercise the prefer-software retry path. One-shot.
       const hwPref =
         cfg.hardwareAcceleration === "prefer-hardware" ||
         !cfg.hardwareAcceleration;
+      const swPref = cfg.hardwareAcceleration === "prefer-software";
       const g = /** @type {any} */ (globalThis);
       if (
         hwPref &&
@@ -1210,7 +1240,50 @@ export class WebCodecsRecorder {
         forced.name = "QuotaExceededError";
         throw forced;
       }
+      // Companion E2E hook so a test can simulate "both HW and SW are
+      // contended" and exercise the cooldown retry path.
+      if (
+        swPref &&
+        g.__screenityForceConfigureSwQuotaError &&
+        !g.__screenityForceConfigureSwQuotaError_fired
+      ) {
+        g.__screenityForceConfigureSwQuotaError_fired = true;
+        const forced = new Error(
+          "Forced SW configure quota error for testing",
+        );
+        forced.name = "QuotaExceededError";
+        throw forced;
+      }
       this.videoEncoder.configure(cfg);
+    };
+    const rebuildEncoder = () => {
+      try {
+        this.videoEncoder.close();
+      } catch {}
+      this.videoEncoder = new VideoEncoder({
+        output: videoEncoderOutput,
+        error: videoEncoderError,
+      });
+    };
+    const isContention = (err) => {
+      const msg = String(err?.message || err || "");
+      return (
+        err?.name === "QuotaExceededError" ||
+        /quota|too many|in use|already|reclaimed/i.test(msg)
+      );
+    };
+    const buildBusyError = (cause, codecLabel) => {
+      // the raw DOMException ("Codec reclaimed due to inactivity") is opaque;
+      // give a user-facing message. errorCodes.js still maps to REC_START_CODEC.
+      const tagged = new Error(
+        "Another app appears to be using the video encoder. Close apps like Zoom, Teams or OBS and try again.",
+      );
+      tagged.cause = cause;
+      tagged.codec = codecLabel;
+      tagged.code = "video-encoder-busy";
+      tagged.swRetryReason = this._swRetryReason || null;
+      tagged.cooldownRetried = Boolean(this._didCooldownRetry);
+      return tagged;
     };
     try {
       tryConfigureWith(config);
@@ -1219,9 +1292,7 @@ export class WebCodecsRecorder {
         config.hardwareAcceleration === "prefer-hardware" ||
         !config.hardwareAcceleration;
       const errMsg = String(err?.message || err || "");
-      const isContentionError =
-        err?.name === "QuotaExceededError" ||
-        /quota|too many|in use|already/i.test(errMsg);
+      const isContentionError = isContention(err);
       if (isHwPreferred && !this._didSwRetry) {
         this._didSwRetry = true;
         this._swRetryReason = isContentionError
@@ -1231,15 +1302,7 @@ export class WebCodecsRecorder {
           "[WCR] HW VideoEncoder.configure failed, retrying prefer-software",
           { reason: this._swRetryReason, codec: codecLabel, message: errMsg },
         );
-        // Rebuild the encoder: configure() on a closed/errored encoder
-        // throws InvalidStateError on subsequent calls.
-        try {
-          this.videoEncoder.close();
-        } catch {}
-        this.videoEncoder = new VideoEncoder({
-          output: videoEncoderOutput,
-          error: videoEncoderError,
-        });
+        rebuildEncoder();
         const swConfig = { ...config, hardwareAcceleration: "prefer-software" };
         try {
           tryConfigureWith(swConfig);
@@ -1247,6 +1310,60 @@ export class WebCodecsRecorder {
           this._activeVideoConfig = swConfig;
           return;
         } catch (swErr) {
+          // both HW and SW threw contention: the OS slot is likely held
+          // transiently, so one pause + retry recovers on the Windows traces.
+          if (
+            isContention(swErr) &&
+            isContentionError &&
+            !this._didCooldownRetry
+          ) {
+            this._didCooldownRetry = true;
+            const cooldownMs = Number.isFinite(
+              this.options.encoderConfigureCooldownMs,
+            )
+              ? this.options.encoderConfigureCooldownMs
+              : 1500;
+            this.warn(
+              "[WCR] both HW and SW configure threw contention; cooling down before retry",
+              {
+                codec: codecLabel,
+                cooldownMs,
+                hwMessage: errMsg,
+                swMessage: String(swErr?.message || swErr || ""),
+              },
+            );
+            await new Promise((r) => setTimeout(r, cooldownMs));
+            rebuildEncoder();
+            try {
+              tryConfigureWith(config);
+              this.log(
+                "[WCR] VideoEncoder configured after cooldown retry",
+                { codec: codecLabel },
+              );
+              this._activeVideoConfig = config;
+              return;
+            } catch (retryErr) {
+              this.warn(
+                "[WCR] cooldown HW retry failed; trying SW once more",
+                {
+                  codec: codecLabel,
+                  message: String(retryErr?.message || retryErr || ""),
+                },
+              );
+              rebuildEncoder();
+              try {
+                tryConfigureWith(swConfig);
+                this.log(
+                  "[WCR] VideoEncoder configured (SW after cooldown)",
+                  { codec: codecLabel },
+                );
+                this._activeVideoConfig = swConfig;
+                return;
+              } catch (finalErr) {
+                throw buildBusyError(finalErr, codecLabel);
+              }
+            }
+          }
           const tagged = new Error(
             `VideoEncoder.configure failed for ${codecLabel} on both HW and SW: ${swErr?.message || swErr}`,
           );

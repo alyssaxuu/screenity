@@ -23,7 +23,7 @@ const openRecorderTab = async (
   let switchTab = true;
 
   const endLogin = perfSpan("BG.openRecorderTab loginWithWebsite");
-  const { authenticated, subscribed, cached, transient, error: authError } = await loginWithWebsite();
+  const { authenticated, subscribed, cached, transient, error: authError } = await loginWithWebsite({ force: true });
   endLogin({ authenticated, subscribed, cached: Boolean(cached) });
   const isCloudRecorder = authenticated && subscribed;
   const recorderUrl = isCloudRecorder

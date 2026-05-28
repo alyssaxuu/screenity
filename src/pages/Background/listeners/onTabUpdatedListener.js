@@ -1,5 +1,24 @@
 import { sendMessageTab } from "../tabManagement";
 import { diagEvent } from "../../utils/diagnosticLog";
+import { loginWithWebsite } from "../auth/loginWithWebsite";
+
+const CLOUD_FEATURES_ENABLED =
+  process.env.SCREENITY_ENABLE_CLOUD_FEATURES === "true";
+const APP_BASE = process.env.SCREENITY_APP_BASE;
+// debounce in-tab triggers so navigation chatter doesn't hammer /auth/refresh
+const APP_AUTH_REFRESH_DEBOUNCE_MS = 10_000;
+let lastAppAuthRefreshAt = 0;
+const tryAppAuthRefresh = async (url) => {
+  if (!CLOUD_FEATURES_ENABLED || !APP_BASE || !url) return;
+  if (!url.startsWith(APP_BASE)) return;
+  const now = Date.now();
+  if (now - lastAppAuthRefreshAt < APP_AUTH_REFRESH_DEBOUNCE_MS) return;
+  // skip when already authed; AUTH_SUCCESS is the fast path.
+  const { isLoggedIn } = await chrome.storage.local.get(["isLoggedIn"]);
+  if (isLoggedIn) return;
+  lastAppAuthRefreshAt = now;
+  loginWithWebsite({ force: true }).catch(() => {});
+};
 
 export const handleTabUpdate = async (tabId, changeInfo, tab) => {
   try {
@@ -89,6 +108,8 @@ export const handleTabUpdate = async (tabId, changeInfo, tab) => {
       ) {
         sendMessageTab(tab.id, { type: "toggle-popup" });
       }
+      // if we look logged out, try a force refresh in case AUTH_SUCCESS was missed.
+      tryAppAuthRefresh(tab.url).catch(() => {});
     }
   } catch (error) {
     console.error("Error in handleTabUpdate:", error.message);

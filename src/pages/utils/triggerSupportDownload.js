@@ -4,6 +4,13 @@ import { buildDiagnosticZip } from "./buildDiagnosticZip";
 // form that opens right after.
 export const triggerSupportDownload = async (opts = {}) => {
   try {
+    // pro users get a dedicated help form (no zip attachment); skip the
+    // background zip download for them.
+    const { isLoggedIn, isSubscribed } = await chrome.storage.local.get([
+      "isLoggedIn",
+      "isSubscribed",
+    ]);
+    if (isLoggedIn && isSubscribed) return null;
     const { blob, filename } = await buildDiagnosticZip(opts);
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");

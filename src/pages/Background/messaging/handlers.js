@@ -465,7 +465,7 @@ const handleCheckStorageQuota = async (retried = false) => {
     // 401: invalidate auth cache so loginWithWebsite refreshes the token
     if (res.status === 401 && !retried) {
       await chrome.storage.local.set({ lastAuthCheck: 0 });
-      const refresh = await loginWithWebsite();
+      const refresh = await loginWithWebsite({ force: true });
       if (refresh.authenticated) {
         return handleCheckStorageQuota(true);
       }
@@ -1207,24 +1207,41 @@ export const setupHandlers = () => {
       "restarting",
       "pendingRecording",
     ]);
+    const writeDecision = (reason, started, extra = {}) => {
+      const decisionAt = Date.now();
+      return chrome.storage.local.set({
+        lastCountdownFinishedDecision: {
+          ts: decisionAt,
+          startedAt: started ? decisionAt : null,
+          endedAt: message?.endedAt || null,
+          acceptedCountdownFinishedAt: started,
+          recording: Boolean(recording),
+          restarting: Boolean(restarting),
+          pendingRecording: Boolean(pendingRecording),
+          started,
+          reason,
+          ...extra,
+        },
+      });
+    };
     // restart leaves `recording: true` briefly from the previous session, so block
     // only when recording is active AND not restarting
     if (recording && !restarting) {
       diagEvent("countdown-finished", { skipped: true, reason: "already-recording" });
-      const decisionAt = Date.now();
-      await chrome.storage.local.set({
-        lastCountdownFinishedDecision: {
-          ts: decisionAt,
-          startedAt: null,
-          endedAt: message?.endedAt || null,
-          acceptedCountdownFinishedAt: false,
-          recording: Boolean(recording),
-          restarting: Boolean(restarting),
-          pendingRecording: Boolean(pendingRecording),
-          started: false,
-          reason: "already-recording",
-        },
+      await writeDecision("already-recording", false);
+      return { ok: true, skipped: true };
+    }
+    // a delayed countdown-finished can fire long after stop; accepting it
+    // starts a phantom recording that orphans the finished editor handoff.
+    const endedAt = Number(message?.endedAt) || 0;
+    const ageMs = endedAt > 0 ? Date.now() - endedAt : null;
+    if (ageMs !== null && ageMs > 10000) {
+      diagEvent("countdown-finished", {
+        skipped: true,
+        reason: "stale-dispatch",
+        ageMs,
       });
+      await writeDecision("stale-dispatch", false, { ageMs });
       return { ok: true, skipped: true };
     }
     diagEvent("countdown-finished", { skipped: false });
@@ -1401,7 +1418,16 @@ export const setupHandlers = () => {
   registerMessage("diag-forward", (message) => {
     const ev = typeof message?.event === "string" ? message.event : null;
     if (!ev) return;
-    const allowedPrefixes = ["sandbox-", "sw-", "opfs-", "recorder-"];
+    const allowedPrefixes = [
+      "sandbox-",
+      "sw-",
+      "opfs-",
+      "recorder-",
+      // emit real failure breadcrumbs; were being silently dropped before.
+      "cloudrecorder-",
+      "camera-",
+      "editor-",
+    ];
     if (!allowedPrefixes.some((p) => ev.startsWith(p))) return;
     diagEvent(ev, message?.data ?? null);
   });
@@ -1456,7 +1482,7 @@ export const setupHandlers = () => {
     // cloud-enabled signed-in users skip local fast-MP4 recovery to stay on the pro flow
     if (CLOUD_FEATURES_ENABLED) {
       try {
-        const { authenticated } = await loginWithWebsite();
+        const { authenticated } = await loginWithWebsite({ force: true });
         if (authenticated) {
           const tab = await getCurrentTab();
           if (tab?.id) {
@@ -1561,7 +1587,7 @@ export const setupHandlers = () => {
     let isLoggedIn = false;
     if (CLOUD_FEATURES_ENABLED) {
       try {
-        const auth = await loginWithWebsite();
+        const auth = await loginWithWebsite({ force: true });
         if (auth.authenticated && auth.user) {
           user = auth.user;
           isLoggedIn = true;
@@ -1732,7 +1758,8 @@ export const setupHandlers = () => {
           message: "Cloud features disabled",
         };
       }
-      return await loginWithWebsite();
+      // force so a fresh web login is picked up even after explicit logout.
+      return await loginWithWebsite({ force: true });
     },
   );
   registerMessage(
@@ -1742,7 +1769,7 @@ export const setupHandlers = () => {
         sendResponse({ success: false, message: "Cloud features disabled" });
         return true;
       }
-      const { authenticated, subscribed, user } = await loginWithWebsite();
+      const { authenticated, subscribed, user } = await loginWithWebsite({ force: true });
 
       if (!authenticated) {
         sendResponse({ success: false, message: "User not authenticated" });
@@ -1999,7 +2026,7 @@ export const setupHandlers = () => {
       sendResponse({ success: false, message: "Cloud features disabled" });
       return true;
     }
-    const { authenticated, subscribed, user } = await loginWithWebsite();
+    const { authenticated, subscribed, user } = await loginWithWebsite({ force: true });
 
     if (!authenticated) {
       sendResponse({ success: false, message: "User not authenticated" });
@@ -2030,7 +2057,7 @@ export const setupHandlers = () => {
         sendResponse({ success: false, error: "Cloud features disabled" });
         return true;
       }
-      const authResult = await loginWithWebsite();
+      const authResult = await loginWithWebsite({ force: true });
       const { authenticated, subscribed } = authResult;
 
       if (!authenticated) {
@@ -2490,7 +2517,7 @@ export const setupHandlers = () => {
       console.warn("Cloud features disabled");
       return;
     }
-    const { authenticated } = await loginWithWebsite();
+    const { authenticated } = await loginWithWebsite({ force: true });
     if (!authenticated) {
       console.warn("User not authenticated, cannot open account settings");
       return;
@@ -2504,7 +2531,7 @@ export const setupHandlers = () => {
       console.warn("Cloud features disabled");
       return;
     }
-    const { authenticated, user } = await loginWithWebsite();
+    const { authenticated, user } = await loginWithWebsite({ force: true });
     if (!authenticated || !user) {
       console.warn("User not authenticated, cannot open support");
       return;
@@ -2559,7 +2586,7 @@ export const setupHandlers = () => {
   registerMessage("refresh-auth", async () => {
     if (!CLOUD_FEATURES_ENABLED)
       return { success: false, message: "Cloud features disabled" };
-    return await loginWithWebsite();
+    return await loginWithWebsite({ force: true });
   });
   registerMessage("sync-recording-state", async (message, sendResponse) => {
     const {

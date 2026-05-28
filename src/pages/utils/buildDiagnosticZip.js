@@ -70,6 +70,7 @@ const FAST_RECORDER_KEYS = [
   "lastStartRecordingCaller",
   "lastCountdownFinishedDecision",
   "lastStartAfterCountdown",
+  "lastSubscriptionLoss",
 ];
 
 export const buildDiagnosticZip = async ({

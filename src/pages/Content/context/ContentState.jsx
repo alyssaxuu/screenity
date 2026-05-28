@@ -276,6 +276,8 @@ const ContentState = (props) => {
   }, []);
 
   const stopRecording = useCallback(() => {
+    // re-entry guard: if a previous stop is still finalizing, ignore.
+    if (contentStateRef.current.finalizingRecording) return;
     chrome.runtime.sendMessage({ type: "clear-recording-alarm" });
     const isMulti = contentStateRef.current.multiMode;
     // Preserve the user's tool state in multi-mode so they keep their
@@ -1689,23 +1691,20 @@ const ContentState = (props) => {
               : prev,
           );
         }
-        // Recording true → false: clear any local flow state that
-        // the sandboxTab listener might have missed on a hidden tab
-        // (Chrome suspends bg tabs; sandboxTab listener may not fire
-        // until the user returns). Prevents the stale "Preparing..."
-        // loader showing when the user reopens the popup.
+        // Recording true → false: clear start-side flow flags the
+        // sandboxTab listener might have missed on a hidden tab. Leave
+        // finalizingRecording alone so the toolbar stop button stays
+        // disabled until sandboxTab (or the 30s watchdog) lands.
         if (
           changes.recording.oldValue === true &&
           changes.recording.newValue === false
         ) {
           setContentState((prev) =>
-            prev.finalizingRecording ||
             prev.preparingRecording ||
             prev.pendingRecording ||
             prev.restartingRecording
               ? {
                   ...prev,
-                  finalizingRecording: false,
                   preparingRecording: false,
                   pendingRecording: false,
                   restartingRecording: false,

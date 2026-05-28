@@ -190,6 +190,7 @@ export const getErrorSnapshot = async () => {
     "lastRecorderStopAt",
     "lastTrackEndEvent",
     "lastTrackEndedEvent",
+    "lastSubscriptionLoss",
   ];
   try {
     return await chrome.storage.local.get(keys);

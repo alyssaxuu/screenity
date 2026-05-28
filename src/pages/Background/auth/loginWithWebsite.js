@@ -25,7 +25,23 @@ const fetchWithTimeout = (url, opts = {}) => {
   );
 };
 
-export const loginWithWebsite = async (_depth = 0) => {
+const recordSubscriptionLoss = async (reason, extra = {}) => {
+  try {
+    await chrome.storage.local.set({
+      lastSubscriptionLoss: {
+        ts: Date.now(),
+        reason,
+        ...extra,
+      },
+    });
+  } catch {}
+};
+
+// force=true bypasses stayLoggedOut and the prior-signals gate, so
+// user-initiated paths can recover via cookie refresh after explicit logout.
+export const loginWithWebsite = async (arg = {}) => {
+  const _depth = typeof arg === "number" ? arg : Number(arg._depth) || 0;
+  const force = typeof arg === "object" && arg !== null ? Boolean(arg.force) : false;
   if (!CLOUD_FEATURES_ENABLED) {
     return { authenticated: false, instantMode: false };
   }
@@ -34,19 +50,72 @@ export const loginWithWebsite = async (_depth = 0) => {
   // separate gets here added ~30-60ms of serial round-trips on the
   // start critical path; consolidating doesn't change semantics but
   // shaves a few ms off every recording start.
-  const { stayLoggedOut, screenityToken, lastAuthCheck, instantMode } =
-    await chrome.storage.local.get([
-      "stayLoggedOut",
-      "screenityToken",
-      "lastAuthCheck",
-      "instantMode",
-    ]);
+  const {
+    stayLoggedOut,
+    screenityToken,
+    lastAuthCheck,
+    instantMode,
+    wasLoggedIn,
+    hasSubscribedBefore,
+    screenityUser,
+  } = await chrome.storage.local.get([
+    "stayLoggedOut",
+    "screenityToken",
+    "lastAuthCheck",
+    "instantMode",
+    "wasLoggedIn",
+    "hasSubscribedBefore",
+    "screenityUser",
+  ]);
 
-  if (stayLoggedOut) {
+  if (stayLoggedOut && !force) {
     return { authenticated: false, instantMode: false };
   }
 
   if (!screenityToken) {
+    // gated on prior signals; force bypasses the gate.
+    const hasPriorSignals =
+      Boolean(wasLoggedIn) ||
+      Boolean(hasSubscribedBefore) ||
+      Boolean(screenityUser);
+    const shouldTryRefresh = force || hasPriorSignals;
+    if (shouldTryRefresh && _depth < MAX_REFRESH_DEPTH && API_BASE) {
+      try {
+        const refreshRes = await fetchWithTimeout(
+          `${API_BASE}/auth/refresh`,
+          { credentials: "include" },
+        );
+        if (refreshRes.ok) {
+          const { token: newToken } = await refreshRes.json();
+          if (newToken) {
+            // also clear stayLoggedOut on force so non-force calls work next time.
+            const writes = { screenityToken: newToken };
+            if (force) writes.stayLoggedOut = false;
+            await chrome.storage.local.set(writes);
+            return await loginWithWebsite({ _depth: _depth + 1, force });
+          }
+        }
+        // only mark as subscription loss for users with prior-Pro evidence.
+        if (hasPriorSignals) {
+          await recordSubscriptionLoss("refresh-failed-no-token", {
+            status: refreshRes.status,
+            hadPriorSignals: true,
+          });
+        }
+      } catch (refreshErr) {
+        if (hasPriorSignals) {
+          await recordSubscriptionLoss("refresh-threw", {
+            err: String(refreshErr?.message || refreshErr).slice(0, 200),
+            hadPriorSignals: true,
+          });
+        }
+      }
+    } else if (hasPriorSignals) {
+      await recordSubscriptionLoss("no-token-no-refresh-allowed", {
+        hadPriorSignals: true,
+        depth: _depth,
+      });
+    }
     // Don't block the start path on this write; it's just a UI flag
     // that will get re-read on next mount.
     chrome.storage.local.set({ isLoggedIn: false });
@@ -76,6 +145,7 @@ export const loginWithWebsite = async (_depth = 0) => {
         onboarding: false,
         isLoggedIn: true,
         wasLoggedIn: false,
+        stayLoggedOut: false,
         ...(!instantMode
           ? {
               backgroundEffectsActive: false,
@@ -121,6 +191,7 @@ export const loginWithWebsite = async (_depth = 0) => {
       lastAuthCheck: now,
       isLoggedIn: true,
       wasLoggedIn: false,
+      stayLoggedOut: false,
       isSubscribed: subscribed,
       proSubscription: subscription,
       hasSubscribedBefore: !!hasSubscribedBefore,
@@ -173,9 +244,10 @@ export const loginWithWebsite = async (_depth = 0) => {
           );
           if (refreshRes.ok) {
             const { token: newToken } = await refreshRes.json();
-            await chrome.storage.local.set({ screenityToken: newToken });
-
-            return await loginWithWebsite(_depth + 1);
+            const writes = { screenityToken: newToken };
+            if (force) writes.stayLoggedOut = false;
+            await chrome.storage.local.set(writes);
+            return await loginWithWebsite({ _depth: _depth + 1, force });
           }
         } catch (refreshErr) {
           console.error("❌ Refresh failed:", refreshErr.message);
@@ -191,6 +263,9 @@ export const loginWithWebsite = async (_depth = 0) => {
         "proSubscription",
       ]);
       await chrome.storage.local.set({ isLoggedIn: false });
+      await recordSubscriptionLoss("token-invalid-refresh-failed", {
+        depth: _depth,
+      });
       return { authenticated: false, instantMode: false };
     }
 
@@ -231,6 +306,9 @@ export const loginWithWebsite = async (_depth = 0) => {
     }
 
     await chrome.storage.local.set({ isLoggedIn: false });
+    await recordSubscriptionLoss("verify-transient-no-cached-user", {
+      err: String(err?.message || err).slice(0, 200),
+    });
     return {
       authenticated: false,
       instantMode: instantMode || false,

@@ -4,7 +4,7 @@ import { loginWithWebsite } from "../auth/loginWithWebsite";
 export const setSurface = async (request) => {
   await chrome.storage.local.set({ surface: request.surface });
 
-  const result = await loginWithWebsite();
+  const result = await loginWithWebsite({ force: true });
   const { activeTab } = await chrome.storage.local.get(["activeTab"]);
 
   sendMessageTab(activeTab, {

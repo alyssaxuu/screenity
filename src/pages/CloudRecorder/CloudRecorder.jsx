@@ -14,6 +14,11 @@ import { IS_OFFSCREEN_HOST } from "../utils/recordingHost";
 import { startPrewarm, stopPrewarm } from "../Recorder/streamWarmup";
 import { preloadWebCodecsModules } from "../Recorder/webcodecs/WebCodecsRecorder";
 import {
+  startEncoderPrewarm,
+  closeActiveEncoderPrewarm,
+} from "../Recorder/encoderPrewarm";
+import { perfMark } from "../utils/perfMarks";
+import {
   chooseChunksStore,
   openExistingChunksStore,
 } from "./recorderStorage/chooseChunksStore";
@@ -5720,6 +5725,45 @@ const CloudRecorder = () => {
           const settings = screenStream.current
             .getVideoTracks()[0]
             .getSettings();
+
+          // warm the OS encoder so the real one hits 30fps from frame 1
+          // instead of crawling for the first ~30 frames. mirrors Recorder.jsx.
+          try {
+            const w = Number(settings.width) || 0;
+            const h = Number(settings.height) || 0;
+            if (w > 0 && h > 0) {
+              const { fastRecorderProbe } = await chrome.storage.local.get([
+                "fastRecorderProbe",
+              ]);
+              const probeConfig =
+                fastRecorderProbe?.details?.selectedVideoConfig || null;
+              perfMark("CloudRecorder.encoderPrewarm.fired", {
+                w,
+                h,
+                codec: probeConfig?.codec || "avc1.4D401F",
+                framerate:
+                  Number(settings.frameRate) ||
+                  Number(probeConfig?.framerate) ||
+                  30,
+              });
+              void startEncoderPrewarm({
+                width: w,
+                height: h,
+                codec: probeConfig?.codec || "avc1.4D401F",
+                bitrate: Number(probeConfig?.bitrate) || 4_000_000,
+                framerate:
+                  Number(settings.frameRate) ||
+                  Number(probeConfig?.framerate) ||
+                  30,
+              });
+            } else {
+              perfMark("CloudRecorder.encoderPrewarm.skipped", { reason: "no-size" });
+            }
+          } catch (err) {
+            perfMark("CloudRecorder.encoderPrewarm.failed", {
+              err: String(err?.message || err).slice(0, 120),
+            });
+          }
 
           traceStep("streamAcquired", { surface: surface || null });
 

@@ -9,8 +9,19 @@ export const MIN_VALID_RECORDING_BYTES = 4096;
 // by a newer recording (which means our writer is gone).
 const FINALIZE_POLL_INTERVAL_MS = 250;
 const FINALIZE_HARD_TIMEOUT_MS = 60_000;
+// don't give up while a huge file is still flushing past the 60s timeout;
+// only stop once growth stalls, capped here.
+const FINALIZE_ABSOLUTE_TIMEOUT_MS = 300_000;
 // don't flash the "finalizing" UI for the common <1s case
 const SLOW_FINALIZE_NOTIFY_MS = 600;
+
+const diagForward = (event, data) => {
+  try {
+    chrome.runtime
+      .sendMessage({ type: "diag-forward", event, data })
+      .catch(() => {});
+  } catch {}
+};
 
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -50,7 +61,27 @@ export class OpfsChunkReader {
       throw new Error("opfs-chunk-reader-not-opened");
     }
     const dir = await navigator.storage.getDirectory();
-    const handle = await dir.getFileHandle(this._fileName);
+
+    let notified = false;
+    const notifySlow = () => {
+      if (notified) return;
+      notified = true;
+      try {
+        onSlowFinalize?.();
+      } catch {}
+    };
+
+    // the writer creates the file before the ref, so a NotFoundError here
+    // means it was deleted, not a create race. fail fast instead of polling.
+    let handle;
+    try {
+      handle = await dir.getFileHandle(this._fileName);
+    } catch (err) {
+      if (err?.name === "NotFoundError") {
+        diagForward("sandbox-opfs-handle-missing", { fileName: this._fileName });
+      }
+      throw err;
+    }
 
     let { sameFile, finalized } = await this._readRefState();
 
@@ -64,7 +95,6 @@ export class OpfsChunkReader {
     // and read what's on disk.
     if (sameFile && !finalized) {
       const startedAt = Date.now();
-      let notified = false;
       let timedOut = false;
       let lastSize = -1;
       let sizeStableSince = 0;
@@ -72,15 +102,20 @@ export class OpfsChunkReader {
       const SIZE_STABLE_MIN_WAIT_MS = 1500;
       let writerDead = false;
       while (true) {
-        if (Date.now() - startedAt > FINALIZE_HARD_TIMEOUT_MS) {
+        const elapsed = Date.now() - startedAt;
+        // only time out once the size stops changing; a still-growing file
+        // keeps waiting up to the ceiling.
+        const growthStalled =
+          sizeStableSince > 0 && Date.now() - sizeStableSince >= SIZE_STABLE_MS;
+        if (
+          elapsed > FINALIZE_HARD_TIMEOUT_MS &&
+          (growthStalled || elapsed > FINALIZE_ABSOLUTE_TIMEOUT_MS)
+        ) {
           timedOut = true;
           break;
         }
-        if (!notified && Date.now() - startedAt > SLOW_FINALIZE_NOTIFY_MS) {
-          try {
-            onSlowFinalize?.();
-          } catch {}
-          notified = true;
+        if (!notified && elapsed > SLOW_FINALIZE_NOTIFY_MS) {
+          notifySlow();
         }
         await wait(FINALIZE_POLL_INTERVAL_MS);
         ({ sameFile, finalized } = await this._readRefState());

@@ -121,7 +121,7 @@ export const onMessageExternalListener = () => {
             });
           }
 
-          const result = await loginWithWebsite();
+          const result = await loginWithWebsite({ force: true });
 
           if (!result?.authenticated) {
             const currentTab = await getCurrentTab();

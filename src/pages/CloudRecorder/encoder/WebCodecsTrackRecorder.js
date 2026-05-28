@@ -3,6 +3,7 @@
 // fragments come out as Blobs via ondataavailable.
 
 import { WebCodecsRecorder } from "../../Recorder/webcodecs/WebCodecsRecorder";
+import { closeActiveEncoderPrewarm } from "../../Recorder/encoderPrewarm";
 
 const dispatchError = (cb, err) => {
   if (typeof cb !== "function") return;
@@ -121,9 +122,12 @@ export class WebCodecsTrackRecorder {
     // underlying recorder.start() is async; dispatch and don't block,
     // since MediaRecorder.start() is sync to the caller and startup
     // errors flow through onerror.
-    Promise.resolve(this._recorder.start()).catch((err) => {
-      handleError(err);
-    });
+    // release the synthetic prewarm encoder's HW slot before the real one
+    // opens, otherwise VideoToolbox contends for the first ~30 frames.
+    Promise.resolve()
+      .then(() => closeActiveEncoderPrewarm().catch(() => {}))
+      .then(() => this._recorder.start())
+      .catch((err) => handleError(err));
   }
 
   pause() {

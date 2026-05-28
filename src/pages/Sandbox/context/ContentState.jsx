@@ -269,6 +269,10 @@ const ContentState = (props) => {
       chrome.storage.local.set({
         editorReadyAt: Date.now(),
         editorReadyPath: path,
+        // clear the error headline so a bundle grabbed after a recovered load
+        // doesn't report a resolved attempt's errCode as the live failure.
+        lastRecordingError: null,
+        editorRecordingError: null,
       });
     } catch {}
   }, [contentState.ready]);
@@ -1195,84 +1199,107 @@ const ContentState = (props) => {
         lastRecordingBackend: lastRecordingBackendRef?.backend || "idb",
       }));
       if (lastRecordingBackendRef?.backend === "opfs") {
-        const reader = chooseReader(lastRecordingBackendRef);
-        const readerOpenStart = Date.now();
-        await reader.open(lastRecordingBackendRef);
-        diagForward("sandbox-opfs-reader-open-done", {
-          elapsedMs: Date.now() - readerOpenStart,
-          fileName: lastRecordingBackendRef?.fileName || null,
-        });
-        const readBlobStart = Date.now();
-        diagForward("sandbox-opfs-readblob-start", {});
-        const { blob: rawBlob } = await reader.readBlob({
-          // OPFS file isn't ready yet, recorder still flushing under load.
-          // Surface a labeled loading state so the user knows it's progressing.
-          onSlowFinalize: () => {
-            diagForward("sandbox-opfs-readblob-slow-finalize", {
-              elapsedMs: Date.now() - readBlobStart,
+        // second layer over the reader's finalize-wait: retry a truncated or
+        // transient read so a recoverable first open doesn't hit the modal.
+        const MAX_OPFS_READ_ATTEMPTS = 3;
+        for (let attempt = 1; attempt <= MAX_OPFS_READ_ATTEMPTS; attempt += 1) {
+          try {
+            const reader = chooseReader(lastRecordingBackendRef);
+            const readerOpenStart = Date.now();
+            await reader.open(lastRecordingBackendRef);
+            diagForward("sandbox-opfs-reader-open-done", {
+              elapsedMs: Date.now() - readerOpenStart,
+              fileName: lastRecordingBackendRef?.fileName || null,
+              attempt,
             });
-            setContentState((prev) =>
-              prev.finalizingRecording ? prev : { ...prev, finalizingRecording: true },
+            const readBlobStart = Date.now();
+            diagForward("sandbox-opfs-readblob-start", { attempt });
+            const { blob: rawBlob } = await reader.readBlob({
+              // OPFS file isn't ready yet, recorder still flushing under load.
+              // Surface a labeled loading state so the user knows it's progressing.
+              onSlowFinalize: () => {
+                diagForward("sandbox-opfs-readblob-slow-finalize", {
+                  elapsedMs: Date.now() - readBlobStart,
+                });
+                setContentState((prev) =>
+                  prev.finalizingRecording ? prev : { ...prev, finalizingRecording: true },
+                );
+              },
+            });
+            diagForward("sandbox-opfs-readblob-done", {
+              elapsedMs: Date.now() - readBlobStart,
+              rawBlobBytes: rawBlob?.size ?? 0,
+              attempt,
+            });
+            await reader.close().catch(() => {});
+            if (!rawBlob) throw new Error("opfs-readblob-empty");
+            // OPFS Blob on the critical path; arrayBuffer copy was 30-60s
+            // on slow disks for 100MB+ ("stuck at 90%"). Materialize in
+            // the background.
+            const blob = rawBlob;
+            diagForward("sandbox-opfs-materialize-deferred", {
+              bytes: rawBlob.size,
+            });
+            // Fire-and-forget materialize. Swaps in once done; the video
+            // element keeps the original src so playback isn't disrupted.
+            if (rawBlob.size <= 1_500_000_000) {
+              const materializeStart = Date.now();
+              (async () => {
+                try {
+                  const buf = await rawBlob.arrayBuffer();
+                  const materialized = new Blob([buf], {
+                    type: rawBlob.type || "video/mp4",
+                  });
+                  diagForward("sandbox-opfs-materialize-done", {
+                    elapsedMs: Date.now() - materializeStart,
+                    outputBytes: materialized.size,
+                  });
+                  setContentState((prev) => ({
+                    ...prev,
+                    blob: materialized,
+                    rawBlob: prev.rawBlob || materialized,
+                  }));
+                } catch (err) {
+                  diagForward("sandbox-opfs-materialize-fail", {
+                    elapsedMs: Date.now() - materializeStart,
+                    err: String(err?.message || err).slice(0, 200),
+                  });
+                }
+              })();
+            }
+            directBlob = blob;
+            diagForward("sandbox-opfs-direct-read", {
+              outputBytes: blob.size,
+              attempt,
+            });
+            if (process.env.SCREENITY_DEV_MODE === "true") {
+              console.log("[recorder-opfs][sandbox] opfs-direct-read-ok", {
+                bytes: blob.size,
+              });
+            }
+            break;
+          } catch (err) {
+            diagForward("sandbox-opfs-direct-read-fail", {
+              attempt,
+              err: String(err?.message || err).slice(0, 200),
+            });
+            console.warn(
+              "[Screenity][Sandbox] OPFS direct read failed",
+              { attempt, err },
             );
-          },
-        });
-        diagForward("sandbox-opfs-readblob-done", {
-          elapsedMs: Date.now() - readBlobStart,
-          rawBlobBytes: rawBlob?.size ?? 0,
-        });
+            if (attempt < MAX_OPFS_READ_ATTEMPTS) {
+              setContentState((prev) =>
+                prev.finalizingRecording ? prev : { ...prev, finalizingRecording: true },
+              );
+              await new Promise((r) => setTimeout(r, attempt * 750));
+              continue;
+            }
+            opfsReadFailed = true;
+          }
+        }
         setContentState((prev) =>
           prev.finalizingRecording ? { ...prev, finalizingRecording: false } : prev,
         );
-        await reader.close().catch(() => {});
-        // OPFS Blob on the critical path; arrayBuffer copy was 30-60s
-        // on slow disks for 100MB+ ("stuck at 90%"). Materialize in
-        // the background.
-        const blob = rawBlob;
-        if (rawBlob) {
-          diagForward("sandbox-opfs-materialize-deferred", {
-            bytes: rawBlob.size,
-          });
-          // Fire-and-forget materialize. Swaps in once done; the video
-          // element keeps the original src so playback isn't disrupted.
-          if (rawBlob.size <= 1_500_000_000) {
-            const materializeStart = Date.now();
-            (async () => {
-              try {
-                const buf = await rawBlob.arrayBuffer();
-                const materialized = new Blob([buf], {
-                  type: rawBlob.type || "video/mp4",
-                });
-                diagForward("sandbox-opfs-materialize-done", {
-                  elapsedMs: Date.now() - materializeStart,
-                  outputBytes: materialized.size,
-                });
-                setContentState((prev) => ({
-                  ...prev,
-                  blob: materialized,
-                  rawBlob: prev.rawBlob || materialized,
-                }));
-              } catch (err) {
-                diagForward("sandbox-opfs-materialize-fail", {
-                  elapsedMs: Date.now() - materializeStart,
-                  err: String(err?.message || err).slice(0, 200),
-                });
-              }
-            })();
-          }
-        }
-        if (blob) {
-          directBlob = blob;
-          diagForward("sandbox-opfs-direct-read", {
-            outputBytes: blob.size,
-          });
-          if (process.env.SCREENITY_DEV_MODE === "true") {
-            console.log("[recorder-opfs][sandbox] opfs-direct-read-ok", {
-              bytes: blob.size,
-            });
-          }
-        } else {
-          opfsReadFailed = true;
-        }
       }
     } catch (err) {
       opfsReadFailed = true;
@@ -1302,6 +1329,8 @@ const ContentState = (props) => {
         }
       } catch {}
       if (!directBlob) {
+        // release the once-only guard so a later make-video-tab can retry.
+        makeVideoCheck.current = false;
         if (typeof contentStateRef.current?.openModal === "function") {
           contentStateRef.current.openModal(
             chrome.i18n.getMessage("opfsLoadErrorTitle"),
@@ -1331,7 +1360,11 @@ const ContentState = (props) => {
         });
       }
     }
-    reconstructVideo(directBlob);
+    // skip on opfs failure (no blob, no relayed chunks) or it builds an empty
+    // blob; the idb path still needs the call.
+    if (directBlob || backendRefForThisLoad?.backend !== "opfs") {
+      reconstructVideo(directBlob);
+    }
 
     // mark ready if duration-fix hangs; don't overwrite an already-fixed webm
     const safetyCheck = () => {

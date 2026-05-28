@@ -36,6 +36,14 @@ export const onInstalledListener = () => {
         }
       });
     } else if (details.reason === "update") {
+      // give WebCodecs a fresh shot on update: a one-time watchdog trip on
+      // an older build shouldn't permanently pin a user to MediaRecorder.
+      chrome.storage.local.remove([
+        "fastRecorderDisabledForDevice",
+        "fastRecorderDisabledReason",
+        "fastRecorderDisabledAt",
+        "fastRecorderDisabledDetails",
+      ]);
       if (details.previousVersion === "2.8.6") {
         chrome.storage.local.set({ updatingFromOld: true });
       } else {

@@ -70,7 +70,7 @@ const openPlaygroundOrPopup = async (tab) => {
     });
 
     if (CLOUD_FEATURES_ENABLED) {
-      const result = await loginWithWebsite();
+      const result = await loginWithWebsite({ force: true });
 
       if (result?.authenticated) {
         await chrome.storage.local.set({

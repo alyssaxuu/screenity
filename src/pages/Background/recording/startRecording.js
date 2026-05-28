@@ -73,8 +73,53 @@ export const startRecording = async (caller = "unknown") => {
   }
 };
 
+// a real back-to-back always goes through the 3s countdown, so a countdown-
+// finished start landing sooner than this after stop is stale.
+const STALE_START_WINDOW_MS = 3000;
+
 const _startRecordingInner = async (caller) => {
   const recordingAttemptId = makeRecordingAttemptId();
+  // only gate countdown-finished; direct/fallback/restart don't share it.
+  try {
+    const { recordingStoppedAt, recording, restarting } =
+      await chrome.storage.local.get([
+        "recordingStoppedAt",
+        "recording",
+        "restarting",
+      ]);
+    const sinceStopMs =
+      typeof recordingStoppedAt === "number"
+        ? Date.now() - recordingStoppedAt
+        : null;
+    if (
+      caller === "countdown-finished" &&
+      sinceStopMs !== null &&
+      sinceStopMs < STALE_START_WINDOW_MS &&
+      !recording &&
+      !restarting
+    ) {
+      console.warn(
+        "[Screenity][BG] startRecording aborted: prior recording stopped",
+        sinceStopMs,
+        "ms ago, caller:",
+        caller,
+      );
+      try {
+        chrome.storage.local.set({
+          lastStartAborted: {
+            ts: Date.now(),
+            caller,
+            sinceStopMs,
+            reason: "rapid-restart-after-stop",
+          },
+          // clear so the start-in-flight guard stops shielding cleanup.
+          recordingStartingAt: null,
+          pendingRecording: false,
+        });
+      } catch {}
+      return;
+    }
+  } catch {}
   // Diagnostic-only snapshot of residual state; runs async so it
   // doesn't block the actual start path. ~17-key storage read can
   // cost 30-80ms on a contended SW and there's no consumer that
