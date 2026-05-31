@@ -1666,5 +1666,29 @@
   },
   "recordingCorruptToast": {
     "message": "Esta gravação não pode ser reproduzida. O arquivo pode estar incompleto ou corrompido. Baixe o arquivo original pelo menu Salvar."
+  },
+  "storageFullRecordingError": {
+    "message": "Não há espaço suficiente para gravar. Libere espaço no disco e tente novamente.",
+    "description": "Shown when the browser can't allocate enough local storage to start a recording"
+  },
+  "storageLowRecordingWarning": {
+    "message": "O armazenamento do seu navegador está quase cheio. Libere espaço no disco para não perder esta gravação.",
+    "description": "Shown when local storage is running low while a recording is in progress"
+  },
+  "screenStreamUnavailableError": {
+    "message": "Não foi possível acessar a tela. Inicie a gravação novamente.",
+    "description": "Shown when the screen capture stream is missing after the user picked a source"
+  },
+  "tabStreamUnavailableError": {
+    "message": "Não foi possível acessar o vídeo desta aba. Recarregue a aba e tente novamente.",
+    "description": "Shown when Chrome won't return a tab capture stream for the chosen tab"
+  },
+  "streamingDataTimeoutError": {
+    "message": "A gravação não começou a tempo. Tente novamente.",
+    "description": "Shown when the recorder tab never received streaming-data from the background script"
+  },
+  "unsupportedVideoCodecError": {
+    "message": "Seu navegador não suporta os codecs de vídeo necessários. Atualize o Chrome e tente novamente.",
+    "description": "Shown when no supported MediaRecorder mimeType is available"
   }
 }

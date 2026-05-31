@@ -25,6 +25,8 @@ export class WebCodecsTrackRecorder {
     // Used by cloud's camera path on macOS to force a software h264
     // encoder, sidestepping VideoToolbox's per-process HW-slot serialization.
     this.preferSoftware = Boolean(options.preferSoftware);
+    // Namespaces the decoderConfig sidecar so dual-track keys don't collide.
+    this.trackKind = options.trackKind || "default";
     // MediaRecorder-shape fields used by callers.
     this._state = "inactive";
     this.ondataavailable = null;
@@ -57,10 +59,7 @@ export class WebCodecsTrackRecorder {
   }
 
   start(_timeslice) {
-    // The timeslice arg is a no-op here; Mp4MuxerWrapper emits fragments
-    // on its own ~1s cadence, which is comparable to the 2000ms timeslice
-    // cloud uses with MediaRecorder. Timing differs slightly but the
-    // chunk-write contract (Blob events) is the same.
+    // timeslice is a no-op: Mp4MuxerWrapper emits on its own ~1s cadence.
     if (this._state !== "inactive") {
       throw new Error(
         `WebCodecsTrackRecorder: cannot start in state ${this._state}`,
@@ -99,14 +98,47 @@ export class WebCodecsTrackRecorder {
     const handleError = (err) => {
       // Sticky-disable handling for non-transient WebCodecs failures lives
       // outside this class (see chooseEncoder.js + CloudRecorder.jsx).
-      // Surface to the caller via the MediaRecorder-shape onerror.
+      // Preserves err.finalized so callers can skip sticky-disable on salvage.
       dispatchError(this.onerror, err);
+    };
+
+    // Per-track sidecar (screen/camera/audio) so a future orphan-recovery
+    // path can rebuild moov from chunks. No reader exists yet; mediabunny's
+    // fragmented fastStart writes moov upfront, so this is reserved.
+    const handleDecoderConfig = (cfg) => {
+      try {
+        const desc = cfg?.description;
+        let descBase64 = null;
+        if (desc instanceof Uint8Array || desc instanceof ArrayBuffer) {
+          const u8 = desc instanceof ArrayBuffer ? new Uint8Array(desc) : desc;
+          let binary = "";
+          for (let i = 0; i < u8.length; i++) {
+            binary += String.fromCharCode(u8[i]);
+          }
+          descBase64 = btoa(binary);
+        }
+        chrome.storage.local.get(["cloudRecorderDecoderConfig"]).then((r) => {
+          const merged = {
+            ...(r?.cloudRecorderDecoderConfig || {}),
+            [this.trackKind]: {
+              codec: cfg?.codec || null,
+              container: cfg?.container || null,
+              width: cfg?.width || null,
+              height: cfg?.height || null,
+              description: descBase64,
+              at: Date.now(),
+            },
+          };
+          chrome.storage.local.set({ cloudRecorderDecoderConfig: merged });
+        });
+      } catch {}
     };
 
     this._recorder = new WebCodecsRecorder(this.stream, {
       onChunk: handleChunk,
       onFinalized: handleFinalized,
       onError: handleError,
+      onDecoderConfig: handleDecoderConfig,
       enableAudio: this.enableAudio,
       videoBitrate: this.videoBitsPerSecond,
       audioBitrate: this.audioBitsPerSecond,
@@ -119,11 +151,8 @@ export class WebCodecsTrackRecorder {
     });
     this._state = "recording";
 
-    // underlying recorder.start() is async; dispatch and don't block,
-    // since MediaRecorder.start() is sync to the caller and startup
-    // errors flow through onerror.
-    // release the synthetic prewarm encoder's HW slot before the real one
-    // opens, otherwise VideoToolbox contends for the first ~30 frames.
+    // MediaRecorder.start() is sync to callers; dispatch and route errors
+    // via onerror. Release the prewarm HW slot first or VideoToolbox contends.
     Promise.resolve()
       .then(() => closeActiveEncoderPrewarm().catch(() => {}))
       .then(() => this._recorder.start())
@@ -152,10 +181,7 @@ export class WebCodecsTrackRecorder {
     this._state = "recording";
   }
 
-  // MediaRecorder.stop() is sync and queues a finalize that fires onstop
-  // on completion. mirror that shape: return undefined, callers await
-  // onstop. WebCodecsRecorder.stop() is async and resolves after finalize;
-  // we hook onFinalized to fire onstop at the right time.
+  // Mirror MediaRecorder.stop(): return undefined; callers await onstop.
   stop() {
     if (this._state === "inactive") return;
     this._state = "inactive";
@@ -166,10 +192,8 @@ export class WebCodecsTrackRecorder {
         } catch (err) {
           dispatchError(this.onerror, err);
         }
-        // if onFinalized never fires (rare: muxer hung past internal
-        // timeout), force the stop callback so the caller's drain doesn't
-        // deadlock. WebCodecsRecorder already has a 5s finalize timeout +
-        // flushPending fallback that emits chunks.
+        // Force the stop callback if onFinalized never fires, so the caller's
+        // drain doesn't deadlock on a hung muxer.
         if (!this._finalizedResolved) {
           this._finalizedResolved = true;
           this._onFinalizedResolve?.();

@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import GradientBackground from "../Components/GradientBackground";
 
 const Setup = () => {
   useEffect(() => {
@@ -28,7 +29,7 @@ const Setup = () => {
         src={chrome.runtime.getURL("assets/logo-text.svg")}
         className="setupLogo"
       />
-      <div className="setupBackgroundSVG"></div>
+      <GradientBackground />
       <style>
         {`
 				body {
@@ -43,30 +44,6 @@ const Setup = () => {
 					text-decoration: none!important;
 					color: #4C7DE2;
 				}
-				.setupBackgroundSVG {
-					position: absolute;
-					top: 0px;
-					left: 0px;
-
-					width: 100%;
-					height: 100%;
-					background: url('` +
-          chrome.runtime.getURL("assets/helper/pattern-svg.svg") +
-          `') repeat;
-					background-size: 62px 23.5px;
-					animation: moveBackground 138s linear infinite;
-				}
-				
-				@keyframes moveBackground {
-					0% {
-						background-position: 0 0;
-					}
-					100% {
-						background-position: 100% 0;
-					}
-				}
-
-
 				.setupLogo {
 					position: absolute;
 					bottom: 30px;
@@ -84,6 +61,7 @@ const Setup = () => {
 					display: flex;
 					justify-content: center;
 					align-items: center;
+					isolation: isolate;
 				}
 
 				.setupContainer {

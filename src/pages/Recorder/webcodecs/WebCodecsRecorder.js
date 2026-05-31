@@ -11,6 +11,18 @@
  */
 import { perfMark, perfSpan } from "../../utils/perfMarks";
 import { diagForward } from "../../utils/diagForward";
+import {
+  AAC_SUPPORTED_RATES,
+  AVC_MAX_PIXELS,
+  VIDEO_DIM_HARD_CAP,
+  computeAvcCappedDimensions,
+  isAacRateInSpec,
+  isReclaimErrorMessage,
+  shouldFailZeroChunksAtStop,
+  shouldResetReclaimCounter,
+  shouldThrottleReclaimRebuild,
+  shouldTriggerSleepRecovery,
+} from "./recorderLogic";
 // Lazy-load Mp4MuxerWrapper so its ~3MB mediabunny static import doesn't
 // drag into recorder.bundle.js cold start (dominates click-record latency).
 let _mp4MuxerWrapperPromise = null;
@@ -115,9 +127,17 @@ export class WebCodecsRecorder {
     this._videoLoopError = null;
     this._firstChunkSeen = false;
     this._firstChunkWatchdog = null;
+    // 12s covers NVENC / VideoToolbox cold-start (5-7s on first encode).
+    // Shorter values false-fired into the MediaRecorder fallback.
     this._firstChunkWatchdogMs = Number.isFinite(options.firstChunkWatchdogMs)
       ? options.firstChunkWatchdogMs
-      : 8000;
+      : Number.isFinite(
+            /** @type {any} */ (globalThis)
+              .__screenityFirstChunkWatchdogMsForTests,
+          )
+        ? /** @type {any} */ (globalThis)
+            .__screenityFirstChunkWatchdogMsForTests
+        : 12000;
 
     // Mid-stream watchdog: encoder goes silent after producing chunks
     // (HW reclaim, hang). Triggers graceful finalize on the partial.
@@ -153,12 +173,59 @@ export class WebCodecsRecorder {
     this._peakAudioEncodeQueueSize = 0;
 
     // Encoder reclaim recovery. Chrome reclaims idle HW slots; we
-    // rebuild with the same config. Capped to surface real failures.
+    // rebuild with the same config. Cap 5 plus throttle is ~10s of retries.
     this._maxEncoderReclaims = Number.isFinite(options.maxEncoderReclaims)
       ? options.maxEncoderReclaims
-      : 3;
+      : 5;
+    // Throttle so the encode loop can't burn the cap on every frame
+    // while the HW slot is still held by another app.
+    this._reclaimRebuildThrottleMs = Number.isFinite(
+      options.reclaimRebuildThrottleMs,
+    )
+      ? options.reclaimRebuildThrottleMs
+      : Number.isFinite(
+            /** @type {any} */ (globalThis)
+              .__screenityReclaimRebuildThrottleMsForTests,
+          )
+        ? /** @type {any} */ (globalThis)
+            .__screenityReclaimRebuildThrottleMsForTests
+        : 2000;
+    this._lastVideoReclaimRebuildAt = null;
+    this._lastAudioReclaimRebuildAt = null;
     this._encoderReclaimCount = 0;
     this._audioEncoderReclaimCount = 0;
+    // Reset the per-encoder reclaim counter after a healthy stretch.
+    this._lastVideoReclaimAt = null;
+    this._lastAudioReclaimAt = null;
+    this._reclaimResetAfterMs = Number.isFinite(options.reclaimResetAfterMs)
+      ? options.reclaimResetAfterMs
+      : Number.isFinite(
+            /** @type {any} */ (globalThis)
+              .__screenityReclaimResetAfterMsForTests,
+          )
+        ? /** @type {any} */ (globalThis).__screenityReclaimResetAfterMsForTests
+        : 30000;
+    // Pause closes encoders to release the HW slot before Chrome's
+    // inactivity-reclaim fires. Flag swallows the racing reclaim error.
+    this._encodersClosedForPause = false;
+    // Serialize pause/resume so a rapid toggle doesn't race close/rebuild.
+    this._pauseResumeChain = Promise.resolve();
+    // Rebuild AudioEncoder when the mic sample rate changes mid-
+    // recording (BT unplug, default device switch). Capped to catch flaps.
+    this._audioDeviceChangePending = false;
+    this._audioSampleRateMismatchRebuilds = 0;
+    this._maxAudioSampleRateRebuilds = Number.isFinite(
+      options.maxAudioSampleRateRebuilds,
+    )
+      ? options.maxAudioSampleRateRebuilds
+      : 3;
+    // Sleep / wake: a long frame-arrival gap means lid-close or OS
+    // preemption. Force a keyframe and reset the stall watchdog.
+    this._lastFrameArrivalAt = null;
+    this._postSleepRecoveries = 0;
+    this._sleepGapMs = Number.isFinite(options.sleepGapMs)
+      ? options.sleepGapMs
+      : 5000;
     // Active configs preserved for rebuild after reclaim. Updated when
     // a SW fallback rebuilds the encoder so the next reclaim uses the
     // config that actually worked, not the originally-attempted HW one.
@@ -193,6 +260,23 @@ export class WebCodecsRecorder {
   }
 
   async _probeRealResolution() {
+    // E2E hook: synthetic probe dims so tests can drive the AVC
+    // pixel-area cap without a real 4K source.
+    const _g = /** @type {any} */ (globalThis);
+    if (
+      _g.__screenityForceProbeResolution &&
+      typeof _g.__screenityForceProbeResolution === "object"
+    ) {
+      const { width, height } = _g.__screenityForceProbeResolution;
+      if (Number.isFinite(width) && Number.isFinite(height)) {
+        this.log("[WCR] Resolution from test override:", width, "x", height);
+        if (this.options) {
+          this.options.width = undefined;
+          this.options.height = undefined;
+        }
+        return { width, height };
+      }
+    }
     // Prefer track settings: on macOS getDisplayMedia, the first frame from
     // MediaStreamTrackProcessor can be delayed several seconds by VideoToolbox
     // capture cold-start, which would block start() and freeze the toolbar.
@@ -243,6 +327,18 @@ export class WebCodecsRecorder {
     this._peakAudioEncodeQueueSize = 0;
     this._encoderReclaimCount = 0;
     this._audioEncoderReclaimCount = 0;
+    this._lastVideoReclaimAt = null;
+    this._lastAudioReclaimAt = null;
+    this._lastVideoReclaimRebuildAt = null;
+    this._lastAudioReclaimRebuildAt = null;
+    this._encodersClosedForPause = false;
+    this._finalizeOnFatalRan = false;
+    this._finalizingFromFatal = false;
+    this._audioDeviceChangePending = false;
+    this._audioSampleRateMismatchRebuilds = 0;
+    this._audioRebuildUnsupportedRates = null;
+    this._lastFrameArrivalAt = null;
+    this._postSleepRecoveries = 0;
     this._activeVideoConfig = null;
     this._activeVideoCodecLabel = null;
     this._activeAudioConfig = null;
@@ -307,29 +403,24 @@ export class WebCodecsRecorder {
         this.actualWidth = width;
         this.actualHeight = height;
 
-        // User quality (options.width/height) caps target; never upscale
-        // beyond capture. 3840 hard cap stops pathological inputs.
-        const HARD_CAP = 3840;
-        const userMaxWidth = Number.isFinite(this.options?.width)
-          ? this.options.width
-          : HARD_CAP;
-        const userMaxHeight = Number.isFinite(this.options?.height)
-          ? this.options.height
-          : HARD_CAP;
-        const effectiveCapWidth = Math.min(userMaxWidth, HARD_CAP);
-        const effectiveCapHeight = Math.min(userMaxHeight, HARD_CAP);
-
-        let targetWidth = Math.min(width, effectiveCapWidth);
-        let targetHeight = Math.round((height / width) * targetWidth);
-        if (targetHeight > effectiveCapHeight) {
-          targetHeight = effectiveCapHeight;
-          targetWidth = Math.round((width / height) * targetHeight);
+        // Apply user/hard cap, even-rounding, and AVC pixel-area cap.
+        const dimResult = computeAvcCappedDimensions({
+          sourceWidth: width,
+          sourceHeight: height,
+          userMaxWidth: this.options?.width,
+          userMaxHeight: this.options?.height,
+        });
+        if (dimResult.capped.area) {
+          this.warn("[WCR] target clamped to AVC max pixel area", {
+            sourceWidth: width,
+            sourceHeight: height,
+            toWidth: dimResult.width,
+            toHeight: dimResult.height,
+            avcMaxPixels: AVC_MAX_PIXELS,
+          });
         }
-        // H.264/HEVC require even dimensions; min 32 for tiny regions.
-        targetWidth = Math.max(32, targetWidth - (targetWidth % 2));
-        targetHeight = Math.max(32, targetHeight - (targetHeight % 2));
-        this.targetWidth = targetWidth;
-        this.targetHeight = targetHeight;
+        this.targetWidth = dimResult.width;
+        this.targetHeight = dimResult.height;
 
         this.log("[WCR] Target:", this.targetWidth, "x", this.targetHeight);
 
@@ -666,11 +757,16 @@ export class WebCodecsRecorder {
             timestamp: tsUs,
             duration: this._frameDurationUs,
           });
-          this.videoEncoder.encode(hold, {
-            timestamp: tsUs,
-            keyFrame: false,
-          });
-          hold.close();
+          // try/finally so an encode() throw doesn't leak the
+          // VideoFrame's GPU buffer.
+          try {
+            this.videoEncoder.encode(hold, {
+              timestamp: tsUs,
+              keyFrame: false,
+            });
+          } finally {
+            hold.close();
+          }
           this._videoFrameIndex += 1;
         }
         // 5s cap on trailing-hold flush; some Windows drivers never
@@ -699,11 +795,30 @@ export class WebCodecsRecorder {
       }
     }
 
+    // Zero chunks: don't ship a header-only file. Skips muxer.finalize
+    // below and the err is NOT tagged finalized (nothing to salvage).
+    if (shouldFailZeroChunksAtStop(this._firstChunkSeen, this.frameCount)) {
+      this.warn("[WCR] stop() reached finalize with zero chunks", {
+        firstChunkSeen: this._firstChunkSeen,
+        frameCount: this.frameCount,
+      });
+      if (!this._failureReported) {
+        const zeroChunkErr =
+          this._videoLoopError ||
+          new Error(
+            "WebCodecs encoder produced zero chunks before stop; flush succeeded without output",
+          );
+        // Callers gate the salvage branch on err.finalized === true.
+        zeroChunkErr.finalized = false;
+        this._reportFailure("webcodecs-zero-frames-at-stop", zeroChunkErr);
+      }
+    }
+
     // Hard timeout on finalize: abrupt stream end can hang it. Most
     // of the file is already in chunksStore (fragmented MP4);
     // flushPending() preserves the rest.
     let muxerFinalizeOk = false;
-    if (this.muxer) {
+    if (this.muxer && !this._failureReported) {
       const endFinalize = perfSpan("WCR.stop.muxer.finalize");
       try {
         await Promise.race([
@@ -776,16 +891,58 @@ export class WebCodecsRecorder {
   }
 
   pause() {
-    if (!this.running || this.paused) return;
-    this.paused = true;
-    this.pauseStartUs = performance.now() * 1000;
+    this._pauseResumeChain = this._pauseResumeChain
+      .catch(() => {})
+      .then(() => this._pauseImpl());
+    return this._pauseResumeChain;
   }
 
   resume() {
-    if (!this.running || !this.paused) return;
+    this._pauseResumeChain = this._pauseResumeChain
+      .catch(() => {})
+      .then(() => this._resumeImpl());
+    return this._pauseResumeChain;
+  }
+
+  async _pauseImpl() {
+    // Bail if stop() landed while we were queued. Closing on a stopped
+    // recorder leaks encoder instances.
+    if (!this.running || this._stopping || this.paused) return;
+    this.paused = true;
+    this.pauseStartUs = performance.now() * 1000;
+
+    // Release the HW slot up front so long pauses don't burn the
+    // reclaim cap. Chrome reclaims at ~60s, w3c/webcodecs#363.
+    this._encodersClosedForPause = true;
+    try {
+      this.videoEncoder?.close();
+    } catch {}
+    try {
+      this.audioEncoder?.close();
+    } catch {}
+  }
+
+  async _resumeImpl() {
+    // Same stop-race bail as _pauseImpl.
+    if (!this.running || this._stopping || !this.paused) return;
 
     const nowUs = performance.now() * 1000;
     this.totalPausedDurationUs += nowUs - this.pauseStartUs;
+
+    // Rebuild encoders pause() closed; loop surfaces any failure.
+    if (this._encodersClosedForPause) {
+      // Clear before rebuild so a fresh reclaim on the new encoder
+      // isn't swallowed by the pause guard.
+      this._encodersClosedForPause = false;
+      if (this._activeVideoConfig) {
+        this._rebuildVideoEncoder(this._activeVideoConfig);
+      }
+      if (this._activeAudioConfig) {
+        this._rebuildAudioEncoder(this._activeAudioConfig);
+      }
+      // Force a keyframe so the decoder doesn't reference pre-pause frames.
+      this._forceNextKeyframe = true;
+    }
 
     this.paused = false;
     this.justResumed = true;
@@ -990,6 +1147,8 @@ export class WebCodecsRecorder {
     this._deviceChangeListener = () => {
       this._deviceChangeCount += 1;
       this._lastDeviceChangeAt = Date.now();
+      // Diag-only flag; audio loop checks per-frame.
+      this._audioDeviceChangePending = true;
       this.log("[WCR] devicechange", { count: this._deviceChangeCount });
     };
     try {
@@ -1119,6 +1278,16 @@ export class WebCodecsRecorder {
     // Extract output/error callbacks so the prefer-software retry below
     // can rebuild the VideoEncoder with the same handlers.
     const videoEncoderOutput = (chunk, meta) => {
+        // E2E hook: drop the first N chunks to drive the no-first-chunk
+        // watchdog in tests.
+        const _g = /** @type {any} */ (globalThis);
+        if (
+          typeof _g.__screenitySuppressFirstChunks === "number" &&
+          _g.__screenitySuppressFirstChunks > 0
+        ) {
+          _g.__screenitySuppressFirstChunks -= 1;
+          return;
+        }
         // First encoded video chunk: the recording is producing real
         // bytes, so disarm the no-first-chunk watchdog and arm the
         // mid-stream stall watchdog instead.
@@ -1130,6 +1299,18 @@ export class WebCodecsRecorder {
         // Refresh the mid-stream watchdog's timestamp on every chunk so
         // it only fires when output genuinely stops.
         this._lastChunkAt = performance.now();
+        // Reset the reclaim counter after a healthy stretch.
+        if (
+          shouldResetReclaimCounter(
+            this._lastChunkAt,
+            this._lastVideoReclaimAt,
+            this._reclaimResetAfterMs,
+            this._encoderReclaimCount,
+          )
+        ) {
+          this._encoderReclaimCount = 0;
+          this._lastVideoReclaimAt = null;
+        }
         // decoderConfig.codec can overstate level vs SPS; parse from
         // avcC ([1]=profile, [2]=compat, [3]=level) when possible.
         if (!this.actualVideoCodec) {
@@ -1210,8 +1391,52 @@ export class WebCodecsRecorder {
       this._handleVideoEncoderError(err);
     };
     this._videoEncoderOutputHandler = videoEncoderOutput;
+    // Raw handler kept for the test hook and per-instance rebuild.
     this._videoEncoderErrorHandler = videoEncoderError;
     this._activeVideoCodecLabel = codecLabel;
+
+    // E2E hook: fire a synthetic reclaim error so tests can drive the
+    // recovery + finalize-on-fatal paths without the 60s real timer.
+    if (typeof globalThis !== "undefined") {
+      const g = /** @type {any} */ (globalThis);
+      g.__screenityFireVideoEncoderError = (customMsg) => {
+        const synthetic = new Error(
+          customMsg || "Codec reclaimed due to inactivity",
+        );
+        synthetic.name = "QuotaExceededError";
+        try {
+          videoEncoderError(synthetic);
+        } catch (e) {
+          this.err("[WCR] __screenityFireVideoEncoderError threw:", e);
+          return false;
+        }
+        return true;
+      };
+      g.__screenityGetReclaimSnapshot = () => ({
+        video: this._encoderReclaimCount,
+        audio: this._audioEncoderReclaimCount,
+        firstChunkSeen: this._firstChunkSeen,
+        encodersClosedForPause: this._encodersClosedForPause,
+        running: this.running,
+        paused: this.paused,
+        stopping: this._stopping,
+        audioSampleRate: this.audioSampleRate,
+        audioSampleRateMismatchRebuilds:
+          this._audioSampleRateMismatchRebuilds,
+        audioDeviceChangePending: this._audioDeviceChangePending,
+        postSleepRecoveries: this._postSleepRecoveries,
+        firstChunkWatchdogMs: this._firstChunkWatchdogMs,
+        maxEncoderReclaims: this._maxEncoderReclaims,
+        reclaimRebuildThrottleMs: this._reclaimRebuildThrottleMs,
+        targetWidth: this.targetWidth,
+        targetHeight: this.targetHeight,
+        actualWidth: this.actualWidth,
+        actualHeight: this.actualHeight,
+        audioRebuildUnsupportedRates: this._audioRebuildUnsupportedRates
+          ? Array.from(this._audioRebuildUnsupportedRates)
+          : [],
+      });
+    }
     this.videoEncoder = new VideoEncoder({
       output: videoEncoderOutput,
       error: videoEncoderError,
@@ -1396,6 +1621,18 @@ export class WebCodecsRecorder {
       // Synthesize a correct 2-byte ASC when invalid.
       const fixed = this._maybeFixAacDescription(meta);
       this.muxer.addAudioChunk(chunk, fixed || meta);
+      // Reset audio reclaim counter after a healthy stretch.
+      if (
+        shouldResetReclaimCounter(
+          performance.now(),
+          this._lastAudioReclaimAt,
+          this._reclaimResetAfterMs,
+          this._audioEncoderReclaimCount,
+        )
+      ) {
+        this._audioEncoderReclaimCount = 0;
+        this._lastAudioReclaimAt = null;
+      }
     };
     const audioEncoderError = (err) => {
       this._handleAudioEncoderError(err);
@@ -1497,8 +1734,20 @@ export class WebCodecsRecorder {
   // async errors. Otherwise surface to onError.
   _handleVideoEncoderError(err) {
     const msg = String(err?.message || err || "");
-    const isReclaim =
-      /codec\s+reclaimed|reclaimed\s+due\s+to\s+inactivity/i.test(msg);
+    const isReclaim = isReclaimErrorMessage(msg);
+
+    // Re-entry guard: stop()'s flush during _finalizeOnFatal can fire
+    // a second error from the same encoder.
+    if (this._finalizingFromFatal) {
+      return;
+    }
+
+    // Pause closed the encoder. Swallow the racing reclaim error;
+    // resume() rebuilds from _activeVideoConfig.
+    if (this._encodersClosedForPause && isReclaim) {
+      return;
+    }
+
     const canRecover =
       this.running &&
       !this._stopping &&
@@ -1511,7 +1760,21 @@ export class WebCodecsRecorder {
       canRecover &&
       this._encoderReclaimCount < this._maxEncoderReclaims
     ) {
+      // Throttle: while the HW slot is held, encoder.error fires every
+      // frame and would burn the cap in ms.
+      const nowMs = performance.now();
+      if (
+        shouldThrottleReclaimRebuild(
+          nowMs,
+          this._lastVideoReclaimRebuildAt,
+          this._reclaimRebuildThrottleMs,
+        )
+      ) {
+        return;
+      }
       this._encoderReclaimCount += 1;
+      this._lastVideoReclaimAt = nowMs;
+      this._lastVideoReclaimRebuildAt = nowMs;
       this.warn("[WCR] VideoEncoder reclaimed, rebuilding", {
         attempt: this._encoderReclaimCount,
         max: this._maxEncoderReclaims,
@@ -1547,7 +1810,40 @@ export class WebCodecsRecorder {
     }
 
     this.err("[WCR] VideoEncoder error:", err);
+
+    // Fatal mid-recording with chunks on disk. Run stop() so the muxer
+    // writes moov, then surface the error tagged finalized for salvage.
+    if (
+      this._firstChunkSeen &&
+      this.running &&
+      !this._stopping &&
+      !this._finalizeOnFatalRan
+    ) {
+      this._finalizeOnFatalRan = true;
+      try {
+        err.finalized = true;
+      } catch {}
+      this._finalizeOnFatal(err);
+      return;
+    }
+
     this.options.onError?.(err);
+  }
+
+  // Runs stop() then re-fires the original error so the caller takes
+  // the salvage branch. Flag blocks re-entry during stop()'s flush.
+  async _finalizeOnFatal(originalErr) {
+    this._finalizingFromFatal = true;
+    try {
+      await this.stop();
+    } catch (stopErr) {
+      this.err("[WCR] _finalizeOnFatal stop() threw:", stopErr);
+    }
+    try {
+      this.options.onError?.(originalErr);
+    } catch (cbErr) {
+      this.err("[WCR] _finalizeOnFatal onError callback threw:", cbErr);
+    }
   }
 
   // Audio reclaim recovery. Less critical than video (audio glitches are
@@ -1555,9 +1851,13 @@ export class WebCodecsRecorder {
   // applies; Chrome can reclaim the AudioEncoder slot too. No keyframe
   // concept for audio; rebuild and continue.
   _handleAudioEncoderError(err) {
+    // Same reentry guard as the video handler: encoder.flush() during
+    // _finalizeOnFatal can fire audio errors too.
+    if (this._finalizingFromFatal) {
+      return;
+    }
     const msg = String(err?.message || err || "");
-    const isReclaim =
-      /codec\s+reclaimed|reclaimed\s+due\s+to\s+inactivity/i.test(msg);
+    const isReclaim = isReclaimErrorMessage(msg);
     if (
       isReclaim &&
       this.running &&
@@ -1567,7 +1867,19 @@ export class WebCodecsRecorder {
       this._audioEncoderErrorHandler &&
       this._audioEncoderReclaimCount < this._maxEncoderReclaims
     ) {
+      const nowMs = performance.now();
+      if (
+        shouldThrottleReclaimRebuild(
+          nowMs,
+          this._lastAudioReclaimRebuildAt,
+          this._reclaimRebuildThrottleMs,
+        )
+      ) {
+        return;
+      }
       this._audioEncoderReclaimCount += 1;
+      this._lastAudioReclaimAt = nowMs;
+      this._lastAudioReclaimRebuildAt = nowMs;
       this.warn("[WCR] AudioEncoder reclaimed, rebuilding", {
         attempt: this._audioEncoderReclaimCount,
         max: this._maxEncoderReclaims,
@@ -1582,18 +1894,23 @@ export class WebCodecsRecorder {
     this.options.onError?.(err);
   }
 
-  // Best-effort close + fresh construct/configure with the same
-  // handlers. The video loop re-reads this.videoEncoder each tick.
+  // Fresh construct/configure with the same handlers. Error handler is
+  // wrapped per-instance to drop late errors from the closed predecessor.
   _rebuildVideoEncoder(config) {
     try {
       this.videoEncoder?.close();
     } catch {}
     try {
-      this.videoEncoder = new VideoEncoder({
+      let nextEncoder = null;
+      nextEncoder = new VideoEncoder({
         output: this._videoEncoderOutputHandler,
-        error: this._videoEncoderErrorHandler,
+        error: (err) => {
+          if (this.videoEncoder !== nextEncoder) return;
+          this._videoEncoderErrorHandler(err);
+        },
       });
-      this.videoEncoder.configure(config);
+      nextEncoder.configure(config);
+      this.videoEncoder = nextEncoder;
       this._activeVideoConfig = config;
       return true;
     } catch (rebuildErr) {
@@ -1603,19 +1920,49 @@ export class WebCodecsRecorder {
   }
 
   _rebuildAudioEncoder(config) {
+    // Snapshot the prior config so we can restore it if configure()
+    // fails (BT switching to HFP narrowband is the usual cause).
+    const priorConfig = this._activeAudioConfig;
     try {
       this.audioEncoder?.close();
     } catch {}
     try {
-      this.audioEncoder = new AudioEncoder({
+      let nextEncoder = null;
+      nextEncoder = new AudioEncoder({
         output: this._audioEncoderOutputHandler,
-        error: this._audioEncoderErrorHandler,
+        error: (err) => {
+          if (this.audioEncoder !== nextEncoder) return;
+          this._audioEncoderErrorHandler(err);
+        },
       });
-      this.audioEncoder.configure(config);
+      nextEncoder.configure(config);
+      this.audioEncoder = nextEncoder;
       this._activeAudioConfig = config;
       return true;
     } catch (rebuildErr) {
       this.err("[WCR] AudioEncoder rebuild failed:", rebuildErr);
+      // Restore the prior encoder so audio keeps flowing at the old
+      // rate. A small pitch shift beats a dead audio path.
+      if (priorConfig) {
+        try {
+          let restoreEncoder = null;
+          restoreEncoder = new AudioEncoder({
+            output: this._audioEncoderOutputHandler,
+            error: (err) => {
+              if (this.audioEncoder !== restoreEncoder) return;
+              this._audioEncoderErrorHandler(err);
+            },
+          });
+          restoreEncoder.configure(priorConfig);
+          this.audioEncoder = restoreEncoder;
+          this._activeAudioConfig = priorConfig;
+        } catch (restoreErr) {
+          this.err(
+            "[WCR] AudioEncoder restore after failed rebuild also failed:",
+            restoreErr,
+          );
+        }
+      }
       return false;
     }
   }
@@ -1715,9 +2062,17 @@ export class WebCodecsRecorder {
 
     for (const c of candidates) {
       const config = { ...base, codec: c.codec, hardwareAcceleration: c.hw };
+      // Use the normalized config from isConfigSupported so a clamp
+      // Chrome would have applied doesn't trigger a SW fallback later.
+      let supported = null;
+      try {
+        supported = await VideoEncoder.isConfigSupported(config);
+      } catch {}
+      const resolvedConfig =
+        supported?.supported && supported.config ? supported.config : config;
       const test = new VideoEncoder({ output() {}, error() {} });
       try {
-        test.configure(config);
+        test.configure(resolvedConfig);
         this.log("[WCR] Selected encoder:", c.codec, c.hw);
         try {
           chrome.storage.local.set({
@@ -1734,7 +2089,7 @@ export class WebCodecsRecorder {
           });
         } catch {}
         return {
-          config,
+          config: resolvedConfig,
           codec: c.codec,
           containerCodec: c.containerCodec,
         };
@@ -1767,8 +2122,48 @@ export class WebCodecsRecorder {
         if (globalThis.__screenityForceZeroFrames) break;
 
         if (this.paused) {
+          // Long pause isn't sleep. Reset so resume skips recovery.
+          this._lastFrameArrivalAt = null;
           await new Promise((r) => setTimeout(r, 10));
           continue;
+        }
+
+        // Sleep / wake recovery: a long inter-frame gap means lid-close
+        // or OS preemption. Reset the watchdog and force a keyframe.
+        const _nowLoopTick = performance.now();
+        const g = /** @type {any} */ (globalThis);
+        const forcedGap =
+          typeof g.__screenityForceSleepGapMs === "number"
+            ? g.__screenityForceSleepGapMs
+            : 0;
+        if (forcedGap > 0) {
+          g.__screenityForceSleepGapMs = 0;
+          this._lastFrameArrivalAt = _nowLoopTick - forcedGap;
+        }
+        if (
+          shouldTriggerSleepRecovery(
+            _nowLoopTick,
+            this._lastFrameArrivalAt,
+            this._sleepGapMs,
+            this._firstChunkSeen,
+            this.running,
+            this._stopping,
+          )
+        ) {
+          this._postSleepRecoveries += 1;
+          this.warn("[WCR] post-sleep gap detected; resetting watchdog", {
+            gapMs: Math.round(_nowLoopTick - this._lastFrameArrivalAt),
+            recoveries: this._postSleepRecoveries,
+          });
+          this._lastChunkAt = _nowLoopTick;
+          this._forceNextKeyframe = true;
+          try {
+            diagForward("recorder-sleep-detected", {
+              gapMs: Math.round(_nowLoopTick - this._lastFrameArrivalAt),
+              recoveries: this._postSleepRecoveries,
+            });
+          } catch {}
+          this._lastFrameArrivalAt = _nowLoopTick;
         }
 
         // Static-frame fallback. macOS ScreenCaptureKit throttles to
@@ -1810,6 +2205,8 @@ export class WebCodecsRecorder {
         } else {
           if (readResult.done || !readResult.value) break;
           frame = readResult.value;
+          // Drives the sleep-gap detection above.
+          this._lastFrameArrivalAt = performance.now();
 
           if (frame.codedWidth === 0 || frame.codedHeight === 0) {
             // A zero-size frame can't be drawn or encoded. Skip it
@@ -1872,7 +2269,13 @@ export class WebCodecsRecorder {
 
           // Track the peak observed queue depth as a leading indicator
           //; useful for tuning the threshold from real telemetry.
-          const vQueueSize = this.videoEncoder.encodeQueueSize;
+          // Closed-encoder pause race: treat as drained.
+          let vQueueSize = 0;
+          try {
+            vQueueSize = this.videoEncoder?.encodeQueueSize ?? 0;
+          } catch {
+            vQueueSize = 0;
+          }
           if (vQueueSize > this._peakVideoEncodeQueueSize) {
             this._peakVideoEncodeQueueSize = vQueueSize;
           }
@@ -1905,31 +2308,65 @@ export class WebCodecsRecorder {
             this.justResumed = false;
           }
 
-          this.videoEncoder.encode(resized, {
-            timestamp: tsUs,
-            keyFrame,
-          });
-          if (this.debug && (this.frameCount < 5 || this.frameCount % 300 === 0)) {
-            this.log("[WCR] video pts", {
-              frame: this.frameCount,
-              tsUs,
-              durUs: frameDurationUs,
-              targetIndex,
-            });
+          // pause() can close the encoder between the top-of-loop check
+          // and here. Drop the frame instead of bubbling a sync throw.
+          if (
+            this.paused ||
+            !this.videoEncoder ||
+            this.videoEncoder.state === "closed"
+          ) {
+            resized.close();
+            this._videoFrameIndex = i + 1;
+            this._forceNextKeyframe = true;
+            continue;
           }
-          // Diag snapshot every 30 frames. encodeQueueSize > 10 means
-          // the encoder can't keep up (the "first seconds sluggish"
-          // signature).
-          if (this.frameCount > 0 && this.frameCount % 30 === 0) {
-            perfMark("WCR.frame.progress", {
-              frame: this.frameCount,
-              videoQ: this.videoEncoder?.encodeQueueSize ?? -1,
-              audioQ: this.audioEncoder?.encodeQueueSize ?? -1,
-            });
+          // try/finally so resized's GPU buffer closes on every exit
+          // (pause-race continue, rethrown encoder error, success).
+          try {
+            try {
+              this.videoEncoder.encode(resized, {
+                timestamp: tsUs,
+                keyFrame,
+              });
+            } catch (encErr) {
+              // Same race after the check. Only swallow when paused
+              // so real encoder errors still surface.
+              if (
+                this.paused ||
+                this.videoEncoder?.state === "closed"
+              ) {
+                this.warn("[WCR] encode() race during pause; dropping frame");
+                this._videoFrameIndex = i + 1;
+                this._forceNextKeyframe = true;
+                continue;
+              }
+              throw encErr;
+            }
+            if (
+              this.debug &&
+              (this.frameCount < 5 || this.frameCount % 300 === 0)
+            ) {
+              this.log("[WCR] video pts", {
+                frame: this.frameCount,
+                tsUs,
+                durUs: frameDurationUs,
+                targetIndex,
+              });
+            }
+            // Diag snapshot every 30 frames. encodeQueueSize > 10 means
+            // the encoder can't keep up.
+            if (this.frameCount > 0 && this.frameCount % 30 === 0) {
+              perfMark("WCR.frame.progress", {
+                frame: this.frameCount,
+                videoQ: this.videoEncoder?.encodeQueueSize ?? -1,
+                audioQ: this.audioEncoder?.encodeQueueSize ?? -1,
+              });
+            }
+            this.frameCount++;
+            this._videoFrameIndex = i + 1;
+          } finally {
+            resized.close();
           }
-          this.frameCount++;
-          this._videoFrameIndex = i + 1;
-          resized.close();
         }
 
         // Only close a real source frame; the synthetic path reuses
@@ -1976,8 +2413,100 @@ export class WebCodecsRecorder {
     this.log("[WCR] audio loop start");
 
     const encodeAudioData = (audioData) => {
+      // E2E hook: override the perceived rate for one frame to drive
+      // mismatch-rebuild in tests. Timestamps still use the real rate.
+      const _g = /** @type {any} */ (globalThis);
+      const overrideRate = _g.__screenityForceAudioSampleRateOverride || 0;
+      if (overrideRate > 0) {
+        _g.__screenityForceAudioSampleRateOverride = 0;
+      }
+      const realSampleRate = audioData.sampleRate || null;
+      const incomingSampleRate = overrideRate || realSampleRate;
+
+      // Mic switched mid-recording: rebuild at the new rate. Pre-check
+      // AAC's allowed rates so configure() can't brick the encoder.
+      const codec = this._activeAudioConfig?.codec || "mp4a.40.2";
+      const isAac = codec.startsWith("mp4a") || codec === "aac";
+      if (
+        isAac &&
+        incomingSampleRate &&
+        this.audioSampleRate &&
+        incomingSampleRate !== this.audioSampleRate &&
+        !isAacRateInSpec(incomingSampleRate)
+      ) {
+        if (!this._audioRebuildUnsupportedRates) {
+          this._audioRebuildUnsupportedRates = new Set();
+        }
+        if (!this._audioRebuildUnsupportedRates.has(incomingSampleRate)) {
+          this._audioRebuildUnsupportedRates.add(incomingSampleRate);
+          try {
+            diagForward("recorder-audio-rebuild-unsupported", {
+              rate: incomingSampleRate,
+              keptRate: this.audioSampleRate,
+              codec,
+              reason: "codec-rate-not-supported",
+            });
+          } catch {}
+        }
+      }
+      const rateUnsupported =
+        incomingSampleRate &&
+        this._audioRebuildUnsupportedRates &&
+        this._audioRebuildUnsupportedRates.has(incomingSampleRate);
+      if (
+        incomingSampleRate &&
+        this.audioSampleRate &&
+        incomingSampleRate !== this.audioSampleRate &&
+        !rateUnsupported &&
+        this._audioSampleRateMismatchRebuilds <
+          this._maxAudioSampleRateRebuilds
+      ) {
+        const oldRate = this.audioSampleRate;
+        this.warn("[WCR] audio sample rate changed mid-recording", {
+          from: oldRate,
+          to: incomingSampleRate,
+          rebuilds: this._audioSampleRateMismatchRebuilds + 1,
+        });
+        const newConfig = this._activeAudioConfig
+          ? { ...this._activeAudioConfig, sampleRate: incomingSampleRate }
+          : null;
+        if (newConfig && this._rebuildAudioEncoder(newConfig)) {
+          this.audioSampleRate = incomingSampleRate;
+          this._audioSampleRateMismatchRebuilds += 1;
+          // Drop this frame so the next one starts at the new rate.
+          try {
+            audioData.close?.();
+          } catch {}
+          this._audioDeviceChangePending = false;
+          try {
+            diagForward("recorder-audio-encoder-rebuilt", {
+              reason: "sample-rate-mismatch",
+              from: oldRate,
+              to: incomingSampleRate,
+              rebuilds: this._audioSampleRateMismatchRebuilds,
+            });
+          } catch {}
+          return;
+        }
+        // Rebuild failed: mark as unsupported (encoder already restored).
+        if (!this._audioRebuildUnsupportedRates) {
+          this._audioRebuildUnsupportedRates = new Set();
+        }
+        this._audioRebuildUnsupportedRates.add(incomingSampleRate);
+        try {
+          diagForward("recorder-audio-rebuild-unsupported", {
+            rate: incomingSampleRate,
+            keptRate: this.audioSampleRate,
+            codec:
+              (this._activeAudioConfig && this._activeAudioConfig.codec) ||
+              null,
+          });
+        } catch {}
+      }
+
+      // Timestamps use the real rate; the override is test-only.
       const sampleRate =
-        audioData.sampleRate || this.audioSampleRate || 48000;
+        realSampleRate || this.audioSampleRate || 48000;
       const frames =
         typeof audioData.numberOfFrames === "number"
           ? audioData.numberOfFrames

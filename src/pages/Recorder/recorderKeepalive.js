@@ -1,9 +1,5 @@
-// Keep-alive bootstrap. Loaded from recorder.html before the main
-// bundle. Region recordings open the tab with active:false so Chrome
-// throttles JS within ~1s and bundle parse stretches from 300ms to
-// 3-4.5s. Audio oscillator + navigator.locks + mediaSession make the
-// tab look active before throttling. Handles on window.__SCREENITY_KEEPALIVE
-// so React's startTabKeepAlive() reuses them.
+// Keep-alive bootstrap. Loads pre-bundle to dodge Chrome's background-tab
+// throttle on region recordings. Handles hang off window.__SCREENITY_KEEPALIVE.
 (function () {
   try {
     var KA = (window.__SCREENITY_KEEPALIVE =
@@ -51,6 +47,69 @@
             },
           )
           .catch(function () {});
+      }
+    } catch (e) {}
+
+    // Loopback PC with a live video track marks the tab "in a call" so
+    // Chrome keeps the renderer at foreground priority. Host-only ICE.
+    try {
+      if (typeof RTCPeerConnection === "function" && !KA.priorityPc1) {
+        var bcanvas = document.createElement("canvas");
+        bcanvas.width = 2;
+        bcanvas.height = 2;
+        var bctx = bcanvas.getContext("2d");
+        if (bctx) bctx.fillRect(0, 0, 2, 2);
+        // captureStream(0) → no automatic frames; we tick manually so
+        // the track stays "live" without burning CPU on capture.
+        var bstream = bcanvas.captureStream
+          ? bcanvas.captureStream(0)
+          : null;
+        var btrack = bstream ? bstream.getVideoTracks()[0] : null;
+        if (btrack) {
+          var pc1 = new RTCPeerConnection();
+          var pc2 = new RTCPeerConnection();
+          KA.priorityPc1 = pc1;
+          KA.priorityPc2 = pc2;
+          KA.priorityCanvas = bcanvas;
+          KA.priorityTrack = btrack;
+          pc1.onicecandidate = function (e) {
+            if (e.candidate) pc2.addIceCandidate(e.candidate).catch(function () {});
+          };
+          pc2.onicecandidate = function (e) {
+            if (e.candidate) pc1.addIceCandidate(e.candidate).catch(function () {});
+          };
+          pc1.addTrack(btrack, bstream);
+          pc1
+            .createOffer()
+            .then(function (offer) {
+              return pc1.setLocalDescription(offer).then(function () {
+                return pc2.setRemoteDescription(offer);
+              });
+            })
+            .then(function () {
+              return pc2.createAnswer();
+            })
+            .then(function (answer) {
+              return pc2.setLocalDescription(answer).then(function () {
+                return pc1.setRemoteDescription(answer);
+              });
+            })
+            .catch(function () {});
+          // Periodic 1×1 redraw keeps the captureStream track from
+          // being marked ended after the first frame is consumed.
+          KA.priorityTick = setInterval(function () {
+            try {
+              if (bctx) {
+                bctx.fillStyle = bctx.fillStyle === "#000" ? "#001" : "#000";
+                bctx.fillRect(0, 0, 2, 2);
+              }
+              if (bstream && typeof bstream.getVideoTracks === "function") {
+                var t = bstream.getVideoTracks()[0];
+                if (t && typeof t.requestFrame === "function") t.requestFrame();
+              }
+            } catch (e) {}
+          }, 2000);
+        }
       }
     } catch (e) {}
 

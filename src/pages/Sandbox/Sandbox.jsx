@@ -15,6 +15,7 @@ import { ContentStateContext } from "./context/ContentState";
 import { diagForward } from "../utils/diagForward";
 import { perfMark } from "../utils/perfMarks";
 import { triggerSupportDownload } from "../utils/triggerSupportDownload";
+import GradientBackground from "../Components/GradientBackground";
 
 const Sandbox = () => {
   const [contentState, setContentState] = useContext(ContentStateContext);
@@ -337,7 +338,7 @@ const Sandbox = () => {
             )}
           </div>
           <HelpButton />
-          <div className="setupBackgroundSVG"></div>
+          <GradientBackground />
         </div>
       )}
       <style>
@@ -345,16 +346,6 @@ const Sandbox = () => {
 				
 				.wrap {
 					overflow: hidden;
-				}
-				.setupBackgroundSVG {
-					position: absolute;
-					top: 0px;
-					left: 0px;
-					width: 100%;
-					height: 100%;
-					background: url(/assets/helper/pattern-svg.svg) repeat;
-					background-size: 62px 23.5px;
-					animation: moveBackground 138s linear infinite;
 				}
 				.button-stop {
 					padding: 10px 20px;
@@ -369,15 +360,6 @@ const Sandbox = () => {
 					margin-left: auto;
 					margin-right: auto;
 					z-index: 999999;
-				}
-				
-				@keyframes moveBackground {
-					0% {
-						background-position: 0 0;
-					}
-					100% {
-						background-position: 100% 0;
-					}
 				}
 
 				.logo {
@@ -395,6 +377,7 @@ const Sandbox = () => {
 					width: 100%;
 					height: 100%;
 					background-color: #F6F7FB;
+					isolation: isolate;
 				}
 					.middle-area {
 						display: flex;

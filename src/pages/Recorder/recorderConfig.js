@@ -1,10 +1,12 @@
+// Pair video + audio codec explicitly (w3c/mediacapture-record#194):
+// Chrome mis-tags blob.type for unqualified codecs string variants.
 export const MIME_TYPES = [
   "video/webm;codecs=vp9,opus",
   "video/webm;codecs=vp8,opus",
-  "video/webm;codecs=h264",
+  "video/webm;codecs=h264,opus",
+  "video/webm;codecs=avc1,opus",
   "video/webm",
   "video/mp4",
-  "video/webm;codecs=avc1",
 ];
 
 export function getBitrates(quality) {

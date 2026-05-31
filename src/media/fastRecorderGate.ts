@@ -79,15 +79,37 @@ const safeMseSupport = (mime: string) => {
   }
 };
 
+// Expire sticky disables so a one-off failure (codec reclaim, HW slot
+// contention, sleep) doesn't permanently downgrade users now that the
+// WebCodecs recorder self-heals via salvage paths.
+const STICKY_DISABLE_TTL_MS = 14 * 24 * 60 * 60 * 1000;
+
 export const getFastRecorderStickyState = async (): Promise<FastRecorderStickyState> => {
   try {
     const result = await chrome.storage.local.get([
       STORAGE_KEYS.stickyDisabled,
       STORAGE_KEYS.stickyReason,
       STORAGE_KEYS.stickyDetails,
+      STORAGE_KEYS.lastFailureAt,
     ]);
+    const disabledRaw = Boolean(result[STORAGE_KEYS.stickyDisabled]);
+    const lastFailureAt = Number(result[STORAGE_KEYS.lastFailureAt]) || 0;
+    // Report stale disables as cleared. Don't wipe other keys here to
+    // avoid racing concurrent setters; next failure overwrites anyway.
+    const expired =
+      disabledRaw &&
+      lastFailureAt > 0 &&
+      Date.now() - lastFailureAt > STICKY_DISABLE_TTL_MS;
+    if (expired) {
+      try {
+        await chrome.storage.local.set({
+          [STORAGE_KEYS.stickyDisabled]: false,
+        });
+      } catch {}
+      return { disabled: false };
+    }
     return {
-      disabled: Boolean(result[STORAGE_KEYS.stickyDisabled]),
+      disabled: disabledRaw,
       reason: result[STORAGE_KEYS.stickyReason] || null,
       details: result[STORAGE_KEYS.stickyDetails] || null,
     };
@@ -118,13 +140,35 @@ export const isTransientFastRecorderError = (errorString: string) => {
 };
 const isTransientError = isTransientFastRecorderError;
 
+// firstChunkSeen=false means no output ever landed: cancel or contention,
+// not an encoder defect (real breakage emits at least one chunk first).
+export const isFastRecorderFailureTransient = (
+  reasonCode: string,
+  errorString: string,
+  detail: any
+): boolean => {
+  if (isTransientFastRecorderError(errorString)) return true;
+  if (
+    reasonCode === "webcodecs-zero-frames-at-stop" &&
+    detail &&
+    detail.firstChunkSeen === false
+  ) {
+    return true;
+  }
+  return false;
+};
+
 export const markFastRecorderFailure = async (
   reasonCode: string,
   details: Record<string, any> = {}
 ) => {
   try {
     const errStr = typeof details?.error === "string" ? details.error : "";
-    if (isTransientError(errStr)) {
+    const detail =
+      details && typeof details === "object" && details.detail
+        ? details.detail
+        : null;
+    if (isFastRecorderFailureTransient(reasonCode, errStr, detail)) {
       await chrome.storage.local.set({
         [STORAGE_KEYS.lastFailureAt]: Date.now(),
         fastRecorderTransientFailure: {
@@ -146,12 +190,8 @@ export const markFastRecorderFailure = async (
   }
 };
 
-// Round-trip 4 synthetic frames through a real VideoEncoder to
-// confirm it emits chunks. isConfigSupported() only validates shape
-// and misses the "28-byte ftyp" failure. 30 frames would also catch
-// first-keyframe-only bugs, but ~900ms/frame under pressure = 27s of
-// blocking; runtime watchdogs handle that. 1.5s flush cap: any chunk
-// landed = healthy-but-slow, zero chunks = no-output.
+// Push 4 synthetic frames through a real VideoEncoder to catch the
+// "28-byte ftyp" zero-output failure isConfigSupported misses.
 const PROBE_FRAME_COUNT = 4;
 const PROBE_WALL_CLOCK_CAP_MS = 1500;
 const verifyEncoderProducesOutput = async (
@@ -201,10 +241,8 @@ const verifyEncoderProducesOutput = async (
       frames.push(frame);
       encoder.encode(frame, { keyFrame: i === 0 });
     }
-    // Wall-clock-bounded flush. A slow but healthy encoder can drain
-    // for tens of seconds under system memory/GPU pressure; we don't
-    // make the user wait. If timeout hits, the chunks counter has
-    // whatever the encoder produced; we'll classify below.
+    // Wall-clock cap: a stressed encoder can drain for tens of seconds.
+    // Classify on whatever landed.
     let flushTimedOut = false;
     let flushTimer: ReturnType<typeof setTimeout> | null = null;
     try {
@@ -241,20 +279,13 @@ const verifyEncoderProducesOutput = async (
   }
   const ms = Date.now() - started;
   if (encoderError) return { ok: false, reason: "error", chunks, ms };
-  // The only firm fail signal is zero output. With the small frame
-  // count + bounded flush, "too-few-chunks" heuristics produce false
-  // negatives (a slow but healthy encoder might only land 1 chunk
-  // within the cap). Runtime watchdogs in WebCodecsRecorder catch
-  // the rest.
+  // Only zero-output is a firm fail; runtime watchdogs handle slow encoders.
   if (chunks === 0) return { ok: false, reason: "no-output", chunks, ms };
   return { ok: true, chunks, ms };
 };
 
-// Round-trip 1s of synthetic audio through a real AudioEncoder. Same
-// purpose as the video probe: isConfigSupported says "yes" but the
-// encoder might still fail at first encode under platform-specific
-// constraints (Opus 48k internal mismatch, AAC channel layout issues,
-// etc). Cheap; ~10 AudioData inputs at 4800 samples each.
+// Audio equivalent of the video probe: catches first-encode failures that
+// isConfigSupported misses (Opus 48k mismatch, AAC channel layout, etc).
 const verifyAudioEncoderProducesOutput = async (
   config: AudioEncoderConfig
 ): Promise<{ ok: boolean; reason?: string; chunks: number; ms: number }> => {
@@ -312,9 +343,7 @@ const verifyAudioEncoderProducesOutput = async (
   return { ok: true, chunks, ms };
 };
 
-// Probe cache TTL. Probe is 250-350ms warm, seconds cold; re-running
-// every start showed up as countdown-to-record delay. Key is
-// { userAgent + GATE_VERSION }. ok=false isn't cached so a driver
+// Cache key: userAgent + GATE_VERSION. ok=false isn't cached so a driver
 // recovery re-probes immediately.
 const PROBE_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 // Short window for failed probes: coalesces back-to-back calls during
@@ -624,17 +653,11 @@ const _probeFastRecorderSupportUncached = async (): Promise<FastRecorderProbeRes
 
     if (containerKind === "mp4") details.containerKind = "mp4";
 
-    // Verify the selected encoder actually produces output, not just
-    // that the config is "supported". This is the proactive guard:
-    // a machine whose encoder emits zero frames is caught here and
-    // routed to MediaRecorder, instead of the user losing a recording.
+    // Verify the encoder emits chunks; otherwise route to MediaRecorder.
     if (details.selectedVideoConfig) {
-      // Retry once on transient encoder errors. VTDecoderXPCService
-      // (macOS), NVIDIA driver hand-offs (Windows), intel-VAAPI
-      // (Linux) all reject the first configure() right after another
-      // encoder ran, then succeed on the retry. Without this, a one-
-      // off "error" reason stickied MediaRecorder for the session.
-      // "no-output" is a real HW bug and does NOT retry.
+      // Retry once on transient errors (VTDecoderXPC, NVIDIA, VAAPI all
+      // reject the first configure() after another encoder ran). "no-output"
+      // is a real HW bug and does NOT retry.
       let encodeCheck = await verifyEncoderProducesOutput(
         details.selectedVideoConfig as VideoEncoderConfig
       );
@@ -670,10 +693,8 @@ const _probeFastRecorderSupportUncached = async (): Promise<FastRecorderProbeRes
     let ok = reasons.length === 0;
     const at = Date.now();
 
-    // Optimistic override: if the only failures are transient encode
-    // errors and a clean probe ran in the last 7 days, trust it.
-    // In-session swap to MediaRecorder is wired up; the cost of a
-    // false-negative IDB recording is higher than a WebCodecs retry.
+    // Trust a clean probe from the last 7 days when only transient errors
+    // failed: in-session MediaRecorder swap covers the WebCodecs miss.
     if (!ok) {
       const onlyTransientReasons = reasons.every((r) =>
         r === "video-encode-error" || r === "audio-encode-error"
@@ -709,11 +730,8 @@ const _probeFastRecorderSupportUncached = async (): Promise<FastRecorderProbeRes
           [STORAGE_KEYS.probe]: { ok, reasons, details, at },
         });
       } else {
-        // Don't overwrite a known-good cached probe with a failure
-        // (one bad VTDecoder run shouldn't wipe a week of confidence).
-        // But also persist the failure separately so the next start
-        // can short-circuit a re-probe for the in-memory TTL window
-        // even if the SW restarted between recordings.
+        // Keep the good cached probe; record the failure separately so the
+        // next start short-circuits even after SW restart.
         await chrome.storage.local.set({
           fastRecorderProbeLastFailure: { reasons, details, at },
         });

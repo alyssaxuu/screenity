@@ -37,8 +37,8 @@ const recordSubscriptionLoss = async (reason, extra = {}) => {
   } catch {}
 };
 
-// force=true bypasses stayLoggedOut and the prior-signals gate, so
-// user-initiated paths can recover via cookie refresh after explicit logout.
+// force=true bypasses the prior-signals gate for cookie-refresh recovery.
+// It does NOT override stayLoggedOut: explicit logout stays sticky.
 export const loginWithWebsite = async (arg = {}) => {
   const _depth = typeof arg === "number" ? arg : Number(arg._depth) || 0;
   const force = typeof arg === "object" && arg !== null ? Boolean(arg.force) : false;
@@ -68,7 +68,9 @@ export const loginWithWebsite = async (arg = {}) => {
     "screenityUser",
   ]);
 
-  if (stayLoggedOut && !force) {
+  // Only AUTH_SUCCESS from the website clears stayLoggedOut. Implicit paths
+  // (record click, popup, tab update, action click) must not revive auth.
+  if (stayLoggedOut) {
     return { authenticated: false, instantMode: false };
   }
 
@@ -88,10 +90,7 @@ export const loginWithWebsite = async (arg = {}) => {
         if (refreshRes.ok) {
           const { token: newToken } = await refreshRes.json();
           if (newToken) {
-            // also clear stayLoggedOut on force so non-force calls work next time.
-            const writes = { screenityToken: newToken };
-            if (force) writes.stayLoggedOut = false;
-            await chrome.storage.local.set(writes);
+            await chrome.storage.local.set({ screenityToken: newToken });
             return await loginWithWebsite({ _depth: _depth + 1, force });
           }
         }
@@ -244,9 +243,7 @@ export const loginWithWebsite = async (arg = {}) => {
           );
           if (refreshRes.ok) {
             const { token: newToken } = await refreshRes.json();
-            const writes = { screenityToken: newToken };
-            if (force) writes.stayLoggedOut = false;
-            await chrome.storage.local.set(writes);
+            await chrome.storage.local.set({ screenityToken: newToken });
             return await loginWithWebsite({ _depth: _depth + 1, force });
           }
         } catch (refreshErr) {

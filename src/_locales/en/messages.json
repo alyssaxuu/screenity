@@ -1521,6 +1521,30 @@
     "message": "Fast MP4 failed — off",
     "description": "WebCodecs failure auto-disable toast"
   },
+  "storageFullRecordingError": {
+    "message": "Not enough storage to record. Free up disk space and try again.",
+    "description": "Shown when the browser can't allocate enough local storage to start a recording"
+  },
+  "storageLowRecordingWarning": {
+    "message": "Your browser storage is almost full. Free up disk space to keep this recording safe.",
+    "description": "Shown when local storage is running low while a recording is in progress"
+  },
+  "screenStreamUnavailableError": {
+    "message": "Failed to access the screen stream. Try starting the recording again.",
+    "description": "Shown when the screen capture stream is missing or can't be accessed (no streamId returned, getDisplayMedia threw, etc.)"
+  },
+  "tabStreamUnavailableError": {
+    "message": "Couldn't access this tab's video. Reload the tab and try again.",
+    "description": "Shown when Chrome won't return a tab capture stream for the chosen tab"
+  },
+  "streamingDataTimeoutError": {
+    "message": "Recording didn't start in time. Please try again.",
+    "description": "Shown when the recorder tab never received streaming-data from the background script"
+  },
+  "unsupportedVideoCodecError": {
+    "message": "Your browser doesn't support the required video codecs. Update Chrome and try again.",
+    "description": "Shown when no supported MediaRecorder mimeType is available"
+  },
   "proOnboardingWelcomeTitle": {
     "message": "Welcome to the Screenity Pro extension",
     "description": "Pro onboarding welcome step title"

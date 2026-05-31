@@ -26,7 +26,11 @@ export const discardRecording = async ({
     } catch {}
   }
 
-  sendMessageRecord({ type: "dismiss-recording", reason, projectId });
+  // Swallow rejection: if the recorder tab is already dead, the promise
+  // rejects and MV3 treats unhandled rejections as SW health signals.
+  sendMessageRecord({ type: "dismiss-recording", reason, projectId }).catch(
+    () => {},
+  );
   chrome.action.setIcon({ path: "assets/icon-34.png" });
 
   // await teardown before recording:false; otherwise handleAlarm fires against torn-down offscreen

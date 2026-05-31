@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import GradientBackground from "../Components/GradientBackground";
 
 import localforage from "localforage";
 
@@ -328,6 +329,7 @@ const Backup = () => {
 
   return (
     <div className="setupBackground">
+      <GradientBackground />
       {!setupComplete && !backupAgain && (
         <div className="setupContainer">
           <div className="setupImage">
@@ -449,12 +451,6 @@ const Backup = () => {
 	padding: 0;
 	min-height: 100%;
 		background-color: #F6F7FB!important;
-		background: url('` +
-          chrome.runtime.getURL("assets/helper/pattern-svg.svg") +
-          `') repeat;
-		background-size: 62px 23.5px;
-		animation: moveBackground 138s linear infinite;
-		transform: rotate(0deg);
 				}
 
 				.button-strong {
@@ -541,15 +537,6 @@ const Backup = () => {
 					text-decoration: none!important;
 					color: #4C7DE2;
 				}
-				
-				@keyframes moveBackground {
-					0% {
-						background-position: 0 0;
-					}
-					100% {
-						background-position: 100% 0;
-					}
-				}
 
 				.setupActions {
 					margin-top: 28px;
@@ -615,6 +602,7 @@ const Backup = () => {
 					display: flex;
 					justify-content: center;
 					align-items: center;
+					isolation: isolate;
 				}
 
 				.setupContainer {

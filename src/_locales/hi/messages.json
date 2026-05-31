@@ -1666,5 +1666,29 @@
   },
   "recordingCorruptToast": {
     "message": "यह रिकॉर्डिंग प्ले नहीं की जा सकती। फ़ाइल अधूरी या ख़राब हो सकती है। सेव मेनू से रॉ फ़ाइल डाउनलोड करने का प्रयास करें।"
+  },
+  "storageFullRecordingError": {
+    "message": "रिकॉर्ड करने के लिए पर्याप्त स्टोरेज नहीं है। डिस्क पर जगह खाली करें और फिर से कोशिश करें।",
+    "description": "Shown when the browser can't allocate enough local storage to start a recording"
+  },
+  "storageLowRecordingWarning": {
+    "message": "आपके ब्राउज़र का स्टोरेज लगभग भर गया है। इस रिकॉर्डिंग को सुरक्षित रखने के लिए डिस्क पर जगह खाली करें।",
+    "description": "Shown when local storage is running low while a recording is in progress"
+  },
+  "screenStreamUnavailableError": {
+    "message": "स्क्रीन तक पहुंचा नहीं जा सका। रिकॉर्डिंग फिर से शुरू करें।",
+    "description": "Shown when the screen capture stream is missing after the user picked a source"
+  },
+  "tabStreamUnavailableError": {
+    "message": "इस टैब के वीडियो तक पहुंचा नहीं जा सका। टैब को फिर से लोड करें और फिर से कोशिश करें।",
+    "description": "Shown when Chrome won't return a tab capture stream for the chosen tab"
+  },
+  "streamingDataTimeoutError": {
+    "message": "रिकॉर्डिंग समय पर शुरू नहीं हुई। कृपया फिर से कोशिश करें।",
+    "description": "Shown when the recorder tab never received streaming-data from the background script"
+  },
+  "unsupportedVideoCodecError": {
+    "message": "आपका ब्राउज़र ज़रूरी वीडियो कोडेक्स का समर्थन नहीं करता। Chrome को अपडेट करें और फिर से कोशिश करें।",
+    "description": "Shown when no supported MediaRecorder mimeType is available"
   }
 }

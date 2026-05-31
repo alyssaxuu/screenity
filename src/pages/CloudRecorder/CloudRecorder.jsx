@@ -9,6 +9,7 @@ import BunnyTusUploader from "./bunnyTusUploader";
 import localforage from "localforage";
 import { createVideoProject } from "./createVideoProject";
 import { getUserMediaWithFallback } from "../utils/mediaDeviceFallback";
+import { shouldAcquireMicAtStart } from "../utils/micAcquisitionPolicy";
 import { traceStep } from "../utils/startFlowTrace";
 import { IS_OFFSCREEN_HOST } from "../utils/recordingHost";
 import { startPrewarm, stopPrewarm } from "../Recorder/streamWarmup";
@@ -163,6 +164,10 @@ const CloudRecorder = () => {
 
   const isRestarting = useRef(false);
   const isFinishing = useRef(false);
+  // Re-entry guard for setMic()'s lazy acquire branch (see Recorder.jsx).
+  const isLazyAcquiringMic = useRef(false);
+  // Latest mic-toggle intent so a mid-acquire toggle-off is honored.
+  const pendingMicIntent = useRef(null);
   const sentLast = useRef(false);
   const lastTimecode = useRef(0);
   const hasChunks = useRef(false);
@@ -1212,6 +1217,45 @@ const CloudRecorder = () => {
     };
 
     startScreenTrackMonitor();
+  };
+
+  // Camera-track lifecycle listener. Unlike bindScreenTrack, a camera
+  // unplug doesn't tear down the recording: screen + audio are still
+  // healthy, so we only log diag and surface a non-fatal toast.
+  const bindCameraTrack = (track) => {
+    if (!track) return;
+    try {
+      track.onended = () => {
+        const diag = {
+          reason: "camera-track-ended",
+          label: track?.label || null,
+          readyState: track?.readyState || null,
+          ts: Date.now(),
+          hasChunks: hasChunks.current,
+          recorderState: cameraRecorder.current?.state || null,
+        };
+        console.warn(
+          "🔴 Camera track ended unexpectedly (e.g. USB unplug)",
+          diag,
+        );
+        try {
+          chrome.runtime.sendMessage({
+            type: "diag-forward",
+            event: "cloudrecorder-camera-track-ended",
+            data: diag,
+          });
+        } catch {}
+      };
+      track.onmute = () => {
+        try {
+          chrome.runtime.sendMessage({
+            type: "diag-forward",
+            event: "cloudrecorder-camera-track-muted",
+            data: { label: track?.label || null },
+          });
+        } catch {}
+      };
+    } catch {}
   };
 
   const startScreenTrackMonitor = () => {
@@ -2496,6 +2540,7 @@ const CloudRecorder = () => {
   };
 
   const setMic = async (result) => {
+    pendingMicIntent.current = Boolean(result.active);
     if (micStream.current && audioInputGain.current) {
       audioInputGain.current.gain.value = result.active ? 1 : 0;
 
@@ -2503,6 +2548,51 @@ const CloudRecorder = () => {
         rawMicStream.current.getAudioTracks().forEach((track) => {
           track.enabled = result.active;
         });
+      }
+      return;
+    }
+
+    // Cold-start path: mic was off at recording start; acquire now and
+    // wire into the existing graph.
+    if (
+      result.active &&
+      !rawMicStream.current &&
+      aCtx.current &&
+      destination.current
+    ) {
+      if (isLazyAcquiringMic.current) return;
+      isLazyAcquiringMic.current = true;
+      try {
+        const deviceId =
+          result.defaultAudioInput ||
+          (await chrome.storage.local.get(["defaultAudioInput"])).defaultAudioInput;
+        const acquired = await startAudioStream(deviceId);
+        const acquireFailed =
+          !acquired || !acquired.getAudioTracks().length;
+        const tornDown =
+          !aCtx.current || !destination.current || isFinishing.current;
+        const userCanceled = pendingMicIntent.current === false;
+        if (acquireFailed || tornDown || userCanceled) {
+          try {
+            acquired?.getTracks?.().forEach((t) => t.stop());
+          } catch {}
+          // See Recorder.jsx setMic for rationale.
+          if (acquireFailed && !tornDown && !userCanceled) {
+            try {
+              chrome.storage.local.set({ micActive: false });
+            } catch {}
+          }
+          return;
+        }
+        rawMicStream.current = acquired;
+        audioInputGain.current = aCtx.current.createGain();
+        const micSource = aCtx.current.createMediaStreamSource(acquired);
+        micSource.connect(audioInputGain.current).connect(destination.current);
+        // Point micStream.current at the mixed destination, matching the
+        // eager path.
+        micStream.current = destination.current.stream;
+      } finally {
+        isLazyAcquiringMic.current = false;
       }
     }
   };
@@ -3207,7 +3297,38 @@ const CloudRecorder = () => {
 
   const createMediaRecorder = (stream, options, onDataAvailable) => {
     try {
-      const recorder = new MediaRecorder(stream, options);
+      // Pro hardcodes one mimeType per track. On Linux with some GPU
+      // drivers + WebCodecs sticky-disabled, construct throws with no
+      // user fallback, so probe Free's MIME_TYPES list first.
+      let effectiveOptions = options;
+      const requested = options?.mimeType;
+      if (
+        requested &&
+        typeof MediaRecorder.isTypeSupported === "function" &&
+        !MediaRecorder.isTypeSupported(requested)
+      ) {
+        const candidates = [
+          "video/webm;codecs=vp9,opus",
+          "video/webm;codecs=vp8,opus",
+          "video/webm;codecs=h264,opus",
+          "video/webm;codecs=avc1,opus",
+          "video/webm",
+          requested.startsWith("audio/") ? "audio/webm" : null,
+        ].filter(Boolean);
+        const fallback = candidates.find((m) =>
+          MediaRecorder.isTypeSupported(m),
+        );
+        if (fallback) {
+          console.warn(
+            "[CloudRecorder] requested mimeType unsupported, falling back",
+            { requested, fallback },
+          );
+          effectiveOptions = { ...options, mimeType: fallback };
+        }
+        // No fallback either: fall through and let construct throw so
+        // the outer catch surfaces the real error.
+      }
+      const recorder = new MediaRecorder(stream, effectiveOptions);
       // Track in-flight write() promises so stopAllRecorders can
       // drain them before finalize(); a late ondataavailable would
       // otherwise race finalize and silently truncate the upload.
@@ -3232,6 +3353,22 @@ const CloudRecorder = () => {
       };
 
       recorder.onerror = (event) => {
+        const errName = event?.error?.name || "";
+        const errMsg = String(event?.error?.message || "").toLowerCase();
+        // InvalidStateError / "not in recording state" / "already
+        // inactive" are harmless stop()-after-teardown races. Mirrors
+        // the Free/Region filter; real errors still hit sendRecordingError.
+        const isTransient =
+          errName === "InvalidStateError" ||
+          errMsg.includes("not in recording state") ||
+          errMsg.includes("already inactive");
+        if (isTransient) {
+          console.warn("[CloudRecorder] transient MR error ignored", {
+            name: errName,
+            message: event?.error?.message,
+          });
+          return;
+        }
         console.error("MediaRecorder error:", event.error);
         sendRecordingError("Recording error: " + event.error?.message);
       };
@@ -3284,7 +3421,7 @@ const CloudRecorder = () => {
           headroom,
         });
         sendRecordingError(
-          "Not enough browser storage available to record. Free up disk space and try again.",
+          chrome.i18n.getMessage("storageFullRecordingError"),
         );
         logStartFlow("recording_error", {
           reason: "preflight-low-quota",
@@ -3301,7 +3438,7 @@ const CloudRecorder = () => {
           headroom,
         });
         sendRecordingError(
-          "Your browser is almost out of storage. Free up space and try again to avoid losing the recording.",
+          chrome.i18n.getMessage("storageLowRecordingWarning"),
         );
         logStartFlow("recording_error", {
           reason: "preflight-critical-headroom",
@@ -4083,9 +4220,23 @@ const CloudRecorder = () => {
     ]);
 
     if (stopStreams) {
+      // Null the refs or Chrome keeps the tab-capture binding.
       [screenStream, cameraStream, micStream, rawMicStream].forEach((ref) => {
         ref.current?.getTracks().forEach((track) => track.stop());
+        ref.current = null;
       });
+      tabID.current = null;
+      // Close the AudioContext: without this the audio thread keeps
+      // ticking and back-to-back Pro multi recordings stack contexts.
+      if (aCtx.current) {
+        try {
+          await aCtx.current.close();
+        } catch {}
+        aCtx.current = null;
+      }
+      destination.current = null;
+      audioInputGain.current = null;
+      audioOutputGain.current = null;
     }
   };
 
@@ -4858,6 +5009,13 @@ const CloudRecorder = () => {
         });
       }
     }
+    pausedStateRef.current = false;
+    stopAllIntervals();
+
+    // Drain recorders before clearing `recording` so the next start
+    // gets a free tab-capture binding.
+    await stopAllRecorders();
+    stopFlowRef.current?.tick?.("recorders-drained");
     await setRecordingTimingState({
       recording: false,
       paused: false,
@@ -4865,11 +5023,6 @@ const CloudRecorder = () => {
       pausedAt: null,
       totalPausedMs: 0,
     });
-    pausedStateRef.current = false;
-    stopAllIntervals();
-
-    await stopAllRecorders();
-    stopFlowRef.current?.tick?.("recorders-drained");
 
     const { sceneId } = await chrome.storage.local.get(["sceneId"]);
     const uploadMeta = {
@@ -4917,6 +5070,24 @@ const CloudRecorder = () => {
     await flushPendingChunks();
 
     let finalizeError = null;
+    const finalizeSkipped = [];
+    if (uploadMeta.screen && !screenUploader.current) {
+      finalizeSkipped.push("screen");
+    }
+    if (uploadMeta.camera && !cameraUploader.current) {
+      finalizeSkipped.push("camera");
+    }
+    if (finalizeSkipped.length > 0) {
+      console.error(
+        "[CloudRecorder] finalize skipped: uploader went null before finalize",
+        { tracks: finalizeSkipped, reason },
+      );
+      void emitUploadTelemetry("upload_finalize_skipped", {
+        tracks: finalizeSkipped,
+        reason,
+        uploaderType: "cloud_recorder",
+      });
+    }
     const finalizeCalls = [
       screenUploader.current?.finalize?.(),
       cameraUploader.current?.finalize?.(),
@@ -5391,6 +5562,22 @@ const CloudRecorder = () => {
     );
   };
 
+  // Camera is acquired before screen on the dual-track path, so a
+  // screen failure leaves the camera LED on until GC. Call before any
+  // early-return-after-screen-fail. Free acquires screen first.
+  const stopCameraStreamIfAlive = () => {
+    const cs = cameraStream.current;
+    if (!cs) return;
+    try {
+      cs.getTracks().forEach((t) => {
+        try {
+          t.stop();
+        } catch {}
+      });
+    } catch {}
+    cameraStream.current = null;
+  };
+
   const startStream = async (data, id, permissions, permissions2, streamOpts = {}) => {
     const canCaptureSourceAudio =
       streamOpts.canRequestAudioTrack !== false;
@@ -5434,6 +5621,7 @@ const CloudRecorder = () => {
           cameraStream.current = await navigator.mediaDevices.getUserMedia(
             constraints,
           );
+          bindCameraTrack(cameraStream.current?.getVideoTracks?.()[0]);
         } catch (err) {
           console.warn("⚠️ Failed to access camera stream:", err);
           cameraStream.current = null;
@@ -5504,6 +5692,7 @@ const CloudRecorder = () => {
               cameraConstraints,
               defaultVideoInput,
             );
+            bindCameraTrack(cameraStream.current?.getVideoTracks?.()[0]);
           } catch (err) {
             console.warn(
               "⚠️ Camera permission denied; continuing without camera:",
@@ -5684,7 +5873,7 @@ const CloudRecorder = () => {
                 })
                 .catch(() => {});
               sendRecordingError(
-                "No screen stream id available [gUM-no-streamId]",
+                chrome.i18n.getMessage("screenStreamUnavailableError"),
               );
               return;
             }
@@ -5828,12 +6017,16 @@ const CloudRecorder = () => {
             },
           }).catch(() => {});
           // Offscreen tab-mode: pre-acquired streamId failed; retry with getDisplayMedia.
+          // NotReadableError ("device busy", e.g. Zoom/OBS or HW slot
+          // contention) is worth a retry, same as Abort/NotAllowed.
           if (
             IS_OFFSCREEN_HOST &&
             isTab.current &&
             id &&
             !useDisplayMedia &&
-            (err?.name === "AbortError" || err?.name === "NotAllowedError")
+            (err?.name === "AbortError" ||
+              err?.name === "NotAllowedError" ||
+              err?.name === "NotReadableError")
           ) {
             console.warn(
               "[CloudRecorder] tab streamId consumption failed - falling back to getDisplayMedia",
@@ -5855,6 +6048,8 @@ const CloudRecorder = () => {
               );
               bindScreenTrack(screenStream.current.getVideoTracks()[0]);
             } catch (fallbackErr) {
+              // Stop the pre-acquired camera so the LED doesn't stay on.
+              stopCameraStreamIfAlive();
               if (isUserCaptureCancel(fallbackErr)) {
                 sendRecordingError(
                   `User cancelled stream selection [offscreen-tab gDM fallback ${fallbackErr?.name || "?"}]`,
@@ -5863,18 +6058,22 @@ const CloudRecorder = () => {
                 return;
               }
               sendRecordingError(
-                "Failed to access screen stream: " + fallbackErr.message,
+                chrome.i18n.getMessage("screenStreamUnavailableError"),
               );
               return;
             }
           } else if (isUserCaptureCancel(err)) {
+            stopCameraStreamIfAlive();
             sendRecordingError(
               `User cancelled stream selection [tab-streamId-consume ${err?.name || "?"}]`,
               true,
             );
             return;
           } else {
-            sendRecordingError("Failed to access screen stream: " + err.message);
+            stopCameraStreamIfAlive();
+            sendRecordingError(
+              chrome.i18n.getMessage("screenStreamUnavailableError"),
+            );
             return;
           }
         }
@@ -5901,6 +6100,7 @@ const CloudRecorder = () => {
               cameraConstraints,
               defaultVideoInput,
             );
+            bindCameraTrack(cameraStream.current?.getVideoTracks?.()[0]);
           } catch (err) {
             console.warn(
               "⚠️ Camera permission denied; continuing without camera:",
@@ -5922,8 +6122,15 @@ const CloudRecorder = () => {
 
       setInitProject(true);
 
-      micStream.current = await startAudioStream(data.defaultAudioInput);
-      rawMicStream.current = micStream.current;
+      // If the user disabled the mic, skip getUserMedia: gain-muting still
+      // wakes iPhone Continuity etc. Toggle-on mid-recording goes via setMic().
+      if (shouldAcquireMicAtStart(data)) {
+        micStream.current = await startAudioStream(data.defaultAudioInput);
+        rawMicStream.current = micStream.current;
+      } else {
+        micStream.current = null;
+        rawMicStream.current = null;
+      }
 
       // Mic track death mid-recording (unplug, OS revoke, BT disconnect): toast only,
       // since Pro recordings often have system audio worth keeping.
@@ -5931,13 +6138,22 @@ const CloudRecorder = () => {
         const rawTrack = rawMicStream.current?.getAudioTracks?.()[0];
         if (rawTrack) {
           rawTrack.addEventListener("ended", () => {
+            const startMs = screenTimer.current?.start || null;
+            const dur = startMs ? Date.now() - startMs : null;
+            const SALVAGE_THRESHOLD_MS = 30000;
+            const isShort = !dur || dur < SALVAGE_THRESHOLD_MS;
+            const trackLabel = String(rawTrack?.label || "");
+            const isLikelyContinuityMic = /\biphone\b/i.test(trackLabel);
             try {
               chrome.runtime.sendMessage({
                 type: "diag-forward",
                 event: "cloudrecorder-mic-track-ended",
                 data: {
-                  trackLabel: String(rawTrack?.label || "").slice(0, 80),
+                  trackLabel: trackLabel.slice(0, 80),
                   readyState: rawTrack?.readyState || null,
+                  recordingDuration: dur,
+                  isLikelyContinuityMic,
+                  salvageOffered: !isShort,
                 },
               });
             } catch {}
@@ -5945,7 +6161,11 @@ const CloudRecorder = () => {
               chrome.runtime.sendMessage({
                 type: "recording-error",
                 error: "stream-ended",
-                why: chrome.i18n.getMessage("audioTrackEndedToast"),
+                why: chrome.i18n.getMessage(
+                  isShort
+                    ? "streamErrorModalDescription"
+                    : "audioTrackEndedToast",
+                ),
               });
             } catch {}
           });
@@ -6453,6 +6673,11 @@ const CloudRecorder = () => {
       ) {
         audioRecorder.current.pause();
       }
+      // Suspend the audio graph: WebAudio keeps the audio thread
+      // ticking otherwise. Paired with resume below.
+      if (aCtx.current && aCtx.current.state === "running") {
+        aCtx.current.suspend().catch(() => {});
+      }
 
       const now = Date.now();
       if (!screenTimer.current.paused && screenTimer.current.start) {
@@ -6484,6 +6709,10 @@ const CloudRecorder = () => {
       }
       if (audioRecorder.current && audioRecorder.current.state === "paused") {
         audioRecorder.current.resume();
+      }
+      // Resume the audio graph (paired with suspend in pause).
+      if (aCtx.current && aCtx.current.state === "suspended") {
+        aCtx.current.resume().catch(() => {});
       }
 
       const now = Date.now();

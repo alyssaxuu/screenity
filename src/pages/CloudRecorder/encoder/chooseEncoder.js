@@ -11,10 +11,8 @@ import {
 import { WebCodecsTrackRecorder } from "./WebCodecsTrackRecorder";
 import { probeHwSlots } from "./hwSlotProbe";
 
-// Mirrors WebCodecsRecorder's resize-canvas math. Cloud uploaders
-// and scene.{screen,camera} need encoded dims, not the source
-// track's native (retina-scale on macOS while encode caps at 1080p).
-// MediaRecorder records native, so callers skip this for it.
+// Encoded dims (capped at 1080p), not source-native. WebCodecs only;
+// MediaRecorder records native, so it skips this.
 export const WEBCODECS_CAP_WIDTH = 1920;
 export const WEBCODECS_CAP_HEIGHT = 1080;
 const HARD_CAP = 3840;
@@ -162,6 +160,7 @@ export const chooseTrackEncoder = async ({
     audioBitsPerSecond,
     enableAudio,
     preferSoftware: Boolean(plan.cameraPreferSoftware),
+    trackKind: track,
   });
   recorder.ondataavailable = (event) => {
     if (event.data && event.data.size > 0) {
@@ -181,12 +180,16 @@ export const chooseTrackEncoder = async ({
   };
   recorder.onerror = (event) => {
     const err = event?.error;
+    // Salvage stop() already ran; don't sticky-disable or double-report.
+    if (err && err.finalized === true) {
+      return;
+    }
     console.error(
       `[chooseEncoder] WebCodecs ${track} runtime error:`,
       err,
     );
-    // Sticky-disable on hard failures, leave transient ones alone. The
-    // gate's marker function distinguishes via its own pattern list.
+    // Pro marks failures per-session (in-memory) instead of persisting
+    // useWebCodecsRecorder=false; fresh HW probes run each session.
     void markFastRecorderFailure(`cloud-${track}-runtime`, {
       error: String(err?.message || err),
       detail: err?.detail || null,

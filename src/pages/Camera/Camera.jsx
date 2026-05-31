@@ -102,8 +102,15 @@ const Camera = () => {
     return () => clearTimeout(id);
   }, [loadingStates.modelLoading]);
 
+  // Re-entry guard. Toggling camera off while getUserMedia is still
+  // in-flight made stopCameraStream operate on a half-built stream, so
+  // the device lock stayed and the LED stayed on.
+  const isAcquiringRef = useRef(false);
+
   const acquireStream = () => {
     if (!videoRef.current || streamRef.current?.active) return;
+    if (isAcquiringRef.current) return;
+    isAcquiringRef.current = true;
     updateLoadingState("videoElement", true);
     chrome.storage.local.get(["defaultVideoInput"], (result) => {
       const constraints =
@@ -119,7 +126,10 @@ const Camera = () => {
         offScreenCanvasContextRef,
         {
           onStart: () => updateLoadingState("videoElement", true),
-          onFinish: () => updateLoadingState("videoElement", false),
+          onFinish: () => {
+            updateLoadingState("videoElement", false);
+            isAcquiringRef.current = false;
+          },
         }
       );
     });

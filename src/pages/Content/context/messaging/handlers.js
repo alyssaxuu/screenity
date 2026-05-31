@@ -433,16 +433,19 @@ export const setupHandlers = () => {
   });
 
   registerMessage("toggle-popup", async () => {
-    // Reconcile stale recording-flow state against storage before
-    // showing the popup. The tab may have been suspended during a
-    // recording handoff and missed the storage events that clear
-    // finalizingRecording / pendingRecording locally; without this,
-    // the post-stop loader briefly renders on reopen.
+    // Reconcile from storage: a suspended tab may have missed the events
+    // that clear finalizing/pending or sync multi-mode across tabs.
     let storageReconcile = null;
+    let multiReconcile = null;
     try {
       const snap = await chrome.storage.local.get([
         "recording",
         "restarting",
+        "multiMode",
+        "multiSceneCount",
+        "multiProjectId",
+        "multiLastSceneId",
+        "projectId",
       ]);
       if (!snap.recording && !snap.restarting) {
         storageReconcile = {
@@ -454,6 +457,12 @@ export const setupHandlers = () => {
         };
         chrome.storage.local.set({ pendingRecording: false }).catch(() => {});
       }
+      multiReconcile = {
+        multiMode: Boolean(snap.multiMode),
+        multiSceneCount: Number(snap.multiSceneCount) || 0,
+        multiProjectId: snap.multiProjectId || null,
+        multiLastSceneId: snap.multiLastSceneId || null,
+      };
     } catch {}
     setContentState((prev) => ({
       ...prev,
@@ -461,6 +470,7 @@ export const setupHandlers = () => {
       hasOpenedBefore: true,
       showPopup: true,
       ...(storageReconcile || {}),
+      ...(multiReconcile || {}),
     }));
     setTimer(0);
     updateFromStorage();
@@ -493,11 +503,8 @@ export const setupHandlers = () => {
         countdownActive: true,
         isCountdownVisible: true,
         countdownCancelled: false,
-        // Latching gate: once the countdown is up, the pre-countdown
-        // loader can never re-show in this session (even during the
-        // brief countdown-end → recording=true storage flip window).
-        // Otherwise the loader bleeds into the captured frame for
-        // region/desktop captures where the stream is already live.
+        // Latch: the pre-countdown loader must never re-show, or it bleeds
+        // into the captured frame for region/desktop (stream already live).
         countdownEverShown: true,
       }));
       chrome.runtime.sendMessage({ type: "diag-countdown-started" }).catch(() => {});
@@ -513,6 +520,8 @@ export const setupHandlers = () => {
     state.stopRecording();
   });
 
+  // Used to nest a second registerMessage call inside the handler,
+  // which added a listener per fire and made the toggle fire N+1 times.
   registerMessage("toggle-drawing-mode", () => {
     const now = Date.now();
     if (now - lastToggleDrawingAt < TOGGLE_DRAWING_COOLDOWN_MS) {
@@ -529,26 +538,9 @@ export const setupHandlers = () => {
       drawingMode: nextDrawingMode,
       blurMode: nextDrawingMode ? false : prev.blurMode,
     }));
-
-    registerMessage("toggle-drawing-mode", () => {
-      const now = Date.now();
-      if (now - lastToggleDrawingAt < TOGGLE_DRAWING_COOLDOWN_MS) return;
-      lastToggleDrawingAt = now;
-      if (document.hidden || !document.hasFocus()) return;
-      if (contentStateRef.current.recordingType === "camera") return;
-
-      const nextDrawingMode = !contentStateRef.current.drawingMode;
-
-      setContentState((prev) => ({
-        ...prev,
-        drawingMode: nextDrawingMode,
-        blurMode: nextDrawingMode ? false : prev.blurMode,
-      }));
-
-      chrome.storage.local.set({
-        drawingMode: nextDrawingMode,
-        ...(nextDrawingMode ? { blurMode: false } : {}),
-      });
+    chrome.storage.local.set({
+      drawingMode: nextDrawingMode,
+      ...(nextDrawingMode ? { blurMode: false } : {}),
     });
   });
 
@@ -1014,12 +1006,8 @@ export const setupHandlers = () => {
   });
 
   registerMessage("reopen-popup-multi", async (message) => {
-    // Read multi-state from storage before setContentState so the
-    // popup renders with multiMode/multiSceneCount correct on first
-    // paint. The old fire-and-forget updateFromStorage() ran AFTER
-    // setContentState, which raced and could leave the popup
-    // showing the "Multi recording" switch instead of "Done" (stale
-    // for hundreds of ms, or persistent across tabs).
+    // Read multi-state from storage before setContentState so the popup's
+    // first paint is correct (a fire-and-forget read would race the render).
     let storedMulti = {};
     try {
       storedMulti = await chrome.storage.local.get([
@@ -1030,12 +1018,8 @@ export const setupHandlers = () => {
         "projectId",
       ]);
     } catch {}
-    // Multi-scene stop choreography. Scene-create is already done
-    // server-side by now. Order: clear loader + recording state
-    // (including finalizingRecording, or the loader sticks until the
-    // 30s watchdog), toast immediately, popup ~700ms later so the
-    // toast settles first. Read multi state from storage; contentState
-    // can be stale on a tab that didn't run the recording.
+    // Order: clear all recording state (incl. finalizingRecording, or the
+    // loader sticks for 30s), toast, then popup ~700ms later so toast settles.
     const isMulti = Boolean(storedMulti.multiMode);
     setContentState((prev) => ({
       ...prev,

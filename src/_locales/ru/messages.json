@@ -1666,5 +1666,29 @@
   },
   "recordingCorruptToast": {
     "message": "Эту запись невозможно воспроизвести. Возможно, файл повреждён или неполный. Попробуйте скачать исходный файл через меню Сохранить."
+  },
+  "storageFullRecordingError": {
+    "message": "Недостаточно места для записи. Освободите место на диске и попробуйте снова.",
+    "description": "Shown when the browser can't allocate enough local storage to start a recording"
+  },
+  "storageLowRecordingWarning": {
+    "message": "Хранилище браузера почти заполнено. Освободите место на диске, чтобы не потерять эту запись.",
+    "description": "Shown when local storage is running low while a recording is in progress"
+  },
+  "screenStreamUnavailableError": {
+    "message": "Не удалось получить доступ к экрану. Запустите запись снова.",
+    "description": "Shown when the screen capture stream is missing after the user picked a source"
+  },
+  "tabStreamUnavailableError": {
+    "message": "Не удалось получить доступ к видео этой вкладки. Перезагрузите вкладку и попробуйте снова.",
+    "description": "Shown when Chrome won't return a tab capture stream for the chosen tab"
+  },
+  "streamingDataTimeoutError": {
+    "message": "Запись не началась вовремя. Попробуйте снова.",
+    "description": "Shown when the recorder tab never received streaming-data from the background script"
+  },
+  "unsupportedVideoCodecError": {
+    "message": "Ваш браузер не поддерживает необходимые видеокодеки. Обновите Chrome и попробуйте снова.",
+    "description": "Shown when no supported MediaRecorder mimeType is available"
   }
 }

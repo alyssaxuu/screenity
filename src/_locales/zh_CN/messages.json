@@ -1665,5 +1665,29 @@
   },
   "stopRecording": {
     "message": "停止录制"
+  },
+  "storageFullRecordingError": {
+    "message": "存储空间不足，无法录制。请释放磁盘空间后重试。",
+    "description": "Shown when the browser can't allocate enough local storage to start a recording"
+  },
+  "storageLowRecordingWarning": {
+    "message": "您的浏览器存储空间快满了。请释放磁盘空间，以免丢失此录制内容。",
+    "description": "Shown when local storage is running low while a recording is in progress"
+  },
+  "screenStreamUnavailableError": {
+    "message": "无法访问屏幕。请重新开始录制。",
+    "description": "Shown when the screen capture stream is missing after the user picked a source"
+  },
+  "tabStreamUnavailableError": {
+    "message": "无法访问此标签页的视频。请重新加载该标签页后重试。",
+    "description": "Shown when Chrome won't return a tab capture stream for the chosen tab"
+  },
+  "streamingDataTimeoutError": {
+    "message": "录制未能及时开始。请重试。",
+    "description": "Shown when the recorder tab never received streaming-data from the background script"
+  },
+  "unsupportedVideoCodecError": {
+    "message": "您的浏览器不支持所需的视频编码器。请更新 Chrome 后重试。",
+    "description": "Shown when no supported MediaRecorder mimeType is available"
   }
 }

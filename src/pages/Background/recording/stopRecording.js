@@ -391,11 +391,9 @@ export const stopRecording = async () => {
     chrome.runtime.sendMessage({ type: "turn-off-pip" });
   }
 
-  // Hold the diag session open until editorReadyAt lands or 90s passes
-  // so sandbox-side events from the editor load make it into the zip.
-  // Closing here used to drop everything past stop+~17ms.
-  // never clear recordingTab here; cleanup runs in handleRecordingComplete /
-  // onTabRemoved / openRecorderTab safety net
+  // Hold the diag session open until editorReadyAt or 90s, so sandbox-side
+  // events from the editor load make it into the zip. Don't clear
+  // recordingTab here; cleanup runs in handleRecordingComplete / onTabRemoved.
   (async () => {
     const SESSION_DEFER_TIMEOUT_MS = 90_000;
     const POLL_INTERVAL_MS = 500;
@@ -571,24 +569,39 @@ export const handleStopRecordingTab = async (request) => {
             return;
           }
           let settled = false;
-          const safetyTimer = setTimeout(() => {
-            if (!settled) {
-              settled = true;
-              console.warn("[Screenity][BG] Editor tab load timed out; releasing lock");
-              diagEvent("editor-open-timeout", { tabId: tab.id, type: "editorwebcodecs" });
-              releasePostStopEditorLock();
-              markEditorStartFailed(
-                tab.id,
-                "EDITOR_TAB_LOAD_TIMEOUT",
-                "editor tab never reached status=complete within 15s",
-              );
-            }
-          }, 15000);
-          chrome.tabs.onUpdated.addListener(function _(
-            tabId,
-            changeInfo,
-            updatedTab,
-          ) {
+          let onUpdatedListener = null;
+          // 45s tolerates slow OPFS/editor mounts (saw 24s in prod); on fire
+          // we re-check tab.status to avoid a phantom fail over a loaded tab.
+          const safetyTimer = setTimeout(async () => {
+            if (settled) return;
+            try {
+              const cur = await chrome.tabs.get(tab.id);
+              if (cur?.status === "complete") {
+                // 'complete' fired between the check and listener removal.
+                if (onUpdatedListener) {
+                  chrome.tabs.onUpdated.removeListener(onUpdatedListener);
+                }
+                if (settled) return;
+                settled = true;
+                chrome.storage.local.set({ sandboxTab: tab.id });
+                releasePostStopEditorLock();
+                sendMessageTab(tab.id, { type: "fallback-recording" }).catch(
+                  () => {},
+                );
+                return;
+              }
+            } catch {}
+            settled = true;
+            console.warn("[Screenity][BG] Editor tab load timed out; releasing lock");
+            diagEvent("editor-open-timeout", { tabId: tab.id, type: "editorwebcodecs" });
+            releasePostStopEditorLock();
+            markEditorStartFailed(
+              tab.id,
+              "EDITOR_TAB_LOAD_TIMEOUT",
+              "editor tab never reached status=complete within 45s",
+            );
+          }, 45000);
+          onUpdatedListener = function _(tabId, changeInfo, updatedTab) {
             if (tabId === tab.id && changeInfo.status === "complete") {
               chrome.tabs.onUpdated.removeListener(_);
               if (settled) return;
@@ -610,7 +623,8 @@ export const handleStopRecordingTab = async (request) => {
                 },
               );
             }
-          });
+          };
+          chrome.tabs.onUpdated.addListener(onUpdatedListener);
         },
       );
     } else {
@@ -630,24 +644,38 @@ export const handleStopRecordingTab = async (request) => {
         }
         perfMark("BG.stopRecording editor-tab-create.done", { tabId: tab.id });
         let settled = false;
-        const safetyTimer = setTimeout(() => {
-          if (!settled) {
-            settled = true;
-            console.warn("[Screenity][BG] Editor tab load timed out; releasing lock");
-            diagEvent("editor-open-timeout", { tabId: tab.id, type: editorUrl });
-            releasePostStopEditorLock({ postStopRecordingId: null });
-            markEditorStartFailed(
-              tab.id,
-              "EDITOR_TAB_LOAD_TIMEOUT",
-              "editor tab never reached status=complete within 15s",
-            );
-          }
-        }, 15000);
-        chrome.tabs.onUpdated.addListener(function _(
-          tabId,
-          changeInfo,
-          updatedTab,
-        ) {
+        let onUpdatedListener = null;
+        // See matching block above for rationale (45s + final-check).
+        const safetyTimer = setTimeout(async () => {
+          if (settled) return;
+          try {
+            const cur = await chrome.tabs.get(tab.id);
+            if (cur?.status === "complete") {
+              if (onUpdatedListener) {
+                chrome.tabs.onUpdated.removeListener(onUpdatedListener);
+              }
+              if (settled) return;
+              settled = true;
+              endTabLoad({ result: "loaded-late" });
+              chrome.storage.local.set({
+                sandboxTab: tab.id,
+                postStopRecordingId: null,
+              });
+              releasePostStopEditorLock({ postStopRecordingId: null });
+              return;
+            }
+          } catch {}
+          settled = true;
+          console.warn("[Screenity][BG] Editor tab load timed out; releasing lock");
+          diagEvent("editor-open-timeout", { tabId: tab.id, type: editorUrl });
+          releasePostStopEditorLock({ postStopRecordingId: null });
+          markEditorStartFailed(
+            tab.id,
+            "EDITOR_TAB_LOAD_TIMEOUT",
+            "editor tab never reached status=complete within 45s",
+          );
+        }, 45000);
+        onUpdatedListener = function _(tabId, changeInfo, updatedTab) {
           if (tabId === tab.id && changeInfo.status === "complete") {
             chrome.tabs.onUpdated.removeListener(_);
             if (settled) return;
@@ -757,7 +785,8 @@ export const handleStopRecordingTab = async (request) => {
               })();
             }
           }
-        });
+        };
+        chrome.tabs.onUpdated.addListener(onUpdatedListener);
       });
     }
   }

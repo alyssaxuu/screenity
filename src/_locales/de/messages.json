@@ -1666,5 +1666,29 @@
   },
   "recordingCorruptToast": {
     "message": "Diese Aufnahme kann nicht abgespielt werden. Die Datei ist möglicherweise unvollständig oder beschädigt. Versuchen Sie, die Rohdatei über das Speichern-Menü herunterzuladen."
+  },
+  "storageFullRecordingError": {
+    "message": "Nicht genügend Speicher für die Aufnahme. Gib Speicherplatz frei und versuche es erneut.",
+    "description": "Shown when the browser can't allocate enough local storage to start a recording"
+  },
+  "storageLowRecordingWarning": {
+    "message": "Der Speicher deines Browsers ist fast voll. Gib Speicherplatz frei, damit diese Aufnahme nicht verloren geht.",
+    "description": "Shown when local storage is running low while a recording is in progress"
+  },
+  "screenStreamUnavailableError": {
+    "message": "Auf den Bildschirm konnte nicht zugegriffen werden. Starte die Aufnahme erneut.",
+    "description": "Shown when the screen capture stream is missing after the user picked a source"
+  },
+  "tabStreamUnavailableError": {
+    "message": "Auf das Video dieses Tabs konnte nicht zugegriffen werden. Lade den Tab neu und versuche es erneut.",
+    "description": "Shown when Chrome won't return a tab capture stream for the chosen tab"
+  },
+  "streamingDataTimeoutError": {
+    "message": "Die Aufnahme konnte nicht rechtzeitig gestartet werden. Bitte versuche es erneut.",
+    "description": "Shown when the recorder tab never received streaming-data from the background script"
+  },
+  "unsupportedVideoCodecError": {
+    "message": "Dein Browser unterstützt die benötigten Video-Codecs nicht. Aktualisiere Chrome und versuche es erneut.",
+    "description": "Shown when no supported MediaRecorder mimeType is available"
   }
 }

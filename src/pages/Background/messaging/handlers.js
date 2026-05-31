@@ -1,5 +1,6 @@
 import JSZip from "jszip";
 import { registerMessage } from "../../../messaging/messageRouter";
+import { appendUploadTelemetryEventSerialized } from "../utils/serializedTelemetryStore";
 import { perfMark, perfSpan } from "../../utils/perfMarks";
 import {
   focusTab,
@@ -584,6 +585,9 @@ export const handleFinishMultiRecording = async () => {
       }
     }
 
+    // Safety net for the !recordingToScene branch, which doesn't clear
+    // these inline. The else branch's bulk set already covers them, so
+    // this is a harmless redundant write on that path.
     await chrome.storage.local.set({
       multiMode: false,
       multiSceneCount: 0,
@@ -958,10 +962,8 @@ export const setupHandlers = () => {
     return { ok: false, error: lastErr || "tabs-sendMessage-failed" };
   });
 
-  // Bearer-auth API call routed through the SW so it survives the calling
-  // tab's teardown (e.g. cloud recorder closing post-stop). Restricted to the
-  // configured Screenity API base. Kept for non-cloud-recorder callers; the
-  // cloud recorder uses the port-based path above instead.
+  // Bearer-auth fetch via SW so it survives caller teardown. Non-cloud-recorder
+  // callers only; the cloud recorder uses the port-based path above.
   registerMessage("pro-api-fetch", async (message) => {
     // Heartbeat resets the SW idle timer for the duration of the fetch,
     // helpful when the originating tab tears down right after dispatch.
@@ -2733,26 +2735,11 @@ export const setupHandlers = () => {
   // Receive perf entries from page contexts at pagehide; routed via
   // BG so the storage IPC completes (a dying page racing storage.set
   // drops the last few marks). Cloud upload telemetry routes here too.
-  const UPLOAD_TELEMETRY_KEY = "cloudUploadTelemetryEvents";
-  const MAX_UPLOAD_TELEMETRY_EVENTS = 200;
   registerMessage("cloud-telemetry-event", async (message) => {
-    try {
-      const event = message?.event;
-      if (!event || typeof event !== "object") return { ok: false };
-      const existing = await chrome.storage.local.get([UPLOAD_TELEMETRY_KEY]);
-      const current = Array.isArray(existing?.[UPLOAD_TELEMETRY_KEY])
-        ? existing[UPLOAD_TELEMETRY_KEY]
-        : [];
-      const next = [...current, event].slice(-MAX_UPLOAD_TELEMETRY_EVENTS);
-      await chrome.storage.local.set({
-        [UPLOAD_TELEMETRY_KEY]: next,
-        lastUploadTelemetryEvent: event,
-      });
-      return { ok: true };
-    } catch (err) {
-      // Best-effort: telemetry isn't user-facing functionality.
-      return { ok: false, error: String(err?.message || err).slice(0, 200) };
-    }
+    const event = message?.event;
+    if (!event || typeof event !== "object") return { ok: false };
+    const ok = await appendUploadTelemetryEventSerialized(event);
+    return { ok };
   });
 
   registerMessage("perf-forward", async (message) => {

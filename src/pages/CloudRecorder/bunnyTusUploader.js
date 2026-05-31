@@ -1089,7 +1089,11 @@ export default class BunnyTusUploader {
   }
   async uploadChunk(chunk) {
     if (this.isFinalizing) return;
-    const data = new Uint8Array(await chunk.arrayBuffer());
+    let data = new Uint8Array(await chunk.arrayBuffer());
+    const chunkStartOffset = this.offset;
+    // One-shot 401 refresh per chunk. Re-armed each chunk so a token
+    // expiring across many chunks keeps recovering.
+    let didAuth401Refresh = false;
 
     for (let attempt = 0; attempt <= this.MAX_RETRIES; attempt++) {
       try {
@@ -1159,6 +1163,29 @@ export default class BunnyTusUploader {
         } else {
           const errorText = await res.text();
 
+          // 401 mid-flight: token expired between checkAuthExpiration
+          // and the server's check. Refresh once and retry; a second
+          // 401 falls through as non-transient.
+          if (res.status === 401 && !didAuth401Refresh) {
+            didAuth401Refresh = true;
+            console.warn(
+              "[bunnyTusUploader] 401 mid-PATCH; refreshing TUS auth + retrying once",
+            );
+            this.emitTelemetry("upload_auth_refresh_after_401", {
+              attempt,
+            });
+            try {
+              await this.refreshTusAuth();
+              continue;
+            } catch (refreshErr) {
+              console.error(
+                "[bunnyTusUploader] refreshTusAuth after 401 failed:",
+                refreshErr,
+              );
+              // Fall through to the generic error throw.
+            }
+          }
+
           // Session invalidated; fatal so callers can fall back.
           if (res.status === 404) {
             this.status = "error";
@@ -1210,12 +1237,32 @@ export default class BunnyTusUploader {
                 }
                 this.lastServerOffset = serverOffset;
                 this.offset = serverOffset;
-                this.totalBytes = Math.max(this.totalBytes || 0, serverOffset);
                 this.emitTelemetry("upload_resumed", {
                   resumedOffset: serverOffset,
                   reason: "offset-conflict",
                 });
                 this.scheduleJournalPersist({ force: true });
+
+                const chunkEnd = chunkStartOffset + data.length;
+                if (serverOffset >= chunkEnd) {
+                  this.emitTelemetry("upload_chunk_skipped_after_resync", {
+                    chunkStartOffset,
+                    chunkLength: data.length,
+                    serverOffset,
+                  });
+                  this.recordProgress(0);
+                  return;
+                }
+                if (serverOffset > chunkStartOffset) {
+                  const trimmedBytes = serverOffset - chunkStartOffset;
+                  data = data.subarray(trimmedBytes);
+                  this.emitTelemetry("upload_chunk_trimmed_after_resync", {
+                    chunkStartOffset,
+                    chunkLength: data.length + trimmedBytes,
+                    trimmedBytes,
+                    serverOffset,
+                  });
+                }
 
                 continue;
               }
@@ -1510,7 +1557,10 @@ export default class BunnyTusUploader {
         },
       });
 
-      if (!res.ok && res.status !== 204) {
+      // 410 = Bunny reports the upload is already finalized. Treat as
+      // success; server is the truth, retrying would just loop.
+      const alreadyFinalized = res.status === 410;
+      if (!res.ok && res.status !== 204 && !alreadyFinalized) {
         this.setUploaderError("finalize-patch-failed");
         throw new Error("Finalization failed");
       }
@@ -1518,6 +1568,7 @@ export default class BunnyTusUploader {
       this.finalizedAt = Date.now();
       this.emitTelemetry("upload_finalize_completed", {
         finalizedBytes: this.totalBytes,
+        alreadyFinalized: alreadyFinalized || undefined,
       });
       this.emitTelemetry("upload_complete_client", {
         finalizedBytes: this.totalBytes,
@@ -1633,11 +1684,8 @@ export default class BunnyTusUploader {
     this.stallRecoveryInFlight = false;
     this.heartbeatTimer = setInterval(() => {
       const now = Date.now();
-      // Sleep/wake: timers don't fire while asleep, but on wake fire
-      // missed ticks back-to-back. Skip ticks whose wall-clock gap is
-      // much shorter than HEARTBEAT_INTERVAL_MS, otherwise an 8hr sleep
-      // stacks ~2880 ticks and each runs stall recovery, flooding
-      // the network on wake.
+      // Skip wake-burst ticks: an 8hr sleep stacks ~2880 missed ticks and
+      // each would run stall recovery, flooding the network on wake.
       const sinceLastTick = now - (this.lastHeartbeatTickAt || 0);
       this.lastHeartbeatTickAt = now;
       if (sinceLastTick < Math.floor(this.HEARTBEAT_INTERVAL_MS * 0.5)) {
@@ -1719,6 +1767,7 @@ export default class BunnyTusUploader {
                 stallMs,
                 serverOffset,
               });
+              this.maybeAutoFinalize();
             }
           }
         }
@@ -1728,6 +1777,28 @@ export default class BunnyTusUploader {
     } finally {
       this.stallRecoveryInFlight = false;
     }
+  }
+
+  maybeAutoFinalize() {
+    if (this.isFinalizing) return;
+    if (this.status === "completed" || this.status === "aborted") return;
+    if (this.totalBytes <= 0) return;
+    // Trigger when offset >= totalBytes (used to be strict equality,
+    // which deadlocked when 409 resync set offset past totalBytes from
+    // a prior session's unjournaled bytes).
+    if (this.offset < this.totalBytes) return;
+    if (this.chunkQueue.length > 0) return;
+    if (this.pendingUploads.length > 0) return;
+    const sinceLastWrite = Date.now() - (this.lastChunkQueuedAt || 0);
+    if (this.lastChunkQueuedAt && sinceLastWrite < this.HEARTBEAT_LAG_MS) return;
+    this.emitTelemetry("upload_auto_finalize_triggered", {
+      sinceLastWriteMs: sinceLastWrite,
+      offset: this.offset,
+      totalBytes: this.totalBytes,
+    });
+    this.finalize().catch((err) => {
+      console.warn("[bunnyTusUploader] auto-finalize failed:", err?.message || err);
+    });
   }
 
   stopHeartbeat() {

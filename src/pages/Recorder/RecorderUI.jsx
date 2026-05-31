@@ -1,6 +1,7 @@
 // RecorderUI.jsx
 import React from "react";
 import Warning from "./warning/Warning";
+import GradientBackground from "../Components/GradientBackground";
 
 const isTabFromUrl = new URLSearchParams(window.location.search).has("tab");
 
@@ -31,7 +32,7 @@ const RecorderUI = ({ started, isTab }) => {
 
       {!isTab && !started && <Warning />}
 
-      <div className="setupBackgroundSVG"></div>
+      <GradientBackground subtle />
 
       <style>
         {`
@@ -52,27 +53,6 @@ const RecorderUI = ({ started, isTab }) => {
             margin-right: auto;
             z-index: 999999;
           }
-          .setupBackgroundSVG {
-            position: absolute;
-            top: 0px;
-            left: 0px;
-            width: 100%;
-            height:100%;
-            background: url('${chrome.runtime.getURL(
-              "assets/helper/pattern-svg.svg"
-            )}') repeat;
-            background-size: 62px 23.5px;
-            animation: moveBackground 138s linear infinite;
-            transform: rotate(0deg);
-          }
-          @keyframes moveBackground {
-            0% {
-              background-position: 0 0;
-            }
-            100% {
-              background-position: 100% 0;
-            }
-          }
           .logo {
             position: absolute;
             bottom: 30px;
@@ -88,6 +68,7 @@ const RecorderUI = ({ started, isTab }) => {
             width: 100%;
             height: 100%;
             background-color: #F6F7FB;
+            isolation: isolate;
           }
           .middle-area {
             display: flex;

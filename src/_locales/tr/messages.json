@@ -1666,5 +1666,29 @@
   },
   "recordingCorruptToast": {
     "message": "Bu kayıt oynatılamıyor. Dosya eksik veya bozuk olabilir. Kaydet menüsünden ham dosyayı indirmeyi deneyin."
+  },
+  "storageFullRecordingError": {
+    "message": "Kayıt için yeterli depolama alanı yok. Disk alanı boşaltıp tekrar deneyin.",
+    "description": "Shown when the browser can't allocate enough local storage to start a recording"
+  },
+  "storageLowRecordingWarning": {
+    "message": "Tarayıcı depolama alanınız neredeyse dolu. Bu kaydı kaybetmemek için disk alanı boşaltın.",
+    "description": "Shown when local storage is running low while a recording is in progress"
+  },
+  "screenStreamUnavailableError": {
+    "message": "Ekrana erişilemedi. Kaydı tekrar başlatın.",
+    "description": "Shown when the screen capture stream is missing after the user picked a source"
+  },
+  "tabStreamUnavailableError": {
+    "message": "Bu sekmenin videosuna erişilemedi. Sekmeyi yeniden yükleyip tekrar deneyin.",
+    "description": "Shown when Chrome won't return a tab capture stream for the chosen tab"
+  },
+  "streamingDataTimeoutError": {
+    "message": "Kayıt zamanında başlamadı. Lütfen tekrar deneyin.",
+    "description": "Shown when the recorder tab never received streaming-data from the background script"
+  },
+  "unsupportedVideoCodecError": {
+    "message": "Tarayıcınız gerekli video codec'lerini desteklemiyor. Chrome'u güncelleyip tekrar deneyin.",
+    "description": "Shown when no supported MediaRecorder mimeType is available"
   }
 }

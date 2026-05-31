@@ -57,6 +57,7 @@ const STREAM_PATTERNS = [
   "failed to setup streaming",
   "failed to get stream",
   "failed to access screen stream",
+  "the screen stream",
   "failed to access region stream",
   "no streams to record",
   "no screen video track",
@@ -96,6 +97,7 @@ const TAB_PATTERNS = [
   "unable to resolve tab",
   "tab capture",
   "message routing",
+  "this tab's video",
 ];
 
 const TIMEOUT_PATTERNS = [
@@ -136,7 +138,11 @@ export const classifyError = (errorStr = "", errorType = "") => {
     return REC_START_PERM;
   }
 
-  if (lower.includes("streaming-data never arrived")) {
+  if (
+    lower.includes("streaming-data never arrived") ||
+    lower.includes("didn't start in time") ||
+    lower.includes("didnt start in time")
+  ) {
     return REC_START_NO_STREAM_MSG;
   }
 

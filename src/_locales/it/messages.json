@@ -1661,5 +1661,29 @@
   },
   "overLimitModalLearnMore": {
     "message": "Scopri di più sull'elaborazione di video lunghi."
+  },
+  "storageFullRecordingError": {
+    "message": "Spazio di archiviazione insufficiente per registrare. Libera spazio sul disco e riprova.",
+    "description": "Shown when the browser can't allocate enough local storage to start a recording"
+  },
+  "storageLowRecordingWarning": {
+    "message": "L'archiviazione del tuo browser è quasi piena. Libera spazio sul disco per non perdere questa registrazione.",
+    "description": "Shown when local storage is running low while a recording is in progress"
+  },
+  "screenStreamUnavailableError": {
+    "message": "Impossibile accedere allo schermo. Avvia di nuovo la registrazione.",
+    "description": "Shown when the screen capture stream is missing after the user picked a source"
+  },
+  "tabStreamUnavailableError": {
+    "message": "Impossibile accedere al video di questa scheda. Ricarica la scheda e riprova.",
+    "description": "Shown when Chrome won't return a tab capture stream for the chosen tab"
+  },
+  "streamingDataTimeoutError": {
+    "message": "La registrazione non è partita in tempo. Riprova.",
+    "description": "Shown when the recorder tab never received streaming-data from the background script"
+  },
+  "unsupportedVideoCodecError": {
+    "message": "Il tuo browser non supporta i codec video richiesti. Aggiorna Chrome e riprova.",
+    "description": "Shown when no supported MediaRecorder mimeType is available"
   }
 }

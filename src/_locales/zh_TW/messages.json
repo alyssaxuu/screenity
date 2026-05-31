@@ -1666,5 +1666,29 @@
   },
   "recordingCorruptToast": {
     "message": "此錄影無法播放。檔案可能不完整或已損毀。請從「儲存」選單下載原始檔案。"
+  },
+  "storageFullRecordingError": {
+    "message": "儲存空間不足，無法錄製。請釋放磁碟空間後再試一次。",
+    "description": "Shown when the browser can't allocate enough local storage to start a recording"
+  },
+  "storageLowRecordingWarning": {
+    "message": "您的瀏覽器儲存空間快滿了。請釋放磁碟空間，以免遺失此錄製內容。",
+    "description": "Shown when local storage is running low while a recording is in progress"
+  },
+  "screenStreamUnavailableError": {
+    "message": "無法存取畫面。請重新開始錄製。",
+    "description": "Shown when the screen capture stream is missing after the user picked a source"
+  },
+  "tabStreamUnavailableError": {
+    "message": "無法存取此分頁的影片。請重新載入分頁後再試一次。",
+    "description": "Shown when Chrome won't return a tab capture stream for the chosen tab"
+  },
+  "streamingDataTimeoutError": {
+    "message": "錄製未能及時開始。請再試一次。",
+    "description": "Shown when the recorder tab never received streaming-data from the background script"
+  },
+  "unsupportedVideoCodecError": {
+    "message": "您的瀏覽器不支援所需的視訊編解碼器。請更新 Chrome 後再試一次。",
+    "description": "Shown when no supported MediaRecorder mimeType is available"
   }
 }

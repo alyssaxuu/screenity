@@ -1666,5 +1666,29 @@
   },
   "recordingCorruptToast": {
     "message": "이 녹화는 재생할 수 없습니다. 파일이 불완전하거나 손상되었을 수 있습니다. 저장 메뉴에서 원본 파일을 다운로드해 보세요."
+  },
+  "storageFullRecordingError": {
+    "message": "녹화할 저장 공간이 부족해요. 디스크 공간을 비우고 다시 시도해 주세요.",
+    "description": "Shown when the browser can't allocate enough local storage to start a recording"
+  },
+  "storageLowRecordingWarning": {
+    "message": "브라우저 저장 공간이 거의 가득 찼어요. 이 녹화를 안전하게 보관하려면 디스크 공간을 비워주세요.",
+    "description": "Shown when local storage is running low while a recording is in progress"
+  },
+  "screenStreamUnavailableError": {
+    "message": "화면에 접근하지 못했어요. 녹화를 다시 시작해 주세요.",
+    "description": "Shown when the screen capture stream is missing after the user picked a source"
+  },
+  "tabStreamUnavailableError": {
+    "message": "이 탭의 영상에 접근하지 못했어요. 탭을 새로고침하고 다시 시도해 주세요.",
+    "description": "Shown when Chrome won't return a tab capture stream for the chosen tab"
+  },
+  "streamingDataTimeoutError": {
+    "message": "녹화가 제때 시작되지 않았어요. 다시 시도해 주세요.",
+    "description": "Shown when the recorder tab never received streaming-data from the background script"
+  },
+  "unsupportedVideoCodecError": {
+    "message": "브라우저가 필요한 비디오 코덱을 지원하지 않아요. Chrome을 업데이트하고 다시 시도해 주세요.",
+    "description": "Shown when no supported MediaRecorder mimeType is available"
   }
 }

@@ -81,22 +81,37 @@ const _startRecordingInner = async (caller) => {
   const recordingAttemptId = makeRecordingAttemptId();
   // only gate countdown-finished; direct/fallback/restart don't share it.
   try {
-    const { recordingStoppedAt, recording, restarting } =
-      await chrome.storage.local.get([
-        "recordingStoppedAt",
-        "recording",
-        "restarting",
-      ]);
+    const {
+      recordingStoppedAt,
+      recording,
+      restarting,
+      countdownStartedAt,
+      countdownFinishedAt,
+    } = await chrome.storage.local.get([
+      "recordingStoppedAt",
+      "recording",
+      "restarting",
+      "countdownStartedAt",
+      "countdownFinishedAt",
+    ]);
     const sinceStopMs =
       typeof recordingStoppedAt === "number"
         ? Date.now() - recordingStoppedAt
         : null;
+    // Countdown after prior stop = fresh back-to-back, not stale dispatch.
+    const countdownIsFresh =
+      typeof recordingStoppedAt === "number" &&
+      ((typeof countdownStartedAt === "number" &&
+        countdownStartedAt > recordingStoppedAt) ||
+        (typeof countdownFinishedAt === "number" &&
+          countdownFinishedAt > recordingStoppedAt));
     if (
       caller === "countdown-finished" &&
       sinceStopMs !== null &&
       sinceStopMs < STALE_START_WINDOW_MS &&
       !recording &&
-      !restarting
+      !restarting &&
+      !countdownIsFresh
     ) {
       console.warn(
         "[Screenity][BG] startRecording aborted: prior recording stopped",
@@ -179,12 +194,8 @@ const _startRecordingInner = async (caller) => {
     "recordingType",
   ]);
 
-  // Close every prior editor tab. OPFS wipes the previous recording
-  // when a new one starts, so a stale editor on old backing data is
-  // worse than closing it. URL-based sweep (not cached `sandboxTab`)
-  // because sandboxTab only tracks the LAST editor; consecutive
-  // recordings would orphan earlier ones. recordingStartingAt above
-  // keeps the cascading close from sweeping the new recorder tab.
+  // Close every prior editor tab by URL (sandboxTab only tracks the last).
+  // OPFS wipes on new recording, so a stale editor would read missing data.
   try {
     const editorUrls = [
       chrome.runtime.getURL("editor.html"),
@@ -243,12 +254,8 @@ const _startRecordingInner = async (caller) => {
     lastStartRecordingCaller: { caller, stack, ts: Date.now() },
   });
 
-  // Clear leaked sceneId from a prior standalone recording; the
-  // cloudrecorder reads storage at start and a stale value tags the
-  // new recording's telemetry. Only clear sceneId/sceneIdStatus, NOT
-  // pendingSceneIndex: it's an array with a `= []` destructuring
-  // default that only covers `undefined`; setting it null makes
-  // `.includes()` throw. Its own upsert/remove lifecycle owns it.
+  // Clear leaked sceneId so cloudrecorder doesn't tag new telemetry with it.
+  // pendingSceneIndex owns its own lifecycle; null would crash its .includes().
   const {
     recordingToScene,
     multiMode,

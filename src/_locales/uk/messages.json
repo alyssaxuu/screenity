@@ -1664,5 +1664,29 @@
   },
   "hostBannerDescription": {
     "message": "Screenity створює один інді-розробник. Самостійний хостинг безкоштовний, але якщо програма вам корисна, підтримайте її через Pro ❤️"
+  },
+  "storageFullRecordingError": {
+    "message": "Недостатньо місця для запису. Звільніть місце на диску й спробуйте знову.",
+    "description": "Shown when the browser can't allocate enough local storage to start a recording"
+  },
+  "storageLowRecordingWarning": {
+    "message": "Сховище браузера майже заповнене. Звільніть місце на диску, щоб не втратити цей запис.",
+    "description": "Shown when local storage is running low while a recording is in progress"
+  },
+  "screenStreamUnavailableError": {
+    "message": "Не вдалося отримати доступ до екрана. Запустіть запис знову.",
+    "description": "Shown when the screen capture stream is missing after the user picked a source"
+  },
+  "tabStreamUnavailableError": {
+    "message": "Не вдалося отримати доступ до відео цієї вкладки. Перезавантажте вкладку й спробуйте знову.",
+    "description": "Shown when Chrome won't return a tab capture stream for the chosen tab"
+  },
+  "streamingDataTimeoutError": {
+    "message": "Запис не почався вчасно. Спробуйте ще раз.",
+    "description": "Shown when the recorder tab never received streaming-data from the background script"
+  },
+  "unsupportedVideoCodecError": {
+    "message": "Ваш браузер не підтримує потрібні відеокодеки. Оновіть Chrome і спробуйте знову.",
+    "description": "Shown when no supported MediaRecorder mimeType is available"
   }
 }

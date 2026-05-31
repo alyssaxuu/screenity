@@ -18,27 +18,14 @@ import { sweepRecorderTabs } from "./sweepRecorderTabs";
 // Mirrors CloudRecorder.appendUploadTelemetryEvent so BG-side projectId mutations
 // land in the same `cloudUploadTelemetryEvents` storage key surfaced by
 // buildDiagnosticZip → upload-telemetry.json. Diagnostic-only; best-effort.
-const BG_UPLOAD_TELEMETRY_KEY = "cloudUploadTelemetryEvents";
-const BG_UPLOAD_TELEMETRY_MAX = 300;
+import { appendUploadTelemetryEventSerialized } from "../utils/serializedTelemetryStore";
+
 const appendBgUploadTelemetryEvent = async (payload) => {
-  try {
-    const existing = await chrome.storage.local.get([BG_UPLOAD_TELEMETRY_KEY]);
-    const current = Array.isArray(existing?.[BG_UPLOAD_TELEMETRY_KEY])
-      ? existing[BG_UPLOAD_TELEMETRY_KEY]
-      : [];
-    const eventPayload = {
-      ts: Date.now(),
-      uploaderType: "bg_recording",
-      ...payload,
-    };
-    const next = [...current, eventPayload].slice(-BG_UPLOAD_TELEMETRY_MAX);
-    await chrome.storage.local.set({
-      [BG_UPLOAD_TELEMETRY_KEY]: next,
-      lastUploadTelemetryEvent: eventPayload,
-    });
-  } catch {
-    // best-effort; telemetry must never break recording
-  }
+  await appendUploadTelemetryEventSerialized({
+    ts: Date.now(),
+    uploaderType: "bg_recording",
+    ...payload,
+  });
 };
 
 export const checkCapturePermissions = async ({ isLoggedIn, isSubscribed }) => {
@@ -184,12 +171,8 @@ export const handleRecordingError = async (request) => {
   ]);
   const preserveMultiProject =
     Boolean(multiMode) && Number(multiSceneCount) > 0;
-  // Clear sceneId/sceneIdStatus/pendingSceneIndex when projectId
-  // clears; a retry inheriting a stale sceneId reaches the
-  // cloudrecorder with projectId=null and sceneIdStatus="recording".
-  // pendingSceneIndex must clear to `[]`, not null: it's consumed
-  // via destructuring defaults that don't fire for null, and a null
-  // value crashes the next .includes() in CloudRecorder.
+  // Clear scene state when projectId clears so retries don't inherit it.
+  // pendingSceneIndex must be [], not null (defaults don't fire on null).
   const multiState = preserveMultiProject
     ? {}
     : {

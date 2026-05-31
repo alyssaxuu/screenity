@@ -1666,5 +1666,29 @@
   },
   "recordingCorruptToast": {
     "message": "Rekaman ini tidak dapat diputar. File mungkin tidak lengkap atau rusak. Coba unduh file mentah dari menu Simpan."
+  },
+  "storageFullRecordingError": {
+    "message": "Penyimpanan tidak cukup untuk merekam. Kosongkan ruang disk lalu coba lagi.",
+    "description": "Shown when the browser can't allocate enough local storage to start a recording"
+  },
+  "storageLowRecordingWarning": {
+    "message": "Penyimpanan browser Anda hampir penuh. Kosongkan ruang disk agar rekaman ini tetap aman.",
+    "description": "Shown when local storage is running low while a recording is in progress"
+  },
+  "screenStreamUnavailableError": {
+    "message": "Tidak dapat mengakses layar. Mulai perekaman lagi.",
+    "description": "Shown when the screen capture stream is missing after the user picked a source"
+  },
+  "tabStreamUnavailableError": {
+    "message": "Tidak dapat mengakses video tab ini. Muat ulang tab lalu coba lagi.",
+    "description": "Shown when Chrome won't return a tab capture stream for the chosen tab"
+  },
+  "streamingDataTimeoutError": {
+    "message": "Perekaman tidak dimulai tepat waktu. Silakan coba lagi.",
+    "description": "Shown when the recorder tab never received streaming-data from the background script"
+  },
+  "unsupportedVideoCodecError": {
+    "message": "Browser Anda tidak mendukung codec video yang diperlukan. Perbarui Chrome lalu coba lagi.",
+    "description": "Shown when no supported MediaRecorder mimeType is available"
   }
 }
