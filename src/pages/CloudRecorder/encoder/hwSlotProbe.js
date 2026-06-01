@@ -231,6 +231,29 @@ const probeConcurrentHw = async ({ codec, framerate }) => {
   };
 };
 
+// MP4 carries AAC audio. probeOne only verifies the H.264 *video* encoder, so
+// a build that encodes H.264 but not AAC (some Chromium builds without
+// proprietary codecs) would pick the WebCodecs MP4 path and then silently drop
+// audio. AAC support is device-global, so probe it once; when missing,
+// chooseEncoder routes video tracks to MediaRecorder (VP9-WebM), which records
+// audio natively. isConfigSupported-only, matching the video probe's style.
+const AAC_PROBE_CONFIG = {
+  codec: "mp4a.40.2",
+  sampleRate: 48000,
+  numberOfChannels: 2,
+  bitrate: 128000,
+};
+
+const probeAacSupported = async () => {
+  if (typeof AudioEncoder === "undefined") return false;
+  try {
+    const support = await AudioEncoder.isConfigSupported(AAC_PROBE_CONFIG);
+    return Boolean(support?.supported);
+  } catch {
+    return false;
+  }
+};
+
 export const probeHwSlots = async ({
   framerate = 30,
 } = {}) => {
@@ -289,6 +312,8 @@ export const probeHwSlots = async ({
   // rejected every codec candidate at the individual probe step.
   const cameraHwViable = cameraProbe.supported;
 
+  const aacSupported = await probeAacSupported();
+
   return {
     screen: screenProbe,
     camera: cameraProbe,
@@ -296,6 +321,7 @@ export const probeHwSlots = async ({
     summary: {
       screenHw: screenProbe.supported,
       cameraHw: cameraHwViable,
+      aacSupported,
       cameraHwAvailable,
       cameraHwAdvertised: cameraProbe.supported,
       cameraPreferSoftware,

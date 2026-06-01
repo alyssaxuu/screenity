@@ -107,6 +107,21 @@ export const inspectTrackPlan = async ({ track, probeOptions }) => {
       reason: `hw-probe-${track}-unsupported`,
     };
   }
+  // MP4/WebCodecs can't carry audio without AAC. When AAC encode is missing
+  // (rare: Chromium with H.264 but no proprietary AAC) the WebCodecs path
+  // would produce a silent MP4, so route video tracks to MediaRecorder
+  // (VP9-WebM), which records audio natively. AAC support is device-global, so
+  // both inspectTrackPlan callers (TUS filetype hint and recorder) agree.
+  // `=== false` so an older cached probe without the field fails open.
+  if (hwSlots.summary.aacSupported === false) {
+    return {
+      kind: "mediarecorder",
+      container: "video/webm",
+      codec: "vp9",
+      hwSlots: hwSlots.summary,
+      reason: "aac-unsupported",
+    };
+  }
   if (track === "camera" && hwSlots.summary.mode === "screen-hw-camera-mr") {
     return {
       kind: "mediarecorder",
