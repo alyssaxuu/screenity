@@ -35,6 +35,25 @@ const post = (payload) => {
   self.postMessage(payload);
 };
 
+// crbug/453704691: createSyncAccessHandle can throw NoModificationAllowedError
+// briefly while GC reclaims a prior handle. Retry with backoff before failing.
+const openSyncAccessHandleWithRetry = async (handle) => {
+  const delaysMs = [0, 200, 400, 600, 800];
+  let lastErr = null;
+  for (let i = 0; i < delaysMs.length; i += 1) {
+    if (delaysMs[i] > 0) {
+      await new Promise((r) => setTimeout(r, delaysMs[i]));
+    }
+    try {
+      return await handle.createSyncAccessHandle();
+    } catch (err) {
+      lastErr = err;
+      if (err?.name !== "NoModificationAllowedError") break;
+    }
+  }
+  throw lastErr;
+};
+
 const openFile = async (recordingId, extension) => {
   // Create NEW before deleting old: if creation fails, the previous
   // recording remains intact for recovery, and a recovery editor
@@ -43,7 +62,7 @@ const openFile = async (recordingId, extension) => {
   const ext = extension === "webm" ? "webm" : "mp4";
   const name = `${FILE_PREFIX}${recordingId}.${ext}`;
   const handle = await dir.getFileHandle(name, { create: true });
-  const sync = await handle.createSyncAccessHandle();
+  const sync = await openSyncAccessHandleWithRetry(handle);
   sync.truncate(0);
   fileName = name;
   syncHandle = sync;

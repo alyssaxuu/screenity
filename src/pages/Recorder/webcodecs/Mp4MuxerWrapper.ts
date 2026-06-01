@@ -247,6 +247,27 @@ export class Mp4MuxerWrapper {
       const next = last + durationUs;
       (this as any)[key] = next;
       this.log(`[MUX] audio ts +${durationUs} => ${next}`);
+      // AAC chunk.duration is unreliable (w3c/webcodecs#624), so our accumulated
+      // ts can drift from chunk.ts. Log when drift exceeds 100ms, once per ~30s.
+      if (
+        typeof timestampUs === "number" &&
+        timestampUs > 0 &&
+        !(this as any)._audioFirstTimestampUs
+      ) {
+        (this as any)._audioFirstTimestampUs = timestampUs;
+      }
+      const firstTs = (this as any)._audioFirstTimestampUs || 0;
+      if (firstTs && typeof timestampUs === "number") {
+        const expectedAccum = timestampUs - firstTs;
+        const drift = Math.abs(next - expectedAccum);
+        if (
+          drift > 100_000 &&
+          next - ((this as any)._audioDriftLogAt || 0) > 30_000_000
+        ) {
+          (this as any)._audioDriftLogAt = next;
+          this.warn(`[MUX] audio ts drift accum=${next} vs chunk.ts=${expectedAccum} (delta=${drift}us)`);
+        }
+      }
       return next;
     }
 

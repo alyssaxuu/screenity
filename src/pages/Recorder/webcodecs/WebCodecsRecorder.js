@@ -621,7 +621,9 @@ export class WebCodecsRecorder {
         this.err("[WCR] start() failed:", err);
         this.options.onError?.(err);
         this.running = false;
-        this.cleanup();
+        // Await the async cleanup; fire-and-forget would let an immediate retry
+        // hit an in-flight reader with InvalidStateError.
+        await this.cleanup();
 
         if (this._startResolve) {
           this._startResolve(false);
@@ -632,7 +634,7 @@ export class WebCodecsRecorder {
       this.err("[WCR] start() outer error:", err);
       this.options.onError?.(err);
       this.running = false;
-      this.cleanup();
+      await this.cleanup();
 
       if (this._startResolve) {
         this._startResolve(false);
@@ -881,7 +883,9 @@ export class WebCodecsRecorder {
     }
 
     perfMark("WCR.stop.exit");
-    this.cleanup();
+    // Await cleanup so reader-drain completes before onStop. Bounded by the
+    // 500ms per-reader cancel timeout, so it can't block stop() pathologically.
+    await this.cleanup();
 
     if (this.options.onStop) {
       await this.options.onStop();
@@ -952,7 +956,7 @@ export class WebCodecsRecorder {
     this._lastChunkAt = performance.now();
   }
 
-  cleanup() {
+  async cleanup() {
     this.log("[WCR] cleanup");
 
     this._clearFirstChunkWatchdog();
@@ -960,12 +964,22 @@ export class WebCodecsRecorder {
     this._detachVisibilityListener();
     this._detachDeviceChangeListener();
 
-    try {
-      this.videoReader?.releaseLock();
-    } catch {}
-    try {
-      this.audioReader?.releaseLock();
-    } catch {}
+    // Drain readers before closing encoders: releaseLock doesn't cancel the in-flight
+    // read, so a frame can hit the encoder after close() (CVE-2026-5890 race). 500ms cap.
+    const cancelWithTimeout = async (reader) => {
+      if (!reader) return;
+      try {
+        await Promise.race([
+          reader.cancel(),
+          new Promise((resolve) => setTimeout(resolve, 500)),
+        ]);
+      } catch {}
+      try { reader.releaseLock(); } catch {}
+    };
+    await Promise.all([
+      cancelWithTimeout(this.videoReader),
+      cancelWithTimeout(this.audioReader),
+    ]);
 
     try {
       this.videoEncoder?.close();
@@ -2044,20 +2058,22 @@ export class WebCodecsRecorder {
             ]
         : preferSoftware
           ? [
+              // Main (avc1.4D...) excluded: silent-no-output bug on Chromium's
+              // Windows MFT wrapper (encode() accepts, no chunks emit).
               { codec: "avc1.64002A", containerCodec: "avc", hw: "prefer-software" },
-              { codec: "avc1.4D401F", containerCodec: "avc", hw: "prefer-software" },
-              { codec: "avc1.42E01E", containerCodec: "avc", hw: "prefer-software" },
+              { codec: "avc1.42E028", containerCodec: "avc", hw: "prefer-software" },
+              { codec: "avc1.64002A", containerCodec: "avc", hw: "no-preference" },
               { codec: "avc1.64002A", containerCodec: "avc", hw: "prefer-hardware" },
-              { codec: "avc1.4D401F", containerCodec: "avc", hw: "prefer-hardware" },
-              { codec: "avc1.42E01E", containerCodec: "avc", hw: "prefer-hardware" },
+              { codec: "avc1.42E028", containerCodec: "avc", hw: "prefer-hardware" },
             ]
           : [
+              // no-preference rung between High-HW and Baseline: on NVENC slot
+              // exhaustion (OBS/Zoom/Discord open) it keeps High over Baseline.
               { codec: "avc1.64002A", containerCodec: "avc", hw: "prefer-hardware" },
-              { codec: "avc1.4D401F", containerCodec: "avc", hw: "prefer-hardware" },
-              { codec: "avc1.42E01E", containerCodec: "avc", hw: "prefer-hardware" },
+              { codec: "avc1.64002A", containerCodec: "avc", hw: "no-preference" },
+              { codec: "avc1.42E028", containerCodec: "avc", hw: "prefer-hardware" },
               { codec: "avc1.64002A", containerCodec: "avc", hw: "prefer-software" },
-              { codec: "avc1.4D401F", containerCodec: "avc", hw: "prefer-software" },
-              { codec: "avc1.42E01E", containerCodec: "avc", hw: "prefer-software" },
+              { codec: "avc1.42E028", containerCodec: "avc", hw: "prefer-software" },
             ];
 
     for (const c of candidates) {
@@ -2340,6 +2356,17 @@ export class WebCodecsRecorder {
                 this._forceNextKeyframe = true;
                 continue;
               }
+              // Chrome 140+ caps the encode queue at 30 frames, throwing QuotaExceededError
+              // synchronously. Drop as backpressure so an oversubscribed recording survives.
+              if (encErr?.name === "QuotaExceededError") {
+                this._droppedForBackpressureCount += 1;
+                this._forceNextKeyframe = true;
+                this._videoFrameIndex = i + 1;
+                this.warn(
+                  "[WCR] encode() QuotaExceededError; dropping frame as backpressure",
+                );
+                continue;
+              }
               throw encErr;
             }
             if (
@@ -2531,9 +2558,23 @@ export class WebCodecsRecorder {
         return;
       }
 
-      this.audioEncoder.encode(audioData, {
-        timestamp: tsUs,
-      });
+      try {
+        this.audioEncoder.encode(audioData, {
+          timestamp: tsUs,
+        });
+      } catch (encErr) {
+        // Audio encode-queue overflow: drop as backpressure (mirrors video) and
+        // advance the sample counter so timestamps stay aligned.
+        if (encErr?.name === "QuotaExceededError") {
+          this._droppedAudioForBackpressureCount += 1;
+          this.audioSamplesWritten += frames;
+          this.warn(
+            "[WCR] audio encode() QuotaExceededError; dropping audio data",
+          );
+          return;
+        }
+        throw encErr;
+      }
       this.audioSamplesWritten += frames;
 
       if (this.debug && (this.audioSamplesWritten === frames || this.audioSamplesWritten % (sampleRate * 10) < frames)) {

@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useCallback } from "react";
 import { getUserMediaWithFallback } from "../utils/mediaDeviceFallback";
 import { shouldAcquireMicAtStart } from "../utils/micAcquisitionPolicy";
+import { attachAudioContextWatchdog } from "../utils/audioContextWatchdog";
 import {
   WebCodecsRecorder,
   preloadWebCodecsModules,
@@ -2311,6 +2312,7 @@ const Recorder = () => {
       preloadWebCodecsModules();
 
       aCtx.current = new AudioContext();
+      attachAudioContextWatchdog(aCtx.current, "Region");
       destination.current = aCtx.current.createMediaStreamDestination();
       liveStream.current = new MediaStream();
       // If the user disabled the mic, skip getUserMedia: gain-muting still

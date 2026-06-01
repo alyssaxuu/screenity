@@ -183,6 +183,17 @@ export const onActionButtonClickedListener = () => {
 
       const { recording, pendingRecording, restarting, recorderSession } = snap;
       const sessionRecording = recorderSession?.status === "recording";
+      // Whitelist of statuses that indicate a session may still have
+      // work in flight. Anything else — completed, cancelled, failed,
+      // crashed, stale-cleared, stopped, or any future addition — gets
+      // bypass treatment so stale pendingRecording/recordingTab flags
+      // can fall through to the reset+reopen path. Whitelisting is
+      // safer than blacklisting: forgetting to add a new terminal
+      // status would silently trap users.
+      const sessionInFlight =
+        recorderSession?.status === "recording" ||
+        recorderSession?.status === "restarting";
+      const sessionTerminal = Boolean(recorderSession?.status) && !sessionInFlight;
       const isRecordingActive = Boolean(
         recording || pendingRecording || restarting || sessionRecording,
       );
@@ -210,7 +221,7 @@ export const onActionButtonClickedListener = () => {
           }
         }
 
-        if (recordingTab && !hasActiveRecorder) {
+        if (recordingTab && !hasActiveRecorder && !sessionTerminal) {
           if (await doesTabExist(recordingTab)) {
             hasActiveRecorder = true;
           } else {
@@ -219,7 +230,7 @@ export const onActionButtonClickedListener = () => {
           }
         }
 
-        if (offscreen && !hasActiveRecorder) {
+        if (offscreen && !hasActiveRecorder && !sessionTerminal) {
           if (await isOffscreenAlive()) {
             hasActiveRecorder = true;
           } else {

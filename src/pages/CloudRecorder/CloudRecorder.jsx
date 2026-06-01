@@ -10,6 +10,7 @@ import localforage from "localforage";
 import { createVideoProject } from "./createVideoProject";
 import { getUserMediaWithFallback } from "../utils/mediaDeviceFallback";
 import { shouldAcquireMicAtStart } from "../utils/micAcquisitionPolicy";
+import { attachAudioContextWatchdog } from "../utils/audioContextWatchdog";
 import { traceStep } from "../utils/startFlowTrace";
 import { IS_OFFSCREEN_HOST } from "../utils/recordingHost";
 import { startPrewarm, stopPrewarm } from "../Recorder/streamWarmup";
@@ -5626,7 +5627,12 @@ const CloudRecorder = () => {
           console.warn("⚠️ Failed to access camera stream:", err);
           cameraStream.current = null;
         }
-      } else if (data.recordingType === "region" && IS_IFRAME_CONTEXT) {
+      } else if (
+        (data.recordingType === "region" || regionRef.current) &&
+        IS_IFRAME_CONTEXT
+      ) {
+        // Key off regionRef.current (set on the crop-target postMessage), not
+        // the raceable recordingType, so region uses preferCurrentTab + cropTo.
         try {
           const constraints = {
             preferCurrentTab: true,
@@ -5929,7 +5935,7 @@ const CloudRecorder = () => {
               perfMark("CloudRecorder.encoderPrewarm.fired", {
                 w,
                 h,
-                codec: probeConfig?.codec || "avc1.4D401F",
+                codec: probeConfig?.codec || "avc1.64002A",
                 framerate:
                   Number(settings.frameRate) ||
                   Number(probeConfig?.framerate) ||
@@ -5938,7 +5944,7 @@ const CloudRecorder = () => {
               void startEncoderPrewarm({
                 width: w,
                 height: h,
-                codec: probeConfig?.codec || "avc1.4D401F",
+                codec: probeConfig?.codec || "avc1.64002A",
                 bitrate: Number(probeConfig?.bitrate) || 4_000_000,
                 framerate:
                   Number(settings.frameRate) ||
@@ -6181,6 +6187,7 @@ const CloudRecorder = () => {
         // Some platforms reject hint sampleRates; fall back to default.
         aCtx.current = new AudioContext();
       }
+      attachAudioContextWatchdog(aCtx.current, "CloudRecorder");
       destination.current = aCtx.current.createMediaStreamDestination();
 
       if (micStream.current?.getAudioTracks().length) {
@@ -6388,6 +6395,7 @@ const CloudRecorder = () => {
         });
       } else if (
         !isTab.current &&
+        !(IS_IFRAME_CONTEXT && regionRef.current) &&
         (data.recordingType != "region" || tabPreferred.current)
       ) {
         _diagBranch("desktop-picker");

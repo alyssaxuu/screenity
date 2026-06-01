@@ -5,15 +5,11 @@
 // 4 Mbps baseline; real encoder uses the configured bitrate later.
 const PROBE_BITRATE = 4_000_000;
 
-// Candidates ordered High → Baseline so machines without the top
-// profile still probe successfully.
-//   64002A = High L4.2, 4D0028 = Main L4.0,
-//   4D401F = Main L3.1,  42E01E = Baseline L3.0
+// 64002A = High L4.2, 42E028 = Baseline L4.0 (Main 4D... omitted: silent-no-output
+// bug on Chromium's Windows MFT wrapper, accepts encode() but emits no chunks).
 const CODEC_CANDIDATES = [
   "avc1.64002A",
-  "avc1.4D0028",
-  "avc1.4D401F",
-  "avc1.42E01E",
+  "avc1.42E028",
 ];
 
 const HW_OPTIONS = ["prefer-hardware", "no-preference"];
@@ -83,6 +79,10 @@ const probeOne = async (label, { width, height, framerate }) => {
 // buffering hides asymmetry until ~500ms in). 2s cap, memoized.
 const CONCURRENT_FRAME_COUNT = 30;
 const CONCURRENT_TIMEOUT_MS = 2500;
+// Windows D3D11 HW encoder (crbug 1504122) crashes when frames pile into
+// encode() without awaiting. Cap queue depth and yield so it can drain.
+const CONCURRENT_QUEUE_YIELD_EVERY = 5;
+const CONCURRENT_MAX_QUEUE_DEPTH = 16;
 
 const probeConcurrentHw = async ({ codec, framerate }) => {
   if (
@@ -152,6 +152,8 @@ const probeConcurrentHw = async ({ codec, framerate }) => {
   }
   const started =
     typeof performance !== "undefined" ? performance.now() : Date.now();
+  let queueOverflow = false;
+  let framesSubmitted = 0;
   for (let i = 0; i < CONCURRENT_FRAME_COUNT; i++) {
     ctx.fillStyle = `hsl(${(i * 31) % 360}, 50%, 40%)`;
     ctx.fillRect(0, 0, width, height);
@@ -173,6 +175,26 @@ const probeConcurrentHw = async ({ codec, framerate }) => {
       b.encoder.encode(frameB, { keyFrame: i === 0 });
       frameB.close();
     } catch {}
+    framesSubmitted = i + 1;
+
+    // Yield every N frames so the encoder can drain. If either queue runs past
+    // the cap, HW is starved: bail and let the caller treat it as not-concurrent.
+    if (i % CONCURRENT_QUEUE_YIELD_EVERY === CONCURRENT_QUEUE_YIELD_EVERY - 1) {
+      await new Promise((r) => setTimeout(r, 0));
+      let qa = 0;
+      let qb = 0;
+      try {
+        qa = a.encoder?.encodeQueueSize ?? 0;
+        qb = b.encoder?.encodeQueueSize ?? 0;
+      } catch {}
+      if (
+        qa > CONCURRENT_MAX_QUEUE_DEPTH ||
+        qb > CONCURRENT_MAX_QUEUE_DEPTH
+      ) {
+        queueOverflow = true;
+        break;
+      }
+    }
   }
   try {
     await Promise.race([
@@ -191,8 +213,10 @@ const probeConcurrentHw = async ({ codec, framerate }) => {
   // We require at least 4 chunks from each (allowing for encoder
   // buffering of the last keyframe close-out). A 2x ratio is the
   // tripwire: anything worse means the second encoder is starved.
+  // Queue overflow is itself a not-concurrent signal: HW couldn't drain.
   const minPerEncoder = 4;
   const concurrent =
+    !queueOverflow &&
     aChunks >= minPerEncoder &&
     bChunks >= minPerEncoder &&
     Math.max(aChunks, bChunks) / Math.max(1, Math.min(aChunks, bChunks)) < 2;
@@ -201,6 +225,8 @@ const probeConcurrentHw = async ({ codec, framerate }) => {
     concurrent,
     aChunks,
     bChunks,
+    framesSubmitted,
+    queueOverflow,
     elapsedMs: Math.round(elapsed),
   };
 };

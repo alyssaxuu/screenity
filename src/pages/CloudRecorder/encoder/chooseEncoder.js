@@ -125,7 +125,9 @@ export const inspectTrackPlan = async ({ track, probeOptions }) => {
   return {
     kind: "webcodecs",
     container: "video/mp4",
-    codec: "avc1.4D0028",
+    // Container/codec hint for Bunny's TUS Upload-Metadata. The real codec
+    // is picked at configure time by chooseVideoEncoderConfig.
+    codec: "avc1.64002A",
     hwSlots: hwSlots.summary,
     cameraPreferSoftware,
     reason: cameraPreferSoftware ? "dual-webcodecs-camera-sw-mode" : "ok",

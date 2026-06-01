@@ -15,6 +15,7 @@ import {
 } from "./encoderPrewarm";
 import { getUserMediaWithFallback } from "../utils/mediaDeviceFallback";
 import { shouldAcquireMicAtStart } from "../utils/micAcquisitionPolicy";
+import { attachAudioContextWatchdog } from "../utils/audioContextWatchdog";
 import { IS_OFFSCREEN_HOST } from "../utils/recordingHost";
 import { chooseWriter } from "./recorderStorage/chooseWriter";
 import { chooseReader } from "./recorderStorage/chooseReader";
@@ -2618,14 +2619,32 @@ const Recorder = () => {
         try {
           const devices = await navigator.mediaDevices.enumerateDevices();
           const audioInputs = devices.filter((d) => d.kind === "audioinput");
+          // If the mic label drops out of enumeration the device is gone and may emit
+          // silent zeros while readyState stays "live" (crbug 40275281). Match by label.
+          let currentMicLabel = null;
+          try {
+            const micTrack = helperAudioStream.current?.getAudioTracks?.()[0];
+            currentMicLabel = micTrack?.label || null;
+          } catch {}
+          const currentMicStillPresent = currentMicLabel
+            ? audioInputs.some((d) => d.label === currentMicLabel)
+            : null;
           chrome.runtime.sendMessage({
             type: "diag-forward",
             event: "recorder-devicechange-mid-recording",
             data: {
               audioInputCount: audioInputs.length,
               labels: audioInputs.map((d) => d.label).slice(0, 5),
+              currentMicLabel,
+              currentMicStillPresent,
             },
           });
+          if (currentMicLabel && currentMicStillPresent === false) {
+            console.warn(
+              "[Recorder] mid-recording devicechange: current mic label no longer enumerable",
+              { label: currentMicLabel },
+            );
+          }
         } catch {}
       };
       try {
@@ -3250,6 +3269,27 @@ const Recorder = () => {
         debug("startAudioStream() got stream with exact device", {
           hasAudio: stream.getAudioTracks().length,
         });
+        // A BT headset used as mic switches A2DP (48k) to HFP (8/16k mono), but
+        // the 48k AudioContext then upsamples garbage. Log as a diag breadcrumb.
+        try {
+          const aTrack = stream.getAudioTracks?.()[0];
+          const settings = aTrack?.getSettings?.() || {};
+          const trackSampleRate = Number(settings.sampleRate) || null;
+          if (trackSampleRate && trackSampleRate <= 24000) {
+            const label = String(aTrack?.label || "").slice(0, 80);
+            console.warn(
+              "[Recorder] mic acquired at low sample rate; likely Bluetooth HFP profile",
+              { trackSampleRate, label },
+            );
+            try {
+              chrome.runtime.sendMessage({
+                type: "diag-forward",
+                event: "recorder-low-sample-rate-mic",
+                data: { trackSampleRate, label },
+              });
+            } catch {}
+          }
+        } catch {}
         return stream;
       })
       .catch((err) => {
@@ -3667,6 +3707,9 @@ const Recorder = () => {
 
     perfMark("Recorder pre-audio-setup");
     aCtx.current = new AudioContext();
+    // A mid-recording AudioContext "interrupted" (macOS audio-server restart,
+    // exclusive-audio grab, Energy Saver) silently encodes a muted gap; watchdog logs+resumes.
+    attachAudioContextWatchdog(aCtx.current, "Recorder");
     destination.current = aCtx.current.createMediaStreamDestination();
     liveStream.current = new MediaStream();
     let mixedAudioConnected = false;
@@ -3889,10 +3932,9 @@ const Recorder = () => {
         ]);
         const probeConfig =
           probeData?.fastRecorderProbe?.details?.selectedVideoConfig || null;
-        // Prefer the codec the probe selected (matches what WCR will
-        // pick). Fall back to a Main-profile h264 that's broadly
-        // supported by VTDecoder.
-        const codec = probeConfig?.codec || "avc1.4D401F";
+        // Prefer the probe's codec; fall back to High L4.2 (Main is excluded
+        // from the ladder for Windows MFT silent-no-output, see WCR).
+        const codec = probeConfig?.codec || "avc1.64002A";
         const bitrate =
           Number(probeConfig?.bitrate) || 4_000_000;
         const framerate =

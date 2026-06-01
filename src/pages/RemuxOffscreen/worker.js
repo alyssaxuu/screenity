@@ -78,7 +78,24 @@ const remuxToOpfs = async ({ requestId, inputFileName, outputFileName }) => {
     const inputFile = await inputHandle.getFile();
 
     outputHandle = await dir.getFileHandle(outputFileName, { create: true });
-    syncHandle = await outputHandle.createSyncAccessHandle();
+    // crbug/453704691: brief NoModificationAllowedError after prior
+    // handle GC. Retry with backoff before failing the remux.
+    syncHandle = await (async () => {
+      const delaysMs = [0, 200, 400, 600, 800];
+      let lastErr = null;
+      for (let i = 0; i < delaysMs.length; i += 1) {
+        if (delaysMs[i] > 0) {
+          await new Promise((r) => setTimeout(r, delaysMs[i]));
+        }
+        try {
+          return await outputHandle.createSyncAccessHandle();
+        } catch (err) {
+          lastErr = err;
+          if (err?.name !== "NoModificationAllowedError") break;
+        }
+      }
+      throw lastErr;
+    })();
     syncHandle.truncate(0);
 
     const writable = createOpfsWritable(syncHandle);

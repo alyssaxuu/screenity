@@ -451,7 +451,9 @@ const _probeFastRecorderSupportUncached = async (): Promise<FastRecorderProbeRes
       { width: 1280, height: 720 },
       { width: 1920, height: 1080 },
     ];
-    const codecCandidates = ["avc1.64002A", "avc1.4D401F", "avc1.42E01E"];
+    // High L4.2 and Baseline L4.0. Main (avc1.4D...) excluded for the
+    // Windows MFT silent-no-output bug (see WebCodecsRecorder).
+    const codecCandidates = ["avc1.64002A", "avc1.42E028"];
     const hwOptions: Array<VideoEncoderConfig["hardwareAcceleration"] | null> = [
       "prefer-hardware",
       "prefer-software",
@@ -551,7 +553,7 @@ const _probeFastRecorderSupportUncached = async (): Promise<FastRecorderProbeRes
     }
   }
 
-    const videoCodecCandidates = ["avc1.64002A", "avc1.4D401F", "avc1.42E01E"];
+  const videoCodecCandidates = ["avc1.64002A", "avc1.42E028"];
   const audioCodec = "mp4a.40.2";
   details.videoCodecCandidates = videoCodecCandidates;
   details.audioCodec = audioCodec;

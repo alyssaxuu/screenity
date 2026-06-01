@@ -1,5 +1,39 @@
 const API_BASE = process.env.SCREENITY_API_BASE_URL;
 
+// Guard so uploaders in the same page session don't sweep concurrently.
+let _journalSweepDone = false;
+
+// Sweep TTL is generous (14d) vs the 24h resume-validity check: the only cost
+// of not sweeping is quota buildup, so leave multi-day uploads room to resume.
+const JOURNAL_SWEEP_TTL_MS = 14 * 24 * 60 * 60 * 1000;
+
+// Orphan uploadJournal-<mediaId> entries accumulate against the storage.local
+// 5MB cap when an uploader dies before finalize/abort. Sweep once per session.
+async function sweepStaleUploadJournals() {
+  if (_journalSweepDone) return;
+  _journalSweepDone = true;
+  if (typeof chrome === "undefined" || !chrome.storage?.local) return;
+  try {
+    const all = await chrome.storage.local.get(null);
+    const cutoff = Date.now() - JOURNAL_SWEEP_TTL_MS;
+    const stale = [];
+    for (const [key, value] of Object.entries(all || {})) {
+      if (!key.startsWith("uploadJournal-")) continue;
+      const updatedAt = Number(value?.updatedAt) || 0;
+      if (updatedAt > 0 && updatedAt < cutoff) stale.push(key);
+    }
+    if (stale.length > 0) {
+      console.log(
+        `[bunnyTusUploader] sweeping ${stale.length} stale journal entries (>${JOURNAL_SWEEP_TTL_MS / (24 * 60 * 60 * 1000)}d)`,
+      );
+      await chrome.storage.local.remove(stale);
+    }
+  } catch (err) {
+    // Non-fatal: a future sweep catches the leftover quota.
+    console.warn("[bunnyTusUploader] journal sweep failed", err);
+  }
+}
+
 export async function getThumbnailFromBlob(blob, seekTo = 0.1) {
   return new Promise((resolve, reject) => {
     const video = document.createElement("video");
@@ -196,7 +230,7 @@ export default class BunnyTusUploader {
     }
   }
 
-  setUploaderError(errorCode, err = null) {
+  setUploaderError(errorCode, err = null, extra = null) {
     this.status = "error";
     this.error = errorCode || err?.message || "upload-error";
     this.lastErrorAt = Date.now();
@@ -206,6 +240,7 @@ export default class BunnyTusUploader {
     this.emitTelemetry("upload_error", {
       errorCode: errorCode || null,
       message: err?.message || this.error || "upload-error",
+      ...(extra && typeof extra === "object" ? extra : {}),
     });
     this.scheduleJournalPersist({ force: true });
   }
@@ -633,6 +668,9 @@ export default class BunnyTusUploader {
     if (this.status !== "idle" && this.status !== "error") {
       throw new Error("Uploader has already been initialized");
     }
+
+    // Fire-and-forget orphan-journal cleanup; doesn't block the hot path.
+    void sweepStaleUploadJournals();
 
     try {
       this.projectId = projectId;
@@ -1096,13 +1134,16 @@ export default class BunnyTusUploader {
     let didAuth401Refresh = false;
 
     for (let attempt = 0; attempt <= this.MAX_RETRIES; attempt++) {
+      // Hoisted so the catch can read signal.reason (wake-jump/stall-recovery/
+      // upload-timeout) for telemetry; in-try it would be out of scope.
+      let controller = null;
       try {
         // AuthorizationSignature has ~20min TTL; refresh before every PATCH.
         await this.checkAuthExpiration();
 
         const currentOffset = this.offset;
 
-        const controller = new AbortController();
+        controller = new AbortController();
         // Exposed so the heartbeat can abort a stalled PATCH.
         this.currentPatchAbort = controller;
         const timeout = setTimeout(
@@ -1286,6 +1327,12 @@ export default class BunnyTusUploader {
           throw new Error(`Upload failed (${res.status}): ${errorText}`);
         }
       } catch (err) {
+        // err.name collapses every abort to AbortError; signal.reason keeps the
+        // real trigger (wake-jump/stall-recovery/upload-timeout) for telemetry.
+        const abortReason =
+          controller?.signal?.aborted && typeof controller.signal.reason === "string"
+            ? controller.signal.reason
+            : null;
         this.currentPatchAbort = null;
         // Transient errors (network/timeout/stall-abort/5xx/408/429) retry forever with capped backoff.
         const isExplicitAbort =
@@ -1302,14 +1349,19 @@ export default class BunnyTusUploader {
           /Upload failed \((?:5\d\d|408|429)\b/.test(msg) ||
           /network|Failed to fetch|timeout/i.test(msg);
         if (err?.name === "AbortError") {
-          console.warn("⚠️ Upload chunk aborted (timeout or stall-recovery)");
+          console.warn(
+            "⚠️ Upload chunk aborted",
+            abortReason ? `(${abortReason})` : "(reason unknown)",
+          );
         }
         if (!isTransient && attempt === this.MAX_RETRIES) {
           console.error(
             `❌ Non-transient failure after ${this.MAX_RETRIES} retries:`,
             err,
           );
-          this.setUploaderError("chunk-upload-retries-exhausted", err);
+          this.setUploaderError("chunk-upload-retries-exhausted", err, {
+            abortReason,
+          });
           throw err;
         }
         const attemptLabel = isTransient
