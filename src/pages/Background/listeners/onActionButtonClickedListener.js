@@ -7,6 +7,7 @@ import {
 import { sendMessageRecord } from "../recording/sendMessageRecord.js";
 import { loginWithWebsite } from "../auth/loginWithWebsite.js";
 import { tryResumePendingUploads } from "../recording/resumePendingUploads";
+import { clearInMemoryEditorLock } from "../recording/stopRecording";
 
 const CLOUD_FEATURES_ENABLED =
   process.env.SCREENITY_ENABLE_CLOUD_FEATURES === "true";
@@ -244,6 +245,7 @@ export const onActionButtonClickedListener = () => {
             "[Screenity][ActionClick] branch: stale-reset-then-popup.",
             { recording, pendingRecording, restarting, sessionRecording, recordingTab, offscreen },
           );
+          clearInMemoryEditorLock();
           await chrome.storage.local.set({
             recording: false,
             pendingRecording: false,

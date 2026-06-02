@@ -15,6 +15,7 @@ import { noteCountdownStarted } from "../recording/countdownFallback";
 import {
   handleStopRecordingTab,
   handleStopRecordingTabBackup,
+  clearInMemoryEditorLock,
 } from "../recording/stopRecording";
 import { sendChunks } from "../recording/sendChunks";
 import { chunksStore } from "../recording/chunkHandler";
@@ -871,10 +872,10 @@ export const setupHandlers = () => {
       const headers = { "Content-Type": "application/json" };
       if (screenityToken) headers.Authorization = `Bearer ${screenityToken}`;
       // No keepalive:true (MV3 SW fetches with it can hang forever).
-      // 1s abort then fall through to editor-tab proxy; healthy is
-      // <500ms, >1s means BG-direct is wedged.
+      // 3s abort then fall through to editor-tab proxy. Healthy is
+      // <500ms, 1s was too tight and tripped on normal latency spikes.
       const controller = new AbortController();
-      const abortTimer = setTimeout(() => controller.abort(), 1_000);
+      const abortTimer = setTimeout(() => controller.abort(), 3_000);
       let res;
       try {
         res = await fetch(`${API_BASE}/videos/${projectId}/scenes/`, {
@@ -1151,6 +1152,7 @@ export const setupHandlers = () => {
     if (!customRegion) return;
 
     diagEvent("region-iframe-destroyed");
+    clearInMemoryEditorLock();
     await chrome.storage.local.set({
       recording: false,
       customRegion: false,

@@ -233,6 +233,11 @@ const ContentState = (props) => {
   const diagMakeVideoAtRef = useRef(null);
   const editorReadyDiagSentRef = useRef(false);
   const editorErrorShownRef = useRef(false);
+  // True while makeVideoTab is mid-OPFS read. Late recording-error from
+  // a post-finalize WCR teardown can race the read and pop the
+  // "Can't load your recording" modal; suppress in-flight, and let the
+  // read result decide (a real failure surfaces via OPFS_LOAD_FAILED).
+  const opfsReadInFlightRef = useRef(false);
   const diagHeartbeatCountRef = useRef(0);
 
   const setContentState = useCallback((updater) => {
@@ -1214,6 +1219,7 @@ const ContentState = (props) => {
             });
             const readBlobStart = Date.now();
             diagForward("sandbox-opfs-readblob-start", { attempt });
+            opfsReadInFlightRef.current = true;
             const { blob: rawBlob } = await reader.readBlob({
               // OPFS file isn't ready yet, recorder still flushing under load.
               // Surface a labeled loading state so the user knows it's progressing.
@@ -1226,6 +1232,7 @@ const ContentState = (props) => {
                 );
               },
             });
+            opfsReadInFlightRef.current = false;
             diagForward("sandbox-opfs-readblob-done", {
               elapsedMs: Date.now() - readBlobStart,
               rawBlobBytes: rawBlob?.size ?? 0,
@@ -1279,6 +1286,7 @@ const ContentState = (props) => {
             }
             break;
           } catch (err) {
+            opfsReadInFlightRef.current = false;
             diagForward("sandbox-opfs-direct-read-fail", {
               attempt,
               err: String(err?.message || err).slice(0, 200),
@@ -1490,6 +1498,17 @@ const ContentState = (props) => {
           Boolean(contentStateRef.current?.ready) ||
           Boolean(contentStateRef.current?.blob);
         if (editorAlreadyLoaded) return;
+        // OPFS read in flight: a post-finalize teardown error (e.g. late
+        // WCR failure) can land between readblob-start and -done. Drop it
+        // here; if the read truly fails, the OPFS_LOAD_FAILED path below
+        // surfaces the same modal with the real cause.
+        if (opfsReadInFlightRef.current) {
+          diagForward("sandbox-recording-error-suppressed-mid-read", {
+            error: String(message?.error || "").slice(0, 120),
+            errorCode: message?.errorCode || null,
+          });
+          return;
+        }
         diagForward("sandbox-recording-error-received", {
           error: String(message?.error || "").slice(0, 120),
           why: String(message?.why || "").slice(0, 240),
@@ -1835,6 +1854,17 @@ const ContentState = (props) => {
               payload?.sandboxTab == null ||
               payload.sandboxTab === tabId)
           ) {
+            // Same in-flight-read suppression as the runtime listener
+            // above: late post-finalize teardown errors arrive via the
+            // editorRecordingError storage fallback too.
+            if (opfsReadInFlightRef.current) {
+              diagForward("sandbox-recording-error-suppressed-mid-read", {
+                error: String(payload?.error || "").slice(0, 120),
+                errorCode: payload?.errorCode || null,
+                source: "storage",
+              });
+              return;
+            }
             diagForward("sandbox-recording-error-received", {
               error: String(payload?.error || "").slice(0, 120),
               why: String(payload?.why || "").slice(0, 240),

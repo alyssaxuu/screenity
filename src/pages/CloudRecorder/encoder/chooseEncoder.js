@@ -171,12 +171,22 @@ export const chooseTrackEncoder = async ({
 
   // WebCodecs path. The MP4 mime type is always video/mp4, regardless of
   // whether audio is included (AAC fits inside MP4 alongside H.264).
+  // forceSoftwareEncoder storage flag biases the encoder candidate list
+  // toward prefer-software. Playwright Chromium 1217 hits a documented
+  // "encode() accepts, no chunks emit" HW silent-fail (see Windows MFT
+  // note in WebCodecsRecorder.js:chooseVideoEncoderConfig) on macOS
+  // auto-select-desktop-capture streams; SW H.264 encodes them cleanly.
+  let forceSoftware = false;
+  try {
+    const s = await chrome.storage.local.get(["forceSoftwareEncoder"]);
+    forceSoftware = Boolean(s.forceSoftwareEncoder);
+  } catch {}
   const recorder = new WebCodecsTrackRecorder(stream, {
     mimeType: "video/mp4",
     videoBitsPerSecond,
     audioBitsPerSecond,
     enableAudio,
-    preferSoftware: Boolean(plan.cameraPreferSoftware),
+    preferSoftware: forceSoftware || Boolean(plan.cameraPreferSoftware),
     trackKind: track,
   });
   recorder.ondataavailable = (event) => {

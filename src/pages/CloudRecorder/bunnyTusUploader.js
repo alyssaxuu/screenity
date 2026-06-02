@@ -810,7 +810,24 @@ export default class BunnyTusUploader {
           if (!transient) break;
         }
 
-        if (!res || !res.ok) throw new Error("Failed to create Bunny video");
+        if (!res || !res.ok) {
+          // PROBE: persist failure shape so post-mortem can see what
+          // came back. Removed once Playwright mock race is identified.
+          try {
+            await chrome.storage.local.set({
+              probeBunnyCreateFail: {
+                ts: Date.now(),
+                resPresent: !!res,
+                status: res?.status ?? null,
+                type: res?.type ?? null,
+                url: res?.url ?? null,
+                redirected: res?.redirected ?? null,
+                ok: res?.ok ?? null,
+              },
+            });
+          } catch {}
+          throw new Error("Failed to create Bunny video");
+        }
         const data = await res.json();
         this.videoId = data.videoId;
         this.mediaId = data.mediaId;

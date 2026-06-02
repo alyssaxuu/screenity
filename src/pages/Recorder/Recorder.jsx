@@ -2092,6 +2092,23 @@ const Recorder = () => {
               typeof err?.code === "string" && err.code
                 ? err.code
                 : "webcodecs-error";
+            // Late teardown error fired after video-ready already shipped:
+            // the recording is finalized on disk and the sandbox is mid
+            // OPFS read. Surfacing as recording-error races that read and
+            // pops a spurious "Can't load your recording" modal — and
+            // would flip the sticky-disable on a recording that succeeded.
+            // Log a breadcrumb and drop. (err.finalized handles the salvage
+            // path below; this handles the normal-finalize path.)
+            if (sentLast.current && !err?.finalized) {
+              chrome.runtime
+                .sendMessage({
+                  type: "diag-forward",
+                  event: "recorder-webcodecs-post-finalize-error",
+                  data: { code: failureCode, err: errStr.slice(0, 200) },
+                })
+                .catch(() => {});
+              return;
+            }
             // Shared with markFastRecorderFailure so the sticky-disable
             // and the user-setting flip use the same heuristic.
             const transient = isFastRecorderFailureTransient(

@@ -3,6 +3,10 @@ import { getUserMediaWithFallback } from "../utils/mediaDeviceFallback";
 import { shouldAcquireMicAtStart } from "../utils/micAcquisitionPolicy";
 import { attachAudioContextWatchdog } from "../utils/audioContextWatchdog";
 import {
+  startTabKeepalive,
+  stopTabKeepalive,
+} from "../utils/tabKeepalive";
+import {
   WebCodecsRecorder,
   preloadWebCodecsModules,
 } from "../Recorder/webcodecs/WebCodecsRecorder";
@@ -19,7 +23,7 @@ import {
   getFastRecorderStickyState,
   markFastRecorderFailure,
   validateFastRecorderOutputBlob,
-  isTransientFastRecorderError,
+  isFastRecorderFailureTransient,
 } from "../../media/fastRecorderGate";
 import { chooseWriter } from "../Recorder/recorderStorage/chooseWriter";
 import { chooseReader } from "../Recorder/recorderStorage/chooseReader";
@@ -121,6 +125,10 @@ const Recorder = () => {
   const pausedStateRef = useRef(false);
   const recordingStartTimeRef = useRef(null);
   const recordingTick = useRef(null);
+  // Keeps the host renderer at foreground priority so a tab switch /
+  // minimize mid-recording doesn't throttle the encode loop into VFR.
+  // See utils/tabKeepalive.js.
+  const keepAliveHandle = useRef(null);
 
   const liveStream = useRef(null);
   const prewarmRef = useRef(null);
@@ -144,6 +152,12 @@ const Recorder = () => {
   const recorder = useRef(null);
   const useWebCodecs = useRef(false);
   const recdbgSessionRef = useRef(null);
+  // MR mid-stream stall watchdog. crbug/343157156: MediaRecorder can silently
+  // stop firing ondataavailable mid-recording with no error/stop event.
+  // CloudRecorder has the same watchdog; mirror here for the Region MR path.
+  const mrLastChunkAt = useRef(0);
+  const mrStallTimer = useRef(null);
+  const mrStallNotified = useRef(false);
 
   const target = useRef(null);
 
@@ -470,6 +484,16 @@ const Recorder = () => {
         code: err?.code || null,
       });
       // OPFS writer death preserves the partial file; quota fail uses a generic toast.
+      // Match Recorder.jsx's wider classification: chunk-store backends may
+      // surface quota errors as QuotaExceededError or with "quota"/"disk"
+      // in the message instead of (or in addition to) the opfs-writer-failed
+      // code. Previously these fell through to a generic toast.
+      const errName = err?.name || "";
+      const errMsg = String(err?.message || err);
+      const isQuota =
+        errName === "QuotaExceededError" ||
+        /quota/i.test(errMsg) ||
+        /disk/i.test(errMsg);
       const isOpfsWriterDead = err?.code === "opfs-writer-failed";
       if (isOpfsWriterDead && err?.fileName) {
         chunkBackendRef.current = {
@@ -485,7 +509,9 @@ const Recorder = () => {
       if (!lowStorageAbort.current) {
         const toastMessage = isOpfsWriterDead
           ? chrome.i18n.getMessage("recordingWriterFailedToast")
-          : chrome.i18n.getMessage("toastStorageCritical");
+          : isQuota
+            ? chrome.i18n.getMessage("toastStorageCritical")
+            : chrome.i18n.getMessage("toastStorageCritical");
         chrome.runtime.sendMessage({
           type: "show-toast",
           message: toastMessage,
@@ -495,7 +521,8 @@ const Recorder = () => {
       lifecycle("Region.Recorder", "memory-error-flag-set", {
         reason: "saveChunk-write-failed",
         isOpfsWriterDead,
-        err: String(err?.message || err).slice(0, 120),
+        isQuota,
+        err: errMsg.slice(0, 120),
         savedCount: savedCount.current,
       });
       lowStorageAbort.current = true;
@@ -506,7 +533,11 @@ const Recorder = () => {
         memoryError: true,
       });
       sendStopWithReason(
-        isOpfsWriterDead ? "opfs-writer-failed" : "region-save-chunk-failed",
+        isOpfsWriterDead
+          ? "opfs-writer-failed"
+          : isQuota
+            ? "region-quota-exceeded"
+            : "region-save-chunk-failed",
       );
       window.location.reload();
       return false;
@@ -699,6 +730,27 @@ const Recorder = () => {
       return;
     }
     persistRegionStartDebug({ stage: "start-recording-enter" });
+
+    if (!keepAliveHandle.current) {
+      try {
+        keepAliveHandle.current = startTabKeepalive();
+      } catch (err) {
+        console.warn("[Region.Recorder] tab keepalive failed:", err);
+      }
+    }
+
+    // BG-coordinated guards: matches what Recorder.jsx + CloudRecorder do.
+    //   • auto-discardable=false → Chrome won't reclaim the host tab
+    //     (and the iframe with it) under memory pressure mid-record.
+    //   • start-first-chunk-watchdog → 8s BG alarm fires recording-error
+    //     if no chunks ever land (encoder hang / silent capture freeze).
+    //     Cancelled on first chunk in handleWebCodecsChunk + saveChunk.
+    chrome.runtime
+      .sendMessage({ type: "set-tab-auto-discardable", discardable: false })
+      .catch(() => {});
+    chrome.runtime
+      .sendMessage({ type: "start-first-chunk-watchdog" })
+      .catch(() => {});
 
     await stopPrewarm(prewarmRef.current);
     prewarmRef.current = null;
@@ -998,6 +1050,14 @@ const Recorder = () => {
 
       const handleWebCodecsChunk = async (blob, timestampUs) => {
         if (lowStorageAbort.current) return;
+        // First chunk landed — cancel the BG watchdog so it doesn't fire
+        // a spurious recording-error. hasChunks is set later in saveChunk
+        // for the MR path; we set it here for WebCodecs.
+        if (!hasChunks.current) {
+          chrome.runtime
+            .sendMessage({ type: "cancel-first-chunk-watchdog" })
+            .catch(() => {});
+        }
         const timecodeMs = timestampUs ? Math.floor(timestampUs / 1000) : 0;
         recdbgChunkCount += 1;
         recdbgTotalBytes += blob.size || 0;
@@ -1210,13 +1270,25 @@ const Recorder = () => {
           },
           onError: (err) => {
             const errStr = String(err);
-            const transient = isTransientFastRecorderError(errStr);
             // err.finalized: salvage stop already ran, skip sticky-disable.
             const fatalFinalized = err?.finalized === true;
-            markFastRecorderFailure(
-              fatalFinalized ? "webcodecs-finalized" : "webcodecs-error",
-              { error: errStr, finalized: fatalFinalized || undefined },
+            const failureCode = fatalFinalized
+              ? "webcodecs-finalized"
+              : "webcodecs-error";
+            // Use the 3-arg classifier: it adds the
+            // `webcodecs-zero-frames-at-stop + firstChunkSeen=false`
+            // heuristic that the 1-arg form misses, so we don't sticky-
+            // disable WebCodecs for benign stream-cancel hiccups the
+            // desktop path already treats as transient.
+            const transient = isFastRecorderFailureTransient(
+              failureCode,
+              errStr,
+              err?.detail,
             );
+            markFastRecorderFailure(failureCode, {
+              error: errStr,
+              finalized: fatalFinalized || undefined,
+            });
             // Keep useWebCodecsRecorder on for transient stream errors.
             const persisted = {
               lastWebCodecsFailureAt: Date.now(),
@@ -1578,6 +1650,8 @@ const Recorder = () => {
 
           recdbgChunkCount += 1;
           recdbgTotalBytes += e.data.size || 0;
+          mrLastChunkAt.current = Date.now();
+          mrStallNotified.current = false;
           const elapsedSec = Math.max(
             0.001,
             (Date.now() - mediaRecorderStartAt) / 1000,
@@ -1649,6 +1723,9 @@ const Recorder = () => {
           }
 
           if (!hasChunks.current) {
+            chrome.runtime
+              .sendMessage({ type: "cancel-first-chunk-watchdog" })
+              .catch(() => {});
             hasChunks.current = true;
             lastTimecode.current = e.timecode ?? 0;
             lastSize.current = e.data.size;
@@ -1748,6 +1825,28 @@ const Recorder = () => {
         setTimeout(() => {
           try { recorder.current?.requestData?.(); } catch (_) {}
         }, 250);
+        mrLastChunkAt.current = Date.now();
+        mrStallNotified.current = false;
+        if (mrStallTimer.current) clearInterval(mrStallTimer.current);
+        mrStallTimer.current = setInterval(() => {
+          if (!recorder.current || recorder.current.state !== "recording") return;
+          if (pausedStateRef.current) return;
+          if (mrStallNotified.current) return;
+          if (!mrLastChunkAt.current) return;
+          if (Date.now() - mrLastChunkAt.current <= 15000) return;
+          mrStallNotified.current = true;
+          lifecycle("Region.Recorder", "mr-chunk-stall", {
+            sinceLastChunkMs: Date.now() - mrLastChunkAt.current,
+            recorderState: recorder.current?.state || null,
+          });
+          chrome.runtime
+            .sendMessage({
+              type: "recording-error",
+              error: "stream-warning",
+              why: "No video data received for 15 seconds. Recording may be stalled.",
+            })
+            .catch(() => {});
+        }, 5000);
       } catch (err) {
         persistRegionStartDebug({
           stage: "mediarecorder-start-throw",
@@ -1901,6 +2000,21 @@ const Recorder = () => {
   async function stopRecording() {
     clearStartRetry();
     stopRecordingTick();
+    if (keepAliveHandle.current) {
+      stopTabKeepalive(keepAliveHandle.current);
+      keepAliveHandle.current = null;
+    }
+    // Release BG guards armed in startRecording.
+    chrome.runtime
+      .sendMessage({ type: "set-tab-auto-discardable", discardable: true })
+      .catch(() => {});
+    chrome.runtime
+      .sendMessage({ type: "cancel-first-chunk-watchdog" })
+      .catch(() => {});
+    if (mrStallTimer.current) {
+      clearInterval(mrStallTimer.current);
+      mrStallTimer.current = null;
+    }
     recordingStartTimeRef.current = null;
     isFinishing.current = true;
     regionRef.current = false;
@@ -2012,6 +2126,23 @@ const Recorder = () => {
   const dismissRecording = async () => {
     clearStartRetry();
     stopRecordingTick();
+    // Match stopRecording teardown: tab keepalive + BG guards must be
+    // released here too. Previously dismiss left them running until the
+    // iframe unloaded (or reloaded), leaking the loopback PC + osc + lock.
+    if (keepAliveHandle.current) {
+      stopTabKeepalive(keepAliveHandle.current);
+      keepAliveHandle.current = null;
+    }
+    chrome.runtime
+      .sendMessage({ type: "set-tab-auto-discardable", discardable: true })
+      .catch(() => {});
+    chrome.runtime
+      .sendMessage({ type: "cancel-first-chunk-watchdog" })
+      .catch(() => {});
+    if (mrStallTimer.current) {
+      clearInterval(mrStallTimer.current);
+      mrStallTimer.current = null;
+    }
     recordingStartTimeRef.current = null;
     regionRef.current = false;
     target.current = null;

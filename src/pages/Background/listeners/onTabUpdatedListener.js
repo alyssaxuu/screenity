@@ -13,9 +13,29 @@ const tryAppAuthRefresh = async (url) => {
   if (!url.startsWith(APP_BASE)) return;
   const now = Date.now();
   if (now - lastAppAuthRefreshAt < APP_AUTH_REFRESH_DEBOUNCE_MS) return;
-  // skip when already authed; AUTH_SUCCESS is the fast path.
-  const { isLoggedIn } = await chrome.storage.local.get(["isLoggedIn"]);
+  const {
+    isLoggedIn,
+    wasLoggedIn,
+    hasSubscribedBefore,
+    screenityUser,
+    stayLoggedOut,
+  } = await chrome.storage.local.get([
+    "isLoggedIn",
+    "wasLoggedIn",
+    "hasSubscribedBefore",
+    "screenityUser",
+    "stayLoggedOut",
+  ]);
   if (isLoggedIn) return;
+  if (stayLoggedOut) return;
+  // Only refresh if there's prior evidence of an account, otherwise every
+  // logged-out visitor hits /auth/refresh and 401s. Mirrors the priorSignals
+  // gate in loginWithWebsite (force:true would bypass it).
+  const hasPriorSignals =
+    Boolean(wasLoggedIn) ||
+    Boolean(hasSubscribedBefore) ||
+    Boolean(screenityUser);
+  if (!hasPriorSignals) return;
   lastAppAuthRefreshAt = now;
   loginWithWebsite({ force: true }).catch(() => {});
 };

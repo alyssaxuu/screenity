@@ -5,7 +5,7 @@ import {
   getCurrentTab,
 } from "../tabManagement";
 import { sendMessageRecord } from "./sendMessageRecord";
-import { stopRecording } from "./stopRecording";
+import { stopRecording, clearInMemoryEditorLock } from "./stopRecording";
 import { addAlarmListener } from "../alarms/addAlarmListener";
 import { getStreamingData } from "./getStreamingData";
 import { discardOffscreenDocuments } from "../offscreen/discardOffscreenDocuments";
@@ -188,6 +188,7 @@ export const handleRecordingError = async (request) => {
         pendingSceneIndex: [],
       };
 
+  clearInMemoryEditorLock();
   await chrome.storage.local.set({
     recording: false,
     // Clear pendingRecording at stop. countdownEverShown is per-tab

@@ -11,6 +11,10 @@ import { createVideoProject } from "./createVideoProject";
 import { getUserMediaWithFallback } from "../utils/mediaDeviceFallback";
 import { shouldAcquireMicAtStart } from "../utils/micAcquisitionPolicy";
 import { attachAudioContextWatchdog } from "../utils/audioContextWatchdog";
+import {
+  startTabKeepalive,
+  stopTabKeepalive,
+} from "../utils/tabKeepalive";
 import { traceStep } from "../utils/startFlowTrace";
 import { IS_OFFSCREEN_HOST } from "../utils/recordingHost";
 import { startPrewarm, stopPrewarm } from "../Recorder/streamWarmup";
@@ -306,10 +310,9 @@ const CloudRecorder = () => {
   const destination = useRef(null);
 
   const keepAliveInterval = useRef(null);
-  const keepAliveAudioCtx = useRef(null);
-  const keepAliveOscillator = useRef(null);
-  const keepAliveLockAbort = useRef(null);
-  const keepAliveMediaSessionActive = useRef(false);
+  // Single handle covering audio osc, navigator.locks, mediaSession,
+  // and the loopback RTC priority boost (see utils/tabKeepalive.js).
+  const keepAliveHandle = useRef(null);
 
   const logDebugEvent = async () => {};
 
@@ -1020,61 +1023,11 @@ const CloudRecorder = () => {
   const startTabKeepAlive = () => {
     if (IS_OFFSCREEN_HOST) return;
 
-    try {
-      if (!keepAliveAudioCtx.current) {
-        const ctx = new (window.AudioContext || window.webkitAudioContext)();
-        keepAliveAudioCtx.current = ctx;
-        const oscillator = ctx.createOscillator();
-        const gainNode = ctx.createGain();
-        oscillator.type = "sine";
-        oscillator.frequency.value = 20000;
-        gainNode.gain.value = 0.0001;
-        oscillator.connect(gainNode);
-        gainNode.connect(ctx.destination);
-        oscillator.start();
-        keepAliveOscillator.current = oscillator;
-      }
-      // AudioContext starts suspended without a user gesture; without
-      // resume() the oscillator emits nothing and Chrome throttles
-      // the tab (camera + screen drop to ~5fps for the first 15s).
-      const aCtx = keepAliveAudioCtx.current;
-      if (aCtx && aCtx.state !== "running" && typeof aCtx.resume === "function") {
-        aCtx.resume().catch(() => {});
-      }
-    } catch (err) {
-      console.warn("[CloudRecorder] keepalive: audio layer failed:", err);
-    }
-
-    try {
-      if (typeof navigator.locks !== "undefined" && !keepAliveLockAbort.current) {
-        const ac = new AbortController();
-        keepAliveLockAbort.current = ac;
-        navigator.locks
-          .request(
-            "screenity-recorder-keepalive",
-            { mode: "exclusive", signal: ac.signal },
-            () => new Promise(() => {}),
-          )
-          .catch(() => {});
-      }
-    } catch (err) {
-      console.warn("[CloudRecorder] keepalive: lock layer failed:", err);
-    }
-
-    try {
-      if (navigator.mediaSession && !keepAliveMediaSessionActive.current) {
-        navigator.mediaSession.metadata = new window.MediaMetadata({
-          title: "Screenity recording",
-          artist: "Screenity",
-        });
-        navigator.mediaSession.playbackState = "playing";
-        try {
-          navigator.mediaSession.setActionHandler("pause", () => {});
-        } catch {}
-        keepAliveMediaSessionActive.current = true;
-      }
-    } catch (err) {
-      console.warn("[CloudRecorder] keepalive: mediaSession layer failed:", err);
+    // The pinned cloudrecorder tab isn't visible while recording the source
+    // tab, so without keepalive the renderer backgrounds and the encode loop
+    // lags into VFR. Layers live in utils/tabKeepalive.js.
+    if (!keepAliveHandle.current) {
+      keepAliveHandle.current = startTabKeepalive();
     }
 
     chrome.runtime.sendMessage({
@@ -1088,24 +1041,9 @@ const CloudRecorder = () => {
 
   const stopTabKeepAlive = () => {
     try {
-      if (keepAliveOscillator.current) {
-        try { keepAliveOscillator.current.stop(); } catch {}
-        try { keepAliveOscillator.current.disconnect(); } catch {}
-        keepAliveOscillator.current = null;
-      }
-      if (keepAliveAudioCtx.current) {
-        try { keepAliveAudioCtx.current.close(); } catch {}
-        keepAliveAudioCtx.current = null;
-      }
-      if (keepAliveLockAbort.current) {
-        try { keepAliveLockAbort.current.abort(); } catch {}
-        keepAliveLockAbort.current = null;
-      }
-      if (keepAliveMediaSessionActive.current && navigator.mediaSession) {
-        try { navigator.mediaSession.playbackState = "none"; } catch {}
-        try { navigator.mediaSession.metadata = null; } catch {}
-        try { navigator.mediaSession.setActionHandler("pause", null); } catch {}
-        keepAliveMediaSessionActive.current = false;
+      if (keepAliveHandle.current) {
+        stopTabKeepalive(keepAliveHandle.current);
+        keepAliveHandle.current = null;
       }
 
       chrome.runtime.sendMessage({

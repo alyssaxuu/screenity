@@ -52,56 +52,51 @@ const markEditorStartFailed = async (tabId, errorCode, why) => {
   } catch {}
 };
 
-// Bound lock acquisition: storage.get + storage.set both block on
-// contended IPC and can stall multi-second on many-tab Chrome. The
-// lock suppresses duplicate stops racing with editor-open; under
-// contention fail-open beats making the user wait. Worst case on
-// fail-open is one extra editor tab.
+// In-memory dedup so a second caller in the same SW instance bails
+// synchronously; storage.local.set can stall multi-second under contention
+// and used to let a duplicate editor tab open. Storage stays as SW-restart backstop.
+let _inMemoryEditorLockHeld = false;
+
+export const clearInMemoryEditorLock = () => {
+  _inMemoryEditorLockHeld = false;
+};
+
 const LOCK_ACQUIRE_TIMEOUT_MS = 500;
 const acquirePostStopEditorLock = async (recordingId = null) => {
-  const timeoutSentinel = Symbol("acquire-lock-timeout");
+  if (_inMemoryEditorLockHeld) return false;
+  _inMemoryEditorLockHeld = true;
+
+  // Mirror to storage for SW-restart durability, with a 500ms timeout +
+  // fire-and-forget so a stalled IPC doesn't delay tabs.create.
+  const writePayload = {
+    postStopEditorOpening: true,
+    postStopEditorOpened: true,
+    postStopRecordingId: recordingId,
+  };
   let timer = null;
-  const timeoutPromise = new Promise((resolve) => {
-    timer = setTimeout(() => resolve(timeoutSentinel), LOCK_ACQUIRE_TIMEOUT_MS);
-  });
   try {
-    const result = await Promise.race([
-      (async () => {
-        const { postStopEditorOpening } = await chrome.storage.local.get([
-          "postStopEditorOpening",
-        ]);
-        if (postStopEditorOpening) return false;
-        await chrome.storage.local.set({
-          postStopEditorOpening: true,
-          postStopEditorOpened: true,
-          postStopRecordingId: recordingId,
-        });
-        return true;
-      })(),
-      timeoutPromise,
+    await Promise.race([
+      chrome.storage.local.set(writePayload),
+      new Promise((_resolve, reject) => {
+        timer = setTimeout(
+          () => reject(new Error("acquire-lock-timeout")),
+          LOCK_ACQUIRE_TIMEOUT_MS,
+        );
+      }),
     ]);
-    if (result === timeoutSentinel) {
-      console.warn(
-        "[Screenity][BG] acquirePostStopEditorLock timed out; failing open",
-      );
-      // Fire-and-forget the writes so the next stop sees the lock
-      // (without us blocking on it).
-      chrome.storage.local
-        .set({
-          postStopEditorOpening: true,
-          postStopEditorOpened: true,
-          postStopRecordingId: recordingId,
-        })
-        .catch(() => {});
-      return true;
-    }
-    return result;
+  } catch {
+    console.warn(
+      "[Screenity][BG] acquirePostStopEditorLock storage mirror timed out; in-memory lock holds",
+    );
+    chrome.storage.local.set(writePayload).catch(() => {});
   } finally {
     if (timer) clearTimeout(timer);
   }
+  return true;
 };
 
 const releasePostStopEditorLock = async (overrides = {}) => {
+  _inMemoryEditorLockHeld = false;
   // keep postStopEditorOpened=true so later stopRecording() can detect the duplicate
   await chrome.storage.local.set({
     postStopEditorOpening: false,
@@ -238,7 +233,11 @@ export const stopRecording = async () => {
     chrome.alarms.clear("recording-alarm");
     discardOffscreenDocuments();
     chrome.storage.local.remove(["recordingMeta"]);
-  } else if (postStopEditorOpening || postStopEditorOpened) {
+  } else if (
+    _inMemoryEditorLockHeld ||
+    postStopEditorOpening ||
+    postStopEditorOpened
+  ) {
     // editor already opened by stop-recording-tab flow; avoid duplicate
   } else if (hasWebCodecs) {
     diagEvent("editor-open", { type: "editorwebcodecs" });
