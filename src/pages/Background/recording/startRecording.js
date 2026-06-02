@@ -5,6 +5,7 @@ import { initDiagSession, diagEvent } from "../../utils/diagnosticLog";
 import { makeRecordingAttemptId } from "../../utils/errorCodes";
 import { lifecycle } from "../../utils/lifecycleLog";
 import { sweepRecorderTabs } from "./sweepRecorderTabs";
+import { emitRecordingTelemetry } from "./emitRecordingTelemetry";
 
 // `recording` flag isn't set until the recorder iframe inits (seconds later),
 // so countdown-finished + 8s fallback can both fire and open two recorder tabs
@@ -343,6 +344,53 @@ const _startRecordingInner = async (caller) => {
   });
   // sync log so the event flushes to storage before SW can be killed
   diagEvent("session-start", { region: Boolean(customRegion), caller });
+
+  // Fire-and-forget beacon before the recorder tab exists, so sessions
+  // that die early still leave a server-side breadcrumb. Skipped for
+  // anonymous users to avoid 401 spam.
+  void (async () => {
+    try {
+      const tokenSnap = await chrome.storage.local.get(["screenityToken"]);
+      if (!tokenSnap?.screenityToken) return;
+      const [extras, tabs, wins] = await Promise.all([
+        chrome.storage.local.get([
+          "screenityUser",
+          "fpsValue",
+          "cameraActive",
+          "micActive",
+          "recordedTabDomain",
+        ]),
+        chrome.tabs.query({}).catch(() => []),
+        chrome.windows.getAll({}).catch(() => []),
+      ]);
+      const userObj = extras?.screenityUser || null;
+      await emitRecordingTelemetry("recording_initiated_beacon", {
+        recordingSessionId: recordingAttemptId,
+        userIdHint: userObj?._id || userObj?.id || null,
+        userAgentFull:
+          typeof navigator !== "undefined" && navigator.userAgent
+            ? String(navigator.userAgent).slice(0, 256)
+            : null,
+        platformFull:
+          typeof navigator !== "undefined" && navigator.platform
+            ? String(navigator.platform).slice(0, 64)
+            : null,
+        hardwareConcurrency: Number.isFinite(navigator?.hardwareConcurrency)
+          ? navigator.hardwareConcurrency
+          : null,
+        recordingType: recordingType || "screen",
+        qualityValue: quality || null,
+        fpsValue: extras?.fpsValue || null,
+        cameraActive: Boolean(extras?.cameraActive),
+        micActive: Boolean(extras?.micActive),
+        systemAudio: Boolean(systemAudio),
+        multiMode: Boolean(multiMode),
+        tabsCount: Array.isArray(tabs) ? tabs.length : null,
+        windowsCount: Array.isArray(wins) ? wins.length : null,
+        recordedTabDomain: extras?.recordedTabDomain || null,
+      });
+    } catch {}
+  })();
 
   const { recordingTab: prevRecTab } = await chrome.storage.local.get([
     "recordingTab",

@@ -58,6 +58,16 @@ export class WebCodecsTrackRecorder {
     return this._recorder?.actualVideoCodec || null;
   }
 
+  // Diagnostic counters; safe to poll mid-recording and after stop.
+  // Returns null before the inner recorder is constructed.
+  getDiagSnapshot() {
+    try {
+      return this._recorder?.getDiagSnapshot?.() || null;
+    } catch {
+      return null;
+    }
+  }
+
   start(_timeslice) {
     // timeslice is a no-op: Mp4MuxerWrapper emits on its own ~1s cadence.
     if (this._state !== "inactive") {

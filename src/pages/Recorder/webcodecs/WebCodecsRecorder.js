@@ -257,6 +257,23 @@ export class WebCodecsRecorder {
     // One-shot: surfaces SPS+PPS bytes once for OPFS persistence so a
     // tab-kill recovery can reconstruct MP4 without the muxer.
     this._decoderConfigEmitted = false;
+
+    // Diagnostic counters. The framesFromMSTP vs framesFed gap points to
+    // MSTP-side issues; framesFed vs chunksOut catches the silent
+    // no-output encoder bug.
+    this._framesFed = 0;
+    this._chunksOut = 0;
+    this._framesFromMSTP = 0;
+    this._staticFrameSyntheticCount = 0;
+    this._firstChunkAt = null;
+    this._encoderConstructCount = 0;
+    this._videoEncoderStateAtStop = null;
+    this._videoCodecConfigsTried = [];
+    this._displaySurface = null;
+    this._frameRateRequested = Number.isFinite(options?.fps) ? options.fps : null;
+    this._frameRateActual = null;
+    this._frameWidthActual = null;
+    this._frameHeightActual = null;
   }
 
   async _probeRealResolution() {
@@ -287,6 +304,15 @@ export class WebCodecsRecorder {
           : null;
       const w = settings && Number(settings.width);
       const h = settings && Number(settings.height);
+      if (settings) {
+        if (typeof settings.displaySurface === "string") {
+          this._displaySurface = settings.displaySurface;
+        }
+        const fr = Number(settings.frameRate);
+        if (Number.isFinite(fr) && fr > 0) this._frameRateActual = fr;
+        if (Number.isFinite(w) && w > 0) this._frameWidthActual = w;
+        if (Number.isFinite(h) && h > 0) this._frameHeightActual = h;
+      }
       if (Number.isFinite(w) && Number.isFinite(h) && w > 0 && h > 0) {
         this.log("[WCR] Resolution from track settings:", w, "x", h);
         return { width: w, height: h };
@@ -766,6 +792,7 @@ export class WebCodecsRecorder {
               timestamp: tsUs,
               keyFrame: false,
             });
+            this._framesFed += 1;
           } finally {
             hold.close();
           }
@@ -795,6 +822,13 @@ export class WebCodecsRecorder {
       } catch (err) {
         this.warn("[WCR] trailing hold frames failed:", err);
       }
+    }
+
+    // Snapshot encoder state before finalize closes it.
+    try {
+      this._videoEncoderStateAtStop = this.videoEncoder?.state || "destroyed";
+    } catch {
+      this._videoEncoderStateAtStop = "unknown";
     }
 
     // Zero chunks: don't ship a header-only file. Skips muxer.finalize
@@ -874,6 +908,7 @@ export class WebCodecsRecorder {
             ? { reason: this._swRetryReason || null }
             : null,
           lastFailureCode: this._lastFailureCode,
+          diag: this.getDiagSnapshot(),
         });
         endOnFinalized({ ok: true });
       } catch (err) {
@@ -892,6 +927,36 @@ export class WebCodecsRecorder {
     }
 
     this._stopping = false;
+  }
+
+  // Read-only snapshot of the diagnostic counters and encoder choice.
+  // Safe to call mid-recording and at stop; never throws.
+  getDiagSnapshot() {
+    let firstChunkLatencyMs = null;
+    if (this._firstChunkAt != null && this._videoStartUs != null) {
+      firstChunkLatencyMs = Math.round(
+        this._firstChunkAt - this._videoStartUs / 1000,
+      );
+    }
+    return {
+      videoCodecString: this.actualVideoCodec || null,
+      hardwareAccelerationActual:
+        this._activeVideoConfig?.hardwareAcceleration || "no-preference",
+      videoCodecConfigsTried: this._videoCodecConfigsTried.slice(0, 8),
+      displaySurface: this._displaySurface,
+      frameRateRequested: this._frameRateRequested,
+      frameRateActual: this._frameRateActual,
+      frameWidthActual: this._frameWidthActual,
+      frameHeightActual: this._frameHeightActual,
+      framesFed: this._framesFed,
+      chunksOut: this._chunksOut,
+      framesFromMSTP: this._framesFromMSTP,
+      staticFrameSyntheticCount: this._staticFrameSyntheticCount,
+      firstChunkLatencyMs,
+      videoEncoderStateAtStop: this._videoEncoderStateAtStop,
+      encoderConstructCount: this._encoderConstructCount,
+      lastWebCodecsFailureCode: this._lastFailureCode || null,
+    };
   }
 
   pause() {
@@ -1305,8 +1370,10 @@ export class WebCodecsRecorder {
         // First encoded video chunk: the recording is producing real
         // bytes, so disarm the no-first-chunk watchdog and arm the
         // mid-stream stall watchdog instead.
+        this._chunksOut += 1;
         if (!this._firstChunkSeen) {
           this._firstChunkSeen = true;
+          this._firstChunkAt = performance.now();
           this._clearFirstChunkWatchdog();
           this._armMidStreamStallWatchdog();
         }
@@ -1455,6 +1522,7 @@ export class WebCodecsRecorder {
       output: videoEncoderOutput,
       error: videoEncoderError,
     });
+    this._encoderConstructCount += 1;
 
     // configure() can throw sync. retry hardware→software on quota/contention
     // (Teams/Zoom, NVIDIA 3-encoder cap); if SW also contends, cooldown and
@@ -1503,6 +1571,7 @@ export class WebCodecsRecorder {
         output: videoEncoderOutput,
         error: videoEncoderError,
       });
+      this._encoderConstructCount += 1;
     };
     const isContention = (err) => {
       const msg = String(err?.message || err || "");
@@ -1923,6 +1992,7 @@ export class WebCodecsRecorder {
           this._videoEncoderErrorHandler(err);
         },
       });
+      this._encoderConstructCount += 1;
       nextEncoder.configure(config);
       this.videoEncoder = nextEncoder;
       this._activeVideoConfig = config;
@@ -2089,6 +2159,11 @@ export class WebCodecsRecorder {
       const test = new VideoEncoder({ output() {}, error() {} });
       try {
         test.configure(resolvedConfig);
+        this._videoCodecConfigsTried.push({
+          codec: c.codec,
+          hw: c.hw,
+          succeeded: true,
+        });
         this.log("[WCR] Selected encoder:", c.codec, c.hw);
         try {
           chrome.storage.local.set({
@@ -2110,6 +2185,11 @@ export class WebCodecsRecorder {
           containerCodec: c.containerCodec,
         };
       } catch (e) {
+        this._videoCodecConfigsTried.push({
+          codec: c.codec,
+          hw: c.hw,
+          succeeded: false,
+        });
       } finally {
         try { test.close(); } catch {}
       }
@@ -2218,9 +2298,11 @@ export class WebCodecsRecorder {
             continue;
           }
           isSynthetic = true;
+          this._staticFrameSyntheticCount += 1;
         } else {
           if (readResult.done || !readResult.value) break;
           frame = readResult.value;
+          this._framesFromMSTP += 1;
           // Drives the sleep-gap detection above.
           this._lastFrameArrivalAt = performance.now();
 
@@ -2344,6 +2426,7 @@ export class WebCodecsRecorder {
                 timestamp: tsUs,
                 keyFrame,
               });
+              this._framesFed += 1;
             } catch (encErr) {
               // Same race after the check. Only swallow when paused
               // so real encoder errors still surface.

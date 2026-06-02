@@ -34,6 +34,7 @@ import {
   resetEncoderProbeCache,
   computeEncodedDimensions,
 } from "./encoder/chooseEncoder";
+import { getCompressedLifecycleLog } from "../utils/lifecycleLog";
 
 localforage.config({
   driver: localforage.INDEXEDDB,
@@ -101,6 +102,35 @@ let trackContainers = {
 };
 let trackCodecs = { screen: "vp9", audio: "opus", camera: "vp9" };
 let encoderHwSlots = null;
+
+// Diagnostic-only snapshot taken once at session start. userAgent is
+// fingerprinting-grade but is already covered by the crash-reports
+// clause in the privacy policy; the rest are aggregate.
+const captureSessionDiag = () => {
+  try {
+    const nav = navigator || {};
+    return {
+      userAgentFull:
+        typeof nav.userAgent === "string"
+          ? nav.userAgent.slice(0, 256)
+          : null,
+      platformFull:
+        typeof nav.platform === "string" ? nav.platform.slice(0, 64) : null,
+      hardwareConcurrency: Number.isFinite(nav.hardwareConcurrency)
+        ? nav.hardwareConcurrency
+        : null,
+      deviceMemoryGb: Number.isFinite(nav.deviceMemory)
+        ? nav.deviceMemory
+        : null,
+      pageVisibilityStateAtStart:
+        typeof document !== "undefined" && document.visibilityState
+          ? document.visibilityState
+          : null,
+    };
+  } catch {
+    return null;
+  }
+};
 
 const urlParams = new URLSearchParams(window.location.search);
 const IS_INJECTED_IFRAME = urlParams.has("injected");
@@ -559,7 +589,18 @@ const CloudRecorder = () => {
       screenUploader.current?.getMeta?.()?.mediaId ||
       cameraUploader.current?.getMeta?.()?.mediaId ||
       null;
-    if (!mediaId && eventPayload.event !== "recording_outcome") {
+    // Diagnostic events fire before mediaId exists; keep them and let the
+    // server attach them by recordingSessionId instead.
+    const DIAG_EVENT_TYPES = new Set([
+      "recording_heartbeat",
+      "recording_stop_diag",
+      "recording_failed_bundle",
+    ]);
+    if (
+      !mediaId &&
+      eventPayload.event !== "recording_outcome" &&
+      !DIAG_EVENT_TYPES.has(eventPayload.event)
+    ) {
       return null;
     }
 
@@ -569,8 +610,10 @@ const CloudRecorder = () => {
         ? parseInt(browserVersion, 10)
         : null;
 
+    const recordingIdForRequest =
+      mediaId || eventPayload.recordingSessionId || null;
     return {
-      recordingId: mediaId,
+      recordingId: recordingIdForRequest,
       recordingSessionId: eventPayload.recordingSessionId || null,
       projectId: eventPayload.projectId || null,
       sceneId: eventPayload.sceneId || null,
@@ -611,8 +654,15 @@ const CloudRecorder = () => {
         recordingSessionId: eventPayload.recordingSessionId || null,
         codec: eventPayload.codec || null,
         container: eventPayload.container || null,
-        encoderKind: eventPayload.encoderKind || null,
-        encoderHwSlots: eventPayload.encoderHwSlots || null,
+        // Fall back to the module globals so post-startup events carry
+        // these without every caller threading them through. Events before
+        // encoder selection still get null, which is correct.
+        encoderKind:
+          eventPayload.encoderKind ||
+          encoderKinds.screen ||
+          encoderKinds.camera ||
+          null,
+        encoderHwSlots: eventPayload.encoderHwSlots || encoderHwSlots || null,
         storageBackend: eventPayload.storageBackend || null,
         storageInitMs:
           typeof eventPayload.storageInitMs === "number"
@@ -664,7 +714,7 @@ const CloudRecorder = () => {
         keepalive: true,
         body,
       });
-      if (res.status === 404 || res.status === 405) {
+      if (res.status === 404 || res.status === 405 || res.status === 413) {
         uploadTelemetryNetworkDisabledRef.current = true;
       }
     } catch {}
@@ -1686,6 +1736,7 @@ const CloudRecorder = () => {
       trackContainers: { ...trackContainers },
       trackCodecs: { ...trackCodecs },
       encoderHwSlots,
+      diag: captureSessionDiag(),
       ...meta,
     };
     recorderSession.current = session;
@@ -1740,6 +1791,35 @@ const CloudRecorder = () => {
   ) => {
     if (!recorderSession.current) return;
     const sessionId = recorderSession.current.id;
+    // Final snapshot before the recorders get cleared, emitted even on
+    // cancel/failed so a recording that never finalizes is still
+    // observable. The lifecycle bundle attaches only on suspected
+    // failures to keep healthy payloads small.
+    try {
+      const screenDiag = screenRecorder.current?.getDiagSnapshot?.() || null;
+      const cameraDiag = cameraRecorder.current?.getDiagSnapshot?.() || null;
+      if (screenDiag || cameraDiag) {
+        const suspectedFailed =
+          status !== "completed" ||
+          (screenDiag && screenDiag.chunksOut === 0) ||
+          (cameraDiag && cameraDiag.chunksOut === 0);
+        const eventType = suspectedFailed
+          ? "recording_failed_bundle"
+          : "recording_stop_diag";
+        let lifecycleBundle = null;
+        if (suspectedFailed) {
+          try {
+            lifecycleBundle = await getCompressedLifecycleLog();
+          } catch {}
+        }
+        void emitUploadTelemetry(eventType, {
+          status,
+          screenDiag,
+          cameraDiag,
+          lifecycleBundle,
+        });
+      }
+    } catch {}
     const opfsSessionId =
       recorderSession.current.opfsSessionId || storageOpfsSessionId || sessionId;
     const usedOpfs = Object.values(
@@ -4482,6 +4562,27 @@ const CloudRecorder = () => {
       stopAllIntervals();
     };
   }, []);
+
+  // 30s heartbeat snapshots WebCodecs counters mid-recording so a
+  // session that dies before stop (tab kill, sleep, crash) still leaves
+  // breadcrumbs at the server. WebCodecs only; MediaRecorder has no
+  // equivalent counters.
+  useEffect(() => {
+    if (!started) return;
+    const intervalId = setInterval(() => {
+      try {
+        if (!recorderSession.current?.id) return;
+        const screen = screenRecorder.current?.getDiagSnapshot?.();
+        const camera = cameraRecorder.current?.getDiagSnapshot?.();
+        if (!screen && !camera) return;
+        void emitUploadTelemetry("recording_heartbeat", {
+          screenDiag: screen || null,
+          cameraDiag: camera || null,
+        });
+      } catch {}
+    }, 30_000);
+    return () => clearInterval(intervalId);
+  }, [started]);
 
   const sendEditorReady = ({
     projectId,

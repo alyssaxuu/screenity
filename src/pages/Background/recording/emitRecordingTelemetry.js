@@ -51,16 +51,23 @@ export const emitRecordingTelemetry = async (eventType, extra = {}) => {
 
     const screenUploader = session?.tracks?.screen?.uploader || null;
     const cameraUploader = session?.tracks?.camera?.uploader || null;
+    // The early beacon fires before this attempt has a session doc, so a
+    // recorderSession in storage is the prior recording's. Skip the fallback
+    // so we don't tag the beacon with a stale mediaId.
+    const isEarlyBeacon = eventType === "recording_initiated_beacon";
     const mediaId =
       extra.mediaId ||
-      screenUploader?.mediaId ||
-      cameraUploader?.mediaId ||
-      null;
+      (isEarlyBeacon
+        ? null
+        : screenUploader?.mediaId || cameraUploader?.mediaId || null);
 
     const extVersion = chrome?.runtime?.getManifest?.()?.version || null;
 
+    const requestRecordingId =
+      extra.recordingId || mediaId || recordingSessionId || null;
+
     const body = JSON.stringify({
-      recordingId: mediaId,
+      recordingId: requestRecordingId,
       recordingSessionId,
       projectId: extra.projectId || session?.projectId || null,
       sceneId: extra.sceneId || session?.sceneId || null,
@@ -100,7 +107,8 @@ export const emitRecordingTelemetry = async (eventType, extra = {}) => {
       keepalive: true,
       body,
     });
-    if (res.status === 404 || res.status === 405) {
+    if (res.status === 404 || res.status === 405 || res.status === 413) {
+      // 413 means the payload is too big; stop sending until a redeploy.
       disabled = true;
     }
   } catch {
