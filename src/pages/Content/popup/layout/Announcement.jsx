@@ -1,22 +1,9 @@
-import React, { useState, useEffect } from "react";
+import React from "react";
 
 const Announcement = (props) => {
-  const [URL, setURL] = useState(
-    "https://help.screenity.io/getting-started/77KizPC8MHVGfpKpqdux9D/what%E2%80%99s-changed-in-the-new-version-of-screenity/bDtvcwAtw9PPesQeNH4zjE"
-  );
+  const URL =
+    "https://help.screenity.io/getting-started/77KizPC8MHVGfpKpqdux9D/what%E2%80%99s-changed-in-the-new-version-of-screenity/bDtvcwAtw9PPesQeNH4zjE";
 
-  useEffect(() => {
-    // check i18n locale, and set URL accordingly w/ google translate
-    const locale = chrome.i18n.getMessage("@@ui_locale");
-    if (!locale.includes("en")) {
-      setURL(
-        "https://translate.google.com/translate?sl=en&tl=" +
-          locale +
-          "&u=" +
-          URL
-      );
-    }
-  }, []);
   return (
     <div className="welcome">
       <div className="announcement-wrap">

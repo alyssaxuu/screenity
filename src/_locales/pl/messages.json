@@ -1338,11 +1338,11 @@
     "description": "Title for the welcome Pro popup"
   },
   "welcomeProDescription": {
-    "message": "Zaloguj się, aby zapisać nagrania w chmurze, udostępniać linkiem i korzystać z zaawansowanych opcji edycji.",
+    "message": "Udostępniaj nagrania przez czytelny link, zapisuj je w chmurze i dodawaj zoomy, napisy i układy, jeśli i kiedy tego potrzebujesz.",
     "description": "Description for the welcome Pro popup"
   },
   "welcomeProButton": {
-    "message": "Zaloguj się, aby odblokować funkcje Pro",
+    "message": "Odblokuj edytor",
     "description": "Button to sign in to Screenity Pro"
   },
   "welcomeProSupport": {

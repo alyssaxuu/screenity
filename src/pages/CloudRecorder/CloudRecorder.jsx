@@ -17,6 +17,8 @@ import {
 } from "../utils/tabKeepalive";
 import { traceStep } from "../utils/startFlowTrace";
 import { IS_OFFSCREEN_HOST } from "../utils/recordingHost";
+import { shouldUseDisplayMediaForScreen } from "../utils/screenCaptureMode";
+import { acquireDisplayMediaWithFocusRetry } from "../utils/acquireDisplayMedia";
 import { startPrewarm, stopPrewarm } from "../Recorder/streamWarmup";
 import { preloadWebCodecsModules } from "../Recorder/webcodecs/WebCodecsRecorder";
 import {
@@ -279,6 +281,9 @@ const CloudRecorder = () => {
   const recoveryExportedRef = useRef(false);
   const screenTrackLostRef = useRef(false);
   const screenTrackMonitor = useRef(null);
+  // Capture identity (recordingType/surface enums only, no labels/URLs) for
+  // forensic telemetry, so a frozen session's capture mechanism is known.
+  const captureContextRef = useRef(null);
   const pausedStateRef = useRef(false);
   const audioCaptureDegradedRef = useRef(false);
   const storagePressureRef = useRef({
@@ -337,6 +342,9 @@ const CloudRecorder = () => {
   const isInit = useRef(false);
 
   const aCtx = useRef(null);
+  // Live AudioContext interruption stats from attachAudioContextWatchdog,
+  // folded into the audio diag snapshot at finalize for upload telemetry.
+  const audioHealthRef = useRef(null);
   const destination = useRef(null);
 
   const keepAliveInterval = useRef(null);
@@ -671,6 +679,15 @@ const CloudRecorder = () => {
         screenStorageBackend: eventPayload.screenStorageBackend || null,
         cameraStorageBackend: eventPayload.cameraStorageBackend || null,
         audioStorageBackend: eventPayload.audioStorageBackend || null,
+        // Diagnostic event fields. Only populated on the diagnostic
+        // event types (recording_heartbeat, recording_stop_diag,
+        // recording_failed_bundle); null otherwise. The server
+        // sanitizer drops them cleanly when absent.
+        screenDiag: eventPayload.screenDiag || null,
+        cameraDiag: eventPayload.cameraDiag || null,
+        audioDiag: eventPayload.audioDiag || null,
+        lifecycleBundle: eventPayload.lifecycleBundle || null,
+        status: eventPayload.status || null,
       },
     };
   };
@@ -751,6 +768,28 @@ const CloudRecorder = () => {
     if (event !== "upload_progress") {
       void sendUploadTelemetryNetwork(eventPayload);
     }
+  };
+
+  // Stamps a lifecycle/focus/track event with ms-since-start so a frozen
+  // session can be reconstructed. Enums and ms only, no labels/URLs/titles.
+  const logForensicEvent = (name, extra = {}) => {
+    try {
+      const startedAt = recorderSession.current?.startedAt || null;
+      // Only during an active recording; capture-context is exempt (fires at acquire).
+      if (!startedAt && name !== "capture-context") return;
+      const host = IS_OFFSCREEN_HOST
+        ? "offscreen"
+        : IS_IFRAME_CONTEXT
+          ? "iframe"
+          : "tab";
+      void emitUploadTelemetry("recording_forensic_event", {
+        name,
+        tMs: startedAt ? Date.now() - startedAt : null,
+        host,
+        ...(captureContextRef.current || {}),
+        ...extra,
+      });
+    } catch {}
   };
 
   const emitRecordingOutcome = (outcome, extra = {}) => {
@@ -1154,6 +1193,17 @@ const CloudRecorder = () => {
   const bindScreenTrack = (track) => {
     if (!track) return;
     screenTrackLostRef.current = false;
+    // Capture identity from the bound track (fires on every acquisition path).
+    // Enums and booleans only, no track.label/title/URL.
+    try {
+      captureContextRef.current = {
+        recordingType: recordingType.current || null,
+        displaySurface: track.getSettings?.().displaySurface || null,
+        isTab: !!isTab.current,
+        region: Boolean(regionRef.current),
+      };
+      logForensicEvent("capture-context");
+    } catch {}
     logScreenTrackEvent("track-start", track);
 
     track.onended = () => {
@@ -1183,6 +1233,12 @@ const CloudRecorder = () => {
 
       console.error("🔴 Screen track ended unexpectedly!", diagnosticInfo);
 
+      // Forward to remote, redacting the window/tab label the local diag keeps.
+      logForensicEvent("screen-track-ended", {
+        readyState: track?.readyState || null,
+        hasChunks: hasChunks.current,
+      });
+
       chrome.storage.local.set({
         screenTrackLost: true,
         lastTrackEndedEvent: diagnosticInfo,
@@ -1199,10 +1255,12 @@ const CloudRecorder = () => {
     track.onmute = () => {
       screenTrackLostRef.current = true;
       logScreenTrackEvent("track-muted", track);
+      logForensicEvent("screen-track-muted");
     };
     track.onunmute = () => {
       screenTrackLostRef.current = false;
       logScreenTrackEvent("track-unmuted", track);
+      logForensicEvent("screen-track-unmuted");
     };
 
     startScreenTrackMonitor();
@@ -1785,6 +1843,66 @@ const CloudRecorder = () => {
     return true;
   };
 
+  // Audio (mic) diagnostic snapshot for the MediaRecorder audio path.
+  // The WebCodecs recorders expose getDiagSnapshot(); MediaRecorder does
+  // not, so we assemble an equivalent from the existing sessionTrackState
+  // counters plus the live mic-track + intent state. This is the one path
+  // the WebCodecs telemetry never covered, which is exactly where the
+  // silent empty-audio failures live.
+  //
+  // Returns null ONLY when the mic was not part of this recording (nothing
+  // to observe). When the user chose the mic we always return a snapshot,
+  // even at zero bytes, so an empty audio track stays observable. Pure
+  // reads — never mutates state, never throws.
+  const getAudioDiagSnapshot = () => {
+    try {
+      const micChosen = audioIntent.current?.micActive === true;
+      const hasUploader = Boolean(audioUploader.current);
+      const hasRecorder = Boolean(audioRecorder.current);
+      if (!micChosen && !hasUploader && !hasRecorder) return null;
+
+      const track = rawMicStream.current?.getAudioTracks?.()[0] || null;
+      const audioState = sessionTrackState.current?.audio || {};
+      const uploaderMeta = audioUploader.current?.getMeta?.() || null;
+      return {
+        // Authoritative user intent — the disambiguator that keeps a
+        // user-disabled mic from ever being read as a failure.
+        micChosen,
+        encoderKind: encoderKinds.audio || null,
+        recorderState: audioRecorder.current?.state || null,
+        // Live mic-track health. A missing/ended/system-muted track with
+        // micChosen=true is the genuine fault signature.
+        trackCount: rawMicStream.current?.getAudioTracks?.().length || 0,
+        trackReadyState: track?.readyState || null,
+        trackMuted: track ? Boolean(track.muted) : null,
+        trackEnabled: track ? Boolean(track.enabled) : null,
+        // Data flow. chunksOut === 0 with micChosen=true === empty audio.
+        chunksOut: audioState.chunkCount || 0,
+        bytesRecorded: audioState.bytesRecorded || 0,
+        durableChunkCount: audioState.durableChunkCount || 0,
+        lastChunkAt: audioState.lastChunkAt || null,
+        captureDegraded: Boolean(audioCaptureDegradedRef.current),
+        uploaderStatus: uploaderMeta?.status || null,
+        uploaderOffset:
+          typeof uploaderMeta?.offset === "number" ? uploaderMeta.offset : null,
+        // Throttling context: a backgrounded tab starves MediaRecorder.
+        documentHidden:
+          typeof document !== "undefined" ? document.hidden : null,
+        visibilityState:
+          typeof document !== "undefined" ? document.visibilityState : null,
+        // AudioContext interruption cause-signal: an OS "interrupted" state
+        // feeds the destination silence, so chunksOut===0 here with
+        // sawInterrupted distinguishes a silent gap from a dead mic track.
+        audioContextState: aCtx.current?.state ?? null,
+        audioInterruptedCount: audioHealthRef.current?.interruptedCount ?? 0,
+        audioInterruptedMs: audioHealthRef.current?.interruptedTotalMs ?? 0,
+        audioSawInterrupted: audioHealthRef.current?.sawInterrupted ?? false,
+      };
+    } catch {
+      return null;
+    }
+  };
+
   const finalizeRecorderSession = async (
     status = "completed",
     { keepOpfsSession = false } = {},
@@ -1798,11 +1916,28 @@ const CloudRecorder = () => {
     try {
       const screenDiag = screenRecorder.current?.getDiagSnapshot?.() || null;
       const cameraDiag = cameraRecorder.current?.getDiagSnapshot?.() || null;
-      if (screenDiag || cameraDiag) {
+      const audioDiag = getAudioDiagSnapshot();
+      if (screenDiag || cameraDiag || audioDiag) {
+        // Mic was chosen but the audio track produced zero bytes while
+        // another track recorded fine — the silent-audio failure. We read
+        // "did another track record" from sessionTrackState (populated for
+        // every encoder kind) rather than the WebCodecs diags, so this
+        // still fires when screen/camera run on MediaRecorder (no diag).
+        // Requiring otherTrackRecorded keeps trivially-short / fully-failed
+        // recordings from being flagged here.
+        const otherTrackRecorded =
+          (sessionTrackState.current.screen?.bytesRecorded || 0) > 0 ||
+          (sessionTrackState.current.camera?.bytesRecorded || 0) > 0;
+        const audioEmptyDespiteIntent =
+          audioDiag &&
+          audioDiag.micChosen === true &&
+          audioDiag.chunksOut === 0 &&
+          otherTrackRecorded;
         const suspectedFailed =
           status !== "completed" ||
           (screenDiag && screenDiag.chunksOut === 0) ||
-          (cameraDiag && cameraDiag.chunksOut === 0);
+          (cameraDiag && cameraDiag.chunksOut === 0) ||
+          audioEmptyDespiteIntent;
         const eventType = suspectedFailed
           ? "recording_failed_bundle"
           : "recording_stop_diag";
@@ -1816,6 +1951,7 @@ const CloudRecorder = () => {
           status,
           screenDiag,
           cameraDiag,
+          audioDiag,
           lifecycleBundle,
         });
       }
@@ -3314,7 +3450,21 @@ const CloudRecorder = () => {
     }
   };
 
-  const createMediaRecorder = (stream, options, onDataAvailable) => {
+  // The codec to drop to when an encoder passes isTypeSupported() but
+  // fails at runtime (EncodingError). Returns null when there's nothing
+  // safer left to try (already on VP8/webm), in which case we surface the
+  // error instead of looping.
+  const pickEncodingFallback = (currentMime, trackKind) => {
+    const m = String(currentMime || "").toLowerCase();
+    if (trackKind === "audio" || m.startsWith("audio/")) {
+      // Opus-in-webm is the floor for audio; nothing safer to fall to.
+      return null;
+    }
+    if (m.includes("vp8") || m === "video/webm") return null;
+    return "video/webm;codecs=vp8,opus";
+  };
+
+  const createMediaRecorder = (stream, options, onDataAvailable, trackKind) => {
     try {
       // Pro hardcodes one mimeType per track. On Linux with some GPU
       // drivers + WebCodecs sticky-disabled, construct throws with no
@@ -3355,6 +3505,11 @@ const CloudRecorder = () => {
 
       recorder.ondataavailable = (event) => {
         if (event.data && event.data.size > 0) {
+          // Marks the recorder as having produced bytes. The EncodingError
+          // auto-retry below only fires when NO data was captured yet, so a
+          // mid-session encoder failure isn't silently restarted (which
+          // would drop already-recorded media).
+          recorder._gotData = true;
           try {
             const maybePromise = onDataAvailable(event.data);
             if (maybePromise && typeof maybePromise.then === "function") {
@@ -3388,6 +3543,80 @@ const CloudRecorder = () => {
           });
           return;
         }
+
+        // EncodingError: the encoder passed isTypeSupported() at construction
+        // but failed once real frames arrived (known on older Android H.264
+        // and high-res getDisplayMedia encoder init). Chrome surfaces it as
+        // EncodingError or one of these messages. If no bytes were captured
+        // yet, transparently rebuild on VP8 and restart on the same stream —
+        // nothing was recorded or uploaded, so the swap loses nothing and the
+        // user barely notices. If data already flowed, we do NOT restart
+        // (that would discard it); we fall through to the normal surface +
+        // graceful stop, keeping what was recorded.
+        const isEncodingError =
+          errName === "EncodingError" ||
+          errMsg.includes("video encoding failed") ||
+          errMsg.includes("encoder initialization failed") ||
+          errMsg.includes("not supported by the encoder");
+        const refForTrack =
+          trackKind === "audio"
+            ? audioRecorder
+            : trackKind === "camera"
+              ? cameraRecorder
+              : trackKind === "screen"
+                ? screenRecorder
+                : null;
+        if (
+          isEncodingError &&
+          !recorder._fellBack &&
+          !recorder._gotData &&
+          refForTrack
+        ) {
+          const fallbackMime = pickEncodingFallback(
+            effectiveOptions?.mimeType,
+            trackKind,
+          );
+          if (fallbackMime && MediaRecorder.isTypeSupported(fallbackMime)) {
+            recorder._fellBack = true;
+            logDebugEvent("encoding-error-fallback", {
+              trackKind,
+              from: effectiveOptions?.mimeType || null,
+              to: fallbackMime,
+              message: event?.error?.message || null,
+            });
+            // Tear down the dead recorder without letting its stop fire the
+            // normal onstop/finalize path.
+            try {
+              recorder.ondataavailable = null;
+              recorder.onstop = null;
+              if (recorder.state !== "inactive") recorder.stop();
+            } catch {}
+            try {
+              const replacement = createMediaRecorder(
+                stream,
+                { ...effectiveOptions, mimeType: fallbackMime },
+                onDataAvailable,
+                trackKind,
+              );
+              // One downgrade only; if VP8 also fails it surfaces normally.
+              replacement._fellBack = true;
+              // Only adopt if the ref still points at the dead recorder; a
+              // concurrent teardown may have already moved on.
+              if (refForTrack.current === recorder) {
+                refForTrack.current = replacement;
+                replacement.start(2000); // matches the 2000ms timeslice at the start sites
+                return;
+              }
+            } catch (retryErr) {
+              console.error(
+                "[CloudRecorder] EncodingError VP8 retry failed:",
+                retryErr,
+              );
+              // fall through to surface the original error
+            }
+          }
+        }
+
         console.error("MediaRecorder error:", event.error);
         sendRecordingError("Recording error: " + event.error?.message);
       };
@@ -4418,11 +4647,13 @@ const CloudRecorder = () => {
   useEffect(() => {
     const onVisibilityChange = () => {
       if (document.visibilityState === "hidden") {
+        logForensicEvent("visibility-hidden");
         persistSessionState({
           visibilityState: "hidden",
           visibilityChangedAt: Date.now(),
         });
       } else if (document.visibilityState === "visible") {
+        logForensicEvent("visibility-visible");
         // In-tab heartbeat may have been throttled while hidden; force stall-recovery.
         try {
           const now = Date.now();
@@ -4465,6 +4696,31 @@ const CloudRecorder = () => {
     return () => {
       document.removeEventListener("visibilitychange", onVisibilityChange);
       window.removeEventListener("beforeunload", onBeforeUnload);
+    };
+  }, []);
+
+  // Focus/lifecycle timeline (recorder is a pinned tab): window blur/focus and
+  // page freeze/resume, to correlate a freeze with the user switching away.
+  useEffect(() => {
+    if (IS_OFFSCREEN_HOST) return undefined;
+    const onWindowBlur = () => logForensicEvent("window-blur");
+    const onWindowFocus = () => logForensicEvent("window-focus");
+    const onPageFreeze = () => logForensicEvent("page-freeze");
+    const onPageResume = () => logForensicEvent("page-resume");
+    const onPageShow = () => logForensicEvent("pageshow");
+
+    window.addEventListener("blur", onWindowBlur);
+    window.addEventListener("focus", onWindowFocus);
+    document.addEventListener("freeze", onPageFreeze);
+    document.addEventListener("resume", onPageResume);
+    window.addEventListener("pageshow", onPageShow);
+
+    return () => {
+      window.removeEventListener("blur", onWindowBlur);
+      window.removeEventListener("focus", onWindowFocus);
+      document.removeEventListener("freeze", onPageFreeze);
+      document.removeEventListener("resume", onPageResume);
+      window.removeEventListener("pageshow", onPageShow);
     };
   }, []);
 
@@ -4563,10 +4819,11 @@ const CloudRecorder = () => {
     };
   }, []);
 
-  // 30s heartbeat snapshots WebCodecs counters mid-recording so a
-  // session that dies before stop (tab kill, sleep, crash) still leaves
-  // breadcrumbs at the server. WebCodecs only; MediaRecorder has no
-  // equivalent counters.
+  // 30s heartbeat snapshots track counters mid-recording so a session
+  // that dies before stop (tab kill, sleep, crash) still leaves
+  // breadcrumbs at the server. Covers the WebCodecs screen/camera diags
+  // and the MediaRecorder audio diag, so a mic that goes silent mid-
+  // recording is visible before the final stop-diag.
   useEffect(() => {
     if (!started) return;
     const intervalId = setInterval(() => {
@@ -4574,10 +4831,12 @@ const CloudRecorder = () => {
         if (!recorderSession.current?.id) return;
         const screen = screenRecorder.current?.getDiagSnapshot?.();
         const camera = cameraRecorder.current?.getDiagSnapshot?.();
-        if (!screen && !camera) return;
+        const audio = getAudioDiagSnapshot();
+        if (!screen && !camera && !audio) return;
         void emitUploadTelemetry("recording_heartbeat", {
           screenDiag: screen || null,
           cameraDiag: camera || null,
+          audioDiag: audio || null,
         });
       } catch {}
     }, 30_000);
@@ -5684,9 +5943,12 @@ const CloudRecorder = () => {
             },
             audio: data.systemAudio,
           };
-          const stream = await navigator.mediaDevices.getDisplayMedia(
+          const stream = await acquireDisplayMediaWithFocusRetry({
+            getDisplayMedia: (c) => navigator.mediaDevices.getDisplayMedia(c),
             constraints,
-          );
+            onReactivate: () =>
+              chrome.runtime.sendMessage({ type: "activate-recorder-tab" }),
+          });
           screenStream.current = stream;
           regionRef.current = true;
           if (!screenStream.current?.getVideoTracks?.().length) {
@@ -5872,8 +6134,20 @@ const CloudRecorder = () => {
                 frameRate: { ideal: targetFps, max: targetFps },
                 width: { ideal: targetWidth, max: targetWidth },
                 height: { ideal: targetHeight, max: targetHeight },
-                ...(isTabModeRequest ? { displaySurface: "browser" } : {}),
+                // Open the picker on Entire Screen for screen, Chrome Tab for
+                // tab/region. Hint only; the user can still switch panes.
+                displaySurface: isTabModeRequest ? "browser" : "monitor",
               },
+              // systemAudio:"include" (default may hide the toggle);
+              // surfaceSwitching:"exclude" dodges crbug 344876285 (switch ends
+              // mac audio). Screen-only; these throw TypeError w/ preferCurrentTab.
+              ...(isTabModeRequest
+                ? {}
+                : {
+                    systemAudio: "include",
+                    surfaceSwitching: "exclude",
+                    selfBrowserSurface: "exclude",
+                  }),
             };
             console.log(
               "[CloudRecorder] offscreen getDisplayMedia constraints",
@@ -5886,9 +6160,12 @@ const CloudRecorder = () => {
                 payload: displayConstraints,
               })
               .catch(() => {});
-            screenStream.current = await navigator.mediaDevices.getDisplayMedia(
-              displayConstraints,
-            );
+            screenStream.current = await acquireDisplayMediaWithFocusRetry({
+              getDisplayMedia: (c) => navigator.mediaDevices.getDisplayMedia(c),
+              constraints: displayConstraints,
+              onReactivate: () =>
+                chrome.runtime.sendMessage({ type: "activate-recorder-tab" }),
+            });
             console.log("[CloudRecorder] offscreen getDisplayMedia OK");
           } else {
             if (!id) {
@@ -6199,6 +6476,11 @@ const CloudRecorder = () => {
                   recordingDuration: dur,
                   isLikelyContinuityMic,
                   salvageOffered: !isShort,
+                  audioContextState: aCtx.current?.state ?? null,
+                  docVisibility:
+                    typeof document !== "undefined"
+                      ? document.visibilityState
+                      : null,
                 },
               });
             } catch {}
@@ -6226,7 +6508,10 @@ const CloudRecorder = () => {
         // Some platforms reject hint sampleRates; fall back to default.
         aCtx.current = new AudioContext();
       }
-      attachAudioContextWatchdog(aCtx.current, "CloudRecorder");
+      audioHealthRef.current = attachAudioContextWatchdog(
+        aCtx.current,
+        "CloudRecorder",
+      );
       destination.current = aCtx.current.createMediaStreamDestination();
 
       if (micStream.current?.getAudioTracks().length) {
@@ -6251,6 +6536,27 @@ const CloudRecorder = () => {
         screenSource
           .connect(audioOutputGain.current)
           .connect(destination.current);
+
+        // Diagnostic only: system/tab audio can die mid-recording (tab closed,
+        // OS mute, BT disconnect). Log it, don't stop; video/mic continue.
+        const screenAudioTrack = screenStream.current.getAudioTracks()[0];
+        if (screenAudioTrack) {
+          screenAudioTrack.addEventListener("ended", () => {
+            if (isFinishing.current) return;
+            // No track label / identifiers: diagnostics stay free of titles,
+            // names, and anything beyond the account ID.
+            const info = { reason: "system-audio-track-ended" };
+            console.warn("[CloudRecorder] system audio track ended");
+            try {
+              chrome.runtime.sendMessage({
+                type: "diag-forward",
+                event: "cloudrecorder-system-audio-track-ended",
+                data: info,
+              });
+            } catch {}
+            chrome.storage.local.set({ lastTrackEndEvent: info });
+          });
+        }
 
         const { systemAudioVolume } = await chrome.storage.local.get([
           "systemAudioVolume",
@@ -6375,6 +6681,18 @@ const CloudRecorder = () => {
         navigator.permissions.query({ name: "microphone" }),
       ]);
 
+      // macOS + Chrome 141+ routes screen capture through getDisplayMedia for
+      // system audio. See screenCaptureMode.js.
+      const { forceDisplayMediaScreen, macSystemAudioCapture } =
+        await chrome.storage.local.get([
+          "forceDisplayMediaScreen",
+          "macSystemAudioCapture",
+        ]);
+      const screenDisplayMediaMode = shouldUseDisplayMediaForScreen({
+        forceDisplayMediaScreen,
+        macSystemAudioCapture,
+      });
+
       if (isTab.current) {
         // Wait for getStreamID across all recordingTypes: an earlier guard skipped
         // region tab-captures and started with tabID.current = null.
@@ -6437,10 +6755,18 @@ const CloudRecorder = () => {
         !(IS_IFRAME_CONTEXT && regionRef.current) &&
         (data.recordingType != "region" || tabPreferred.current)
       ) {
-        _diagBranch("desktop-picker");
-        // Desktop picker path: non-tab mode without region, or tabPreferred forced
-        // isTab=false (playground) so there's no pre-obtained streamId.
-        {
+        if (screenDisplayMediaMode) {
+          // getDisplayMedia path; startStream's useDisplayMedia branch handles it.
+          _diagBranch("screen-getDisplayMedia");
+          chrome.storage.local.set({ lastScreenCaptureApi: "getDisplayMedia" });
+          startStream(data, null, permissions, permissions2, {
+            useDisplayMedia: true,
+          });
+        } else {
+          _diagBranch("desktop-picker");
+          chrome.storage.local.set({ lastScreenCaptureApi: "desktopCapture" });
+          // Desktop picker path: non-tab mode without region, or tabPreferred forced
+          // isTab=false (playground) so there's no pre-obtained streamId.
           chrome.desktopCapture.chooseDesktopMedia(
             ["screen", "window", "tab", "audio"],
             null,

@@ -1338,11 +1338,11 @@
     "description": "Title for the welcome Pro popup"
   },
   "welcomeProDescription": {
-    "message": "Увійдіть, щоб зберігати відео в хмарі, ділитися посиланням і редагувати з розширеними функціями.",
+    "message": "Діліться записами за допомогою акуратного посилання, зберігайте їх у хмарі та додавайте зуми, субтитри й макети, якщо і коли це знадобиться.",
     "description": "Description for the welcome Pro popup"
   },
   "welcomeProButton": {
-    "message": "Увійти, щоб відкрити платні функції",
+    "message": "Розблокувати редактор",
     "description": "Button to sign in to Screenity Pro"
   },
   "welcomeProSupport": {

@@ -1338,11 +1338,11 @@
     "description": "Title for the welcome Pro popup"
   },
   "welcomeProDescription": {
-    "message": "Videolarını buluta kaydetmek, bağlantıyla paylaşmak ve gelişmiş düzenleme özelliklerine erişmek için giriş yap.",
+    "message": "Kayıtları temiz bir bağlantıyla paylaş, bulutta sakla ve gerektiğinde yakınlaştırmalar, altyazılar ve düzenler ekle.",
     "description": "Description for the welcome Pro popup"
   },
   "welcomeProButton": {
-    "message": "Ücretli özelliklerin kilidini açmak için giriş yap",
+    "message": "Editörün kilidini aç",
     "description": "Button to sign in to Screenity Pro"
   },
   "welcomeProSupport": {

@@ -1338,11 +1338,11 @@
     "description": "Title for the welcome Pro popup"
   },
   "welcomeProDescription": {
-    "message": "영상을 클라우드에 저장하고 링크로 공유하며 고급 편집 기능을 사용하려면 로그인하세요.",
+    "message": "녹화를 깔끔한 링크로 공유하고 클라우드에 저장하며, 필요할 때 줌, 자막, 레이아웃을 추가하세요.",
     "description": "Description for the welcome Pro popup"
   },
   "welcomeProButton": {
-    "message": "유료 기능 잠금 해제를 위해 로그인",
+    "message": "에디터 잠금 해제",
     "description": "Button to sign in to Screenity Pro"
   },
   "welcomeProSupport": {

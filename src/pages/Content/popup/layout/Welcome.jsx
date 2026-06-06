@@ -1,19 +1,9 @@
-import React, { useEffect, useState } from "react";
-import SoloDev from "../../../../assets/solo-dev.png";
+import React from "react";
 // import EditorPreview from "../../../../assets/editor-preview.png"; // replace with actual screenshot file
 
 const Welcome = (props) => {
   const isUpdated = props.isBack;
   const clearBack = props.clearBack;
-  const [learntAboutPro, setLearntAboutPro] = useState(false);
-
-  useEffect(() => {
-    // if (isUpdated) {
-    chrome.storage.local.get("learntAboutPro", (res) => {
-      if (res.learntAboutPro) setLearntAboutPro(true);
-    });
-    // }
-  }, []);
 
   return (
     <div
@@ -96,54 +86,13 @@ const Welcome = (props) => {
               textAlign: "center",
             }}
           >
-            {learntAboutPro
-              ? chrome.i18n.getMessage("welcomeProDescription") ||
-                "Sign in to save your videos to the cloud, share with a link, and access advanced editing features."
-              : chrome.i18n.getMessage("welcomeBackProDescription") ||
-                "Sign in to save your videos to the cloud, share with a link, and access advanced editing features."}
+            {chrome.i18n.getMessage("welcomeProDescription") ||
+              "Cloud backup, real editing, and a clean link to share."}
           </p>
-
-          {/* <div
-            onClick={() => {
-              if (!isUpdated || learntAboutPro) {
-                chrome.runtime.sendMessage({ type: "handle-login" });
-              } else {
-                chrome.storage.local.set({ learntAboutPro: true });
-                chrome.runtime.sendMessage({ type: "pricing" });
-                setLearntAboutPro(true);
-              }
-            }}
-            role="button"
-            className="main-button dashboard-button"
-            tabIndex="0"
-            style={{
-              zIndex: 99,
-              marginTop: "25px",
-            }}
-          >
-            <span className="main-button-label">
-              {!isUpdated || learntAboutPro
-                ? chrome.i18n.getMessage("welcomeProButton") ||
-                  "Sign in to unlock paid features"
-                : !learntAboutPro
-                ? chrome.i18n.getMessage("welcomeBackProCTA") ||
-                  "Learn more about Screenity Pro"
-                : chrome.i18n.getMessage("welcomeBackProCTAAfterLearn") ||
-                  "Sign in to unlock paid features"}
-            </span>
-          </div> */}
 
           <div
             onClick={() => {
-              if (learntAboutPro) {
-                // After they've seen the Pro info, trigger sign in
-                chrome.runtime.sendMessage({ type: "handle-login" });
-              } else {
-                // First click: show pricing page and mark as "learnt"
-                chrome.storage.local.set({ learntAboutPro: true });
-                chrome.runtime.sendMessage({ type: "pricing" });
-                setLearntAboutPro(true);
-              }
+              chrome.runtime.sendMessage({ type: "pricing", source: "welcome" });
             }}
             role="button"
             className="main-button dashboard-button"
@@ -154,26 +103,36 @@ const Welcome = (props) => {
             }}
           >
             <span className="main-button-label">
-              {learntAboutPro
-                ? chrome.i18n.getMessage("welcomeProButton") ||
-                  "Sign in to unlock paid features"
-                : chrome.i18n.getMessage("welcomeBackProCTA") ||
-                  "Learn more about Screenity Pro"}
+              {chrome.i18n.getMessage("welcomeProButton") || "Unlock the editor"}
+            </span>
+            <span
+              className="main-button-label"
+              style={{
+                opacity: 0.55,
+                fontWeight: 400,
+                marginLeft: "8px",
+              }}
+            >
+              $10/mo
             </span>
           </div>
-          <a
-            className="welcome-support"
-            href="https://alyssax.substack.com/"
-            target="_blank"
-            rel="noopener noreferrer"
+          <div
+            onClick={() => {
+              chrome.runtime.sendMessage({ type: "handle-login" });
+            }}
+            role="button"
+            tabIndex="0"
             style={{
+              marginTop: "14px",
+              fontSize: "13px",
+              color: "#6E7684",
               cursor: "pointer",
+              textAlign: "center",
             }}
           >
-            {chrome.i18n.getMessage("welcomeProSupport") ||
-              "Support development by a solo indie maker "}
-            <img src={chrome.runtime.getURL(SoloDev)} alt="Alyssa X" />
-          </a>
+            {chrome.i18n.getMessage("shareModalSandboxLogin") ||
+              "Already have an account? Log in"}
+          </div>
         </div>
       </div>
     </div>

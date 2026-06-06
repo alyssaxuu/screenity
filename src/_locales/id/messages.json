@@ -1338,11 +1338,11 @@
     "description": "Title for the welcome Pro popup"
   },
   "welcomeProDescription": {
-    "message": "Masuk untuk menyimpan video ke cloud, berbagi dengan tautan, dan akses fitur editing lanjutan.",
+    "message": "Bagikan rekaman lewat tautan yang rapi, simpan di cloud, dan tambahkan zoom, teks, dan tata letak, kapan pun kamu membutuhkannya.",
     "description": "Description for the welcome Pro popup"
   },
   "welcomeProButton": {
-    "message": "Masuk untuk membuka fitur berbayar",
+    "message": "Buka editor",
     "description": "Button to sign in to Screenity Pro"
   },
   "welcomeProSupport": {

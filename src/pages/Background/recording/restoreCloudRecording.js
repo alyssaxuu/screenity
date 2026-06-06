@@ -76,7 +76,7 @@ export const restoreCloudRecording = async () => {
 
   await resetWatchdogState();
 
-  const tab = await createTab("download.html", true, true);
+  const tab = await createTab("download.html", true);
   if (!tab?.id) return;
 
   let settled = false;

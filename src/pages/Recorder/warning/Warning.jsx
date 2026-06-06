@@ -10,6 +10,8 @@ import { ReactSVG } from "react-svg";
 
 import * as ToastEl from "@radix-ui/react-toast";
 
+import { shouldUseDisplayMediaForScreen } from "../../utils/screenCaptureMode";
+
 const Warning = () => {
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("Record computer audio");
@@ -24,21 +26,32 @@ const Warning = () => {
   }, []);
 
   useEffect(() => {
-    // Check if macOS
+    // macOS + Chrome 141+ captures system audio via getDisplayMedia, so show
+    // Windows-style guidance. Read the same flags the capture path uses so the
+    // warning can't disagree with what actually happens.
     const isMac = navigator.userAgent.indexOf("Mac") !== -1;
-    if (isMac) {
-      openWarning(
-        chrome.i18n.getMessage("recordAudioWarningMacTitle"),
-        chrome.i18n.getMessage("recordAudioWarningMacDescription"),
-        10000
-      );
-    } else {
-      openWarning(
-        chrome.i18n.getMessage("recordAudioWarningOtherTitle"),
-        chrome.i18n.getMessage("recordAudioWarningOtherDescription"),
-        10000
-      );
-    }
+    chrome.storage.local.get(
+      ["forceDisplayMediaScreen", "macSystemAudioCapture"],
+      ({ forceDisplayMediaScreen, macSystemAudioCapture }) => {
+        const useDisplayMedia = shouldUseDisplayMediaForScreen({
+          forceDisplayMediaScreen,
+          macSystemAudioCapture,
+        });
+        if (isMac && !useDisplayMedia) {
+          openWarning(
+            chrome.i18n.getMessage("recordAudioWarningMacTitle"),
+            chrome.i18n.getMessage("recordAudioWarningMacDescription"),
+            10000
+          );
+        } else {
+          openWarning(
+            chrome.i18n.getMessage("recordAudioWarningOtherTitle"),
+            chrome.i18n.getMessage("recordAudioWarningOtherDescription"),
+            10000
+          );
+        }
+      }
+    );
   }, []);
 
   return (

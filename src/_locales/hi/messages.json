@@ -1338,11 +1338,11 @@
     "description": "Title for the welcome Pro popup"
   },
   "welcomeProDescription": {
-    "message": "अपने वीडियो क्लाउड में सेव करने, लिंक के साथ साझा करने और एडवांस एडिटिंग फीचर्स एक्सेस करने के लिए साइन इन करें।",
+    "message": "रिकॉर्डिंग को एक साफ़ लिंक से शेयर करें, उन्हें क्लाउड में सेव करें, और ज़रूरत पड़ने पर ज़ूम, कैप्शन और लेआउट जोड़ें।",
     "description": "Description for the welcome Pro popup"
   },
   "welcomeProButton": {
-    "message": "पेड फीचर्स अनलॉक करने के लिए साइन इन करें",
+    "message": "एडिटर अनलॉक करें",
     "description": "Button to sign in to Screenity Pro"
   },
   "welcomeProSupport": {

@@ -48,10 +48,10 @@ const ContentState = (props) => {
   const CLOUD_FEATURES_ENABLED =
     process.env.SCREENITY_ENABLE_CLOUD_FEATURES === "true";
   setTimer = setTimerInternal;
-  const [URL, setURL] = useState(
+  const [URL] = useState(
     "https://help.screenity.io/getting-started/77KizPC8MHVGfpKpqdux9D/why-does-screenity-ask-for-permissions/9AAE8zJ6iiUtCAtjn4SUT1",
   );
-  const [URL2, setURL2] = useState(
+  const [URL2] = useState(
     "https://help.screenity.io/troubleshooting/9Jy5RGjNrBB42hqUdREQ7W/how-to-grant-screenity-permission-to-record-your-camera-and-microphone/x6U69TnrbMjy5CQ96Er2E9",
   );
   const startBeepRef = useRef(null);
@@ -97,7 +97,11 @@ const ContentState = (props) => {
 
   const verifyUser = useCallback(async () => {
     if (!CLOUD_FEATURES_ENABLED) return;
-    const result = await checkAuthStatus();
+    // Don't force a cookie-based re-login from the popup: a fresh install with
+    // no prior signals stays logged out (shows the welcome immediately) until
+    // the user explicitly clicks "Log in". Returning users still auto-verify
+    // via hasPriorSignals in loginWithWebsite.
+    const result = await checkAuthStatus({ force: false });
 
     setContentState((prev) => ({
       ...prev,
@@ -168,22 +172,6 @@ const ContentState = (props) => {
         }));
       }
     } catch {}
-  }, []);
-
-  useEffect(() => {
-    const locale = chrome.i18n.getMessage("@@ui_locale");
-    if (!locale.includes("en")) {
-      setURL(
-        "https://translate.google.com/translate?sl=en&tl=" +
-          locale +
-          "&u=https://help.screenity.io/getting-started/77KizPC8MHVGfpKpqdux9D/why-does-screenity-ask-for-permissions/9AAE8zJ6iiUtCAtjn4SUT1",
-      );
-      setURL2(
-        "https://translate.google.com/translate?sl=en&tl=" +
-          locale +
-          "&u=https://help.screenity.io/troubleshooting/9Jy5RGjNrBB42hqUdREQ7W/how-to-grant-screenity-permission-to-record-your-camera-and-microphone/x6U69TnrbMjy5CQ96Er2E9",
-      );
-    }
   }, []);
 
   const startRecording = useCallback(() => {
@@ -690,16 +678,8 @@ const ContentState = (props) => {
       if (typeof contentStateRef.current.openModal === "function") {
         let clear = null;
         let clearAction = () => {};
-        const locale = chrome.i18n.getMessage("@@ui_locale");
-        let helpURL =
+        const helpURL =
           "https://help.screenity.io/troubleshooting/9Jy5RGjNrBB42hqUdREQ7W/what-does-%E2%80%9Cmemory-limit-reached%E2%80%9D-mean-when-recording/8WkwHbt3puuXunYqQnyPcb";
-
-        if (!locale.includes("en")) {
-          helpURL =
-            "https://translate.google.com/translate?sl=en&tl=" +
-            locale +
-            "&u=https://help.screenity.io/troubleshooting/9Jy5RGjNrBB42hqUdREQ7W/what-does-%E2%80%9Cmemory-limit-reached%E2%80%9D-mean-when-recording/8WkwHbt3puuXunYqQnyPcb";
-        }
 
         const response = await chrome.runtime.sendMessage({
           type: "check-restore",

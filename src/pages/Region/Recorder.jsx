@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useCallback } from "react";
 import { getUserMediaWithFallback } from "../utils/mediaDeviceFallback";
 import { shouldAcquireMicAtStart } from "../utils/micAcquisitionPolicy";
 import { attachAudioContextWatchdog } from "../utils/audioContextWatchdog";
+import { acquireDisplayMediaWithFocusRetry } from "../utils/acquireDisplayMedia";
 import {
   startTabKeepalive,
   stopTabKeepalive,
@@ -840,8 +841,9 @@ const Recorder = () => {
         ),
       });
       if (useWebCodecs.current) {
+        // Recoverable device-sticky disable, not the durable user setting.
+        await markFastRecorderFailure("start-exception", { error: String(err) });
         await chrome.storage.local.set({
-          useWebCodecsRecorder: false,
           lastWebCodecsFailureAt: Date.now(),
           lastWebCodecsFailureCode: "start-exception",
         });
@@ -1231,7 +1233,6 @@ const Recorder = () => {
               if (validation && !validation.ok) {
                 await markFastRecorderFailure("validation-failed", validation);
                 await chrome.storage.local.set({
-                  useWebCodecsRecorder: false,
                   lastWebCodecsFailureAt: Date.now(),
                   lastWebCodecsFailureCode: "validation-failed",
                   fastRecorderValidationFailed: Boolean(validation.hardFail),
@@ -1298,7 +1299,8 @@ const Recorder = () => {
                   ? "webcodecs-finalized"
                   : "webcodecs-error",
             };
-            if (!transient) persisted.useWebCodecsRecorder = false;
+            // Disable is via markFastRecorderFailure above (recoverable sticky
+            // with TTL); don't pin the durable useWebCodecsRecorder user setting.
             chrome.storage.local.set(persisted);
             if (fatalFinalized) return;
             updateFreeFinalizeStatus("failed", 100, errStr);
@@ -1415,8 +1417,9 @@ const Recorder = () => {
         if (!started) {
           useWebCodecs.current = false;
           await chrome.storage.local.set({ fastRecorderInUse: false });
+          // Recoverable device-sticky disable, not the durable user setting.
+          await markFastRecorderFailure("start-failed", {});
           await chrome.storage.local.set({
-            useWebCodecsRecorder: false,
             lastWebCodecsFailureAt: Date.now(),
             lastWebCodecsFailureCode: "start-failed",
           });
@@ -1958,6 +1961,11 @@ const Recorder = () => {
               recordingDuration: dur,
               isLikelyContinuityMic,
               salvageOffered: !isShort,
+              audioContextState: aCtx.current?.state ?? null,
+              docVisibility:
+                typeof document !== "undefined"
+                  ? document.visibilityState
+                  : null,
             },
           });
         } catch {}
@@ -2412,7 +2420,14 @@ const Recorder = () => {
         },
       };
       const endGetDisplayMedia = perfSpan("Region.Recorder getDisplayMedia");
-      stream = await navigator.mediaDevices.getDisplayMedia(constraints);
+      // Region needs a focused doc too: retry once on InvalidStateError. No
+      // monitor constraints here (tab-crop via preferCurrentTab).
+      stream = await acquireDisplayMediaWithFocusRetry({
+        getDisplayMedia: (c) => navigator.mediaDevices.getDisplayMedia(c),
+        constraints,
+        onReactivate: () =>
+          chrome.runtime.sendMessage({ type: "activate-recorder-tab" }),
+      });
       endGetDisplayMedia({
         videoTracks: stream?.getVideoTracks?.()?.length ?? 0,
         audioTracks: stream?.getAudioTracks?.()?.length ?? 0,

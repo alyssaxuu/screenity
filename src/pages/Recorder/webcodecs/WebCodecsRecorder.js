@@ -145,7 +145,13 @@ export class WebCodecsRecorder {
     this._midStreamWatchdog = null;
     this._midStreamWatchdogMs = Number.isFinite(options.midStreamWatchdogMs)
       ? options.midStreamWatchdogMs
-      : 15000;
+      : Number.isFinite(
+            /** @type {any} */ (globalThis)
+              .__screenityMidStreamWatchdogMsForTests,
+          )
+        ? /** @type {any} */ (globalThis)
+            .__screenityMidStreamWatchdogMsForTests
+        : 15000;
 
     // Last structured failure code that fired via _reportFailure; passed
     // to onFinalized so the consumer can distinguish a clean stop, a
@@ -194,6 +200,7 @@ export class WebCodecsRecorder {
     this._lastAudioReclaimRebuildAt = null;
     this._encoderReclaimCount = 0;
     this._audioEncoderReclaimCount = 0;
+    this._midStreamStallRebuilds = 0;
     // Reset the per-encoder reclaim counter after a healthy stretch.
     this._lastVideoReclaimAt = null;
     this._lastAudioReclaimAt = null;
@@ -353,6 +360,7 @@ export class WebCodecsRecorder {
     this._peakAudioEncodeQueueSize = 0;
     this._encoderReclaimCount = 0;
     this._audioEncoderReclaimCount = 0;
+    this._midStreamStallRebuilds = 0;
     this._lastVideoReclaimAt = null;
     this._lastAudioReclaimAt = null;
     this._lastVideoReclaimRebuildAt = null;
@@ -1291,9 +1299,8 @@ export class WebCodecsRecorder {
     }
   }
 
-  // Mid-stream stall watchdog. If the encoder goes silent past the
-  // window (HW reclaim, hang, OS pressure), fire onError and stop the
-  // loop so finalize ships what's already encoded.
+  // Mid-stream stall watchdog. On a silent stall (no error) rebuild the
+  // encoder in-session (prefer-software); give up only when budget runs out.
   _armMidStreamStallWatchdog() {
     this._clearMidStreamStallWatchdog();
     this._lastChunkAt = performance.now();
@@ -1313,14 +1320,47 @@ export class WebCodecsRecorder {
         this.warn(
           `[WCR] no encoded video chunk for ${Math.round(sinceLastChunkMs)}ms mid-recording`,
         );
+        // Silent stall fires no error, so the error-driven rebuild never runs.
+        // Rebuild here (prefer-software) and keep recording. Shares the budget.
+        if (
+          this.running &&
+          !this._stopping &&
+          this._activeVideoConfig &&
+          this._encoderReclaimCount < this._maxEncoderReclaims
+        ) {
+          this._encoderReclaimCount += 1;
+          this._midStreamStallRebuilds += 1;
+          this._lastVideoReclaimAt = performance.now();
+          this._lastVideoReclaimRebuildAt = performance.now();
+          this.warn("[WCR] mid-stream stall; rebuilding encoder prefer-software", {
+            attempt: this._encoderReclaimCount,
+          });
+          try {
+            diagForward("recorder-midstream-stall-rebuild", {
+              sinceLastChunkMs: Math.round(sinceLastChunkMs),
+              attempt: this._encoderReclaimCount,
+            });
+          } catch {}
+          const swConfig = {
+            ...this._activeVideoConfig,
+            hardwareAcceleration: "prefer-software",
+          };
+          if (this._rebuildVideoEncoder(swConfig)) {
+            this._didSwRetry = true;
+            this._swRetryReason = this._swRetryReason || "midstream-stall";
+            this._forceNextKeyframe = true;
+            this._lastChunkAt = performance.now();
+            return;
+          }
+        }
         this._reportFailure(
           "webcodecs-mid-stream-stall",
           new Error(
             `WebCodecs produced no chunks for ${Math.round(sinceLastChunkMs)}ms after frame ${this.frameCount}`,
           ),
         );
-        // Graceful stop: exit the run-loop so the normal finalize path
-        // packages whatever was encoded into a playable file.
+        // Budget exhausted or rebuild failed: exit the run-loop so the normal
+        // finalize path packages whatever was encoded into a playable file.
         this.running = false;
         this._clearMidStreamStallWatchdog();
       }
@@ -1365,6 +1405,11 @@ export class WebCodecsRecorder {
           _g.__screenitySuppressFirstChunks > 0
         ) {
           _g.__screenitySuppressFirstChunks -= 1;
+          return;
+        }
+        // E2E hook: drop chunks mid-stream (after the first) to simulate a
+        // silent encoder stall and drive the mid-stream rebuild path.
+        if (_g.__screenitySuppressChunks === true && this._firstChunkSeen) {
           return;
         }
         // First encoded video chunk: the recording is producing real
@@ -1506,6 +1551,7 @@ export class WebCodecsRecorder {
           this._audioSampleRateMismatchRebuilds,
         audioDeviceChangePending: this._audioDeviceChangePending,
         postSleepRecoveries: this._postSleepRecoveries,
+        midStreamStallRebuilds: this._midStreamStallRebuilds,
         firstChunkWatchdogMs: this._firstChunkWatchdogMs,
         maxEncoderReclaims: this._maxEncoderReclaims,
         reclaimRebuildThrottleMs: this._reclaimRebuildThrottleMs,

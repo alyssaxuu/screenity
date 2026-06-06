@@ -1338,11 +1338,11 @@
     "description": "Title for the welcome Pro popup"
   },
   "welcomeProDescription": {
-    "message": "Inicia sessió per guardar els vídeos al núvol, compartir amb enllaç i accedir a funcions avançades d'edició.",
+    "message": "Comparteix les gravacions amb un enllaç net, desa-les al núvol i afegeix zooms, subtítols i dissenys, quan ho necessitis.",
     "description": "Description for the welcome Pro popup"
   },
   "welcomeProButton": {
-    "message": "Inicia sessió per desbloquejar funcions Pro",
+    "message": "Desbloqueja l'editor",
     "description": "Button to sign in to Screenity Pro"
   },
   "welcomeProSupport": {

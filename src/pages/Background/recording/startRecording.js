@@ -331,6 +331,13 @@ const _startRecordingInner = async (caller) => {
     ]);
   await initDiagSession({
     recordingAttemptId,
+    // Chrome major pins each session to a version so the local diagnostic
+    // zip can be read against version-gated browser fixes.
+    browserMajor: (() => {
+      const ua = (typeof navigator !== "undefined" && navigator.userAgent) || "";
+      const m = ua.match(/Chrome\/([0-9]+)/);
+      return m ? parseInt(m[1], 10) : null;
+    })(),
     recordingType: recordingType || "screen",
     quality: quality || null,
     region: Boolean(customRegion),
@@ -355,6 +362,7 @@ const _startRecordingInner = async (caller) => {
       const [extras, tabs, wins] = await Promise.all([
         chrome.storage.local.get([
           "screenityUser",
+          "qualityValue",
           "fpsValue",
           "cameraActive",
           "micActive",
@@ -379,7 +387,10 @@ const _startRecordingInner = async (caller) => {
           ? navigator.hardwareConcurrency
           : null,
         recordingType: recordingType || "screen",
-        qualityValue: quality || null,
+        // Storage canonical key is qualityValue, not quality. `quality`
+        // is unset on this read path; reading it returned undefined and
+        // surfaced as null on every beacon.
+        qualityValue: extras?.qualityValue || null,
         fpsValue: extras?.fpsValue || null,
         cameraActive: Boolean(extras?.cameraActive),
         micActive: Boolean(extras?.micActive),

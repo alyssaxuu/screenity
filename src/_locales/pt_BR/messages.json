@@ -1338,11 +1338,11 @@
     "description": "Title for the welcome Pro popup"
   },
   "welcomeProDescription": {
-    "message": "Faça login para salvar os vídeos na nuvem, compartilhar por link e acessar recursos avançados de edição.",
+    "message": "Compartilhe gravações com um link limpo, salve-as na nuvem e adicione zooms, legendas e layouts, se e quando precisar.",
     "description": "Description for the welcome Pro popup"
   },
   "welcomeProButton": {
-    "message": "Faça login para desbloquear recursos Pro",
+    "message": "Desbloqueie o editor",
     "description": "Button to sign in to Screenity Pro"
   },
   "welcomeProSupport": {

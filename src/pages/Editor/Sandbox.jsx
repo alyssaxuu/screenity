@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from "react";
 
 import addAudioToVideo from "./utils/addAudioToVideo";
 import base64ToBlob from "./utils/base64toBlob";
+import { fixWebmDurationOffThread } from "./utils/fixWebmDurationOffThread";
 import blobToArrayBuffer from "./utils/blobToArrayBuffer";
 import cropVideo from "./utils/cropVideo";
 import cutVideo from "./utils/cutVideo";
@@ -86,6 +87,26 @@ const Sandbox = () => {
     if (message.type === "load-ffmpeg") {
       triggerLoad.current = true;
       loadFfmpeg();
+    } else if (message.type === "fix-webm-duration") {
+      // The child iframe can't spawn a blob worker (extension_pages CSP), so it
+      // relays the Blob up here, where the sandbox CSP allows it.
+      try {
+        const fixed = await fixWebmDurationOffThread(
+          message.blob,
+          message.durationMs,
+        );
+        sendMessage({
+          type: "fix-webm-duration-result",
+          id: message.id,
+          blob: fixed,
+        });
+      } catch (error) {
+        sendMessage({
+          type: "fix-webm-duration-result",
+          id: message.id,
+          error: String(error),
+        });
+      }
     } else if (message.type === "add-audio-to-video") {
       try {
         const blob = await addAudioToVideo(

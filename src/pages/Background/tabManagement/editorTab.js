@@ -269,7 +269,7 @@ export const resolveEditorTabForTarget = async ({
     return { tabId: null, reused: false, opened: false };
   }
 
-  const createdTab = await createTab(targetUrl, true, true);
+  const createdTab = await createTab(targetUrl, true);
   if (!createdTab?.id) {
     console.warn("[Screenity][BG] Failed to open fallback editor tab", {
       reason,

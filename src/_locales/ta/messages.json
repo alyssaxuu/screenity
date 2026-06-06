@@ -1338,11 +1338,11 @@
     "description": "Title for the welcome Pro popup"
   },
   "welcomeProDescription": {
-    "message": "შედით, რომ შეინახოთ ვიდეოები ღრუბელში, გაუზიაროთ ბმულით და გამოიყენოთ დამატებითი რედაქტირების ფუნქციები.",
+    "message": "பதிவுகளை ஒரு சுத்தமான இணைப்பின் மூலம் பகிரவும், அவற்றை கிளவுட்டில் சேமிக்கவும், தேவைப்படும்போது ஜூம், வசன வரிகள் மற்றும் தளவமைப்புகளைச் சேர்க்கவும்.",
     "description": "Description for the welcome Pro popup"
   },
   "welcomeProButton": {
-    "message": "შედით ფასიანი ფუნქციების გასახსნელად",
+    "message": "எடிட்டரைத் திறக்கவும்",
     "description": "Button to sign in to Screenity Pro"
   },
   "welcomeProSupport": {

@@ -1338,11 +1338,11 @@
     "description": "Title for the welcome Pro popup"
   },
   "welcomeProDescription": {
-    "message": "Войдите, чтобы сохранить видео в облако, делиться ссылкой и использовать расширенное редактирование.",
+    "message": "Делитесь записями по аккуратной ссылке, сохраняйте их в облаке и добавляйте зумы, субтитры и макеты, если и когда понадобится.",
     "description": "Description for the welcome Pro popup"
   },
   "welcomeProButton": {
-    "message": "Войти, чтобы открыть платные функции",
+    "message": "Разблокировать редактор",
     "description": "Button to sign in to Screenity Pro"
   },
   "welcomeProSupport": {

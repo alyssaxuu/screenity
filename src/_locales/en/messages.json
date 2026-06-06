@@ -1422,11 +1422,11 @@
     "description": "Title for the welcome Pro popup"
   },
   "welcomeProDescription": {
-    "message": "Sign in to save your videos to the cloud, share with a link, and access advanced editing features.",
+    "message": "Share recordings with a clean link, save them to the cloud, and add zooms, captions, and layouts, if and when you need it.",
     "description": "Description for the welcome Pro popup"
   },
   "welcomeProButton": {
-    "message": "Sign in to unlock paid features",
+    "message": "Unlock the editor",
     "description": "Button to sign in to Screenity Pro"
   },
   "welcomeProSupport": {

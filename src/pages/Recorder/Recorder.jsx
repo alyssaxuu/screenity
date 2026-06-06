@@ -17,6 +17,8 @@ import { getUserMediaWithFallback } from "../utils/mediaDeviceFallback";
 import { shouldAcquireMicAtStart } from "../utils/micAcquisitionPolicy";
 import { attachAudioContextWatchdog } from "../utils/audioContextWatchdog";
 import { IS_OFFSCREEN_HOST } from "../utils/recordingHost";
+import { shouldUseDisplayMediaForScreen } from "../utils/screenCaptureMode";
+import { acquireDisplayMediaWithFocusRetry } from "../utils/acquireDisplayMedia";
 import { chooseWriter } from "./recorderStorage/chooseWriter";
 import { chooseReader } from "./recorderStorage/chooseReader";
 import { lifecycle } from "../utils/lifecycleLog";
@@ -2044,7 +2046,6 @@ const Recorder = () => {
               if (validation && !validation.ok) {
                 await markFastRecorderFailure("validation-failed", validation);
                 await chrome.storage.local.set({
-                  useWebCodecsRecorder: false,
                   lastWebCodecsFailureAt: Date.now(),
                   lastWebCodecsFailureCode: "validation-failed",
                   lastFailedValidation: {
@@ -2131,7 +2132,8 @@ const Recorder = () => {
                 : failureCode,
               lastWebCodecsFailureDetail: err?.detail || null,
             };
-            if (!transient) persisted.useWebCodecsRecorder = false;
+            // Disable is via markFastRecorderFailure above (recoverable sticky
+            // with TTL); don't pin the durable useWebCodecsRecorder user setting.
             chrome.storage.local.set(persisted);
             if (fatalFinalized) return;
             updateFreeFinalizeStatus("failed", 100, errStr);
@@ -2237,8 +2239,9 @@ const Recorder = () => {
           );
           useWebCodecs.current = false;
           await chrome.storage.local.set({ fastRecorderInUse: false });
+          // Recoverable device-sticky disable, not the durable user setting.
+          await markFastRecorderFailure("start-failed", {});
           await chrome.storage.local.set({
-            useWebCodecsRecorder: false,
             lastWebCodecsFailureAt: Date.now(),
             lastWebCodecsFailureCode: "start-failed",
           });
@@ -2523,8 +2526,9 @@ const Recorder = () => {
     } catch (err) {
       debugError("startRecording() top-level error", err);
       if (useWebCodecs.current) {
+        // Recoverable device-sticky disable, not the durable user setting.
+        await markFastRecorderFailure("start-exception", { error: String(err) });
         await chrome.storage.local.set({
-          useWebCodecsRecorder: false,
           lastWebCodecsFailureAt: Date.now(),
           lastWebCodecsFailureCode: "start-exception",
         });
@@ -3410,7 +3414,8 @@ const Recorder = () => {
     }
   };
 
-  async function startStream(data, id, options, permissions, permissions2) {
+  async function startStream(data, id, options, permissions, permissions2, streamOpts = {}) {
+    const useDisplayMedia = !!streamOpts.useDisplayMedia;
     perfMark("Recorder startStream.enter", {
       recordingType: data?.recordingType,
       hasId: Boolean(id),
@@ -3610,6 +3615,66 @@ const Recorder = () => {
       }
       helperVideoStream.current = userStream;
       slLog("helperVideoStream-assigned", { path: "camera", streamId: userStream.id });
+    } else if (useDisplayMedia) {
+      // macOS + Chrome 141+ screen path: getDisplayMedia for system audio.
+      // Falls through to the shared mixing/recorder setup below.
+      const displayConstraints = {
+        audio: data.systemAudio ? true : false,
+        video: {
+          frameRate: { ideal: fps, max: fps },
+          width: { ideal: width, max: width },
+          height: { ideal: height, max: height },
+          displaySurface: "monitor",
+        },
+        // systemAudio:"include" (default may hide the toggle);
+        // surfaceSwitching:"exclude" dodges crbug 344876285 (switch ends mac
+        // audio). Screen-only; these throw TypeError w/ preferCurrentTab.
+        systemAudio: "include",
+        surfaceSwitching: "exclude",
+        selfBrowserSurface: "exclude",
+      };
+      debug("getDisplayMedia screen constraints", displayConstraints);
+      slLog("getDisplayMedia-start");
+      let stream;
+      const endGdm = perfSpan("Recorder getDisplayMedia(screen)");
+      try {
+        stream = await acquireDisplayMediaWithFocusRetry({
+          getDisplayMedia: (c) => navigator.mediaDevices.getDisplayMedia(c),
+          constraints: displayConstraints,
+          onReactivate: () =>
+            chrome.runtime.sendMessage({ type: "activate-recorder-tab" }),
+        });
+        endGdm({
+          videoTracks: stream.getVideoTracks().length,
+          audioTracks: stream.getAudioTracks().length,
+        });
+      } catch (err) {
+        endGdm({ error: String(err?.message || err).slice(0, 80) });
+        const cancelled =
+          err?.name === "NotAllowedError" ||
+          err?.name === "AbortError" ||
+          String(err?.message || "").toLowerCase().includes("permission denied");
+        debugWarn("getDisplayMedia screen capture failed", err);
+        resetGateState();
+        sendRecordingError(
+          cancelled
+            ? "User cancelled the modal"
+            : "Failed to get user media: " + String(err),
+          cancelled,
+        );
+        return;
+      }
+      if (stream.getVideoTracks().length === 0) {
+        debugError("No video tracks returned from getDisplayMedia");
+        resetGateState();
+        sendRecordingError("No video tracks available");
+        return;
+      }
+      helperVideoStream.current = stream;
+      slLog("helperVideoStream-assigned", {
+        path: "getDisplayMedia",
+        streamId: stream.id,
+      });
     } else {
       // Chrome's tab capture defaults to a 1920x1080 frame and pillarboxes
       // narrower tabs to fit. Match the constraint box to the tab's real
@@ -3762,6 +3827,9 @@ const Recorder = () => {
           reason: "system-audio-track-ended",
           trackLabel: String(sysTrack.label || "").slice(0, 80),
           savedChunks: savedCount.current,
+          audioContextState: aCtx.current?.state ?? null,
+          docVisibility:
+            typeof document !== "undefined" ? document.visibilityState : null,
         };
         console.warn("[Recorder] System audio track ended", info);
         try {
@@ -3884,6 +3952,11 @@ const Recorder = () => {
                       ?.length,
                     hasSystemAudio:
                       sysTracks.length > 0 && data.systemAudio,
+                    audioContextState: aCtx.current?.state ?? null,
+                    docVisibility:
+                      typeof document !== "undefined"
+                        ? document.visibilityState
+                        : null,
                   },
                 });
               } catch {}
@@ -4005,6 +4078,18 @@ const Recorder = () => {
       microphone: permissions2.state,
     });
 
+    // macOS + Chrome 141+ routes screen capture through getDisplayMedia for
+    // system audio. See utils/screenCaptureMode.js.
+    const { forceDisplayMediaScreen, macSystemAudioCapture } =
+      await chrome.storage.local.get([
+        "forceDisplayMediaScreen",
+        "macSystemAudioCapture",
+      ]);
+    const screenDisplayMediaMode = shouldUseDisplayMediaForScreen({
+      forceDisplayMediaScreen,
+      macSystemAudioCapture,
+    });
+
     try {
       if (data.recordingType === "camera") {
         debug("Streaming camera recording");
@@ -4016,6 +4101,16 @@ const Recorder = () => {
         !isTab.current &&
         data.recordingType !== "region"
       ) {
+        if (screenDisplayMediaMode) {
+          debug("screen capture via getDisplayMedia (mac+141)");
+          slLog("getDisplayMedia-screen-route");
+          chrome.storage.local.set({ lastScreenCaptureApi: "getDisplayMedia" });
+          startStream(data, null, null, permissions, permissions2, {
+            useDisplayMedia: true,
+          });
+          return;
+        }
+        chrome.storage.local.set({ lastScreenCaptureApi: "desktopCapture" });
         let captureTypes = ["screen", "window", "tab", "audio"];
         if (tabPreferred.current) {
           captureTypes = ["tab", "screen", "window", "audio"];

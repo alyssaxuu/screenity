@@ -1338,11 +1338,11 @@
     "description": "Title for the welcome Pro popup"
   },
   "welcomeProDescription": {
-    "message": "Connectez-vous pour sauvegarder vos vidéos dans le cloud, les partager par lien et accéder à des outils de montage avancés.",
+    "message": "Partagez vos enregistrements via un lien clair, enregistrez-les dans le cloud et ajoutez des zooms, des sous-titres et des mises en page, si et quand vous en avez besoin.",
     "description": "Description for the welcome Pro popup"
   },
   "welcomeProButton": {
-    "message": "Connectez-vous pour débloquer les fonctionnalités Pro",
+    "message": "Débloquez l'éditeur",
     "description": "Button to sign in to Screenity Pro"
   },
   "welcomeProSupport": {

@@ -1318,11 +1318,11 @@
     "description": "Title for the welcome Pro popup"
   },
   "welcomeProDescription": {
-    "message": "Accedi per salvare i video sul cloud, condividerli con un link e accedere a funzioni di editing avanzate.",
+    "message": "Condividi le registrazioni con un link pulito, salvale nel cloud e aggiungi zoom, sottotitoli e layout, se e quando ti serve.",
     "description": "Description for the welcome Pro popup"
   },
   "welcomeProButton": {
-    "message": "Accedi per sbloccare le funzioni Pro",
+    "message": "Sblocca l'editor",
     "description": "Button to sign in to Screenity Pro"
   },
   "welcomeProSupport": {

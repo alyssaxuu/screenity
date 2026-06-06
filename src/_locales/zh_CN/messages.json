@@ -1334,11 +1334,11 @@
     "description": "Title for the welcome Pro popup"
   },
   "welcomeProDescription": {
-    "message": "登录即可将视频保存到云端、生成分享链接并使用高级编辑功能。",
+    "message": "用简洁的链接分享录制内容，保存到云端，并在需要时添加缩放、字幕和布局。",
     "description": "Description for the welcome Pro popup"
   },
   "welcomeProButton": {
-    "message": "登录以解锁付费功能",
+    "message": "解锁编辑器",
     "description": "Button to sign in to Screenity Pro"
   },
   "welcomeProSupport": {

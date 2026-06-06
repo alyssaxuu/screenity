@@ -925,7 +925,7 @@ const ContentState = (props) => {
     try {
       if (safeDuration > 0) {
         if (!isWindows10) {
-          fixWebmDuration(
+          requestParentFixWebmDuration(
             blob,
             safeDuration,
             async (fixedWebm) => {
@@ -2334,6 +2334,45 @@ const ContentState = (props) => {
 
   const sendMessage = (message) => {
     window.parent.postMessage(message, "*");
+  };
+
+  // Off-thread the WebM duration fix by relaying the Blob to editor.html, whose
+  // CSP allows blob workers. Same shape as fix-webm-duration; sync fallback.
+  const requestParentFixWebmDuration = (blob, durationMs, callback) => {
+    let done = false;
+    let timer = null;
+    const id = "wdf-" + Date.now() + "-" + Math.random().toString(36).slice(2);
+    function finish(fixed) {
+      if (done) return;
+      done = true;
+      if (timer) clearTimeout(timer);
+      window.removeEventListener("message", onResult);
+      if (fixed) {
+        callback(fixed);
+      } else {
+        try {
+          fixWebmDuration(blob, durationMs, (f) => callback(f), {
+            logger: false,
+          });
+        } catch (err) {
+          callback(blob);
+        }
+      }
+    }
+    function onResult(e) {
+      const d = e && e.data;
+      if (!d || d.type !== "fix-webm-duration-result" || d.id !== id) return;
+      finish(d.blob || null);
+    }
+    window.addEventListener("message", onResult);
+    timer = setTimeout(function () {
+      finish(null);
+    }, 90000);
+    try {
+      sendMessage({ type: "fix-webm-duration", id, blob, durationMs });
+    } catch (err) {
+      finish(null);
+    }
   };
 
   const getBlob = async () => {

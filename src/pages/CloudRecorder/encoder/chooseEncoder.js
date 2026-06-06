@@ -165,7 +165,7 @@ export const chooseTrackEncoder = async ({
   if (plan.kind === "mediarecorder") {
     return {
       ...plan,
-      recorder: createMediaRecorder(stream, { mimeType }, onDataAvailable),
+      recorder: createMediaRecorder(stream, { mimeType }, onDataAvailable, track),
     };
   }
 

@@ -517,7 +517,7 @@ export const handleFinishMultiRecording = async () => {
 
       markProjectPublic(multiProjectId);
 
-      createTab(url, true, true).then(() => {
+      createTab(url, true).then(() => {
         if (publicUrl) {
           copyToClipboard(publicUrl);
           chrome.runtime.sendMessage({
@@ -1431,6 +1431,8 @@ export const setupHandlers = () => {
       "cloudrecorder-",
       "camera-",
       "editor-",
+      // AudioContext interrupt/resume from attachAudioContextWatchdog (page realm).
+      "audiocontext-",
     ];
     if (!allowedPrefixes.some((p) => ev.startsWith(p))) return;
     diagEvent(ev, message?.data ?? null);
@@ -1503,7 +1505,7 @@ export const setupHandlers = () => {
       }
     }
 
-    const tab = await createTab("download.html", true, true);
+    const tab = await createTab("download.html", true);
     if (!tab?.id) return;
     chrome.tabs.onUpdated.addListener(function listener(tabId, info) {
       if (info.status === "complete" && tabId === tab.id) {
@@ -1516,20 +1518,25 @@ export const setupHandlers = () => {
   registerMessage("review-screenity", () =>
     createTab(
       "https://chrome.google.com/webstore/detail/screenity-screen-recorder/kbbdabhdfibnancpjfhlkhafgdilcnji/reviews",
-      false,
       true,
     ),
   );
   registerMessage("follow-twitter", () =>
-    createTab("https://alyssax.substack.com/", false, true),
+    createTab("https://alyssax.substack.com/", true),
   );
-  registerMessage("pricing", () =>
-    createTab("https://screenity.io/pro", false, true),
-  );
+  registerMessage("pricing", (message) => {
+    const source =
+      typeof message?.source === "string" && message.source
+        ? message.source
+        : "extension";
+    return createTab(
+      `https://screenity.io/?ref=${encodeURIComponent(source)}`,
+      true,
+    );
+  });
   registerMessage("open-processing-info", () =>
     createTab(
       "https://help.screenity.io/editing-and-exporting/dJRFpGq56JFKC7k8zEvsqb/why-is-there-a-5-minute-limit-for-editing/ddy4e4TpbnrFJ8VoRT37tQ",
-      true,
       true,
     ),
   );
@@ -1537,23 +1544,20 @@ export const setupHandlers = () => {
     createTab(
       "https://help.screenity.io/getting-started/77KizPC8MHVGfpKpqdux9D/what-are-the-technical-requirements-for-using-screenity/6kdB6qru6naVD8ZLFvX3m9",
       true,
-      true,
     ),
   );
   registerMessage("trim-info", () =>
     createTab(
       "https://help.screenity.io/editing-and-exporting/dJRFpGq56JFKC7k8zEvsqb/how-to-cut-trim-or-mute-parts-of-your-video/svNbM7YHYY717MuSWXrKXH",
       true,
-      true,
     ),
   );
   registerMessage("join-waitlist", () =>
-    createTab("https://tally.so/r/npojNV", true, true),
+    createTab("https://tally.so/r/npojNV", true),
   );
   registerMessage("chrome-update-info", () =>
     createTab(
       "https://help.screenity.io/getting-started/77KizPC8MHVGfpKpqdux9D/what-are-the-technical-requirements-for-using-screenity/6kdB6qru6naVD8ZLFvX3m9",
-      true,
       true,
     ),
   );
@@ -1562,17 +1566,16 @@ export const setupHandlers = () => {
   registerMessage("pip-started", () => handlePip(true));
   registerMessage("sign-out-drive", (message) => handleSignOutDrive(message));
   registerMessage("open-help", () =>
-    createTab("https://help.screenity.io/", true, true),
+    createTab("https://help.screenity.io/", true),
   );
   registerMessage("memory-limit-help", () =>
     createTab(
       "https://help.screenity.io/troubleshooting/9Jy5RGjNrBB42hqUdREQ7W/what-does-%E2%80%9Cmemory-limit-reached%E2%80%9D-mean-when-recording/8WkwHbt3puuXunYqQnyPcb",
       true,
-      true,
     ),
   );
   registerMessage("open-home", () =>
-    createTab("https://screenity.io/", false, true),
+    createTab("https://screenity.io/", true),
   );
   registerMessage("report-bug", async (message) => {
     const qs = await supportContextQuery({
@@ -1580,7 +1583,7 @@ export const setupHandlers = () => {
       source: "settings",
     });
     const zipParam = message?.zipBundled ? "&zipBundled=1" : "";
-    createTab(`https://tally.so/r/3ElpXq?${qs}${zipParam}`, false, true);
+    createTab(`https://tally.so/r/3ElpXq?${qs}${zipParam}`, true);
   });
   registerMessage("report-error", async (message) => {
     const errorCode = message?.errorCode || null;
@@ -1609,9 +1612,9 @@ export const setupHandlers = () => {
 
     const zipParam = message?.zipBundled ? "&zipBundled=1" : "";
     if (isLoggedIn) {
-      createTab(`https://tally.so/r/310MNg?extension=true&${qs}`, false, true);
+      createTab(`https://tally.so/r/310MNg?extension=true&${qs}`, true);
     } else {
-      createTab(`https://tally.so/r/3ElpXq?feedbackType=Bug&${qs}${zipParam}`, false, true);
+      createTab(`https://tally.so/r/3ElpXq?feedbackType=Bug&${qs}${zipParam}`, true);
     }
   });
   registerMessage("clear-recordings", () => clearAllRecordings());
@@ -1748,22 +1751,24 @@ export const setupHandlers = () => {
   registerMessage("extension-media-permissions", () =>
     createTab(
       `chrome://settings/content/siteDetails?site=chrome-extension://${chrome.runtime.id}`,
-      false,
       true,
     ),
   );
   registerMessage("add-alarm-listener", (payload) => addAlarmListener(payload));
   registerMessage(
     "check-auth-status",
-    async () => {
+    async (message) => {
       if (!CLOUD_FEATURES_ENABLED) {
         return {
           authenticated: false,
           message: "Cloud features disabled",
         };
       }
-      // force so a fresh web login is picked up even after explicit logout.
-      return await loginWithWebsite({ force: true });
+      // Force a fresh web-login pickup by default, but let callers opt out.
+      // The popup mount opts out so a fresh install doesn't silently revive
+      // auth from a leftover website cookie (it would flash the paid welcome
+      // screen at a returning user who should just see "Log in").
+      return await loginWithWebsite({ force: message?.force !== false });
     },
   );
   registerMessage(
@@ -2528,7 +2533,7 @@ export const setupHandlers = () => {
     }
 
     const url = `${process.env.SCREENITY_APP_BASE}/?settings=open`;
-    createTab(url, true, true);
+    createTab(url, true);
   });
   registerMessage("open-support", async () => {
     if (!CLOUD_FEATURES_ENABLED) {
@@ -2548,7 +2553,7 @@ export const setupHandlers = () => {
       user: { name, email },
     });
     const url = `https://tally.so/r/310MNg?extension=true&${qs}`;
-    createTab(url, true, true);
+    createTab(url, true);
   });
   registerMessage("check-banner-support", async (message, sendResponse) => {
     const { bannerSupport } = await chrome.storage.local.get(["bannerSupport"]);

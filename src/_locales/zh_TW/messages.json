@@ -1338,11 +1338,11 @@
     "description": "Title for the welcome Pro popup"
   },
   "welcomeProDescription": {
-    "message": "登入即可將影片儲存至雲端、使用連結分享，並存取進階編輯功能。",
+    "message": "用簡潔的連結分享錄製內容，儲存到雲端，並在需要時加入縮放、字幕和版面配置。",
     "description": "Description for the welcome Pro popup"
   },
   "welcomeProButton": {
-    "message": "登入以解鎖付費功能",
+    "message": "解鎖編輯器",
     "description": "Button to sign in to Screenity Pro"
   },
   "welcomeProSupport": {
