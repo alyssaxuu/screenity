@@ -1412,7 +1412,10 @@ const ContentState = (props) => {
           const errCode = message?.errorCode || "OPFS_LOAD_FAILED";
           contentStateRef.current.openModal(
             chrome.i18n.getMessage("opfsLoadErrorTitle"),
-            message?.why || chrome.i18n.getMessage("opfsLoadErrorDescription"),
+            // Never surface the raw internal `why` (e.g. "WebCodecs produced
+            // no encoded video within 12000ms") — it's engineer-facing. The
+            // raw string still rides along in the diag bundle via diagForward.
+            chrome.i18n.getMessage("opfsLoadErrorDescription"),
             null,
             chrome.i18n.getMessage("permissionsModalDismiss"),
             () => {},
@@ -1727,10 +1730,6 @@ const ContentState = (props) => {
               typeof contentStateRef.current?.openModal === "function"
             ) {
               editorErrorShownRef.current = true;
-              // prefer i18n over raw codes like "REC_STOP_NO_CHUNKS"
-              const rawWhy = payload?.why;
-              const whyIsCode =
-                typeof rawWhy === "string" && /^[A-Z][A-Z0-9_]+$/.test(rawWhy);
               // pipeline failures get copy that says the recording may still be on-device
               const pipelineFailureCodes = new Set([
                 "EDITOR_TAB_LOAD_TIMEOUT",
@@ -1754,10 +1753,8 @@ const ContentState = (props) => {
                 );
               } else {
                 title = chrome.i18n.getMessage("opfsLoadErrorTitle");
-                description =
-                  whyIsCode || !rawWhy
-                    ? chrome.i18n.getMessage("opfsLoadErrorDescription")
-                    : rawWhy;
+                // Never surface the raw internal `why` to users (see above).
+                description = chrome.i18n.getMessage("opfsLoadErrorDescription");
               }
               contentStateRef.current.openModal(
                 title,
@@ -1885,7 +1882,8 @@ const ContentState = (props) => {
         const errCode = payload?.errorCode || "OPFS_LOAD_FAILED";
         contentStateRef.current.openModal(
           chrome.i18n.getMessage("opfsLoadErrorTitle"),
-          payload?.why || chrome.i18n.getMessage("opfsLoadErrorDescription"),
+          // Never surface the raw internal `why` to users (see above).
+          chrome.i18n.getMessage("opfsLoadErrorDescription"),
           null,
           chrome.i18n.getMessage("permissionsModalDismiss"),
           () => {},

@@ -155,6 +155,21 @@ export const isFastRecorderFailureTransient = (
   ) {
     return true;
   }
+  // No-first-chunk watchdog with zero encoded frames: the capture track
+  // never delivered a frame (macOS static-screen starvation, cancel, or HW
+  // contention), not an encoder defect — so don't sticky-disable the device.
+  // The genuine "28-byte ftyp" silent-encoder defect this guard exists for
+  // draws real frames first (framesEncoded > 0) and only then emits no chunk,
+  // so that case still falls through to the sticky-disable below. Discriminate
+  // on framesEncoded, not the reason code.
+  if (
+    reasonCode === "webcodecs-no-first-chunk" &&
+    detail &&
+    detail.firstChunkSeen === false &&
+    detail.framesEncoded === 0
+  ) {
+    return true;
+  }
   return false;
 };
 
@@ -169,7 +184,14 @@ export const markFastRecorderFailure = async (
         ? details.detail
         : null;
     if (isFastRecorderFailureTransient(reasonCode, errStr, detail)) {
+      // Clear any sticky disable a coarser path set earlier in this same
+      // attempt (e.g. the BG no-first-chunk alarm fires without detail and
+      // can't discriminate; the detailed recorder-side report arriving here
+      // is authoritative). Reaching a WebCodecs failure at all means the gate
+      // allowed WebCodecs this attempt, so an outstanding sticky flag is
+      // either from this race or already expired — safe to clear.
       await chrome.storage.local.set({
+        [STORAGE_KEYS.stickyDisabled]: false,
         [STORAGE_KEYS.lastFailureAt]: Date.now(),
         fastRecorderTransientFailure: {
           reasonCode,

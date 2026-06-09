@@ -1,6 +1,6 @@
 {
   "name": "screenity",
-  "version": "4.5.0",
+  "version": "4.5.1",
   "description": "The free and privacy-friendly screen recorder with no sign in needed.",
   "scripts": {
     "build": "cross-env NODE_ENV=production node utils/build.js",

@@ -2077,13 +2077,17 @@ const Recorder = () => {
             // landed and the capture track is still live, swap to
             // MediaRecorder via a recursive startRecording() so the user
             // doesn't have to re-pick the screen / re-grant prompts.
+            // NOT gated on `transient`: a live track with zero chunks is the
+            // canonical recoverable case (e.g. a no-first-chunk stall on a
+            // static screen), and that's exactly when a silent swap should
+            // run. Transient failures whose track is already gone (cancel,
+            // track-ended, stream-missing) fail `trackLive` and skip it.
             const liveVideoTrack =
               liveStream.current?.getVideoTracks?.()[0] || null;
             const trackLive = liveVideoTrack?.readyState === "live";
             const noChunksYet =
               savedCount.current === 0 && !hasChunks.current;
             if (
-              !transient &&
               !webcodecsFallbackTriggered &&
               noChunksYet &&
               trackLive
@@ -3947,8 +3951,12 @@ const Recorder = () => {
         !isTab.current &&
         data.recordingType !== "region"
       ) {
-        if (screenDisplayMediaMode) {
-          debug("screen capture via getDisplayMedia (mac+141)");
+        if (IS_OFFSCREEN_HOST || screenDisplayMediaMode) {
+          // Offscreen docs can't consume a chrome.desktopCapture streamId
+          // (AbortError "Error starting tab capture", esp. on Windows), so the
+          // offscreen recorder always uses getDisplayMedia for screen capture,
+          // matching CloudRecorder. mac+141 also uses it for system audio.
+          debug("screen capture via getDisplayMedia (offscreen or mac+141)");
           slLog("getDisplayMedia-screen-route");
           chrome.storage.local.set({ lastScreenCaptureApi: "getDisplayMedia" });
           startStream(data, null, null, permissions, permissions2, {

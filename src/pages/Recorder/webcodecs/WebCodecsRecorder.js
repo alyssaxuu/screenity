@@ -272,6 +272,9 @@ export class WebCodecsRecorder {
     this._chunksOut = 0;
     this._framesFromMSTP = 0;
     this._staticFrameSyntheticCount = 0;
+    // Black placeholder frames synthesized before the first real frame to
+    // bridge macOS static-screen first-frame starvation (see readVideoLoop).
+    this._syntheticFirstFrameCount = 0;
     this._firstChunkAt = null;
     this._encoderConstructCount = 0;
     this._videoEncoderStateAtStop = null;
@@ -1125,6 +1128,11 @@ export class WebCodecsRecorder {
       err.detail = {
         framesEncoded: this.frameCount,
         firstChunkSeen: this._firstChunkSeen,
+        // Real frames read off the track vs black placeholders synthesized to
+        // bridge static-screen first-frame starvation. framesFromMSTP === 0
+        // pins capture-track starvation (transient) over an encoder defect.
+        framesFromMSTP: this._framesFromMSTP,
+        syntheticFirstFrameCount: this._syntheticFirstFrameCount,
         droppedForBackpressure: {
           video: this._droppedForBackpressureCount,
           audio: this._droppedAudioForBackpressureCount,
@@ -2338,13 +2346,37 @@ export class WebCodecsRecorder {
         let isSynthetic = false;
         let frame = null;
         if (readResult.isSyntheticTimeout) {
-          // Track stalled; only synthesize if we've drawn a frame
-          // already (else first-chunk watchdog handles no-frames).
-          if (!this._firstChunkSeen || !this.resizeCanvas) {
-            continue;
+          if (!this._firstChunkSeen) {
+            // No real frame has arrived yet. macOS ScreenCaptureKit can
+            // withhold the very first frame on a fully static screen, which
+            // starves the encoder and trips the no-first-chunk watchdog even
+            // though capture is healthy. While the track is live, prime the
+            // stream with a black placeholder so the encoder starts and the
+            // watchdog disarms; the first real frame replaces it the moment
+            // the screen changes. If the track is gone (ended / muted / not
+            // ready) leave it to the watchdog to surface the real failure.
+            const trackLive =
+              this.videoTrack &&
+              this.videoTrack.readyState === "live" &&
+              this.videoTrack.muted !== true;
+            if (!trackLive || !this.targetWidth || !this.targetHeight) {
+              continue;
+            }
+            ensureResizeCanvas();
+            if (this._videoStartUs == null) {
+              this._videoStartUs = performance.now() * 1000;
+            }
+            isSynthetic = true;
+            this._syntheticFirstFrameCount += 1;
+          } else {
+            // Track stalled mid-stream; reuse the last drawn frame so chunks
+            // keep flowing through the static stretch.
+            if (!this.resizeCanvas) {
+              continue;
+            }
+            isSynthetic = true;
+            this._staticFrameSyntheticCount += 1;
           }
-          isSynthetic = true;
-          this._staticFrameSyntheticCount += 1;
         } else {
           if (readResult.done || !readResult.value) break;
           frame = readResult.value;
