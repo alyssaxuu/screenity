@@ -82,21 +82,16 @@ export const discardRecording = async ({
     region: false,
     customRegion: false,
     memoryError: false,
-    backup: false,
-    backupSetup: false,
-    backupTab: null,
     ...multiState,
   });
   chrome.storage.local.set({ pipForceClose: Date.now() });
   chrome.storage.local.set({ recordingUiTabId: null });
   chrome.storage.local.remove(["recordingMeta"]);
 
-  chrome.runtime.sendMessage({ type: "discard-backup" });
   chrome.runtime.sendMessage({ type: "turn-off-pip" });
 };
 
 export const handleDismissRecordingTab = async (message = {}) => {
-  chrome.runtime.sendMessage({ type: "discard-backup" });
   discardRecording({
     reason: message?.reason || "dismiss-recording-tab",
     projectId: message?.projectId || null,

@@ -1,0 +1,24 @@
+@use "../global/variables.scss" as *;
+
+.content {
+  display: flex;
+  position: absolute;
+  top: 80px;
+  width: 100%;
+  height: calc(100% - 80px);
+  box-sizing: border-box;
+  left: 0px;
+}
+.player {
+  position: absolute;
+}
+
+@media (max-width: 900px) {
+  .content {
+    display: block !important;
+    height: auto !important;
+  }
+  .player {
+    position: relative;
+  }
+}

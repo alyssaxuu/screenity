@@ -162,7 +162,7 @@ export const buildDiagnosticZip = async ({
         if (!session.events?.length) continue;
         const hints = [];
         const hasEditorOpen = session.events.some(
-          (ev) => ev.e === "editor-open" && ev.d?.type === "editorwebcodecs",
+          (ev) => ev.e === "editor-open" && ev.d?.type === "editor",
         );
         const hasEditorReady = session.events.some(
           (ev) => ev.e === "editor-load-ready",

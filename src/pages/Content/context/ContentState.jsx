@@ -222,7 +222,6 @@ const ContentState = (props) => {
     const sourceTabId = tabIdRef.current ?? activeTabRef.current ?? null;
     chrome.storage.local.set({ restarting: true });
     setTimeout(() => {
-      chrome.runtime.sendMessage({ type: "discard-backup-restart" });
       chrome.runtime.sendMessage({ type: "handle-restart", sourceTabId });
       if (contentStateRef.current.alarm) {
         setTimer(contentStateRef.current.alarmTime);
@@ -1137,6 +1136,9 @@ const ContentState = (props) => {
     pushToTalk: false,
     zoomEnabled: false,
     offscreenRecording: false,
+    // kill-switch for the offscreen recorder host (default ON); only false
+    // falls back to the legacy pinned recorder tab
+    useOffscreenCloud: true,
     isAddingImage: false,
     pipEnded: false,
     tabCaptureFrame: false,
@@ -1155,8 +1157,6 @@ const ContentState = (props) => {
     askDismiss: true,
     quality: "max",
     systemAudio: true,
-    backup: false,
-    backupSetup: false,
     openWarning: false,
     hasOpenedBefore: false,
     qualityValue: "1080p",
@@ -1766,12 +1766,18 @@ const ContentState = (props) => {
       // sandboxTab appearing means BG opened the editor tab and the
       // finalize handoff is done; tear down recording UI (toolbar,
       // camera, drawing/blur/cursor, preparing overlay). Storage-
-      // driven so it fires even on a non-recording tab. Only triggers
-      // for single-scene stop; multi-scene reuses the editor tab and
-      // cleans up via reopen-popup-multi.
+      // driven so it fires even on a non-recording tab. Covers free/local
+      // single-scene stop; multi-scene reuses the editor tab and cleans up
+      // via reopen-popup-multi.
       const sandboxTabAppeared =
         changes.sandboxTab && changes.sandboxTab.newValue != null;
-      if (sandboxTabAppeared) {
+      // Cloud single-scene has no sandboxTab (its app opens in a new tab),
+      // so the finalize toolbar would otherwise linger until the 30s
+      // watchdog. pendingEditorOpen is written when the upload finishes and
+      // the app opens, so treat it as the same handoff-done signal.
+      const cloudEditorOpening =
+        changes.pendingEditorOpen && changes.pendingEditorOpen.newValue != null;
+      if (sandboxTabAppeared || cloudEditorOpening) {
         const wasMulti = contentStateRef.current?.multiMode === true;
         setContentState((prev) =>
           prev.finalizingRecording || prev.recording

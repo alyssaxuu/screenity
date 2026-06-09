@@ -41,12 +41,7 @@ export const handleTabActivation = async (activeInfo) => {
         ]);
       if (tabRecordedID && tabRecordedID !== activeInfo.tabId) {
         sendMessageTab(activeInfo.tabId, { type: "hide-popup-recording" });
-      } else if (
-        !(
-          tab.url.includes("backup.html") &&
-          tab.url.includes("chrome-extension://")
-        )
-      ) {
+      } else {
         // Update the active tab reference
         chrome.storage.local.set({ activeTab: activeInfo.tabId });
       }

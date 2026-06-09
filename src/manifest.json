@@ -3,7 +3,7 @@
   "name": "__MSG_extName__",
   "description": "__MSG_extDesc__",
   "default_locale": "en",
-  "version": "4.4.14",
+  "version": "4.5.0",
   "background": {
     "service_worker": "background.bundle.js"
   },
@@ -34,7 +34,6 @@
       "resources": [
         "content.styles.css",
         "blank.mp4",
-        "editor.html",
         "assets/*",
         "setup.html",
         "worker.js",
@@ -42,15 +41,13 @@
         "cloudrecorder.html",
         "recorder.html",
         "offscreenrecorder.html",
-        "sandbox.html",
         "wrapper.html",
         "camera.html",
         "permissions.html",
         "region.html",
         "waveform.html",
         "playground.html",
-        "editorwebcodecs.html",
-        "editorviewer.html",
+        "editor.html",
         "download.html",
         "*"
       ],
@@ -65,20 +62,8 @@
       "https://www.googleapis.com/auth/drive.file"
     ]
   },
-  "cross_origin_embedder_policy": {
-    "value": "require-corp"
-  },
-  "cross_origin_opener_policy": {
-    "value": "same-origin"
-  },
   "content_security_policy": {
-    "sandbox": "sandbox allow-scripts allow-modals allow-popups; script-src 'self' 'unsafe-inline' 'unsafe-eval' blob:; object-src 'self'; worker-src 'self' blob: ;",
     "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'; media-src 'self' data: blob: *; img-src 'self' https: data: blob:"
-  },
-  "sandbox": {
-    "pages": [
-      "editor.html"
-    ]
   },
   "commands": {
     "start-recording": {

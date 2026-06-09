@@ -46,7 +46,9 @@ const listOpfsRecordings = async () => {
     const files = [];
     for await (const [name, handle] of dir.entries()) {
       if (!name.startsWith(OPFS_RECORDING_PREFIX)) continue;
-      if (!name.endsWith(".mp4")) continue;
+      // WebCodecs writes .webm on the no-AAC/Linux path; matching .mp4 only left
+      // crashed webm sessions as unrecoverable orphans. OpfsChunkReader infers type.
+      if (!name.endsWith(".mp4") && !name.endsWith(".webm")) continue;
       try {
         const file = await handle.getFile();
         if (file.size < MIN_VALID_RECORDING_BYTES) continue;
@@ -97,7 +99,7 @@ export const restoreRecording = async () => {
       // orphan from a prior session, writer is gone, reader can skip polling
       lastRecordingFinalizedFileName: latest.name,
     });
-    const editorUrl = "editorwebcodecs.html?mode=recover";
+    const editorUrl = "editor.html?mode=recover";
     chrome.tabs.create({ url: editorUrl, active: true }, async (tab) => {
       chrome.storage.local.set({ sandboxTab: tab.id });
       await new Promise((resolve) => {
@@ -136,10 +138,10 @@ export const restoreRecording = async () => {
 
   // IDB fallback: MediaRecorder produces IDB chunks. WebCodecs (4.4.0+) writes
   // OPFS, which was already handled above. Routing here is purely IDB:
-  // editor.html for short, editorviewer.html for long. Reading fastRecorderInUse
+  // editor.html for short, editor.html?view=1 for long. Reading fastRecorderInUse
   // here was a stale-flag hazard — a crashed WebCodecs session can leave it
   // true while no OPFS file ever made it to disk, which would route to
-  // editorwebcodecs.html and find nothing.
+  // editor.html and find nothing.
   const {
     recordingDuration,
     firstChunkAt,
@@ -158,12 +160,12 @@ export const restoreRecording = async () => {
 
   let editorUrl, messageType;
   if (durationMs > 0 && durationMs <= FFMPEG_MAX_DURATION_MS) {
-    // ffmpeg-wasm cap: editLimit:600
+    // recover into editor (mediabunny); reads IDB chunks via chooseReader
     editorUrl = "editor.html?mode=recover";
     messageType = "fallback-recording";
   } else {
-    // ffmpeg-wasm OOMs on >7min; viewer-only
-    editorUrl = "editorviewer.html?mode=recover";
+    // long recordings stay viewer-only for now (editor.html?view=1 is edit-free)
+    editorUrl = "editor.html?mode=recover&view=1";
     messageType = "viewer-recording";
   }
 

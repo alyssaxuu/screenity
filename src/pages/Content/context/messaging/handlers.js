@@ -621,6 +621,38 @@ export const setupHandlers = () => {
     }
   });
 
+  registerMessage("finalize-failure", () => {
+    const state = getState();
+    if (state && typeof state.openModal === "function") {
+      state.openModal(
+        "Upload couldn't finish",
+        "Your recording is safe. Retry the upload, or export diagnostics to help us figure out what went wrong.",
+        "Retry upload",
+        "Dismiss",
+        () => {
+          chrome.runtime.sendMessage({ type: "retry-finalize" });
+          if (typeof state.openToast === "function") {
+            state.openToast("Retrying upload…", () => {}, 5000);
+          }
+        },
+        () => {},
+        null,
+        null,
+        null,
+        true,
+        "Export diagnostics",
+        () => {
+          chrome.runtime.sendMessage({ type: "export-finalize-diagnostics" });
+        },
+      );
+    }
+  });
+  registerMessage("finalize-recovered", () => {
+    const state = getState();
+    if (state && typeof state.openToast === "function") {
+      state.openToast("Upload complete.", () => {}, 4000);
+    }
+  });
   registerMessage("recording-error", () => {
     setStartFlowOutcome("error");
     setContentState((prev) => ({
@@ -826,36 +858,6 @@ export const setupHandlers = () => {
     const state = getState();
     if (typeof state.openToast !== "function") return;
     state.openToast(message?.message || "", () => {}, message?.timeout || 5000);
-  });
-
-  registerMessage("backup-error", () => {
-    const state = getState();
-    state.openModal(
-      chrome.i18n.getMessage("backupPermissionFailTitle"),
-      chrome.i18n.getMessage("backupPermissionFailDescription"),
-      chrome.i18n.getMessage("permissionsModalDismiss"),
-      null,
-      () => {
-        state.dismissRecording("backup-error");
-      },
-      () => {
-        state.dismissRecording("backup-error");
-      },
-      null,
-      null,
-      null,
-      false,
-      chrome.i18n.getMessage("getHelpButton"),
-      () => {
-        triggerSupportDownload({ source: "backup-error" });
-        chrome.runtime.sendMessage({
-          type: "report-error",
-          source: "backup-error",
-          errorCode: "BACKUP_PERMISSION_FAILED",
-          zipBundled: true,
-        });
-      },
-    );
   });
 
   registerMessage("fast-recorder-hard-fail", async () => {

@@ -83,7 +83,7 @@ export const buildSupportDebugInfo = async (opts = {}) => {
     lastOutcome = last?.outcome || null;
     if (last?.events?.length) {
       const hasEditorOpen = last.events.some(
-        (ev) => ev.e === "editor-open" && ev.d?.type === "editorwebcodecs",
+        (ev) => ev.e === "editor-open" && ev.d?.type === "editor",
       );
       const hasEditorReady = last.events.some(
         (ev) => ev.e === "editor-load-ready",

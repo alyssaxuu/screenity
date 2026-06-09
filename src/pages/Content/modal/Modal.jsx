@@ -80,7 +80,15 @@ const Modal = (props) => {
         )}
       >
         <div className="AlertDialogOverlay"></div>
-        <AlertDialog.Content className="AlertDialogContent">
+        <AlertDialog.Content
+          className="AlertDialogContent"
+          onEscapeKeyDown={() => {
+            // Escape == the cancel/secondary action. For modals that pause the
+            // recording while open (restart/discard confirm), this resumes it
+            // instead of leaving it stuck paused with the modal gone.
+            trigger2();
+          }}
+        >
           <AlertDialog.Title className="AlertDialogTitle">
             {title}
           </AlertDialog.Title>

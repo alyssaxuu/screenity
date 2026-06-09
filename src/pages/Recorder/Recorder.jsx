@@ -1,8 +1,10 @@
 import React, { useEffect, useState, useRef } from "react";
+import { createDebugLogger } from "../utils/recorderDebug";
+import { selectMimeType, getCodecLabel, buildTrackSnapshot } from "../utils/recorderCodec";
 import localforage from "localforage";
 import RecorderUI from "./RecorderUI";
 import { createMediaRecorder } from "./mediaRecorderUtils";
-import { sendRecordingError, sendStopRecording } from "./messaging";
+import { sendRecordingError, sendStopRecording } from "../utils/recorderMessaging";
 import { getBitrates, getResolutionForQuality } from "./recorderConfig";
 import {
   WebCodecsRecorder,
@@ -14,9 +16,11 @@ import {
   closeActiveEncoderPrewarm,
 } from "./encoderPrewarm";
 import { getUserMediaWithFallback } from "../utils/mediaDeviceFallback";
+import { startAudioStream as acquireMicStream } from "../utils/startAudioStream";
 import { shouldAcquireMicAtStart } from "../utils/micAcquisitionPolicy";
 import { attachAudioContextWatchdog } from "../utils/audioContextWatchdog";
 import { IS_OFFSCREEN_HOST } from "../utils/recordingHost";
+import { sendSystemAudioGuidanceToast } from "../utils/systemAudioGuidance";
 import { shouldUseDisplayMediaForScreen } from "../utils/screenCaptureMode";
 import { acquireDisplayMediaWithFocusRetry } from "../utils/acquireDisplayMedia";
 import { chooseWriter } from "./recorderStorage/chooseWriter";
@@ -60,23 +64,10 @@ const FORCE_MEDIARECORDER =
     : false;
 const logPrefix = "[Screenity Recorder]";
 
-function debug(...args) {
-  if (!DEBUG_RECORDER) return;
-  // eslint-disable-next-line no-console
-  console.log(logPrefix, ...args);
-}
-
-function debugWarn(...args) {
-  if (!DEBUG_RECORDER) return;
-  // eslint-disable-next-line no-console
-  console.warn(logPrefix, ...args);
-}
-
-function debugError(...args) {
-  if (!DEBUG_RECORDER) return;
-  // eslint-disable-next-line no-console
-  console.error(logPrefix, ...args);
-}
+const { debug, debugWarn, debugError } = createDebugLogger(
+  logPrefix,
+  DEBUG_RECORDER,
+);
 
 // Stream lifecycle ring-buffer, persisted to storage, survives tab discards.
 const SL_KEY = "streamLifecycleLog";
@@ -127,21 +118,6 @@ function logCaptureContext(label, stream) {
   });
 }
 
-function buildTrackSnapshot(track) {
-  if (!track) return null;
-  const settings =
-    typeof track.getSettings === "function" ? track.getSettings() : {};
-  const constraints =
-    typeof track.getConstraints === "function" ? track.getConstraints() : {};
-  const capabilities =
-    typeof track.getCapabilities === "function" ? track.getCapabilities() : {};
-  return {
-    label: track.label,
-    settings,
-    constraints,
-    capabilities,
-  };
-}
 
 function logRecordingSnapshot(label, data) {
   if (!DEBUG_RECORDER && !isRecordingDebugEnabled()) return;
@@ -195,32 +171,6 @@ const computeTargetVideoBps = (width, height, fps, isPro = false) => {
   return clamp(target, VIDEO_BPS_MIN, VIDEO_BPS_MAX);
 };
 
-const selectMimeType = (preferredCodec) => {
-  const preferred = (preferredCodec || "").toLowerCase();
-  const mimeTypes = [
-    "video/webm;codecs=vp9,opus",
-    "video/webm;codecs=vp9",
-    "video/webm;codecs=vp8,opus",
-    "video/webm;codecs=vp8",
-    "video/webm;codecs=avc1",
-    "video/webm;codecs=h264",
-    "video/webm",
-  ];
-  const ordered = preferred
-    ? mimeTypes
-        .filter((type) => type.includes(preferred))
-        .concat(mimeTypes.filter((type) => !type.includes(preferred)))
-    : mimeTypes;
-  return ordered.find((type) => MediaRecorder.isTypeSupported(type)) || null;
-};
-
-const getCodecLabel = (mimeType) => {
-  if (!mimeType) return "unknown";
-  if (mimeType.includes("vp9")) return "vp9";
-  if (mimeType.includes("vp8")) return "vp8";
-  if (mimeType.includes("avc1") || mimeType.includes("h264")) return "h264";
-  return "unknown";
-};
 
 const Recorder = () => {
   const isRestarting = useRef(false);
@@ -376,8 +326,6 @@ const Recorder = () => {
   // capture constraints.
   const recordedTabId = useRef(null);
   const tabPreferred = useRef(false);
-
-  const backupRef = useRef(false);
 
   const pending = useRef([]);
   const draining = useRef(false);
@@ -911,9 +859,6 @@ const Recorder = () => {
     lastSize.current = e.data.size;
     savedCount.current += 1;
 
-    if (backupRef.current) {
-      chrome.runtime.sendMessage({ type: "write-file", index: i });
-    }
     return true;
   }
 
@@ -1033,12 +978,6 @@ const Recorder = () => {
     }
   }
 
-  useEffect(() => {
-    chrome.storage.local.get(["backup"], (result) => {
-      backupRef.current = !!result.backup;
-      debug("Loaded backup flag from storage", backupRef.current);
-    });
-  }, []);
 
   // The recorder tab opens hidden (active:false for region/non-camera). Chrome
   // throttles silent hidden tabs after ~1s, before streaming-data arrives, so
@@ -1726,10 +1665,6 @@ const Recorder = () => {
               size: blob.size,
               savedCount: savedCount.current,
             });
-          }
-
-          if (backupRef.current) {
-            chrome.runtime.sendMessage({ type: "write-file", index: i });
           }
         } catch (err) {
           debugError("Failed to save WebCodecs chunk", err);
@@ -3243,101 +3178,12 @@ const Recorder = () => {
     return true;
   };
 
-  async function startAudioStream(id) {
-    debug("startAudioStream()", { id });
-    // "none" sentinel: bail before getUserMedia would otherwise grab the default mic.
-    if (!id || id === "none") {
-      debug("startAudioStream() skipped: no audio input selected");
-      return null;
-    }
-    const useExact = true;
-    const audioStreamOptions = {
-      mimeType: "video/webm;codecs=vp8,opus",
-      audio: {
-        deviceId: {
-          exact: id,
-        },
-      },
-    };
-
-    const { defaultAudioInputLabel, audioinput } =
-      await chrome.storage.local.get(["defaultAudioInputLabel", "audioinput"]);
-    const desiredLabel =
-      defaultAudioInputLabel ||
-      audioinput?.find((device) => device.deviceId === id)?.label ||
-      "";
-
-    const result = await getUserMediaWithFallback({
-      constraints: audioStreamOptions,
-      fallbacks:
-        useExact && desiredLabel
-          ? [
-              {
-                kind: "audioinput",
-                desiredDeviceId: id,
-                desiredLabel,
-                onResolved: (resolvedId) => {
-                  chrome.storage.local.set({
-                    defaultAudioInput: resolvedId,
-                    defaultAudioInputLabel: desiredLabel,
-                  });
-                },
-              },
-            ]
-          : [],
-    })
-      .then((stream) => {
-        debug("startAudioStream() got stream with exact device", {
-          hasAudio: stream.getAudioTracks().length,
-        });
-        // A BT headset used as mic switches A2DP (48k) to HFP (8/16k mono), but
-        // the 48k AudioContext then upsamples garbage. Log as a diag breadcrumb.
-        try {
-          const aTrack = stream.getAudioTracks?.()[0];
-          const settings = aTrack?.getSettings?.() || {};
-          const trackSampleRate = Number(settings.sampleRate) || null;
-          if (trackSampleRate && trackSampleRate <= 24000) {
-            const label = String(aTrack?.label || "").slice(0, 80);
-            console.warn(
-              "[Recorder] mic acquired at low sample rate; likely Bluetooth HFP profile",
-              { trackSampleRate, label },
-            );
-            try {
-              chrome.runtime.sendMessage({
-                type: "diag-forward",
-                event: "recorder-low-sample-rate-mic",
-                data: { trackSampleRate, label },
-              });
-            } catch {}
-          }
-        } catch {}
-        return stream;
-      })
-      .catch((err) => {
-        debugWarn(
-          "startAudioStream() exact device failed, retrying generic",
-          err,
-        );
-        const audioStreamOptions = {
-          mimeType: "video/webm;codecs=vp8,opus",
-          audio: true,
-        };
-
-        return navigator.mediaDevices
-          .getUserMedia(audioStreamOptions)
-          .then((stream) => {
-            debug("startAudioStream() got generic stream", {
-              hasAudio: stream.getAudioTracks().length,
-            });
-            return stream;
-          })
-          .catch((err2) => {
-            debugError("startAudioStream() failed completely", err2);
-            return null;
-          });
-      });
-
-    return result;
+  function startAudioStream(id) {
+    return acquireMicStream(id, {
+      bailOnNone: true,
+      bluetoothDiag: true,
+      logger: { debug, warn: debugWarn },
+    });
   }
 
   function setAudioInputVolume(volume) {
@@ -4365,7 +4211,10 @@ const Recorder = () => {
     if (request.type === "loaded") {
       perfMark("Recorder loaded.received", { isTab: Boolean(request?.isTab) });
       slLog("msg-loaded");
-      backupRef.current = request.backup;
+      // offscreen has no visible Warning; surface system-audio guidance as a toast
+      if (IS_OFFSCREEN_HOST && !request.isTab) {
+        sendSystemAudioGuidanceToast();
+      }
       if (!tabPreferred.current) {
         isTab.current = request.isTab;
         if (request.isTab) {

@@ -1,43 +1,36 @@
-/* getFrame.js */
-async function getFrame(ffmpeg, videoBlob, time = 0) {
-  const videoData = new Uint8Array(await videoBlob.arrayBuffer());
-  // Write video data to a file
-  ffmpeg.FS("writeFile", "input.mp4", videoData);
+async function getFrame(ffmpeg, videoBlob, time) {
+  return new Promise((resolve, reject) => {
+    const video = document.createElement("video");
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
 
-  const outputFileName = "output.jpg";
+    video.addEventListener("loadedmetadata", () => {
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      video.currentTime = time;
+    });
 
-  // Use FFmpeg to extract a frame as a JPEG image
-  await ffmpeg.run(
-    "-i",
-    "input.mp4",
-    "-ss",
-    time.toString(),
-    "-frames:v",
-    "1",
-    "-preset",
-    "superfast",
-    "-threads",
-    "0",
-    "-r",
-    "30",
-    "-tune",
-    "fastdecode",
-    outputFileName
-  );
+    video.addEventListener("seeked", () => {
+      try {
+        ctx.drawImage(video, 0, 0);
+        canvas.toBlob((blob) => {
+          URL.revokeObjectURL(video.src);
+          if (blob) resolve(blob);
+          else reject(new Error("Failed to create blob from canvas"));
+        }, "image/png");
+      } catch (error) {
+        URL.revokeObjectURL(video.src);
+        reject(error);
+      }
+    });
 
-  // Read the generated frame image
-  const frameData = ffmpeg.FS("readFile", outputFileName);
+    video.addEventListener("error", (e) => {
+      URL.revokeObjectURL(video.src);
+      reject(new Error(`Video error: ${e.message || "Unknown error"}`));
+    });
 
-  // Create a Blob from the frame data
-  const frameBlob = new Blob([frameData.buffer], {
-    type: "image/jpeg",
+    video.src = URL.createObjectURL(videoBlob);
   });
-
-  // Clean up
-  ffmpeg.FS("unlink", "input.mp4");
-  ffmpeg.FS("unlink", outputFileName);
-
-  return frameBlob;
 }
 
 export default getFrame;

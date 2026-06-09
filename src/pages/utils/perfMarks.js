@@ -23,14 +23,9 @@ const buildDevImpl = () => {
       if (path.endsWith("/region.html")) return "Region";
       if (path.endsWith("/recorder.html")) return "Recorder";
       if (path.endsWith("/cloudrecorder.html")) return "CloudRecorder";
-      if (path.endsWith("/sandbox.html")) return "Sandbox";
       if (path.endsWith("/editor.html")) return "Editor";
-      if (path.endsWith("/editorwebcodecs.html")) return "EditorWebCodecs";
-      if (path.endsWith("/editorviewer.html")) return "EditorViewer";
       if (path.endsWith("/offscreenrecorder.html")) return "OffscreenRecorder";
-      if (path.endsWith("/audiooffscreen.html")) return "AudioOffscreen";
       if (path.endsWith("/remuxoffscreen.html")) return "RemuxOffscreen";
-      if (path.endsWith("/backup.html")) return "Backup";
       if (path.endsWith("/popup.html")) return "Popup";
       return "Content";
     } catch {

@@ -196,18 +196,15 @@ export const stopRecording = async () => {
     validation?.details?.recordingId &&
     validation.details.recordingId === fastRecorderActiveRecordingId;
   const hardFailForCurrent = Boolean(validationMatches && validation?.hardFail);
-  // Route by where the bytes actually live: editor.html is sandboxed and
-  // can't read OPFS, so OPFS-backed recordings MUST go to editorwebcodecs.html
-  // regardless of which encoder produced them. fastRecorderInUse is the encoder
-  // flag, not a storage flag, and the two can diverge on probe/validation
-  // fallback. Backend is ground truth.
+  // route by where the bytes live (backend), not fastRecorderInUse: that's the
+  // encoder flag, not a storage flag, and the two diverge on validation fallback.
   const bytesInOpfs = lastRecordingBackendRef?.backend === "opfs";
   const hasWebCodecs = bytesInOpfs;
   diagEvent("editor-route-decision", {
     backend: lastRecordingBackendRef?.backend || null,
     fastRecorderInUse: Boolean(fastRecorderInUse),
     hardFailForCurrent,
-    route: hasWebCodecs ? "webcodecs" : "ffmpeg",
+    route: "webcodecs",
   });
 
   const {
@@ -240,11 +237,11 @@ export const stopRecording = async () => {
   ) {
     // editor already opened by stop-recording-tab flow; avoid duplicate
   } else if (hasWebCodecs) {
-    diagEvent("editor-open", { type: "editorwebcodecs" });
+    diagEvent("editor-open", { type: "editor" });
     const query = postStopRecordingId
       ? `?mode=postStop&recordingId=${encodeURIComponent(postStopRecordingId)}`
       : "?mode=postStop";
-    const wcUrl = `editorwebcodecs.html${query}`;
+    const wcUrl = `editor.html${query}`;
     chrome.tabs.create(
       { url: wcUrl, active: true },
       (tab) => {
@@ -290,13 +287,13 @@ export const stopRecording = async () => {
 
     chrome.runtime.sendMessage({ type: "turn-off-pip" });
   } else if (duration > maxDuration) {
-    diagEvent("editor-open", { type: "editorviewer", duration });
+    diagEvent("editor-open", { type: "editor", viewer: true, duration });
     // Fallback for large recordings without WebCodecs - use viewer mode
 
     const query = postStopRecordingId
       ? `?mode=postStop&recordingId=${encodeURIComponent(postStopRecordingId)}`
       : "?mode=postStop";
-    const viewerUrl = `editorviewer.html${query}`;
+    const viewerUrl = `editor.html${query}&view=1`;
     chrome.tabs.create(
       { url: viewerUrl, active: true },
       (tab) => {
@@ -342,14 +339,15 @@ export const stopRecording = async () => {
 
     chrome.runtime.sendMessage({ type: "turn-off-pip" });
   } else {
-    diagEvent("editor-open", { type: "editor-ffmpeg" });
+    // IDB-backed (MediaRecorder) recordings open editor too; fallback-recording drives the read
+    diagEvent("editor-open", { type: "editor", via: "stop-idb" });
     const query = postStopRecordingId
       ? `?mode=postStop&recordingId=${encodeURIComponent(postStopRecordingId)}`
       : "?mode=postStop";
-    const ffmpegUrl = `editor.html${query}`;
-    chrome.tabs.create({ url: ffmpegUrl, active: true }, (tab) => {
+    const editorUrl = `editor.html${query}`;
+    chrome.tabs.create({ url: editorUrl, active: true }, (tab) => {
       if (chrome.runtime.lastError || !tab?.id) {
-        handleEditorOpenFailed(ffmpegUrl, chrome.runtime.lastError?.message);
+        handleEditorOpenFailed(editorUrl, chrome.runtime.lastError?.message);
         return;
       }
       onTabLoaded(
@@ -498,7 +496,7 @@ export const handleStopRecordingTab = async (request) => {
     via: "stop-tab",
     backend: lastRecordingBackendRef?.backend || null,
     fastRecorderInUse: Boolean(fastRecorderInUse),
-    route: bytesInOpfs ? "webcodecs" : "ffmpeg",
+    route: "webcodecs",
   });
   const stopTabNow = Date.now();
   const stopTabStartTime = Number(recordingStartTime);
@@ -548,8 +546,8 @@ export const handleStopRecordingTab = async (request) => {
     }
 
     if (bytesInOpfs) {
-      diagEvent("editor-open", { type: "editorwebcodecs", via: "stop-tab" });
-      const editorUrl = "editorwebcodecs.html";
+      diagEvent("editor-open", { type: "editor", via: "stop-tab" });
+      const editorUrl = "editor.html";
       // Open editor immediately in postStop mode (WebCodecs only)
       chrome.tabs.create(
         {
@@ -592,7 +590,7 @@ export const handleStopRecordingTab = async (request) => {
             } catch {}
             settled = true;
             console.warn("[Screenity][BG] Editor tab load timed out; releasing lock");
-            diagEvent("editor-open-timeout", { tabId: tab.id, type: "editorwebcodecs" });
+            diagEvent("editor-open-timeout", { tabId: tab.id, type: "editor" });
             releasePostStopEditorLock();
             markEditorStartFailed(
               tab.id,
@@ -627,9 +625,15 @@ export const handleStopRecordingTab = async (request) => {
         },
       );
     } else {
-      const editorUrl =
-        duration > maxDuration ? "editorviewer.html" : "editor.html";
-      diagEvent("editor-open", { type: editorUrl.replace(".html", ""), via: "stop-tab", duration });
+      // long recordings open the same editor page in viewer mode (?view=1)
+      const isViewerRoute = duration > maxDuration;
+      const editorUrl = isViewerRoute ? "editor.html?view=1" : "editor.html";
+      diagEvent("editor-open", {
+        type: "editor",
+        viewer: isViewerRoute,
+        via: "stop-tab",
+        duration,
+      });
       perfMark("BG.stopRecording editor-tab-create.start", { editorUrl });
       const endTabLoad = perfSpan("BG.stopRecording editor-tab-load");
       chrome.tabs.create({ url: editorUrl, active: true }, (tab) => {
@@ -686,7 +690,7 @@ export const handleStopRecordingTab = async (request) => {
               postStopRecordingId: null,
             });
             releasePostStopEditorLock({ postStopRecordingId: null });
-            if (editorUrl === "editorviewer.html") {
+            if (isViewerRoute) {
               sendMessageTab(tab.id, { type: "viewer-recording" }).catch(
                 (err) => {
                   console.error(
@@ -833,22 +837,4 @@ export const handleStopRecordingTab = async (request) => {
       }
     }
   })();
-};
-
-export const handleStopRecordingTabBackup = async (request) => {
-  // gated: unconditional flag would fire the modal on a clean backup-tab close
-  const isMemoryError = Boolean(request?.memoryError);
-  chrome.storage.local.set({
-    recording: false,
-    restarting: false,
-    tabRecordedID: null,
-    recordingStoppedAt: Date.now(),
-    ...(isMemoryError ? { memoryError: true } : {}),
-  });
-  sendMessageRecord({ type: "stop-recording-tab" });
-
-  const { activeTab } = await chrome.storage.local.get(["activeTab"]);
-
-  sendMessageTab(activeTab, { type: "stop-pending" });
-  focusTab(activeTab);
 };

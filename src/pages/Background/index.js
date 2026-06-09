@@ -24,6 +24,7 @@ const clearStaleLocks = async () => {
       pendingRecording,
       restarting,
       recordingTab,
+      offscreen,
       multiMode,
       region,
     } = await chrome.storage.local.get([
@@ -34,6 +35,7 @@ const clearStaleLocks = async () => {
       "pendingRecording",
       "restarting",
       "recordingTab",
+      "offscreen",
       "multiMode",
       "region",
     ]);
@@ -54,20 +56,32 @@ const clearStaleLocks = async () => {
 
     // SW died mid-dispatch or tab closed
     if (recording || pendingRecording || restarting) {
-      let tabAlive = false;
+      let recorderAlive = false;
       if (recordingTab) {
         try {
           await new Promise((resolve) => {
             chrome.tabs.get(recordingTab, (tab) => {
-              tabAlive = !chrome.runtime.lastError && Boolean(tab);
+              recorderAlive = !chrome.runtime.lastError && Boolean(tab);
               resolve();
             });
           });
         } catch {
-          tabAlive = false;
+          recorderAlive = false;
         }
       }
-      if (!tabAlive) {
+      // Offscreen recordings have no recordingTab; the recorder lives in the
+      // offscreen document. Pause idles the SW, which restarts and would
+      // otherwise tear down a perfectly alive (paused) offscreen recording.
+      // Treat the offscreen doc's existence as the recorder being alive.
+      if (!recorderAlive && offscreen) {
+        try {
+          const contexts = await chrome.runtime.getContexts({});
+          recorderAlive = (contexts || []).some(
+            (c) => c.contextType === "OFFSCREEN_DOCUMENT",
+          );
+        } catch {}
+      }
+      if (!recorderAlive) {
         stale.recording = false;
         stale.pendingRecording = false;
         stale.restarting = false;
@@ -81,17 +95,14 @@ const clearStaleLocks = async () => {
         stale.memoryError = false;
         // keep editorRecordingError + sandboxTab; the editor reads them on mount
         // and onTabRemovedListener clears sandboxTab when the editor closes.
-        stale.backup = false;
-        stale.backupSetup = false;
-        stale.backupTab = null;
         stale.paused = false;
         stale.pausedAt = null;
         stale.totalPausedMs = 0;
         stale.tabRecordedID = null;
         stale.recordingUiTabId = null;
         console.warn(
-          "[Screenity][BG] Stale recording state on startup (no live recorderTab) - clearing",
-          { recording, pendingRecording, restarting, recordingTab },
+          "[Screenity][BG] Stale recording state on startup (no live recorder tab or offscreen doc) - clearing",
+          { recording, pendingRecording, restarting, recordingTab, offscreen },
         );
       }
     }
@@ -206,12 +217,11 @@ const recoverInFlightRecording = async () => {
       tabUrl: tab?.url,
       status: tab?.status,
     });
-    const { region, customRegion, tabRecordedID, backup, recordingType } =
+    const { region, customRegion, tabRecordedID, recordingType } =
       await chrome.storage.local.get([
         "region",
         "customRegion",
         "tabRecordedID",
-        "backup",
         "recordingType",
       ]);
     const isRegion = Boolean(region) && !customRegion;
@@ -219,7 +229,6 @@ const recoverInFlightRecording = async () => {
       await chrome.tabs.sendMessage(recordingTab, {
         type: "loaded",
         request: { recordingType, region, customRegion },
-        backup: Boolean(backup),
         tabPreferred: false,
         ...(isRegion && tabRecordedID
           ? { isTab: true, tabID: tabRecordedID }

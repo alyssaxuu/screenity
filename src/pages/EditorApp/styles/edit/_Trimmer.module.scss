@@ -1,0 +1,118 @@
+@use "../global/variables.scss" as *;
+
+.img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.trimmerContainer {
+  position: absolute;
+  bottom: 75px;
+  left: 0px;
+  right: 0px;
+  margin: auto;
+  width: 90%;
+  height: 80px;
+}
+.thumbstrip {
+  width: 100%;
+  display: flex;
+  overflow: hidden;
+  position: relative;
+}
+.trimSection {
+  pointer-events: none;
+}
+.trimmer {
+  position: absolute; /* Position the trimmer over the thumbstrip */
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+.trimWrap {
+  position: absolute;
+  top: 0px;
+  left: 0px;
+  z-index: 999999;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+.handle {
+  position: absolute;
+  width: 12px;
+  height: 30px;
+  top: 0px;
+  bottom: 0px;
+  margin: auto;
+  background-color: $color-primary;
+  cursor: pointer;
+  pointer-events: all !important;
+
+  &::after {
+    content: "";
+    width: 2px;
+    height: 12px;
+    border-radius: 30px;
+    background-color: #fff;
+    position: absolute;
+    top: 0px;
+    left: 0px;
+    bottom: 0px;
+    right: 0px;
+    margin: auto;
+  }
+
+  &:hover {
+    cursor: ew-resize;
+    background-color: #2969d8 !important;
+  }
+}
+
+.startHandle {
+  border-radius: 5px 0px 0px 5px;
+  transform: translateX(-10px);
+}
+
+.endHandle {
+  border-radius: 0px 5px 5px 0px;
+  transform: translateX(2px);
+}
+
+.overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(255, 255, 255, 0.5);
+  pointer-events: none !important;
+}
+
+.leftOverlay {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 5px 0px 0px 5px;
+}
+
+.rightOverlay {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  left: auto;
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 0px 5px 5px 0px;
+}
+
+.trimSection {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border: 2px solid $color-primary;
+  border-radius: 5px;
+}

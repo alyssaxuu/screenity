@@ -973,10 +973,6 @@
     "message": "Screenity önceki sekmenizde desteklenmiyordu. Yine de burada kaydı başlatabilir ve ardından sekmeye geçebilirsiniz, ancak kamera ve araç çubuğunuz görünür olmayacaktır.",
     "description": "Sekme Üzerinde Desteklenmeyen Uzantı Açıklaması"
   },
-  "backupsTitle": {
-    "message": "Screenity Kayıtlarınız için Yerel Yedekleme Ayarları",
-    "description": "Yedeklemeler Başlığı"
-  },
   "backupsDescription1": {
     "message": "Yaptığınız tüm kayıtların bir yedeğini alın. Yedeklemeleri yapılandırmazsanız, kayıtlarınızı indirmeye karar verdiğinizde yalnızca kaydedilecektir.",
     "description": "Yedeklemeler Açıklaması"
@@ -984,54 +980,6 @@
   "backupsDescription2": {
     "message": "İndirmeler veya diğer sistem klasörlerine kaydetmeye çalışıyorsanız, önce yeni bir klasör oluşturmanız gerekebilir.",
     "description": "Yedeklemeler Açıklaması"
-  },
-  "backupsSelectFolder": {
-    "message": "Klasör Seç",
-    "description": "Klasör Seçme Düğmesi"
-  },
-  "backupsNotNow": {
-    "message": "Şimdi Değil",
-    "description": "Şimdi Değil Düğmesi"
-  },
-  "backupsOnTitle": {
-    "message": "Kayıtlarınız Yerel Olarak Senkronize Ediliyor",
-    "description": "Etkin Yedeklemeler Başlığı"
-  },
-  "backupsOnDescription": {
-    "message": "Her kayıt yaparken izin istemekten kaçınmak için bu sekme açık bırakmanızı öneririz.",
-    "description": "Etkin Yedeklemeler Açıklaması"
-  },
-  "backupsClose": {
-    "message": "Yine de Sekmeyi Kapat",
-    "description": "Yine de Sekmeyi Kapat Düğmesi"
-  },
-  "backupsStop": {
-    "message": "Tüm Kayıtların Yedeklemesini Durdur",
-    "description": "Yedeklemeleri Durdur Düğmesi"
-  },
-  "backupsConfirmTitle": {
-    "message": "Lütfen Screenity'in Yerel Yedekleme Klasörüne Erişimini Tekrar Onaylayın",
-    "description": "Yedeklemeler Onay Başlığı"
-  },
-  "backupsConfirmDescription": {
-    "message": "Üzgünüz, ancak kayıtlarınızın yerel kopyalarını oluşturmaya devam etmek için tekrar izniniz gerekiyor. Maalesef, bu sekme kapandığında her seferinde sormamız gerekecek, bu da tarayıcıyı kapatmanız veya bilgisayarınızı yeniden başlatmanız durumunda olabilir.",
-    "description": "Yedeklemeler Onay Açıklaması"
-  },
-  "backupsConfirmAllow": {
-    "message": "Screenity'e Kayıtların Yedeklemesine Devam Etme İzni Ver",
-    "description": "Yedeklemeler Onayında İzin Ver Düğmesi"
-  },
-  "backupsToggle": {
-    "message": "Kayıtların Yedeklerini Al",
-    "description": "Yedeklemeleri Değiştir Etiketi"
-  },
-  "backupPermissionFailTitle": {
-    "message": "Kaydın Yedeklemesi İçin İzin Verilmedi",
-    "description": "Yedekleme İzin Reddi Başlığı"
-  },
-  "backupPermissionFailDescription": {
-    "message": "Kayıtlarınızın yerel bir kopyası oluşturmak için bir klasör seçmediniz. Tarayıcınızın veya işletim sisteminizin sürümüne bağlı olarak, her kayıt yapmaya başladığınızda klasörü seçmeniz istenebilir. Tekrar deneyebilir veya izinleri tekrar vermek istemiyorsanız yedeklemeleri tamamen devre dışı bırakabilirsiniz.",
-    "description": "Yedekleme İzin Reddi Açıklaması"
   },
   "recordAudioWarningMacTitle": {
     "message": "Bilgisayar Sesini Kaydet",

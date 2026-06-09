@@ -156,9 +156,6 @@ const _startRecordingInner = async (caller) => {
         "offscreen",
         "useWebCodecsRecorder",
         "fastRecorderInUse",
-        "backup",
-        "backupSetup",
-        "backupTab",
         "memoryError",
       ]);
       lifecycle("BG.startRecording", "session-boundary", {
@@ -198,11 +195,8 @@ const _startRecordingInner = async (caller) => {
   // Close every prior editor tab by URL (sandboxTab only tracks the last).
   // OPFS wipes on new recording, so a stale editor would read missing data.
   try {
-    const editorUrls = [
-      chrome.runtime.getURL("editor.html"),
-      chrome.runtime.getURL("editorwebcodecs.html"),
-      chrome.runtime.getURL("editorviewer.html"),
-    ];
+    // editor.html covers viewer mode too (editor.html?view=1); startsWith match.
+    const editorUrls = [chrome.runtime.getURL("editor.html")];
     const allTabs = await chrome.tabs.query({});
     const editorTabs = allTabs.filter(
       (t) =>
@@ -318,12 +312,11 @@ const _startRecordingInner = async (caller) => {
 
   chrome.storage.local.set({ lastRecordingType: recordingType || "screen" });
 
-  const { quality, systemAudio, audioInput, backup, offscreen, alarm, alarmTime, countdown } =
+  const { quality, systemAudio, audioInput, offscreen, alarm, alarmTime, countdown } =
     await chrome.storage.local.get([
       "quality",
       "systemAudio",
       "audioInput",
-      "backup",
       "offscreen",
       "alarm",
       "alarmTime",
@@ -343,7 +336,6 @@ const _startRecordingInner = async (caller) => {
     region: Boolean(customRegion),
     systemAudio: Boolean(systemAudio),
     audioInput: Boolean(audioInput),
-    backup: Boolean(backup),
     offscreen: Boolean(offscreen),
     alarm: Boolean(alarm),
     alarmTime: alarm ? (alarmTime || null) : null,

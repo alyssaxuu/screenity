@@ -12,9 +12,7 @@ const isDev = env.NODE_ENV === "development";
 // drops post-recording UI + WASM. recording + camera paths preserved.
 const isBsBuild = process.env.SCREENITY_BS_BUILD === "1";
 const BS_DROPPED_ENTRIES = new Set([
-  "editorviewer",
   "cloudrecorder",
-  "backup",
   "download",
   "waveform",
   "setup",
@@ -61,37 +59,14 @@ const entryPoints = {
     "OffscreenRecorder",
     "index.jsx"
   ),
-  audiooffscreen: path.join(
-    __dirname,
-    "src",
-    "pages",
-    "AudioOffscreen",
-    "index.js"
-  ),
   camera: path.join(__dirname, "src", "pages", "Camera", "index.jsx"),
   waveform: path.join(__dirname, "src", "pages", "Waveform", "index.jsx"),
-  sandbox: path.join(__dirname, "src", "pages", "Sandbox", "index.jsx"),
   permissions: path.join(__dirname, "src", "pages", "Permissions", "index.jsx"),
   setup: path.join(__dirname, "src", "pages", "Setup", "index.jsx"),
   playground: path.join(__dirname, "src", "pages", "Playground", "index.jsx"),
-  editor: path.join(__dirname, "src", "pages", "Editor", "index.jsx"),
   region: path.join(__dirname, "src", "pages", "Region", "index.jsx"),
   download: path.join(__dirname, "src", "pages", "Download", "index.jsx"),
-  editorwebcodecs: path.join(
-    __dirname,
-    "src",
-    "pages",
-    "EditorWebCodecs",
-    "index.jsx"
-  ),
-  editorviewer: path.join(
-    __dirname,
-    "src",
-    "pages",
-    "EditorViewer",
-    "index.jsx"
-  ),
-  backup: path.join(__dirname, "src", "pages", "Backup", "index.jsx"),
+  editor: path.join(__dirname, "src", "pages", "Editor", "index.jsx"),
   remuxoffscreen: path.join(
     __dirname,
     "src",
@@ -143,9 +118,6 @@ const htmlPlugins = Object.keys(entryPoints)
     const folderNameMap = {
       cloudrecorder: "CloudRecorder",
       offscreenrecorder: "OffscreenRecorder",
-      audiooffscreen: "AudioOffscreen",
-      editorwebcodecs: "EditorWebCodecs",
-      editorviewer: "EditorViewer",
       remuxoffscreen: "RemuxOffscreen",
     };
 
@@ -179,17 +151,7 @@ const htmlPlugins = Object.keys(entryPoints)
       ...(needsKeepalive ? { chunksSortMode: "manual" } : {}),
     };
 
-    // Add favicon only for backup page
-    if (entryName === "backup") {
-      options.favicon = path.join(
-        __dirname,
-        "src",
-        "assets",
-        "backup-favicon.ico"
-      );
-    } else {
-      options.favicon = path.join(__dirname, "src", "assets", "favicon.png");
-    }
+    options.favicon = path.join(__dirname, "src", "assets", "favicon.png");
 
     return new HtmlWebpackPlugin(options);
   })
@@ -355,7 +317,6 @@ const config = {
           force: true,
           filter: isBsBuild
             ? (resourcePath) =>
-                !/ffmpeg-core\.wasm$/.test(resourcePath) &&
                 !/vision_wasm.*\.wasm$/.test(resourcePath) &&
                 !/\/videos\//.test(resourcePath) &&
                 !/pin\.gif$/.test(resourcePath)

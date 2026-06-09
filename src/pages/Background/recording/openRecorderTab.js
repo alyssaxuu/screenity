@@ -1,7 +1,8 @@
 import { getCurrentTab } from "../tabManagement";
 import { removeTab } from "../tabManagement/removeTab";
 import { sendMessageRecord } from "./sendMessageRecord.js";
-import { closeOffscreenDocument } from "../offscreen/closeOffscreenDocument.js";
+import { closeOffscreenDocumentWithFlush } from "../offscreen/closeOffscreenDocumentWithFlush";
+import { createCloudRecorderOffscreen } from "../offscreen/createCloudRecorderOffscreen.js";
 import { loginWithWebsite } from "../auth/loginWithWebsite.js";
 import { traceStep } from "../../utils/startFlowTrace.js";
 import { handleGetStreamingData } from "./recordingHelpers.js";
@@ -10,7 +11,6 @@ import { sweepRecorderTabs } from "./sweepRecorderTabs";
 
 const openRecorderTab = async (
   activeTab,
-  backup,
   isRegion,
   camera = false,
   request
@@ -71,6 +71,86 @@ const openRecorderTab = async (
       }
     } catch {}
     chrome.storage.local.set({ recordingTab: null });
+  }
+
+  // offscreen host escapes background-tab freeze/discard. useOffscreenCloud is a
+  // kill-switch (default ON; false forces the old tab host). recordingType isn't
+  // on the desktop-capture message, content UI writes it to storage first.
+  const { useOffscreenCloud, recordingType: storedRecordingType, customRegion: storedCustomRegion } =
+    await chrome.storage.local.get(["useOffscreenCloud", "recordingType", "customRegion"]);
+  const recordingType = request?.recordingType ?? storedRecordingType ?? null;
+  const customRegion = request?.customRegion ?? storedCustomRegion ?? false;
+  // all modes run offscreen except customRegion: its track.cropTo(CropTarget)
+  // needs an iframe inside the recorded tab and can't run in an offscreen doc.
+  const willUseOffscreen = useOffscreenCloud !== false && !customRegion;
+  perfMark("BG.openRecorderTab offscreen-decision", {
+    isCloudRecorder,
+    isRegion,
+    camera,
+    recordingType,
+    willUseOffscreen,
+  });
+  if (willUseOffscreen) {
+    perfMark("BG.openRecorderTab offscreen-route", { camera });
+    try {
+      await createCloudRecorderOffscreen({ cloud: isCloudRecorder });
+    } catch (err) {
+      console.error(
+        "[Screenity][BG] openRecorderTab: offscreen create failed",
+        err,
+      );
+      chrome.runtime
+        .sendMessage({
+          type: "recording-error",
+          error: "stream-error",
+          why: "offscreen create failed: " + String(err?.message || err),
+          errorCode: "REC_START_NO_OFFSCREEN",
+        })
+        .catch(() => {});
+      return;
+    }
+    // offscreen:true routes sendMessageRecord to the offscreen doc; set before
+    // the loaded push. tab/region need a tabCapture streamId, but offscreen can't
+    // call chrome.tabCapture so it requests one from the SW via the tabID below.
+    const isTabCapture = recordingType === "tab" || isRegion;
+    await chrome.storage.local.set({
+      recordingTab: null,
+      offscreen: true,
+      region: false,
+      wasRegion: false,
+      clickEvents: [],
+      recordingUiTabId: activeTab.id,
+    });
+    traceStep("recorderOffscreenCreated");
+    perfMark("BG.openRecorderTab offscreen-loaded.send");
+    const loadedMsg = {
+      type: "loaded",
+      request: request,
+      tabPreferred: false,
+      ...(isTabCapture ? { isTab: true, tabID: activeTab.id } : {}),
+    };
+    // offscreen React app mounts its listener async, so early sends are lost; retry
+    (async () => {
+      const backoffMs = [0, 150, 300, 600, 1000, 1500, 2500];
+      for (let attempt = 0; attempt < backoffMs.length; attempt += 1) {
+        if (backoffMs[attempt] > 0) {
+          await new Promise((r) => setTimeout(r, backoffMs[attempt]));
+        }
+        try {
+          await sendMessageRecord(loadedMsg);
+          return;
+        } catch {
+          // offscreen recorder not ready yet; retry
+        }
+      }
+      console.warn(
+        "[Screenity][BG] offscreen recorder loaded-send exhausted retries",
+      );
+    })();
+    setTimeout(() => {
+      handleGetStreamingData().catch(() => {});
+    }, 300);
+    return;
   }
 
   const finalUrl = isRegion ? `${recorderUrl}?tab=true` : recorderUrl;
@@ -198,7 +278,6 @@ const openRecorderTab = async (
       const loadedMsg = {
         type: "loaded",
         request: request,
-        backup: backup,
         tabPreferred: isPlayground,
         ...(isRegion
           ? {
@@ -251,9 +330,6 @@ export const startRecorderSession = async (request, tabId = null) => {
     camera: Boolean(request?.camera),
   });
   console.log("[Screenity][startRecorderSession] entered", { request, tabId });
-  const endStorage = perfSpan("BG.startRecorderSession storage.read");
-  const { backup } = await chrome.storage.local.get(["backup"]);
-  endStorage();
   const endTab = perfSpan("BG.startRecorderSession getCurrentTab");
   let activeTab = await getCurrentTab();
   endTab({ tabId: activeTab?.id || null });
@@ -276,7 +352,9 @@ export const startRecorderSession = async (request, tabId = null) => {
   }
 
   const endCloseOffscreen = perfSpan("BG.startRecorderSession closeOffscreenDocument");
-  await closeOffscreenDocument();
+  // finalize any in-flight offscreen upload before teardown; a back-to-back
+  // start otherwise bare-closes the prior TUS finalize and loses it
+  await closeOffscreenDocumentWithFlush({ reason: "new-recording-start" });
   endCloseOffscreen();
 
   if (request.region) {
@@ -293,7 +371,6 @@ export const startRecorderSession = async (request, tabId = null) => {
       sendMessageRecord({
         type: "loaded",
         request: request,
-        backup: backup,
         region: true,
       })
         .then(() => endSendLoaded({ ok: true }))
@@ -310,10 +387,10 @@ export const startRecorderSession = async (request, tabId = null) => {
         region: true,
         recordingUiTabId: activeTab.id,
       });
-      await openRecorderTab(activeTab, backup, true, false, request);
+      await openRecorderTab(activeTab, true, false, request);
     }
   } else {
     chrome.storage.local.set({ region: false });
-    await openRecorderTab(activeTab, backup, false, request.camera, request);
+    await openRecorderTab(activeTab, false, request.camera, request);
   }
 };

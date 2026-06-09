@@ -1,0 +1,86 @@
+@use "../global/variables.scss" as *;
+
+.trimWrap {
+  position: absolute;
+  bottom: 0px;
+  left: 0px;
+  width: 100%;
+  height: 230px;
+  border-top: 1px solid $color-border;
+  background-color: #fff;
+}
+.controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 90%;
+  margin: auto;
+  margin-top: 12px;
+}
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.controlsRight {
+  display: flex;
+  align-items: center;
+}
+.timeWrap {
+  color: $color-text-primary;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  position: absolute;
+  left: 0px;
+  right: 0px;
+  margin: auto;
+  width: fit-content;
+
+  span {
+    position: relative;
+    font-variant-numeric: tabular-nums;
+  }
+  svg {
+    color: $color-icon;
+    margin-top: 5px;
+  }
+}
+.trimInfo {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background-color: $color-light-grey;
+  border-radius: $container-border-radius;
+  padding: 8px 16px;
+  width: fit-content;
+  margin-left: auto;
+  margin-right: auto;
+  margin-top: 8px;
+  margin-bottom: 8px;
+  justify-content: center;
+  align-items: center;
+  color: $color-text-primary;
+  position: absolute;
+  left: 0px;
+  right: 0px;
+  bottom: 8px;
+
+  svg {
+    color: $color-icon;
+    margin-top: 5px;
+    margin-right: 5px;
+  }
+  .trimInfoLink {
+    color: $color-primary;
+    cursor: pointer;
+    display: inline-block;
+    margin-left: 5px;
+  }
+}
+
+@media (max-width: 1000px) {
+  .timeWrap {
+    display: none;
+  }
+}

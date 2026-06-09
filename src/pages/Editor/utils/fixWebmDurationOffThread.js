@@ -1,6 +1,4 @@
-// Off-main-thread fix-webm-duration via a blob-URL worker, so the EBML rewrite
-// doesn't freeze the renderer. Must run in editor.html (only its sandbox CSP
-// allows blob workers). Falls back to the synchronous path on any failure.
+// makes a MediaRecorder WebM seekable. tries a blob-URL worker, but MV3 extension_pages CSP forbids blob: in worker-src so the Worker ctor throws in the editor host; falls back to the sync path (correct blob, on the main thread, responds before the child's 90s relay timeout)
 import webmDurationLibSrc from "!!raw-loader!fix-webm-duration/fix-webm-duration.js";
 import fixWebmDurationSync from "fix-webm-duration";
 

@@ -14,10 +14,8 @@ import { startAfterCountdown, startRecording } from "../recording/startRecording
 import { noteCountdownStarted } from "../recording/countdownFallback";
 import {
   handleStopRecordingTab,
-  handleStopRecordingTabBackup,
   clearInMemoryEditorLock,
 } from "../recording/stopRecording";
-import { sendChunks } from "../recording/sendChunks";
 import { chunksStore } from "../recording/chunkHandler";
 import { openExistingChunksStore } from "../../CloudRecorder/recorderStorage/chooseChunksStore";
 import { destroySessionDir } from "../../CloudRecorder/recorderStorage/opfsKvStore";
@@ -26,7 +24,6 @@ import { addAlarmListener } from "../alarms/addAlarmListener";
 import { cancelRecording, handleDismiss } from "../recording/cancelRecording";
 import { handleDismissRecordingTab } from "../recording/discardRecording";
 import { sendMessageRecord } from "../recording/sendMessageRecord";
-import { startRecorderSession } from "../recording/openRecorderTab";
 import { acquireStreamForOffscreen } from "../offscreen/acquireStream";
 import { registerProxyStorageHandlers } from "../offscreen/proxyStorageHandlers";
 import { ensureRemuxOffscreen } from "../offscreen/ensureRemuxOffscreen";
@@ -64,7 +61,6 @@ import {
 import { FIRST_CHUNK_WATCHDOG_ALARM, RECORDER_KEEPALIVE_ALARM } from "../alarms/alarmConstants";
 import { desktopCapture } from "../recording/desktopCapture";
 import {
-  writeFile,
   videoReady,
   handleGetStreamingData,
   handleRecordingError,
@@ -73,7 +69,7 @@ import {
   handlePip,
   checkCapturePermissions,
 } from "../recording/recordingHelpers";
-import { newChunk, clearAllRecordings } from "../recording/chunkHandler";
+import { clearAllRecordings } from "../recording/chunkHandler";
 import { setMicActiveTab } from "../tabManagement/tabHelpers";
 import { handleSignOutDrive } from "../drive/handleSignOutDrive";
 import { loginWithWebsite } from "../auth/loginWithWebsite";
@@ -302,27 +298,6 @@ const getValidLocalPlaybackOffer = async ({
   if (!offer.chunkCount || !offer.estimatedBytes) return null;
 
   return offer;
-};
-
-const ensureAudioOffscreen = async () => {
-  if (!chrome.offscreen) return false;
-  try {
-    const contexts = await chrome.runtime.getContexts({});
-    const hasAnyOffscreen = contexts.some(
-      (context) => context.contextType === "OFFSCREEN_DOCUMENT",
-    );
-    // reuse existing offscreen doc if any; Chrome only allows one per extension
-    if (hasAnyOffscreen) return true;
-    await chrome.offscreen.createDocument({
-      url: "audiooffscreen.html",
-      reasons: ["AUDIO_PLAYBACK"],
-      justification: "Play short UI beep sounds.",
-    });
-    return true;
-  } catch (error) {
-    console.warn("Failed to ensure audio offscreen document", error);
-    return false;
-  }
 };
 
 const logStopRecordingTabEvent = (message, sender) => {
@@ -799,9 +774,6 @@ export const setupHandlers = () => {
       }, 1000);
     }
   });
-  registerMessage("backup-created", (message) =>
-    startRecorderSession(message.request, message.tabId),
-  );
   registerMessage("start-recorder-keepalive-alarm", async () => {
     try {
       await chrome.alarms.create(RECORDER_KEEPALIVE_ALARM, {
@@ -1072,7 +1044,6 @@ export const setupHandlers = () => {
       return { ok: false, error: err?.message || String(err) };
     }
   });
-  registerMessage("write-file", (message) => writeFile(message));
   registerMessage("handle-restart", (message, sender) =>
     handleRestart(message, sender),
   );
@@ -1271,86 +1242,6 @@ export const setupHandlers = () => {
     return { ok: true };
   });
   registerMessage("restarted", (message) => restartActiveTab(message));
-  const sendChunksToSandbox = async (sender) => {
-    perfMark("BG.handlers sendChunksToSandbox.enter", {
-      senderTab: sender?.tab?.id || null,
-    });
-    if (DEBUG_POSTSTOP)
-      console.debug("[Screenity][BG] sendChunksToSandbox invoked", {
-        senderTab: sender?.tab?.id,
-      });
-
-    const { sandboxTab } = await chrome.storage.local.get(["sandboxTab"]);
-    const targetTab = sandboxTab || sender?.tab?.id || null;
-    if (!targetTab) {
-      if (DEBUG_POSTSTOP)
-        console.warn("[Screenity][BG] no targetTab for sendChunksToSandbox");
-      throw new Error("no-sandbox-tab");
-    }
-
-    // sandboxed iframes don't receive runtime.sendMessage; chunk delivery uses
-    // tabs.sendMessage with frameId which does reach them, so no ping needed
-
-    const maxAttempts = 6;
-    const delayMs = 250;
-    let chunkCount = 0;
-    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
-      chunkCount = 0;
-      await chunksStore.iterate(() => {
-        chunkCount += 1;
-      });
-      if (DEBUG_POSTSTOP)
-        console.debug("[Screenity][BG] checking chunks in IndexedDB", {
-          attempt,
-          chunkCount,
-        });
-      if (chunkCount > 0) break;
-      await new Promise((r) => setTimeout(r, delayMs));
-    }
-
-    let result = null;
-    const maxDeliveryAttempts = 6;
-    for (
-      let deliveryAttempt = 1;
-      deliveryAttempt <= maxDeliveryAttempts;
-      deliveryAttempt += 1
-    ) {
-      if (DEBUG_POSTSTOP)
-        console.debug("[Screenity][BG] calling sendChunks() to deliver", {
-          targetTab,
-          chunkCount,
-          deliveryAttempt,
-        });
-      // eslint-disable-next-line no-await-in-loop
-      result = await sendChunks(false, {
-        tabId: targetTab,
-        frameId: sender?.frameId,
-      });
-      if (result?.status === "ok") {
-        if (DEBUG_POSTSTOP)
-          console.debug("[Screenity][BG] sendChunks() completed", result);
-        return { status: "ok", chunkCount: result.chunkCount };
-      }
-      // eslint-disable-next-line no-await-in-loop
-      await new Promise((r) => setTimeout(r, 1000));
-    }
-
-    if (DEBUG_POSTSTOP)
-      console.warn("[Screenity][BG] sendChunks() did not find chunks", {
-        targetTab,
-        result,
-      });
-    return { status: "empty", chunkCount: 0 };
-  };
-
-  registerMessage("send-chunks-to-sandbox", (message, sender) =>
-    sendChunksToSandbox(sender),
-  );
-
-  registerMessage("new-chunk", (message, sender, sendResponse) => {
-    newChunk(message, sendResponse);
-    return true;
-  });
 
   registerMessage(
     "get-streaming-data",
@@ -1405,6 +1296,12 @@ export const setupHandlers = () => {
   registerMessage("resume-recording-tab", () => {
     diagEvent("resume");
     return sendMessageRecord({ type: "resume-recording-tab" });
+  });
+  registerMessage("retry-finalize", () => {
+    return sendMessageRecord({ type: "retry-finalize" });
+  });
+  registerMessage("export-finalize-diagnostics", () => {
+    return sendMessageRecord({ type: "export-finalize-diagnostics" });
   });
   registerMessage("set-mic-active-tab", (message) => setMicActiveTab(message));
 
@@ -1621,9 +1518,6 @@ export const setupHandlers = () => {
   registerMessage("force-processing", (message) => forceProcessing(message));
   registerMessage("focus-this-tab", (message, sender) =>
     focusTab(sender.tab.id),
-  );
-  registerMessage("stop-recording-tab-backup", (message) =>
-    handleStopRecordingTabBackup(message),
   );
   registerMessage("indexed-db-download", (message) =>
     downloadIndexedDB(message),
@@ -2580,16 +2474,27 @@ export const setupHandlers = () => {
       }
     } catch {}
   });
+  registerMessage("finalize-failure", async (message) => {
+    try {
+      const { activeTab } = await chrome.storage.local.get(["activeTab"]);
+      if (activeTab) {
+        sendMessageTab(activeTab, {
+          type: "finalize-failure",
+          reason: message.reason,
+        }).catch(() => {});
+      }
+    } catch {}
+  });
+  registerMessage("finalize-recovered", async () => {
+    try {
+      const { activeTab } = await chrome.storage.local.get(["activeTab"]);
+      if (activeTab) {
+        sendMessageTab(activeTab, { type: "finalize-recovered" }).catch(() => {});
+      }
+    } catch {}
+  });
   registerMessage("get-tab-id", (message, sender, sendResponse) => {
     sendResponse({ tabId: sender?.tab?.id ?? null });
-    return true;
-  });
-  registerMessage("play-beep", async (message, sender, sendResponse) => {
-    const ok = await ensureAudioOffscreen();
-    if (ok) {
-      chrome.runtime.sendMessage({ type: "play-beep-offscreen" });
-    }
-    if (sendResponse) sendResponse({ ok });
     return true;
   });
   registerMessage("refresh-auth", async () => {

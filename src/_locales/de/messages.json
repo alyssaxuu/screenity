@@ -973,10 +973,6 @@
     "message": "Screenity wurde in Ihrem vorherigen Tab nicht unterstützt. Sie können Ihre Aufnahme hier dennoch starten und dann zum Tab wechseln, aber Ihre Kamera und Symbolleiste werden nicht sichtbar sein.",
     "description": "Beschreibung der Erweiterung nicht auf Tab unterstützt"
   },
-  "backupsTitle": {
-    "message": "Lokales Backup für Ihre Screenity-Aufnahmen einrichten",
-    "description": "Titel des Backups"
-  },
   "backupsDescription1": {
     "message": "Bewahren Sie eine Kopie aller Ihrer Aufnahmen auf. Wenn Sie keine Backups einrichten, werden Ihre Aufnahmen nur gespeichert, wenn Sie sich entscheiden, sie herunterzuladen.",
     "description": "Beschreibung des Backups"
@@ -984,54 +980,6 @@
   "backupsDescription2": {
     "message": "Es könnte erforderlich sein, zuerst einen neuen Ordner zu erstellen, wenn Sie versuchen, in Downloads oder andere Systemordner zu speichern.",
     "description": "Beschreibung des Backups"
-  },
-  "backupsSelectFolder": {
-    "message": "Ordner auswählen",
-    "description": "Schaltfläche „Ordner auswählen“"
-  },
-  "backupsNotNow": {
-    "message": "Jetzt nicht",
-    "description": "Schaltfläche „Jetzt nicht“"
-  },
-  "backupsOnTitle": {
-    "message": "Ihre Aufnahmen werden lokal gesichert",
-    "description": "Titel der aktiven Backups"
-  },
-  "backupsOnDescription": {
-    "message": "Um zu verhindern, dass Sie jedes Mal um Berechtigungen gebeten werden, wenn Sie aufzeichnen, empfehlen wir Ihnen, diesen Tab geöffnet zu lassen.",
-    "description": "Beschreibung der aktiven Backups"
-  },
-  "backupsClose": {
-    "message": "Tab dennoch schließen",
-    "description": "Schaltfläche „Tab dennoch schließen“"
-  },
-  "backupsStop": {
-    "message": "Sicherung aller Aufnahmen beenden",
-    "description": "Schaltfläche „Backups beenden“"
-  },
-  "backupsConfirmTitle": {
-    "message": "Bitte bestätigen Sie erneut den Zugriff auf Ihren lokalen Screenity-Backup-Ordner",
-    "description": "Titel der Backup-Bestätigung"
-  },
-  "backupsConfirmDescription": {
-    "message": "Es tut uns leid, aber wir benötigen noch einmal Ihre Zustimmung, um Ihre Aufnahmen weiterhin lokal zu sichern. Leider müssen wir jedes Mal fragen, wenn Sie diesen Tab schließen, was passieren kann, wenn Sie den Browser schließen oder Ihren Computer neu starten.",
-    "description": "Beschreibung der Backup-Bestätigung"
-  },
-  "backupsConfirmAllow": {
-    "message": "Erlauben Sie Screenity, Aufnahmen weiterhin zu sichern",
-    "description": "Schaltfläche „Erlauben“ in der Backup-Bestätigung"
-  },
-  "backupsToggle": {
-    "message": "Aufnahmen sichern",
-    "description": "Beschriftung für die Backup-Option"
-  },
-  "backupPermissionFailTitle": {
-    "message": "Berechtigung zur Sicherung der Aufnahme nicht erteilt",
-    "description": "Titel des Backup-Berechtigungsfehlers"
-  },
-  "backupPermissionFailDescription": {
-    "message": "Sie haben keinen Ordner für die lokale Sicherung Ihrer Aufnahmen ausgewählt. Je nach Browser-Version oder Betriebssystem kann es erforderlich sein, den Ordner jedes Mal auszuwählen, wenn Sie mit der Aufzeichnung beginnen. Sie können es erneut versuchen oder Backups ganz deaktivieren, wenn Sie wiederholte Berechtigungsanfragen vermeiden möchten.",
-    "description": "Beschreibung des Backup-Berechtigungsfehlers"
   },
   "recordAudioWarningMacTitle": {
     "message": "Computer-Audio aufzeichnen",

@@ -132,6 +132,10 @@ const Wrapper = () => {
   const LOADER_DELAY_MS = 800;
   const inPreCountdownWait =
     Boolean(contentState.pendingRecording) &&
+    // Popup stays open showing "starting recording" until ready-to-record
+    // (stream acquired) closes it; that's the pre-acquisition feedback, so
+    // don't stack the loader on top. Only fill the post-popup → countdown gap.
+    !contentState.showPopup &&
     !contentState.countdownActive &&
     !contentState.isCountdownVisible &&
     !contentState.recording &&
@@ -150,7 +154,20 @@ const Wrapper = () => {
   // visibility-hidden gate below never fires. Without this flag the
   // toolbar would just freeze.
   const inRestartWait = Boolean(contentState.restartingRecording);
-  const waitActive = inPreCountdownWait || inPostStopWait || inRestartWait;
+  // The real "starting" gap is the post-acquisition preparing window: stream
+  // acquired → cloud project created → countdown. preparingRecording is true
+  // throughout it, the popup is already closed, document is visible, and no
+  // recorder tab exists — so show the loader here (bypassing the hide gate).
+  // pendingRecording/inPreCountdownWait is only true for ~10ms before the
+  // countdown, so it can't drive this. Gate on the offscreen host (default ON).
+  const inPreparingWait =
+    Boolean(contentState.preparingRecording) &&
+    !contentState.countdownActive &&
+    !contentState.isCountdownVisible &&
+    !contentState.recording &&
+    contentState.useOffscreenCloud !== false;
+  const waitActive =
+    inPreCountdownWait || inPostStopWait || inRestartWait || inPreparingWait;
   const [showLoader, setShowLoader] = useState(false);
   useEffect(() => {
     if (!waitActive) {
@@ -191,13 +208,18 @@ const Wrapper = () => {
     if (inRestartWait) {
       wasHiddenThisWait = true;
     }
+    // Preparing window (post-acquisition): no recorder tab steals focus, so
+    // skip the hide gate and let the loader show during the cloud-prep gap.
+    if (inPreparingWait) {
+      wasHiddenThisWait = true;
+    }
     armTimer();
     document.addEventListener("visibilitychange", onVisibility);
     return () => {
       if (timeoutId) clearTimeout(timeoutId);
       document.removeEventListener("visibilitychange", onVisibility);
     };
-  }, [waitActive, inPostStopWait, inRestartWait]);
+  }, [waitActive, inPostStopWait, inRestartWait, inPreparingWait]);
 
   useEffect(() => {
     if (!parentRef.current) return;

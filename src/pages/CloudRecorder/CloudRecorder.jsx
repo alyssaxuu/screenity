@@ -3,12 +3,13 @@ import RecorderUI from "./RecorderUI";
 import {
   sendRecordingError as sendRecordingErrorBase,
   sendStopRecording,
-} from "./messaging";
+} from "../utils/recorderMessaging";
 import { getBitrates, getResolutionForQuality } from "./recorderConfig";
 import BunnyTusUploader from "./bunnyTusUploader";
 import localforage from "localforage";
 import { createVideoProject } from "./createVideoProject";
 import { getUserMediaWithFallback } from "../utils/mediaDeviceFallback";
+import { startAudioStream as acquireMicStream } from "../utils/startAudioStream";
 import { shouldAcquireMicAtStart } from "../utils/micAcquisitionPolicy";
 import { attachAudioContextWatchdog } from "../utils/audioContextWatchdog";
 import {
@@ -17,6 +18,7 @@ import {
 } from "../utils/tabKeepalive";
 import { traceStep } from "../utils/startFlowTrace";
 import { IS_OFFSCREEN_HOST } from "../utils/recordingHost";
+import { sendSystemAudioGuidanceToast } from "../utils/systemAudioGuidance";
 import { shouldUseDisplayMediaForScreen } from "../utils/screenCaptureMode";
 import { acquireDisplayMediaWithFocusRetry } from "../utils/acquireDisplayMedia";
 import { startPrewarm, stopPrewarm } from "../Recorder/streamWarmup";
@@ -158,8 +160,17 @@ const CloudRecorder = () => {
 
   const retryFinalize = async () => {
     setRetryingFinalize(true);
+    // clear first so a re-failure re-sets it (and re-opens the content modal);
+    // if it's still null after, the retry succeeded.
+    finalizeFailureRef.current = null;
+    setFinalizeFailure(null);
     try {
       await stopRecording(true, "retry-finalize");
+      if (!finalizeFailureRef.current && IS_OFFSCREEN_HOST) {
+        chrome.runtime
+          .sendMessage({ type: "finalize-recovered" })
+          .catch(() => {});
+      }
     } catch (err) {
       console.warn("Retry finalize failed:", err);
     } finally {
@@ -190,7 +201,6 @@ const CloudRecorder = () => {
   const localScreenPlaybackOfferRef = useRef(null);
   const emptyCleanupRef = useRef(false);
 
-  const backupRef = useRef(false);
   const audioInputGain = useRef(null);
   const audioOutputGain = useRef(null);
 
@@ -2213,6 +2223,20 @@ const CloudRecorder = () => {
     try {
       await chrome.storage.local.set({ sceneIdStatus: "failed" });
     } catch {}
+
+    // offscreen has no visible recovery UI; surface a modal in content. keep
+    // offscreen:true so the retry/export commands route back to this doc.
+    if (IS_OFFSCREEN_HOST) {
+      try {
+        await chrome.storage.local.set({ offscreen: true });
+      } catch {}
+      chrome.runtime
+        .sendMessage({
+          type: "finalize-failure",
+          reason: diagnostics?.reason || "finalize-failed",
+        })
+        .catch(() => {});
+    }
   };
   const exportLocalRecovery = async (reason = "upload failed") => {
     try {
@@ -3992,13 +4016,6 @@ const CloudRecorder = () => {
               }
             }
 
-            if (backupRef.current) {
-              chrome.runtime.sendMessage({
-                type: "write-file",
-                index: index.current,
-              });
-            }
-
             index.current++;
           },
           probeOptions: {
@@ -5758,65 +5775,8 @@ const CloudRecorder = () => {
     }
   };
 
-  const startAudioStream = async (id) => {
-    const useExact = id && id !== "none";
-    const audioStreamOptions = {
-      audio: useExact ? { deviceId: { exact: id } } : true,
-    };
-
-    try {
-      const { defaultAudioInputLabel, audioinput } =
-        await chrome.storage.local.get([
-          "defaultAudioInputLabel",
-          "audioinput",
-        ]);
-      const desiredLabel =
-        defaultAudioInputLabel ||
-        audioinput?.find((device) => device.deviceId === id)?.label ||
-        "";
-
-      return await getUserMediaWithFallback({
-        constraints: audioStreamOptions,
-        fallbacks:
-          useExact && desiredLabel
-            ? [
-                {
-                  kind: "audioinput",
-                  desiredDeviceId: id,
-                  desiredLabel,
-                  onResolved: (resolvedId) => {
-                    chrome.storage.local.set({
-                      defaultAudioInput: resolvedId,
-                      defaultAudioInputLabel: desiredLabel,
-                    });
-                  },
-                },
-              ]
-            : [],
-      });
-    } catch (err) {
-      console.warn(
-        "⚠️ Failed to access audio with deviceId, trying fallback:",
-        err,
-      );
-      try {
-        return await navigator.mediaDevices.getUserMedia({ audio: true });
-      } catch (err2) {
-        console.warn(
-          "⚠️ Microphone blocked/unavailable; continuing without mic:",
-          err2,
-        );
-
-        chrome.runtime.sendMessage({
-          type: "show-toast",
-          message:
-            "Microphone permission is blocked. Recording will be silent.",
-        });
-
-        return null;
-      }
-    }
-  };
+  const startAudioStream = (id) =>
+    acquireMicStream(id, { toastOnBlocked: true, logger: { warn: console.warn } });
 
   const getVideoStreamWithFallback = async (constraints, deviceId) => {
     if (!deviceId || deviceId === "none") {
@@ -5892,15 +5852,6 @@ const CloudRecorder = () => {
     ]);
     instantMode.current = instant || false;
 
-    const constraints = {
-      audio: false,
-      video: {
-        width: { ideal: width },
-        height: { ideal: height },
-        frameRate: { ideal: fps },
-      },
-    };
-
     recordingType.current = data.recordingType || "screen";
     // Snapshot audio intent from BG's startStreaming payload. Reading
     // micActive from storage later races with ContentState's fresh-state
@@ -5916,9 +5867,27 @@ const CloudRecorder = () => {
       const shouldUseCamera = cameraActive === true && !instantMode.current;
 
       if (data.recordingType === "camera") {
+        // Honor the user's selected camera (defaultVideoInput); the bare
+        // constraints above have no deviceId and would silently grab the
+        // system-default camera. Mirrors the region/screen+camera paths.
+        const { defaultVideoInput } = await chrome.storage.local.get([
+          "defaultVideoInput",
+        ]);
+        const cameraConstraints = {
+          audio: false,
+          video: {
+            ...(defaultVideoInput && defaultVideoInput !== "none"
+              ? { deviceId: { exact: defaultVideoInput } }
+              : {}),
+            width: { ideal: width },
+            height: { ideal: height },
+            frameRate: { ideal: fps },
+          },
+        };
         try {
-          cameraStream.current = await navigator.mediaDevices.getUserMedia(
-            constraints,
+          cameraStream.current = await getVideoStreamWithFallback(
+            cameraConstraints,
+            defaultVideoInput,
           );
           bindCameraTrack(cameraStream.current?.getVideoTracks?.()[0]);
         } catch (err) {
@@ -6887,7 +6856,10 @@ const CloudRecorder = () => {
         return;
       }
       setInitProject(false);
-      backupRef.current = request.backup;
+      // offscreen has no visible Warning; surface system-audio guidance as a toast
+      if (IS_OFFSCREEN_HOST && !request.isTab) {
+        sendSystemAudioGuidanceToast();
+      }
       if (IS_IFRAME_CONTEXT) {
         // Skip payloads targeted at offscreen; otherwise both contexts race for the stream.
         if (request.region && request._targetHost !== "offscreen") {
@@ -6909,7 +6881,8 @@ const CloudRecorder = () => {
           recordingTabId.current = request.tabID || null;
           if (IS_OFFSCREEN_HOST && request.isTab && request.tabStreamId) {
             tabID.current = request.tabStreamId;
-          } else if (request.isTab && !IS_OFFSCREEN_HOST) {
+          } else if (request.isTab) {
+            // offscreen doc delegates to SW (getStreamID branches on IS_OFFSCREEN_HOST); SW streamId is consumable here now isolation is gone
             getStreamID(request.tabID);
           }
         } else {
@@ -7138,6 +7111,14 @@ const CloudRecorder = () => {
         return;
       }
       dismissRecording(false, dismissReason);
+    } else if (request.type === "retry-finalize") {
+      retryFinalize();
+      sendResponse?.({ ok: true });
+      return true;
+    } else if (request.type === "export-finalize-diagnostics") {
+      exportFinalizeDiagnostics(finalizeFailureRef.current);
+      sendResponse?.({ ok: true });
+      return true;
     }
   }, []);
 

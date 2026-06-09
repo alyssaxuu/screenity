@@ -1,0 +1,90 @@
+@use "../global/variables.scss" as *;
+
+.modalWrap {
+  position: fixed;
+  width: 100%;
+  height: 100%;
+  top: 0px;
+  left: 0px;
+  overflow: hidden;
+  z-index: $z-index-max;
+}
+
+.modal {
+  position: absolute;
+  left: 0px;
+  right: 0px;
+  top: 0px;
+  bottom: 0px;
+  margin: auto;
+  padding: 24px;
+  background: $color-background;
+  z-index: $z-index-max;
+  text-align: center;
+  width: fit-content;
+  height: fit-content;
+  border-radius: $container-border-radius;
+
+  .emoji {
+    font-size: 22px;
+  }
+
+  .title {
+    font-family: $font-bold;
+    color: $color-text-primary;
+    text-align: center;
+    margin-top: 8px;
+  }
+
+  .subtitle {
+    font-family: $font-medium;
+    color: $color-text-secondary;
+    margin-top: 8px;
+    text-align: center;
+    width: 300px;
+    line-height: 150%;
+  }
+
+  .button {
+    background: radial-gradient(
+        118.3% 119.01% at 35.44% 0%,
+        #2baef8 23.13%,
+        #3582f6 46.35%,
+        #486def 74.48%,
+        #7b9aea 100%
+      ),
+      #1b58f6;
+    color: $color-text-contrast;
+    text-align: center;
+    padding: 8px 16px;
+    border-radius: $container-border-radius;
+    margin-top: 18px;
+    font-family: $font-medium;
+    width: fit-content;
+    margin-left: auto;
+    margin-right: auto;
+
+    &:hover {
+      cursor: pointer;
+      opacity: 0.8;
+    }
+  }
+}
+
+.modalBackground {
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  background: rgba(0, 0, 0, 0.6);
+}
+
+.close {
+  position: absolute;
+  right: 18px;
+  top: 18px;
+
+  &:hover {
+    cursor: pointer;
+    opacity: 0.8;
+  }
+}

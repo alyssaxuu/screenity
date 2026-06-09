@@ -1,0 +1,69 @@
+@use "../global/variables.scss" as *;
+
+.editorNav {
+  width: 100%;
+  margin: auto;
+  height: 80px;
+  left: 0px;
+  top: 0px;
+  position: fixed;
+  z-index: 999999999999;
+  background-color: #fff;
+  border-bottom: 1px solid $color-border;
+}
+.navWrap {
+  margin: auto;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  height: 100%;
+  width: 95%;
+}
+.editorNavCenter {
+  position: absolute;
+  left: 0px;
+  right: 0px;
+  margin: auto;
+  width: fit-content;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.editorNavTitle {
+  font-size: $font-size-normal;
+  color: $color-text-primary;
+  font-weight: 600;
+  text-align: center;
+  margin: auto;
+
+  span {
+    margin-left: 4px;
+    font-weight: 400;
+    font-size: $font-size-small;
+    color: $color-text-contrast;
+    background-color: $color-primary;
+    border-radius: $container-border-radius;
+    padding: $spacing-02 $spacing-03;
+  }
+}
+.editorNavRight {
+  display: flex;
+  height: fit-content;
+  align-items: center;
+  gap: 8px;
+}
+.editorNavLeft {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  img {
+    height: 30px;
+  }
+}
+
+// max 1000px
+@media (max-width: 1000px) {
+  .editorNavCenter {
+    display: none;
+  }
+}

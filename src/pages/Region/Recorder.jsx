@@ -1,5 +1,8 @@
 import React, { useEffect, useRef, useCallback } from "react";
+import { createDebugLogger } from "../utils/recorderDebug";
+import { selectMimeType, getCodecLabel, buildTrackSnapshot } from "../utils/recorderCodec";
 import { getUserMediaWithFallback } from "../utils/mediaDeviceFallback";
+import { startAudioStream as acquireMicStream } from "../utils/startAudioStream";
 import { shouldAcquireMicAtStart } from "../utils/micAcquisitionPolicy";
 import { attachAudioContextWatchdog } from "../utils/audioContextWatchdog";
 import { acquireDisplayMediaWithFocusRetry } from "../utils/acquireDisplayMedia";
@@ -47,71 +50,17 @@ const DEBUG_RECORDER =
   typeof window !== "undefined" ? !!window.SCREENITY_DEBUG_RECORDER : false;
 const logPrefix = "[Screenity Region Recorder]";
 
-function debug(...args) {
-  if (!DEBUG_RECORDER) return;
-  // eslint-disable-next-line no-console
-  console.log(logPrefix, ...args);
-}
+const { debug, debugWarn, debugError } = createDebugLogger(
+  logPrefix,
+  DEBUG_RECORDER,
+);
 
-function debugWarn(...args) {
-  if (!DEBUG_RECORDER) return;
-  // eslint-disable-next-line no-console
-  console.warn(logPrefix, ...args);
-}
-
-function debugError(...args) {
-  if (!DEBUG_RECORDER) return;
-  // eslint-disable-next-line no-console
-  console.error(logPrefix, ...args);
-}
-
-function buildTrackSnapshot(track) {
-  if (!track) return null;
-  const settings =
-    typeof track.getSettings === "function" ? track.getSettings() : {};
-  const constraints =
-    typeof track.getConstraints === "function" ? track.getConstraints() : {};
-  const capabilities =
-    typeof track.getCapabilities === "function" ? track.getCapabilities() : {};
-  return {
-    label: track.label,
-    settings,
-    constraints,
-    capabilities,
-  };
-}
 
 function logRecordingSnapshot(label, data) {
   if (!DEBUG_RECORDER && !isRecordingDebugEnabled()) return;
   debug(`Recording snapshot: ${label}`, data);
 }
 
-const selectMimeType = (preferredCodec) => {
-  const preferred = (preferredCodec || "").toLowerCase();
-  const mimeTypes = [
-    "video/webm;codecs=vp9,opus",
-    "video/webm;codecs=vp9",
-    "video/webm;codecs=vp8,opus",
-    "video/webm;codecs=vp8",
-    "video/webm;codecs=avc1",
-    "video/webm;codecs=h264",
-    "video/webm",
-  ];
-  const ordered = preferred
-    ? mimeTypes
-        .filter((type) => type.includes(preferred))
-        .concat(mimeTypes.filter((type) => !type.includes(preferred)))
-    : mimeTypes;
-  return ordered.find((type) => MediaRecorder.isTypeSupported(type)) || null;
-};
-
-const getCodecLabel = (mimeType) => {
-  if (!mimeType) return "unknown";
-  if (mimeType.includes("vp9")) return "vp9";
-  if (mimeType.includes("vp8")) return "vp8";
-  if (mimeType.includes("avc1") || mimeType.includes("h264")) return "h264";
-  return "unknown";
-};
 
 const Recorder = () => {
   const isRestarting = useRef(false);
@@ -164,7 +113,6 @@ const Recorder = () => {
 
   const recordingRef = useRef();
   const regionRef = useRef();
-  const backupRef = useRef(false);
 
   const pending = useRef([]);
   const draining = useRef(false);
@@ -552,9 +500,6 @@ const Recorder = () => {
       savedCount: savedCount.current,
     });
 
-    if (backupRef.current) {
-      chrome.runtime.sendMessage({ type: "write-file", index: i });
-    }
     return true;
   }
 
@@ -2288,66 +2233,8 @@ const Recorder = () => {
     return true;
   };
 
-  async function startAudioStream(id) {
-    const useExact = id && id !== "none";
-    const audioStreamOptions = {
-      mimeType: "video/webm;codecs=vp8,opus",
-      audio: useExact
-        ? {
-            deviceId: {
-              exact: id,
-            },
-          }
-        : true,
-    };
-
-    const { defaultAudioInputLabel, audioinput } =
-      await chrome.storage.local.get(["defaultAudioInputLabel", "audioinput"]);
-    const desiredLabel =
-      defaultAudioInputLabel ||
-      audioinput?.find((device) => device.deviceId === id)?.label ||
-      "";
-
-    const result = await getUserMediaWithFallback({
-      constraints: audioStreamOptions,
-      fallbacks:
-        useExact && desiredLabel
-          ? [
-              {
-                kind: "audioinput",
-                desiredDeviceId: id,
-                desiredLabel,
-                onResolved: (resolvedId) => {
-                  chrome.storage.local.set({
-                    defaultAudioInput: resolvedId,
-                    defaultAudioInputLabel: desiredLabel,
-                  });
-                },
-              },
-            ]
-          : [],
-    })
-      .then((stream) => {
-        return stream;
-      })
-      .catch((err) => {
-        // Retry without device ID.
-        const audioStreamOptions = {
-          mimeType: "video/webm;codecs=vp8,opus",
-          audio: true,
-        };
-
-        return navigator.mediaDevices
-          .getUserMedia(audioStreamOptions)
-          .then((stream) => {
-            return stream;
-          })
-          .catch((err) => {
-            return null;
-          });
-      });
-
-    return result;
+  function startAudioStream(id) {
+    return acquireMicStream(id);
   }
   function setAudioInputVolume(volume) {
     if (!audioInputGain.current) return;
@@ -2565,16 +2452,6 @@ const Recorder = () => {
   }
 
   useEffect(() => {
-    chrome.storage.local.get(["backup"], (result) => {
-      if (result.backup) {
-        backupRef.current = true;
-      } else {
-        backupRef.current = false;
-      }
-    });
-  }, []);
-
-  useEffect(() => {
     const handleBeforeUnload = (e) => {
       if (recordingRef.current && regionRef.current) {
         // The "Leave page?" dialog gives ondataavailable enough time to
@@ -2663,7 +2540,6 @@ const Recorder = () => {
         perfMark("Region.Recorder loaded.received", {
           isRegion: Boolean(request.region),
         });
-        backupRef.current = request.backup;
         // streaming-data is pulled on mount; `loaded` is lost to the
         // cold-start race and can't be the sole trigger.
         // Ack so BG's sendMessageRecord doesn't reject + trigger retries.

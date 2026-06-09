@@ -1,26 +1,18 @@
-async function reencodeVideo(ffmpeg, blob) {
-  const videoData = new Uint8Array(await blob.arrayBuffer());
-  const outputFileName = "output.mp4";
-  ffmpeg.FS("writeFile", "input.mp4", videoData);
-  await ffmpeg.run(
-    "-i",
-    "input.mp4",
-    "-preset",
-    "superfast",
-    "-threads",
-    "0",
-    "-r",
-    "30",
-    "-tune",
-    "fastdecode",
-    outputFileName
-  );
+import { VideoConverter } from "../mediabunny/lib/videoConverter.ts";
 
-  const data = ffmpeg.FS("readFile", outputFileName);
-  const editedVideoBlob = new Blob([data.buffer], {
-    type: "video/mp4",
+async function reencodeVideo(
+  ffmpeg,
+  videoBlob,
+  duration,
+  onProgress = () => {}
+) {
+  const converter = new VideoConverter();
+
+  return converter.convertToMP4(videoBlob, {
+    videoBitrate: 5_000_000,
+    audioBitrate: 128_000,
+    onProgress,
   });
-  return editedVideoBlob;
 }
 
 export default reencodeVideo;

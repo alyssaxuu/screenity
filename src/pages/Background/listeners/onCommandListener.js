@@ -1,4 +1,5 @@
 import { sendMessageTab, getCurrentTab } from "../tabManagement";
+import { sendMessageRecord } from "../recording/sendMessageRecord.js";
 
 export const onCommandListener = () => {
   let lastToggleDrawingAt = 0;
@@ -53,12 +54,40 @@ export const onCommandListener = () => {
             });
           });
       }
-    } else if (command === "cancel-recording") {
-      sendMessageTab(activeTab.id, { type: "cancel-recording" });
-    } else if (command === "pause-recording") {
-      sendMessageTab(activeTab.id, { type: "pause-recording" });
-    } else if (command === "stop-recording") {
-      sendMessageTab(activeTab.id, { type: "stop-recording-tab" });
+    } else if (
+      command === "cancel-recording" ||
+      command === "pause-recording" ||
+      command === "stop-recording"
+    ) {
+      // Recording controls must reach the recording UI tab (the pill + its
+      // content-script handlers), not the focused tab. With offscreen
+      // recording (default in 4.5.0) the focused tab is often unrelated to the
+      // recording and may be unscriptable (chrome://, web store), which
+      // silently dropped the shortcut. recordingUiTabId mirrors the toolbar's
+      // targeting; it equals the active tab in the normal case.
+      const { recordingUiTabId } = await chrome.storage.local.get([
+        "recordingUiTabId",
+      ]);
+      const targetTabId = recordingUiTabId || activeTab.id;
+      const msg =
+        command === "cancel-recording"
+          ? { type: "cancel-recording" }
+          : command === "pause-recording"
+            ? { type: "pause-recording" }
+            : { type: "stop-recording-tab" };
+      try {
+        await sendMessageTab(targetTabId, msg);
+      } catch (err) {
+        // Recording UI tab gone (closed/navigated). The offscreen recorder
+        // accepts stop-recording-tab directly, so stop can still end the
+        // recording; pause/cancel need the content-script pill UI, so they
+        // have no direct fallback here (the user can stop via the toolbar).
+        if (command === "stop-recording") {
+          await sendMessageRecord({ type: "stop-recording-tab" }).catch(
+            () => {},
+          );
+        }
+      }
     } else if (command === "toggle-drawing-mode") {
       const now = Date.now();
       if (now - lastToggleDrawingAt < TOGGLE_DRAWING_COOLDOWN_MS) {

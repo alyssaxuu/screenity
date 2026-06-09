@@ -279,8 +279,6 @@ export const handleRecordingError = async (request) => {
     }
     if (request.error === "stream-error") {
       sendMessageTab(activeTab, { type: "stream-error", errorCode });
-    } else if (request.error === "backup-error") {
-      sendMessageTab(activeTab, { type: "backup-error", errorCode });
     }
   });
 
@@ -348,20 +346,15 @@ export const handleGetStreamingData = async () => {
 
 export const videoReady = async () => {
   perfMark("BG.recordingHelpers videoReady.enter");
-  const { backupTab, recordingDuration, recordingTab, lastRecordingBackendRef } =
+  const { recordingDuration, recordingTab, lastRecordingBackendRef } =
     await chrome.storage.local.get([
-      "backupTab",
       "recordingDuration",
       "recordingTab",
       "lastRecordingBackendRef",
     ]);
   diagEvent("sw-received-video-ready", {
     recordingDurationMs: Number(recordingDuration) || 0,
-    backupTabPresent: Boolean(backupTab),
   });
-  if (backupTab) {
-    sendMessageTab(backupTab, { type: "close-writable" });
-  }
   chrome.runtime
     .sendMessage({
       type: "clear-recording-session-safe",
@@ -398,24 +391,4 @@ export const videoReady = async () => {
     }
   }
   await stopRecording();
-};
-
-export const writeFile = async (request) => {
-  const { backupTab } = await chrome.storage.local.get(["backupTab"]);
-
-  if (backupTab) {
-    sendMessageTab(
-      backupTab,
-      {
-        type: "write-file",
-        index: request.index,
-      },
-      null,
-      () => {
-        sendMessageRecord({ type: "stop-recording-tab" });
-      },
-    );
-  } else {
-    sendMessageRecord({ type: "stop-recording-tab" });
-  }
 };

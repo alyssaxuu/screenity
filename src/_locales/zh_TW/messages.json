@@ -973,10 +973,6 @@
     "message": "Screenity 不支援您先前的分頁。您還是可以從這裡開始錄製然後再切換回該分頁，但是攝影機和工具列會沒辦法顯示。",
     "description": "Extension not supported on tab description"
   },
-  "backupsTitle": {
-    "message": "為您的 Screenity 錄影建立本機備份",
-    "description": "Backups title"
-  },
   "backupsDescription1": {
     "message": "為您每個錄影保留副本。如果您不設定備份，您的錄影只會在您選擇下載時才會被儲存。",
     "description": "Backups description"
@@ -984,54 +980,6 @@
   "backupsDescription2": {
     "message": "您可能會需要先建立新資料夾才能儲存到《下載》或是其他系統資料夾當中。",
     "description": "Backups description"
-  },
-  "backupsSelectFolder": {
-    "message": "選擇資料夾",
-    "description": "Select a folder button"
-  },
-  "backupsNotNow": {
-    "message": "現在不要",
-    "description": "Not now button"
-  },
-  "backupsOnTitle": {
-    "message": "您的錄製已在本機備份",
-    "description": "Backups on title"
-  },
-  "backupsOnDescription": {
-    "message": "要防止每次錄製的時候都被要求權限，我們建議維持這個分頁開啟。",
-    "description": "Backups on description"
-  },
-  "backupsClose": {
-    "message": "還是要關閉分頁",
-    "description": "Close tab anyway button"
-  },
-  "backupsStop": {
-    "message": "停止備份所有錄影",
-    "description": "Stop backups button"
-  },
-  "backupsConfirmTitle": {
-    "message": "請重新確認對於您的 Screenity 本機備份資料夾的存取權",
-    "description": "Backups confirm title"
-  },
-  "backupsConfirmDescription": {
-    "message": "不好意思，我們需要重新要求您的權限來繼續備份您的錄影。不幸的，每次這個分頁關閉（包含瀏覽器關閉或是電腦重啟）的時候我們都需要再重新詢問權限。",
-    "description": "Backups confirm description"
-  },
-  "backupsConfirmAllow": {
-    "message": "允許 Screenity 繼續備份錄影",
-    "description": "Backups confirm allow button"
-  },
-  "backupsToggle": {
-    "message": "備份錄影",
-    "description": "Backups toggle label"
-  },
-  "backupPermissionFailTitle": {
-    "message": "未提供權限以備份錄影",
-    "description": "Backup permission fail title"
-  },
-  "backupPermissionFailDescription": {
-    "message": "您沒有選擇備份錄影的資料夾。依您的瀏覽器版本或是作業系統，每次開始錄製的時候可能都會請您再次選擇資料夾。您可以再試一次，或是如果不希望一天到晚重複提供權限的話也可以選擇完全停用備份。",
-    "description": "Backup permission fail description"
   },
   "recordAudioWarningMacTitle": {
     "message": "錄製電腦音訊",

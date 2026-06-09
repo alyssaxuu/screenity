@@ -88,7 +88,7 @@ const SAFE_DATA_KEYS = new Set([
   "isRecording", "isTargetTab", "recordingType", "isTarget", "cancelled",
   "filename", "beep", "wasPreloaded",
   // back-to-back / restart context
-  "backup", "backupSetup", "memoryError", "offscreen", "pendingRecording",
+  "memoryError", "offscreen", "pendingRecording",
   "recording", "restarting", "region", "sandboxTab",
 ]);
 const MAX_SAFE_STRING_LEN = 32;

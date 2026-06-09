@@ -22,9 +22,6 @@ const TRACKED_KEYS = new Set([
   "fastRecorderDisabledForDevice",
   "memoryError",
   "lastRecordingBackendRef",
-  "backup",
-  "backupSetup",
-  "backupTab",
   "editorRecordingError",
 ]);
 

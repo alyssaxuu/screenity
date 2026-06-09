@@ -56,9 +56,6 @@ export const cancelRecording = async () => {
       restarting: false,
       offscreen: false,
       memoryError: false,
-      backup: false,
-      backupSetup: false,
-      backupTab: null,
     });
 
     // URL-guard so we never close a user tab by mistake

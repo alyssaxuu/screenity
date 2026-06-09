@@ -1,4 +1,3 @@
-import { removeTab } from "../tabManagement";
 import { executeScripts } from "../utils/executeScripts";
 import { supportContextQuery } from "../../utils/buildSupportContext";
 import { tryResumePendingUploads } from "../recording/resumePendingUploads";
@@ -58,20 +57,10 @@ export const onInstalledListener = () => {
       chrome.runtime.setUninstallURL(updateUrl);
     }
 
-    // Backup mode is deprecated: hidden from the settings dropdown and
-    // forced off for all users on install/update. OPFS-backed recording
-    // covers the same crash-resilience without the picker UX.
-    chrome.storage.local.set({ backup: false, backupSetup: false });
-
     if (details.reason === "install") {
       chrome.storage.local.set({ systemAudio: true });
     }
     chrome.storage.local.set({ offscreenRecording: false });
-
-    const { backupTab } = await chrome.storage.local.get(["backupTab"]);
-    if (backupTab) {
-      removeTab(backupTab);
-    }
 
     // Backfill content scripts into already-open tabs. manifest
     // content_scripts only auto-inject on future loads; without this,

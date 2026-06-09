@@ -19,10 +19,15 @@ export const ensureRemuxOffscreen = async () => {
     (c) => c.contextType === "OFFSCREEN_DOCUMENT",
   );
   if (existing) {
-    const alreadyRemux =
-      typeof existing.documentUrl === "string" &&
-      existing.documentUrl.endsWith(REMUX_OFFSCREEN_URL);
+    const existingUrl =
+      typeof existing.documentUrl === "string" ? existing.documentUrl : "";
+    const alreadyRemux = existingUrl.endsWith(REMUX_OFFSCREEN_URL);
     if (alreadyRemux) return;
+    // never displace the recorder offscreen; closing it mid-capture kills the
+    // recording and mid-upload aborts TUS finalize. editor download() falls back.
+    if (existingUrl.includes("offscreenrecorder.html")) {
+      throw new Error("offscreen-busy-recorder");
+    }
     try {
       await chrome.offscreen.closeDocument();
     } catch (err) {

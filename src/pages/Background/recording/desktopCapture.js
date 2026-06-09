@@ -1,7 +1,4 @@
-import { getCurrentTab } from "../tabManagement";
-import { initBackup } from "../backup/initBackup";
 import { startRecorderSession } from "./openRecorderTab";
-import { localDirectoryStore } from "./chunkHandler";
 import { perfMark } from "../../utils/perfMarks";
 
 export const desktopCapture = async (request) => {
@@ -12,11 +9,7 @@ export const desktopCapture = async (request) => {
   });
   console.log("[Screenity][desktopCapture] entered", request);
   // batched: two sequential gets added 80-160ms of storage-queue latency
-  const { backup, backupSetup, onboarding } = await chrome.storage.local.get([
-    "backup",
-    "backupSetup",
-    "onboarding",
-  ]);
+  const { onboarding } = await chrome.storage.local.get(["onboarding"]);
 
   // onboarding gate: prevent recorder tab opening behind the Welcome splash
   if (onboarding === true) {
@@ -36,18 +29,5 @@ export const desktopCapture = async (request) => {
       ? request.initiatingTabId
       : null;
 
-  if (backup) {
-    if (!backupSetup) {
-      localDirectoryStore.clear();
-    }
-
-    let id = initiatingTabId;
-    if (id == null) {
-      const activeTab = await getCurrentTab();
-      id = activeTab?.id ?? null;
-    }
-    initBackup(request, id);
-  } else {
-    startRecorderSession(request, initiatingTabId);
-  }
+  startRecorderSession(request, initiatingTabId);
 };
