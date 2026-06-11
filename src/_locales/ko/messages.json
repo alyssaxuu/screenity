@@ -1,4 +1,48 @@
 {
+  "reviewAskTitle": {
+    "message": "Screenity는 잘 쓰고 계신가요?",
+    "description": "Review prompt step 1 question (sentiment check) in the editor"
+  },
+  "reviewAskGood": {
+    "message": "만족스러워요",
+    "description": "Review prompt positive sentiment button label / tooltip"
+  },
+  "reviewAskBad": {
+    "message": "별로예요",
+    "description": "Review prompt negative sentiment button label / tooltip"
+  },
+  "reviewThanksTitle": {
+    "message": "덕분에 오늘 하루가 즐거워졌어요!",
+    "description": "Review prompt happy-branch title in the editor"
+  },
+  "reviewThanksDescription": {
+    "message": "저는 Screenity를 만든 1인 개발자 Alyssa예요. 2020년에 첫 버전을 만들었고, 지금도 이 무료 확장 프로그램을 직접 관리하고 있어요.\n\nScreenity가 도움이 되었다면, 짧은 리뷰를 남겨 주시는 것이 가장 큰 응원이 돼요 ❤️",
+    "description": "Review prompt happy-branch description (founder voice) in the editor. Paragraphs separated by a blank line."
+  },
+  "reviewThanksButton": {
+    "message": "리뷰 남기기",
+    "description": "Review prompt button that opens the Chrome Web Store review page"
+  },
+  "reviewThanksLater": {
+    "message": "나중에 할게요",
+    "description": "Review prompt snooze button on the happy branch"
+  },
+  "reviewSorryTitle": {
+    "message": "그러셨군요, 죄송해요",
+    "description": "Review prompt unhappy-branch title in the editor"
+  },
+  "reviewSorryDescription": {
+    "message": "저는 Screenity를 만든 Alyssa이고, 모든 메시지를 직접 읽고 있어요. 무엇이 잘못되었는지 알려 주시면 최선을 다해 고쳐 볼게요.",
+    "description": "Review prompt unhappy-branch description in the editor"
+  },
+  "reviewSorryButton": {
+    "message": "의견 보내기",
+    "description": "Review prompt button that opens the private feedback form"
+  },
+  "reviewSorryDismiss": {
+    "message": "괜찮아요",
+    "description": "Review prompt dismiss button on the unhappy branch"
+  },
   "extName": {
     "message": "Screenity - 화면 녹화 프로그램 & 주석 도구",
     "description": "Extension name"

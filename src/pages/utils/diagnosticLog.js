@@ -7,6 +7,58 @@ const MAX_SESSIONS = 5;
 const MAX_EVENTS = 100;
 const FLUSH_EVERY_N = 10;
 
+// Force-flush on lifecycle/error events so they survive SW termination.
+const ALWAYS_FLUSH = [
+  "error",
+  "crash",
+  "start-fail",
+  "warning",
+  "session-start",
+  "stop",
+  "stop-tab",
+  "editor-open",
+  "chunks-sent",
+  "chunks-fail",
+  "sw-init",
+  "countdown-started",
+  "countdown-cancelled",
+  "countdown-finished",
+  "pause",
+  "resume",
+  "restart-requested",
+  "restart-completed",
+  "restart-failed",
+  "alarm-fired",
+  "recorded-tab-closed",
+  "recorded-tab-navigated",
+  "drive-upload-start",
+  "drive-upload-ok",
+  "drive-upload-fail",
+  "drive-save-fail",
+  "drive-auth-fail",
+  "editor-load-ready",
+  // OPFS load + video element handoff: critical for diagnosing
+  // editor-stuck-at-90% reports. If any of these is the last event
+  // before a hang, that's the step that hung.
+  "sandbox-opfs-reader-open-done",
+  "sandbox-opfs-readblob-start",
+  "sandbox-opfs-readblob-done",
+  "sandbox-opfs-readblob-slow-finalize",
+  "sandbox-opfs-materialize-start",
+  "sandbox-opfs-materialize-done",
+  "sandbox-opfs-materialize-fail",
+  "sandbox-opfs-arraybuffer-done",
+  "sandbox-opfs-materialize-skipped",
+  "sandbox-video-src-set",
+  "sandbox-video-loadedmetadata",
+  "sandbox-video-load-error",
+  "sandbox-opfs-wait-finalize-timeout",
+  "sandbox-opfs-writer-dead-detected",
+  "sandbox-opfs-materialize-deferred",
+  "session-deferred-end",
+  "editor-route-decision",
+];
+
 let _log = null;
 let _dirty = 0;
 
@@ -74,8 +126,22 @@ export const diagEvent = (eventType, data) => {
   const s = currentSession();
   if (!s) return;
 
+  const t = now() - s.startedAt;
+
+  // Collapse repeats of the same type into one entry with a count, so retry
+  // spam can't flood the buffer and evict the event that explains the failure.
+  for (let i = s.events.length - 1; i >= 0; i -= 1) {
+    if (s.events[i].e === eventType) {
+      s.events[i].n = (s.events[i].n || 1) + 1;
+      s.events[i].lt = t;
+      if (ALWAYS_FLUSH.includes(eventType)) flush();
+      else maybeFlush();
+      return;
+    }
+  }
+
   const entry = {
-    t: now() - s.startedAt,
+    t,
     e: eventType,
   };
   if (data !== undefined && data !== null) {
@@ -89,56 +155,6 @@ export const diagEvent = (eventType, data) => {
   }
 
   // Force-flush on lifecycle/error events so they survive SW termination.
-  const ALWAYS_FLUSH = [
-    "error",
-    "crash",
-    "start-fail",
-    "warning",
-    "session-start",
-    "stop",
-    "stop-tab",
-    "editor-open",
-    "chunks-sent",
-    "chunks-fail",
-    "sw-init",
-    "countdown-started",
-    "countdown-cancelled",
-    "countdown-finished",
-    "pause",
-    "resume",
-    "restart-requested",
-    "restart-completed",
-    "restart-failed",
-    "alarm-fired",
-    "recorded-tab-closed",
-    "recorded-tab-navigated",
-    "drive-upload-start",
-    "drive-upload-ok",
-    "drive-upload-fail",
-    "drive-save-fail",
-    "drive-auth-fail",
-    "editor-load-ready",
-    // OPFS load + video element handoff: critical for diagnosing
-    // editor-stuck-at-90% reports. If any of these is the last event
-    // before a hang, that's the step that hung.
-    "sandbox-opfs-reader-open-done",
-    "sandbox-opfs-readblob-start",
-    "sandbox-opfs-readblob-done",
-    "sandbox-opfs-readblob-slow-finalize",
-    "sandbox-opfs-materialize-start",
-    "sandbox-opfs-materialize-done",
-    "sandbox-opfs-materialize-fail",
-    "sandbox-opfs-arraybuffer-done",
-    "sandbox-opfs-materialize-skipped",
-    "sandbox-video-src-set",
-    "sandbox-video-loadedmetadata",
-    "sandbox-video-load-error",
-    "sandbox-opfs-wait-finalize-timeout",
-    "sandbox-opfs-writer-dead-detected",
-    "sandbox-opfs-materialize-deferred",
-    "session-deferred-end",
-    "editor-route-decision",
-  ];
   if (ALWAYS_FLUSH.includes(eventType)) {
     flush();
   } else {

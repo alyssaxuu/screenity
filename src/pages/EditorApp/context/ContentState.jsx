@@ -115,6 +115,43 @@ const ContentState = (props) => {
       }
       if (diagHeartbeatCountRef.current >= MAX_HEARTBEATS) {
         clearInterval(interval);
+        // Stuck with no data after ~3 min. Show the same "couldn't load" error
+        // the load-failure paths use instead of spinning forever.
+        if (
+          !s?.ready &&
+          !editorErrorShownRef.current &&
+          typeof s?.openModal === "function"
+        ) {
+          editorErrorShownRef.current = true;
+          diagForward("sandbox-stuck-timeout-error", {});
+          s.openModal(
+            chrome.i18n.getMessage("opfsLoadErrorTitle"),
+            chrome.i18n.getMessage("opfsLoadErrorDescription"),
+            null,
+            chrome.i18n.getMessage("permissionsModalDismiss"),
+            () => {},
+            () => {},
+            null,
+            null,
+            null,
+            true,
+            chrome.i18n.getMessage("getHelpButton"),
+            () => {
+              triggerSupportDownload({ source: "editor-stuck-timeout" });
+              chrome.runtime.sendMessage({
+                type: "report-error",
+                source: "editor-stuck-timeout",
+                errorCode: "EDITOR_STUCK_TIMEOUT",
+                zipBundled: true,
+              });
+            },
+          );
+          setContentState((prev) => ({
+            ...prev,
+            ready: true,
+            recordingFailed: true,
+          }));
+        }
         return;
       }
       diagHeartbeatCountRef.current += 1;
@@ -218,6 +255,8 @@ const ContentState = (props) => {
     chunkCount: 0,
     chunkIndex: 0,
     bannerSupport: false,
+    reviewPrompt: false,
+    reviewEligible: false,
     backupBlob: null,
     recordingMeta: null,
   };
@@ -340,6 +379,36 @@ const ContentState = (props) => {
       pollMs,
     });
 
+    // A finalized OPFS recording is download-ready once the OPFS writer stamps
+    // lastRecordingFinalizedFileName (a reliable write). The freeFinalizeStatus
+    // "ready" below is fire-and-forget and often never lands, so use the marker.
+    const isOpfsFinalized = async () => {
+      try {
+        const { lastRecordingBackendRef, lastRecordingFinalizedFileName } =
+          await chrome.storage.local.get([
+            "lastRecordingBackendRef",
+            "lastRecordingFinalizedFileName",
+          ]);
+        const fileName = lastRecordingBackendRef?.fileName;
+        return (
+          lastRecordingBackendRef?.backend === "opfs" &&
+          Boolean(fileName) &&
+          lastRecordingFinalizedFileName === fileName &&
+          String(fileName).includes(recordingId)
+        );
+      } catch {
+        return false;
+      }
+    };
+
+    if (await isOpfsFinalized()) {
+      debugRecordingEventWithSession(recdbgSessionRef.current, "poststop-ready", {
+        recordingId,
+        stage: "opfs-finalized",
+      });
+      return { ok: true };
+    }
+
     const getStatus = async () => {
       const res = await chrome.storage.local.get([key]);
       return res[key] || null;
@@ -413,6 +482,19 @@ const ContentState = (props) => {
             { recordingId, timeoutMs },
           );
           resolve({ ok: false, error: "timeout" });
+          return;
+        }
+        // The finalized marker can land mid-wait (the recorder finishes after
+        // the editor opened); resolve as soon as it does instead of waiting on
+        // the throttled freeFinalizeStatus write.
+        if (await isOpfsFinalized()) {
+          cleanup();
+          debugRecordingEventWithSession(
+            recdbgSessionRef.current,
+            "poststop-ready",
+            { recordingId, stage: "opfs-finalized" },
+          );
+          resolve({ ok: true });
           return;
         }
         const status = await getStatus();
@@ -1629,7 +1711,13 @@ const ContentState = (props) => {
       } else if (message.type === "banner-support") {
         setContentState((prevContentState) => ({
           ...prevContentState,
-          bannerSupport: true,
+          // The review prompt and Pro banner are mutually exclusive; never
+          // enable the Pro banner while the review prompt is showing or the
+          // user is eligible for it (the slot is reserved for the review ask).
+          bannerSupport:
+            prevContentState.reviewPrompt || prevContentState.reviewEligible
+              ? prevContentState.bannerSupport
+              : true,
         }));
       }
     },

@@ -70,6 +70,16 @@ const CHUNK_PURGE_SAFETY_WINDOW_BYTES = 32 * 1024 * 1024;
 const MAX_UPLOAD_TELEMETRY_EVENTS = 300;
 const UPLOAD_TELEMETRY_KEY = "cloudUploadTelemetryEvents";
 const UPLOAD_TELEMETRY_ENDPOINT = `${API_BASE}/log/upload-event`;
+// Resolve the extension version at call time so upload events carry it (the
+// cached telemetry runtime can come up without one). Without this the version
+// only rides the BG beacon and lands on a separate, unjoinable session doc.
+const resolveExtVersion = () => {
+  try {
+    return chrome?.runtime?.getManifest?.()?.version || null;
+  } catch {
+    return null;
+  }
+};
 const SESSION_STATE_INDEX_KEY = "cloudRecorderSessionStateIndex";
 const RECOVERABLE_SESSION_STATUSES = new Set([
   "recording",
@@ -527,7 +537,10 @@ const CloudRecorder = () => {
       platformInfo = null;
     }
     telemetryRuntimeRef.current = {
-      extensionVersion: manifestVersion,
+      // BG (get-platform-info) is the authoritative version source since it
+      // always has manifest access; fall back through the local manifest read.
+      extensionVersion:
+        manifestVersion || platformInfo?.extVersion || resolveExtVersion(),
       browserVersion: getBrowserVersion(),
       platform: platformInfo?.os || navigator.platform || null,
       arch: platformInfo?.arch || null,
@@ -766,7 +779,7 @@ const CloudRecorder = () => {
       bunnyVideoId: payload.bunnyVideoId || null,
       trackType: payload.trackType || null,
       uploaderType: payload.uploaderType || "cloud_recorder",
-      extensionVersion: runtime.extensionVersion,
+      extensionVersion: runtime.extensionVersion || resolveExtVersion(),
       browserVersion: runtime.browserVersion,
       platform: runtime.platform,
       arch: runtime.arch,

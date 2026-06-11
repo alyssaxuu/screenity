@@ -1,4 +1,48 @@
 {
+  "reviewAskTitle": {
+    "message": "Jak Ci się korzysta ze Screenity?",
+    "description": "Review prompt step 1 question (sentiment check) in the editor"
+  },
+  "reviewAskGood": {
+    "message": "Idzie świetnie",
+    "description": "Review prompt positive sentiment button label / tooltip"
+  },
+  "reviewAskBad": {
+    "message": "Bywało lepiej",
+    "description": "Review prompt negative sentiment button label / tooltip"
+  },
+  "reviewThanksTitle": {
+    "message": "Właśnie umiliłaś mi dzień!",
+    "description": "Review prompt happy-branch title in the editor"
+  },
+  "reviewThanksDescription": {
+    "message": "Jestem Alyssa, twórczyni Screenity, działam sama. Pierwszą wersję zrobiłam w 2020 roku i do dziś aktywnie utrzymuję darmowe rozszerzenie.\n\nJeśli Screenity Ci pomogło, krótka recenzja to jeden z najlepszych sposobów, żeby je wesprzeć ❤️",
+    "description": "Review prompt happy-branch description (founder voice) in the editor. Paragraphs separated by a blank line."
+  },
+  "reviewThanksButton": {
+    "message": "Zostaw recenzję",
+    "description": "Review prompt button that opens the Chrome Web Store review page"
+  },
+  "reviewThanksLater": {
+    "message": "Może później",
+    "description": "Review prompt snooze button on the happy branch"
+  },
+  "reviewSorryTitle": {
+    "message": "Przykro mi to słyszeć",
+    "description": "Review prompt unhappy-branch title in the editor"
+  },
+  "reviewSorryDescription": {
+    "message": "Jestem Alyssa, twórczyni Screenity, i każdą wiadomość czytam osobiście. Napisz mi, co poszło nie tak, a zrobię, co w mojej mocy, żeby to naprawić.",
+    "description": "Review prompt unhappy-branch description in the editor"
+  },
+  "reviewSorryButton": {
+    "message": "Wyślij opinię",
+    "description": "Review prompt button that opens the private feedback form"
+  },
+  "reviewSorryDismiss": {
+    "message": "Nie, dziękuję",
+    "description": "Review prompt dismiss button on the unhappy branch"
+  },
   "extName": {
     "message": "Screenity - Nagrywarka & Edytor adnotacji",
     "description": "Nazwa rozszerzenia"

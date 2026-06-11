@@ -1,4 +1,48 @@
 {
+  "reviewAskTitle": {
+    "message": "Bagaimana Screenity buatmu?",
+    "description": "Review prompt step 1 question (sentiment check) in the editor"
+  },
+  "reviewAskGood": {
+    "message": "Berjalan baik",
+    "description": "Review prompt positive sentiment button label / tooltip"
+  },
+  "reviewAskBad": {
+    "message": "Kurang oke",
+    "description": "Review prompt negative sentiment button label / tooltip"
+  },
+  "reviewThanksTitle": {
+    "message": "Kamu bikin hariku jadi indah!",
+    "description": "Review prompt happy-branch title in the editor"
+  },
+  "reviewThanksDescription": {
+    "message": "Aku Alyssa, satu-satunya pembuat di balik Screenity. Aku membuat versi pertamanya pada 2020, dan sampai sekarang aku masih aktif merawat ekstensi gratis ini.\n\nKalau Screenity membantumu, meninggalkan ulasan singkat adalah salah satu cara terbaik untuk mendukungnya ❤️",
+    "description": "Review prompt happy-branch description (founder voice) in the editor. Paragraphs separated by a blank line."
+  },
+  "reviewThanksButton": {
+    "message": "Tinggalkan ulasan",
+    "description": "Review prompt button that opens the Chrome Web Store review page"
+  },
+  "reviewThanksLater": {
+    "message": "Mungkin nanti",
+    "description": "Review prompt snooze button on the happy branch"
+  },
+  "reviewSorryTitle": {
+    "message": "Maaf mendengarnya",
+    "description": "Review prompt unhappy-branch title in the editor"
+  },
+  "reviewSorryDescription": {
+    "message": "Aku Alyssa, pembuat Screenity, dan aku membaca setiap pesan sendiri. Ceritakan apa yang salah dan aku akan berusaha sebaik mungkin untuk memperbaikinya.",
+    "description": "Review prompt unhappy-branch description in the editor"
+  },
+  "reviewSorryButton": {
+    "message": "Kirim masukan",
+    "description": "Review prompt button that opens the private feedback form"
+  },
+  "reviewSorryDismiss": {
+    "message": "Tidak, terima kasih",
+    "description": "Review prompt dismiss button on the unhappy branch"
+  },
   "extName": {
     "message": "Screenity - Perekam Layar & Alat Anotasi",
     "description": "Nama ekstensi"

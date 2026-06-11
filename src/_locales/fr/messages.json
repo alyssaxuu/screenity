@@ -1,4 +1,48 @@
 {
+  "reviewAskTitle": {
+    "message": "Comment se passe votre expérience avec Screenity ?",
+    "description": "Review prompt step 1 question (sentiment check) in the editor"
+  },
+  "reviewAskGood": {
+    "message": "Ça se passe bien",
+    "description": "Review prompt positive sentiment button label / tooltip"
+  },
+  "reviewAskBad": {
+    "message": "Pas terrible",
+    "description": "Review prompt negative sentiment button label / tooltip"
+  },
+  "reviewThanksTitle": {
+    "message": "Vous illuminez ma journée !",
+    "description": "Review prompt happy-branch title in the editor"
+  },
+  "reviewThanksDescription": {
+    "message": "Je suis Alyssa, la créatrice indépendante derrière Screenity. J'ai créé la première version en 2020, et je continue de maintenir activement l'extension gratuite aujourd'hui.\n\nSi Screenity vous a été utile, laisser un petit avis est l'une des meilleures façons de la soutenir ❤️",
+    "description": "Review prompt happy-branch description (founder voice) in the editor. Paragraphs separated by a blank line."
+  },
+  "reviewThanksButton": {
+    "message": "Laisser un avis",
+    "description": "Review prompt button that opens the Chrome Web Store review page"
+  },
+  "reviewThanksLater": {
+    "message": "Peut-être plus tard",
+    "description": "Review prompt snooze button on the happy branch"
+  },
+  "reviewSorryTitle": {
+    "message": "Désolée de l'apprendre",
+    "description": "Review prompt unhappy-branch title in the editor"
+  },
+  "reviewSorryDescription": {
+    "message": "Je suis Alyssa, la créatrice de Screenity, et je lis chaque message personnellement. Dites-moi ce qui n'a pas fonctionné et je ferai de mon mieux pour le corriger.",
+    "description": "Review prompt unhappy-branch description in the editor"
+  },
+  "reviewSorryButton": {
+    "message": "Envoyer un retour",
+    "description": "Review prompt button that opens the private feedback form"
+  },
+  "reviewSorryDismiss": {
+    "message": "Non merci",
+    "description": "Review prompt dismiss button on the unhappy branch"
+  },
   "extName": {
     "message": "Screenity - Capture & Annotation d'écran",
     "description": "Nom de l'extension"

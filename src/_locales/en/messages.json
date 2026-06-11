@@ -1405,6 +1405,50 @@
     "message": "Try it",
     "description": "Pro banner button in the editor"
   },
+  "reviewAskTitle": {
+    "message": "How's Screenity working for you?",
+    "description": "Review prompt step 1 question (sentiment check) in the editor"
+  },
+  "reviewAskGood": {
+    "message": "Going well",
+    "description": "Review prompt positive sentiment button label / tooltip"
+  },
+  "reviewAskBad": {
+    "message": "Not great",
+    "description": "Review prompt negative sentiment button label / tooltip"
+  },
+  "reviewThanksTitle": {
+    "message": "You just made my day!",
+    "description": "Review prompt happy-branch title in the editor"
+  },
+  "reviewThanksDescription": {
+    "message": "I'm Alyssa, the solo maker behind Screenity. I built the first version back in 2020, and I'm still actively maintaining the free extension today.\n\nIf Screenity has helped you, leaving a quick review is one of the best ways to support it ❤️",
+    "description": "Review prompt happy-branch description (founder voice) in the editor. Paragraphs separated by a blank line."
+  },
+  "reviewThanksButton": {
+    "message": "Leave a review",
+    "description": "Review prompt button that opens the Chrome Web Store review page"
+  },
+  "reviewThanksLater": {
+    "message": "Maybe later",
+    "description": "Review prompt snooze button on the happy branch"
+  },
+  "reviewSorryTitle": {
+    "message": "Sorry to hear that",
+    "description": "Review prompt unhappy-branch title in the editor"
+  },
+  "reviewSorryDescription": {
+    "message": "I'm Alyssa, the maker of Screenity, and I read every message myself. Tell me what went wrong and I'll do my best to fix it.",
+    "description": "Review prompt unhappy-branch description in the editor"
+  },
+  "reviewSorryButton": {
+    "message": "Send feedback",
+    "description": "Review prompt button that opens the private feedback form"
+  },
+  "reviewSorryDismiss": {
+    "message": "No thanks",
+    "description": "Review prompt dismiss button on the unhappy branch"
+  },
   "multiRecordingModeTitle": {
     "message": "Multi-recording mode",
     "description": "Title for the multi-recording mode modal"

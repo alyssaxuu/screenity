@@ -1,4 +1,48 @@
 {
+  "reviewAskTitle": {
+    "message": "Як вам Screenity?",
+    "description": "Review prompt step 1 question (sentiment check) in the editor"
+  },
+  "reviewAskGood": {
+    "message": "Все чудово",
+    "description": "Review prompt positive sentiment button label / tooltip"
+  },
+  "reviewAskBad": {
+    "message": "Не дуже",
+    "description": "Review prompt negative sentiment button label / tooltip"
+  },
+  "reviewThanksTitle": {
+    "message": "Ви зробили мій день!",
+    "description": "Review prompt happy-branch title in the editor"
+  },
+  "reviewThanksDescription": {
+    "message": "Я Alyssa, творчиня Screenity, працюю сама. Першу версію я створила ще у 2020 році й досі активно підтримую безкоштовне розширення.\n\nЯкщо Screenity вам допомогло, короткий відгук, це один із найкращих способів його підтримати ❤️",
+    "description": "Review prompt happy-branch description (founder voice) in the editor. Paragraphs separated by a blank line."
+  },
+  "reviewThanksButton": {
+    "message": "Залиште відгук",
+    "description": "Review prompt button that opens the Chrome Web Store review page"
+  },
+  "reviewThanksLater": {
+    "message": "Можливо, пізніше",
+    "description": "Review prompt snooze button on the happy branch"
+  },
+  "reviewSorryTitle": {
+    "message": "Шкода це чути",
+    "description": "Review prompt unhappy-branch title in the editor"
+  },
+  "reviewSorryDescription": {
+    "message": "Я Alyssa, творчиня Screenity, і я особисто читаю кожне повідомлення. Напишіть, що пішло не так, і я зроблю все можливе, щоб це виправити.",
+    "description": "Review prompt unhappy-branch description in the editor"
+  },
+  "reviewSorryButton": {
+    "message": "Надіслати відгук",
+    "description": "Review prompt button that opens the private feedback form"
+  },
+  "reviewSorryDismiss": {
+    "message": "Ні, дякую",
+    "description": "Review prompt dismiss button on the unhappy branch"
+  },
   "extName": {
     "message": "Screenity - Запис екрану & Анотації",
     "description": "Extension name"

@@ -859,6 +859,28 @@ export const setupHandlers = () => {
     if (typeof state.openToast !== "function") return;
     state.openToast(message?.message || "", () => {}, message?.timeout || 5000);
   });
+  // Offscreen recordings relay the system-audio guidance here so it shows in the
+  // dedicated Warning component (dark pill + audio icon), matching the in-page
+  // recorder, instead of a generic toast. i18n resolves natively in content.
+  registerMessage("show-audio-warning", (message) => {
+    const state = getState();
+    const isMac = message?.variant === "mac";
+    const title = chrome.i18n.getMessage(
+      isMac ? "recordAudioWarningMacTitle" : "recordAudioWarningOtherTitle",
+    );
+    const description = chrome.i18n.getMessage(
+      isMac
+        ? "recordAudioWarningMacDescription"
+        : "recordAudioWarningOtherDescription",
+    );
+    if (!description) return;
+    const timeout = message?.timeout || 10000;
+    if (typeof state.openWarning === "function") {
+      state.openWarning(title, description, "AudioIcon", timeout);
+    } else if (typeof state.openToast === "function") {
+      state.openToast(description, () => {}, timeout);
+    }
+  });
 
   registerMessage("fast-recorder-hard-fail", async () => {
     const state = getState();

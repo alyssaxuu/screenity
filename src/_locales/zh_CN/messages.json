@@ -1,4 +1,48 @@
 {
+  "reviewAskTitle": {
+    "message": "Screenity 用得还顺手吗？",
+    "description": "Review prompt step 1 question (sentiment check) in the editor"
+  },
+  "reviewAskGood": {
+    "message": "挺不错的",
+    "description": "Review prompt positive sentiment button label / tooltip"
+  },
+  "reviewAskBad": {
+    "message": "不太行",
+    "description": "Review prompt negative sentiment button label / tooltip"
+  },
+  "reviewThanksTitle": {
+    "message": "你让我今天超开心！",
+    "description": "Review prompt happy-branch title in the editor"
+  },
+  "reviewThanksDescription": {
+    "message": "我是 Alyssa，Screenity 背后的独立开发者。早在 2020 年我就做出了第一个版本，到今天我依然在用心维护这个免费扩展。\n\n如果 Screenity 帮到了你，留下一条简短的评论就是支持它的最好方式之一 ❤️",
+    "description": "Review prompt happy-branch description (founder voice) in the editor. Paragraphs separated by a blank line."
+  },
+  "reviewThanksButton": {
+    "message": "发表评论",
+    "description": "Review prompt button that opens the Chrome Web Store review page"
+  },
+  "reviewThanksLater": {
+    "message": "以后再说",
+    "description": "Review prompt snooze button on the happy branch"
+  },
+  "reviewSorryTitle": {
+    "message": "很遗憾听到这个",
+    "description": "Review prompt unhappy-branch title in the editor"
+  },
+  "reviewSorryDescription": {
+    "message": "我是 Alyssa，Screenity 的开发者，每一条留言我都会亲自阅读。告诉我哪里出了问题，我会尽全力把它修好。",
+    "description": "Review prompt unhappy-branch description in the editor"
+  },
+  "reviewSorryButton": {
+    "message": "发送反馈",
+    "description": "Review prompt button that opens the private feedback form"
+  },
+  "reviewSorryDismiss": {
+    "message": "不用了",
+    "description": "Review prompt dismiss button on the unhappy branch"
+  },
   "extName": {
     "message": "Screenity - 屏幕录像和标注工具",
     "description": "Extension name"

@@ -928,6 +928,39 @@ export class WebCodecsRecorder {
       }
     }
 
+    // Salvage marker: the recording survived only via a recovery workaround
+    // (synthesized frames, stall rebuild, encoder fallback, partial finalize).
+    // The review prompt reads this to skip asking after a rough recording.
+    try {
+      const hadContent = this._firstChunkSeen && this.frameCount > 0;
+      let salvageReason = null;
+      if (hadContent) {
+        if (this._finalizeOnFatalRan || this._finalizingFromFatal) {
+          salvageReason = "finalize-on-fatal";
+        } else if (this.muxer && !muxerFinalizeOk && !this._failureReported) {
+          salvageReason = "partial-finalize";
+        } else if (this._syntheticFirstFrameCount > 0) {
+          salvageReason = "no-first-frame-recovery";
+        } else if (this._midStreamStallRebuilds > 0) {
+          salvageReason = "midstream-stall-recovery";
+        } else if (this._didSwRetry) {
+          salvageReason = "encoder-fallback";
+        }
+      }
+      if (
+        salvageReason &&
+        typeof chrome !== "undefined" &&
+        chrome.storage &&
+        chrome.storage.local
+      ) {
+        chrome.storage.local.set({
+          lastRecordingSalvaged: { at: Date.now(), reason: salvageReason },
+        });
+      }
+    } catch {
+      // best effort
+    }
+
     perfMark("WCR.stop.exit");
     // Await cleanup so reader-drain completes before onStop. Bounded by the
     // 500ms per-reader cancel timeout, so it can't block stop() pathologically.
@@ -1869,9 +1902,11 @@ export class WebCodecsRecorder {
   // Handle VideoEncoder.error: rebuild on HW reclaim (capped by
   // _maxEncoderReclaims), or one HW→SW rebuild for pre-first-chunk
   // async errors. Otherwise surface to onError.
-  _handleVideoEncoderError(err) {
+  _handleVideoEncoderError(err, forceReclaim = false) {
     const msg = String(err?.message || err || "");
-    const isReclaim = isReclaimErrorMessage(msg);
+    // forceReclaim is set only when encode() routes a non-full-queue
+    // QuotaExceededError here (reclaim, not backpressure).
+    const isReclaim = forceReclaim || isReclaimErrorMessage(msg);
 
     // Re-entry guard: stop()'s flush during _finalizeOnFatal can fire
     // a second error from the same encoder.
@@ -2517,9 +2552,22 @@ export class WebCodecsRecorder {
                 this._forceNextKeyframe = true;
                 continue;
               }
-              // Chrome 140+ caps the encode queue at 30 frames, throwing QuotaExceededError
-              // synchronously. Drop as backpressure so an oversubscribed recording survives.
+              // QuotaExceededError means a full queue (Chrome 140+ backpressure,
+              // drop the frame) or a reclaimed encoder (near-empty queue). Route
+              // the reclaim case to a rebuild, not a drop into a dead encoder.
               if (encErr?.name === "QuotaExceededError") {
+                const q = this.videoEncoder?.encodeQueueSize ?? 0;
+                // Well below the ~30 backpressure cap.
+                if (q <= 5) {
+                  this._videoFrameIndex = i + 1;
+                  this._forceNextKeyframe = true;
+                  this.warn(
+                    "[WCR] encode() QuotaExceededError with near-empty queue; treating as encoder reclaim, rebuilding",
+                    { queue: q },
+                  );
+                  this._handleVideoEncoderError(encErr, true);
+                  continue;
+                }
                 this._droppedForBackpressureCount += 1;
                 this._forceNextKeyframe = true;
                 this._videoFrameIndex = i + 1;

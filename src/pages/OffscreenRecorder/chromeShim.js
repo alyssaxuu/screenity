@@ -99,8 +99,55 @@ export function installChromeShims() {
 
   if (!chrome.i18n || typeof chrome.i18n.getMessage !== "function") {
     chrome.i18n = chrome.i18n || {};
-    chrome.i18n.getMessage = (key) => String(key || "");
-    console.log("[ChromeShim] chrome.i18n.getMessage shimmed");
+
+    // Offscreen docs have no native chrome.i18n, and the old stub returned the
+    // message KEY, which leaked into user-facing copy. Preload the real catalog
+    // (en + UI locale) so getMessage() returns localized strings.
+    const catalog = {};
+    const loadCatalog = (locale) => {
+      if (!locale) return null;
+      try {
+        const xhr = new XMLHttpRequest();
+        xhr.open(
+          "GET",
+          chrome.runtime.getURL(`_locales/${locale}/messages.json`),
+          false,
+        );
+        xhr.send();
+        if (xhr.status === 200 || xhr.status === 0) {
+          return JSON.parse(xhr.responseText || "{}");
+        }
+      } catch {}
+      return null;
+    };
+    const uiLang = (navigator.language || "en").replace("-", "_");
+    const baseLang = uiLang.split("_")[0];
+    for (const loc of ["en", baseLang, uiLang]) {
+      const loaded = loadCatalog(loc);
+      if (loaded) Object.assign(catalog, loaded);
+    }
+    // Returns "" on a miss (matching native chrome.i18n), never the key.
+    chrome.i18n.getMessage = (key, substitutions) => {
+      if (!key) return "";
+      const entry = catalog[key];
+      let msg = entry && typeof entry.message === "string" ? entry.message : "";
+      if (!msg) return "";
+      if (substitutions != null) {
+        const subs = Array.isArray(substitutions)
+          ? substitutions
+          : [substitutions];
+        msg = msg.replace(/\$(\d+)/g, (_, n) => subs[Number(n) - 1] ?? "");
+      }
+      return msg;
+    };
+    if (typeof chrome.i18n.getUILanguage !== "function") {
+      chrome.i18n.getUILanguage = () => navigator.language || "en";
+    }
+    console.log(
+      "[ChromeShim] chrome.i18n catalog installed",
+      Object.keys(catalog).length,
+      "messages",
+    );
   }
 
   if (!chrome.tabs) {

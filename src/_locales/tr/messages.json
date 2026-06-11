@@ -1,4 +1,48 @@
 {
+  "reviewAskTitle": {
+    "message": "Screenity senin için nasıl gidiyor?",
+    "description": "Review prompt step 1 question (sentiment check) in the editor"
+  },
+  "reviewAskGood": {
+    "message": "İyi gidiyor",
+    "description": "Review prompt positive sentiment button label / tooltip"
+  },
+  "reviewAskBad": {
+    "message": "Pek iyi değil",
+    "description": "Review prompt negative sentiment button label / tooltip"
+  },
+  "reviewThanksTitle": {
+    "message": "Günümü güzelleştirdin!",
+    "description": "Review prompt happy-branch title in the editor"
+  },
+  "reviewThanksDescription": {
+    "message": "Ben Alyssa, Screenity'nin arkasındaki tek geliştiriciyim. İlk sürümünü 2020'de yaptım ve ücretsiz eklentiyi bugün hâlâ aktif olarak geliştiriyorum.\n\nScreenity sana yardımcı olduysa, kısa bir inceleme bırakmak onu desteklemenin en güzel yollarından biri ❤️",
+    "description": "Review prompt happy-branch description (founder voice) in the editor. Paragraphs separated by a blank line."
+  },
+  "reviewThanksButton": {
+    "message": "İnceleme bırak",
+    "description": "Review prompt button that opens the Chrome Web Store review page"
+  },
+  "reviewThanksLater": {
+    "message": "Belki sonra",
+    "description": "Review prompt snooze button on the happy branch"
+  },
+  "reviewSorryTitle": {
+    "message": "Bunu duyduğuma üzüldüm",
+    "description": "Review prompt unhappy-branch title in the editor"
+  },
+  "reviewSorryDescription": {
+    "message": "Ben Alyssa, Screenity'nin geliştiricisiyim ve her mesajı kendim okuyorum. Neyin ters gittiğini bana anlat, düzeltmek için elimden geleni yapayım.",
+    "description": "Review prompt unhappy-branch description in the editor"
+  },
+  "reviewSorryButton": {
+    "message": "Geri bildirim gönder",
+    "description": "Review prompt button that opens the private feedback form"
+  },
+  "reviewSorryDismiss": {
+    "message": "Hayır, teşekkürler",
+    "description": "Review prompt dismiss button on the unhappy branch"
+  },
   "extName": {
     "message": "Screenity - Ekran Kayıt & Not Aracı",
     "description": "Uzantı adı"

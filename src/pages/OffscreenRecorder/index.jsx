@@ -25,6 +25,16 @@ window.addEventListener("unhandledrejection", (e) => {
   });
 });
 
+// Ping the SW every 20s while this offscreen doc is alive so it doesn't hit
+// the 30s idle timeout. A dead SW loses the stop/finalize handoff mid-recording.
+const SW_KEEPALIVE_MS = 20000;
+const swKeepaliveTimer = setInterval(() => {
+  chrome.runtime
+    .sendMessage({ type: "sw-keepalive" })
+    .catch(() => {});
+}, SW_KEEPALIVE_MS);
+window.addEventListener("pagehide", () => clearInterval(swKeepaliveTimer));
+
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg?.type === "resume-pending-uploads" && Array.isArray(msg.journals)) {
     (async () => {

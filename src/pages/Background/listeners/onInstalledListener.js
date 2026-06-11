@@ -21,6 +21,7 @@ export const onInstalledListener = () => {
         onboarding: cloudFeaturesEnabled,
         bannerSupport: true,
         firstTimePro: cloudFeaturesEnabled,
+        extensionInstalledAt: Date.now(),
       });
 
       chrome.storage.managed.get("skipSetup", (managedConfig) => {
@@ -50,6 +51,15 @@ export const onInstalledListener = () => {
             onboarding: cloudFeaturesEnabled,
           });
         }
+      }
+
+      // Existing users are already established, so backfill an install time in
+      // the past to clear the review prompt's install-age gate immediately.
+      const { extensionInstalledAt } = await chrome.storage.local.get(
+        "extensionInstalledAt",
+      );
+      if (typeof extensionInstalledAt !== "number") {
+        chrome.storage.local.set({ extensionInstalledAt: 0 });
       }
 
       const updateQs = await supportContextQuery({ source: "uninstall" });

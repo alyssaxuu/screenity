@@ -1,4 +1,48 @@
 {
+  "reviewAskTitle": {
+    "message": "Com et va amb Screenity?",
+    "description": "Review prompt step 1 question (sentiment check) in the editor"
+  },
+  "reviewAskGood": {
+    "message": "Va bé",
+    "description": "Review prompt positive sentiment button label / tooltip"
+  },
+  "reviewAskBad": {
+    "message": "No gaire bé",
+    "description": "Review prompt negative sentiment button label / tooltip"
+  },
+  "reviewThanksTitle": {
+    "message": "M'has alegrat el dia!",
+    "description": "Review prompt happy-branch title in the editor"
+  },
+  "reviewThanksDescription": {
+    "message": "Sóc l'Alyssa, la creadora independent que hi ha darrere de Screenity. Vaig fer la primera versió allà pel 2020, i encara avui continuo mantenint activament l'extensió gratuïta.\n\nSi Screenity t'ha ajudat, deixar una ressenya ràpida és una de les millors maneres de donar-li suport ❤️",
+    "description": "Review prompt happy-branch description (founder voice) in the editor. Paragraphs separated by a blank line."
+  },
+  "reviewThanksButton": {
+    "message": "Deixa una ressenya",
+    "description": "Review prompt button that opens the Chrome Web Store review page"
+  },
+  "reviewThanksLater": {
+    "message": "Potser més tard",
+    "description": "Review prompt snooze button on the happy branch"
+  },
+  "reviewSorryTitle": {
+    "message": "Em sap greu sentir-ho",
+    "description": "Review prompt unhappy-branch title in the editor"
+  },
+  "reviewSorryDescription": {
+    "message": "Sóc l'Alyssa, la creadora de Screenity, i llegeixo cada missatge jo mateixa. Explica'm què ha anat malament i faré tot el possible per arreglar-ho.",
+    "description": "Review prompt unhappy-branch description in the editor"
+  },
+  "reviewSorryButton": {
+    "message": "Envia comentaris",
+    "description": "Review prompt button that opens the private feedback form"
+  },
+  "reviewSorryDismiss": {
+    "message": "No, gràcies",
+    "description": "Review prompt dismiss button on the unhappy branch"
+  },
   "extName": {
     "message": "Screenity - Grava i Anota la Pantalla",
     "description": "Nom de l'extensió"

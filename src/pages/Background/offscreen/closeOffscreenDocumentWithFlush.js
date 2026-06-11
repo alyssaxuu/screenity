@@ -3,23 +3,31 @@ export const closeOffscreenDocumentWithFlush = async ({
   timeoutMs = 25000,
   shouldFinalize = true,
 } = {}) => {
-  let offDocExists = false;
+  let offDoc = null;
   try {
     const existingContexts = await chrome.runtime.getContexts({});
-    offDocExists = existingContexts.some(
-      (c) => c.contextType === "OFFSCREEN_DOCUMENT"
-    );
+    offDoc =
+      existingContexts.find((c) => c.contextType === "OFFSCREEN_DOCUMENT") ||
+      null;
   } catch (err) {
     console.warn("closeOffscreenDocumentWithFlush getContexts:", err);
   }
 
-  if (!offDocExists) return { ok: true, existed: false };
+  if (!offDoc) return { ok: true, existed: false };
+
+  // The long timeout only matters for an in-flight TUS upload (cloud). A free
+  // doc has no uploader, so waiting 25s for an ack it may never send just blocks
+  // the next picker. Cloud docs carry ?cloud=1 in their URL; free ones don't.
+  const isCloudDoc =
+    typeof offDoc.documentUrl === "string" &&
+    offDoc.documentUrl.includes("cloud=1");
+  const effectiveTimeoutMs = isCloudDoc ? timeoutMs : Math.min(timeoutMs, 3000);
 
   const ackPromise = new Promise((resolve) => {
     const timer = setTimeout(() => {
       chrome.runtime.onMessage.removeListener(listener);
       resolve({ ok: false, timedOut: true });
-    }, timeoutMs);
+    }, effectiveTimeoutMs);
     const listener = (msg) => {
       if (msg?.type === "offscreen-shutdown-complete") {
         clearTimeout(timer);
@@ -35,7 +43,7 @@ export const closeOffscreenDocumentWithFlush = async ({
       type: "offscreen-shutdown",
       reason,
       shouldFinalize,
-      timeoutMs: Math.max(5000, timeoutMs - 2000),
+      timeoutMs: Math.max(2000, effectiveTimeoutMs - 2000),
     })
     .catch(() => {});
 

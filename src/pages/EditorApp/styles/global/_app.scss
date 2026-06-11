@@ -432,6 +432,160 @@ button {
   flex-shrink: 0;
 }
 
+// Compact, toast-like review ask floating at the bottom-center of the
+// editor. Light surface with a soft shadow so it reads as a transient
+// prompt, not a permanent banner.
+.review-toast {
+  position: absolute;
+  bottom: 24px;
+  left: 0;
+  right: 0;
+  margin: 0 auto;
+  width: fit-content;
+  max-width: calc(100% - 40px);
+  display: flex;
+  align-items: center;
+  gap: 0;
+  box-sizing: border-box;
+  background: $color-background;
+  border: 1px solid $color-border;
+  border-radius: 30px;
+  padding: 8px 12px 8px 18px;
+  box-shadow: 0 10px 34px rgba(0, 0, 0, 0.18);
+  z-index: 20;
+  transform-origin: bottom center;
+  animation: reviewToastIn 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+// Slide up from below with a gentle overshoot + settle, so it pops into view
+// instead of appearing silently.
+@keyframes reviewToastIn {
+  0% {
+    opacity: 0;
+    transform: translateY(26px) scale(0.92);
+  }
+  55% {
+    opacity: 1;
+    transform: translateY(-5px) scale(1.02);
+  }
+  78% {
+    transform: translateY(1px) scale(0.996);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.review-toast-text {
+  font-family: $font-bold;
+  color: $color-text-primary;
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+.review-toast-divider {
+  width: 1px;
+  height: 22px;
+  background: $color-border;
+  flex-shrink: 0;
+  // Left/right margins differ to offset the thumb buttons' internal
+  // padding, so the line looks evenly spaced from the text and the emojis.
+  margin: 0 6px 0 14px;
+}
+
+.review-toast-thumbs {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.review-toast-thumb {
+  border: none;
+  background: transparent;
+  border-radius: 50%;
+  width: 34px;
+  height: 34px;
+  font-size: 17px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+
+  &:hover {
+    background: $color-light-grey;
+  }
+}
+
+// Expanded card for the happy / feedback branches.
+.review-toast--card {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 16px;
+  width: 360px;
+  border-radius: 18px;
+  padding: 20px;
+}
+
+.review-toast-title {
+  font-family: $font-bold;
+  color: $color-text-primary;
+  font-size: 15px;
+  margin-bottom: 7px;
+}
+
+.review-toast-message {
+  font-family: $font-medium;
+  color: $color-text-secondary;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.review-toast-paragraph {
+  margin: 0;
+
+  & + & {
+    margin-top: 10px;
+  }
+}
+
+.review-toast-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.review-toast-btn {
+  height: 34px;
+  padding: 0 14px;
+  border-radius: 30px;
+  font-size: 13px;
+  font-family: $font-bold;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.review-toast-btn--ghost {
+  background: transparent;
+  border: 1px solid transparent;
+  color: $color-text-primary;
+
+  &:hover {
+    background: $color-light-grey;
+  }
+}
+
+.review-toast-btn--primary {
+  background: $color-text-primary;
+  color: $color-text-contrast;
+  border: none;
+
+  &:hover {
+    background: #000;
+  }
+}
+
 .altButton {
   background: transparent !important;
   color: $color-text-primary;

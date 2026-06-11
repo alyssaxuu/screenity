@@ -1,4 +1,48 @@
 {
+  "reviewAskTitle": {
+    "message": "Como está a correr o Screenity para ti?",
+    "description": "Review prompt step 1 question (sentiment check) in the editor"
+  },
+  "reviewAskGood": {
+    "message": "Está a correr bem",
+    "description": "Review prompt positive sentiment button label / tooltip"
+  },
+  "reviewAskBad": {
+    "message": "Nem por isso",
+    "description": "Review prompt negative sentiment button label / tooltip"
+  },
+  "reviewThanksTitle": {
+    "message": "Acabaste de me alegrar o dia!",
+    "description": "Review prompt happy-branch title in the editor"
+  },
+  "reviewThanksDescription": {
+    "message": "Sou a Alyssa, a criadora independente por trás do Screenity. Fiz a primeira versão lá em 2020, e ainda hoje continuo a manter ativamente a extensão gratuita.\n\nSe o Screenity te ajudou, deixar uma avaliação rápida é uma das melhores formas de o apoiar ❤️",
+    "description": "Review prompt happy-branch description (founder voice) in the editor. Paragraphs separated by a blank line."
+  },
+  "reviewThanksButton": {
+    "message": "Deixa uma avaliação",
+    "description": "Review prompt button that opens the Chrome Web Store review page"
+  },
+  "reviewThanksLater": {
+    "message": "Talvez mais tarde",
+    "description": "Review prompt snooze button on the happy branch"
+  },
+  "reviewSorryTitle": {
+    "message": "Lamento saber isso",
+    "description": "Review prompt unhappy-branch title in the editor"
+  },
+  "reviewSorryDescription": {
+    "message": "Sou a Alyssa, a criadora do Screenity, e leio cada mensagem eu mesma. Diz-me o que correu mal e farei tudo o que puder para resolver.",
+    "description": "Review prompt unhappy-branch description in the editor"
+  },
+  "reviewSorryButton": {
+    "message": "Enviar comentários",
+    "description": "Review prompt button that opens the private feedback form"
+  },
+  "reviewSorryDismiss": {
+    "message": "Agora não",
+    "description": "Review prompt dismiss button on the unhappy branch"
+  },
   "extName": {
     "message": "Screenity - Grave o ecrã e faça anotações",
     "description": "Nome da extensão"

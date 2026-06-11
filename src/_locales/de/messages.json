@@ -1,4 +1,48 @@
 {
+  "reviewAskTitle": {
+    "message": "Wie läuft es bei dir mit Screenity?",
+    "description": "Review prompt step 1 question (sentiment check) in the editor"
+  },
+  "reviewAskGood": {
+    "message": "Läuft gut",
+    "description": "Review prompt positive sentiment button label / tooltip"
+  },
+  "reviewAskBad": {
+    "message": "Nicht so gut",
+    "description": "Review prompt negative sentiment button label / tooltip"
+  },
+  "reviewThanksTitle": {
+    "message": "Du hast mir gerade den Tag gerettet!",
+    "description": "Review prompt happy-branch title in the editor"
+  },
+  "reviewThanksDescription": {
+    "message": "Ich bin Alyssa, die alleinige Macherin hinter Screenity. Ich habe die erste Version 2020 gebaut und pflege die kostenlose Erweiterung bis heute aktiv.\n\nWenn Screenity dir geholfen hat, ist eine kurze Bewertung eine der besten Möglichkeiten, das Projekt zu unterstützen ❤️",
+    "description": "Review prompt happy-branch description (founder voice) in the editor. Paragraphs separated by a blank line."
+  },
+  "reviewThanksButton": {
+    "message": "Bewertung hinterlassen",
+    "description": "Review prompt button that opens the Chrome Web Store review page"
+  },
+  "reviewThanksLater": {
+    "message": "Vielleicht später",
+    "description": "Review prompt snooze button on the happy branch"
+  },
+  "reviewSorryTitle": {
+    "message": "Das tut mir leid zu hören",
+    "description": "Review prompt unhappy-branch title in the editor"
+  },
+  "reviewSorryDescription": {
+    "message": "Ich bin Alyssa, die Macherin von Screenity, und ich lese jede Nachricht selbst. Sag mir, was schiefgelaufen ist, und ich gebe mein Bestes, es zu beheben.",
+    "description": "Review prompt unhappy-branch description in the editor"
+  },
+  "reviewSorryButton": {
+    "message": "Feedback senden",
+    "description": "Review prompt button that opens the private feedback form"
+  },
+  "reviewSorryDismiss": {
+    "message": "Nein danke",
+    "description": "Review prompt dismiss button on the unhappy branch"
+  },
   "extName": {
     "message": "Screenity - Bildschirmaufnahme & Beschriftung",
     "description": "Erweiterungsname"

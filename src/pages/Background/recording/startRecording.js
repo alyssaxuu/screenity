@@ -246,6 +246,7 @@ const _startRecordingInner = async (caller) => {
     lastRecordingFinalizedFileName: null,
     lastRecordingError: null,
     lastChunkSendFailure: null,
+    lastRecordingSalvaged: null,
     lastStartRecordingCaller: { caller, stack, ts: Date.now() },
   });
 

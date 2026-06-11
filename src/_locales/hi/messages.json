@@ -1,4 +1,48 @@
 {
+  "reviewAskTitle": {
+    "message": "Screenity आपके लिए कैसा काम कर रहा है?",
+    "description": "Review prompt step 1 question (sentiment check) in the editor"
+  },
+  "reviewAskGood": {
+    "message": "अच्छा चल रहा है",
+    "description": "Review prompt positive sentiment button label / tooltip"
+  },
+  "reviewAskBad": {
+    "message": "कुछ खास नहीं",
+    "description": "Review prompt negative sentiment button label / tooltip"
+  },
+  "reviewThanksTitle": {
+    "message": "आपने तो मेरा दिन बना दिया!",
+    "description": "Review prompt happy-branch title in the editor"
+  },
+  "reviewThanksDescription": {
+    "message": "मैं Alyssa हूँ, Screenity बनाने वाली अकेली मेकर। मैंने इसका पहला वर्शन 2020 में बनाया था, और आज भी मैं इस मुफ्त एक्सटेंशन को सक्रिय रूप से बनाए रखती हूँ।\n\nअगर Screenity ने आपकी मदद की है, तो एक छोटी सी समीक्षा छोड़ना इसका समर्थन करने के सबसे अच्छे तरीकों में से एक है ❤️",
+    "description": "Review prompt happy-branch description (founder voice) in the editor. Paragraphs separated by a blank line."
+  },
+  "reviewThanksButton": {
+    "message": "समीक्षा छोड़ें",
+    "description": "Review prompt button that opens the Chrome Web Store review page"
+  },
+  "reviewThanksLater": {
+    "message": "शायद बाद में",
+    "description": "Review prompt snooze button on the happy branch"
+  },
+  "reviewSorryTitle": {
+    "message": "यह सुनकर दुख हुआ",
+    "description": "Review prompt unhappy-branch title in the editor"
+  },
+  "reviewSorryDescription": {
+    "message": "मैं Alyssa हूँ, Screenity की मेकर, और मैं हर मैसेज खुद पढ़ती हूँ। मुझे बताइए कि क्या गलत हुआ और मैं इसे ठीक करने की पूरी कोशिश करूँगी।",
+    "description": "Review prompt unhappy-branch description in the editor"
+  },
+  "reviewSorryButton": {
+    "message": "फीडबैक भेजें",
+    "description": "Review prompt button that opens the private feedback form"
+  },
+  "reviewSorryDismiss": {
+    "message": "नहीं, धन्यवाद",
+    "description": "Review prompt dismiss button on the unhappy branch"
+  },
   "extName": {
     "message": "स्क्रीनिटी - स्क्रीन रिकॉर्डिंग & नोट्स",
     "description": "एक्सटेंशन का नाम"

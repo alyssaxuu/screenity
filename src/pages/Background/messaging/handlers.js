@@ -113,6 +113,100 @@ const DEBUG_POSTSTOP = false;
 const DEBUG_FLOW =
   process.env.NODE_ENV !== "production" ||
   (typeof globalThis !== "undefined" && !!globalThis.SCREENITY_DEBUG_RECORDER);
+const DAY_MS = 86400000;
+
+// Gating for the editor review prompt: only ask established users right after
+// a smooth recording, stay quiet otherwise.
+const REVIEW_GATE = {
+  minInstallDays: 7, // installed at least this long (never reset by updates)
+  minSuccessfulRecordingsNew: 2, // fresh installs: a small track record
+  minSuccessfulRecordingsExisting: 1, // backfilled/existing users: one clean one
+  recentFailureWindowDays: 7, // backstop; failure keys also reset each attempt
+  reshowCooldownDays: [1, 7], // escalating gap (days) after the 1st, 2nd reveal
+  maxShows: 3, // stop asking after this many un-acted reveals
+  snoozeDays: 120, // "maybe later" pushes it out this far
+};
+
+// Whether the user is eligible for the review prompt (the editor adds a final
+// "used the result" gate). Any uncertain signal returns false; the failure keys
+// below reset each attempt, so only the most recent recording counts.
+const shouldShowReviewPrompt = async () => {
+  try {
+    const s = await chrome.storage.local.get([
+      "reviewPromptState",
+      "extensionInstalledAt",
+      "successfulRecordingCount",
+      "startFlowTrace",
+      "lastRecordingError",
+      "editorRecordingError",
+      "lastChunkSendFailure",
+      "cloudRecorderDegradedMode",
+      "lastRecordingSalvaged",
+    ]);
+    const state = s.reviewPromptState || {};
+    const now = Date.now();
+
+    // Already reviewed, opted out, or routed to feedback: never ask again.
+    if (state.done) return false;
+    // Snoozed after a "maybe later".
+    if (state.snoozedUntil && now < state.snoozedUntil) return false;
+    // Stop asking after maxShows un-acted reveals, widening the gap each time
+    // (24h, then 7d), so a user who ignores it isn't asked repeatedly.
+    const shownCount = state.shownCount || 0;
+    if (shownCount >= REVIEW_GATE.maxShows) return false;
+    if (state.lastShownAt) {
+      const cooldownDays =
+        REVIEW_GATE.reshowCooldownDays[
+          Math.min(shownCount, REVIEW_GATE.reshowCooldownDays.length) - 1
+        ] || 0;
+      if (now - state.lastShownAt < cooldownDays * DAY_MS) return false;
+    }
+
+    // Established install. Existing users were backfilled to 0 so they pass
+    // immediately; updates never reset this.
+    const installedAt =
+      typeof s.extensionInstalledAt === "number" ? s.extensionInstalledAt : now;
+    const isExisting = installedAt === 0;
+    if (now - installedAt < REVIEW_GATE.minInstallDays * DAY_MS) return false;
+
+    // Track record. Install age already proves an existing user isn't a
+    // newcomer, so they only need one clean recording; fresh installs need a
+    // couple.
+    const minRecordings = isExisting
+      ? REVIEW_GATE.minSuccessfulRecordingsExisting
+      : REVIEW_GATE.minSuccessfulRecordingsNew;
+    if ((s.successfulRecordingCount || 0) < minRecordings) return false;
+
+    // The last recording must not have explicitly failed. Region/other types
+    // leave outcome "in-progress" (only tab/desktop set "ok"), so block on known
+    // FAILURE outcomes rather than requiring "ok".
+    const FAILURE_OUTCOMES = ["error", "stuck", "cancelled"];
+    if (s.startFlowTrace && FAILURE_OUTCOMES.includes(s.startFlowTrace.outcome))
+      return false;
+
+    // No hard failure or degraded-output marker on the most recent recording.
+    // (cloudRecorderDegradedMode stamps `.at`, the error keys stamp `.ts`.)
+    const win = REVIEW_GATE.recentFailureWindowDays * DAY_MS;
+    const recent = (e) => {
+      if (!e) return false;
+      const ts = typeof e.ts === "number" ? e.ts : e.at;
+      return typeof ts === "number" && now - ts < win;
+    };
+    if (
+      recent(s.lastRecordingError) ||
+      recent(s.editorRecordingError) ||
+      recent(s.lastChunkSendFailure) ||
+      recent(s.cloudRecorderDegradedMode) ||
+      recent(s.lastRecordingSalvaged)
+    )
+      return false;
+
+    return true;
+  } catch {
+    return false;
+  }
+};
+
 const STOP_RECORDING_TAB_DEBOUNCE_MS = 1200;
 const CLOUD_LOCAL_PLAYBACK_MAX_BYTES = 250 * 1024 * 1024;
 const CLOUD_LOCAL_PLAYBACK_MAX_CHUNKS = 4000;
@@ -792,6 +886,9 @@ export const setupHandlers = () => {
       return { ok: false, error: err?.message || String(err) };
     }
   });
+  // Offscreen doc pings this to keep the SW alive during recording; just
+  // receiving it resets the idle timer, so the body is a no-op.
+  registerMessage("sw-keepalive", () => ({ ok: true }));
   // CloudRecorder mirrors each step of its stop→finalize→close
   // sequence here so the timeline survives the tab's window.close().
   // Read the BG service worker console (chrome://extensions → service
@@ -1056,6 +1153,22 @@ export const setupHandlers = () => {
     perfMark("BG.handlers video-ready.received");
     await videoReady(message);
     await clearRecordingSessionSafe("video-ready");
+    // video-ready fires for every recorder type once finalized and playable, so
+    // count successful recordings here instead of the tab-only start-flow "ok"
+    // branch (which missed region recordings). Best-effort.
+    try {
+      const { successfulRecordingCount } = await chrome.storage.local.get(
+        "successfulRecordingCount",
+      );
+      const prev =
+        typeof successfulRecordingCount === "number"
+          ? successfulRecordingCount
+          : 0;
+      await chrome.storage.local.set({
+        successfulRecordingCount: prev + 1,
+        lastSuccessfulRecordingAt: Date.now(),
+      });
+    } catch {}
   });
 
   // download-path remux request from sandbox; falls back to in-sandbox BufferTarget on failure
@@ -1522,7 +1635,17 @@ export const setupHandlers = () => {
   registerMessage("indexed-db-download", (message) =>
     downloadIndexedDB(message),
   );
-  registerMessage("get-platform-info", async () => await getPlatformInfo());
+  registerMessage("get-platform-info", async () => {
+    // Include the manifest version so contexts that ask BG for platform info
+    // (e.g. the offscreen recorder telemetry runtime) get an authoritative
+    // version even if their own getManifest read comes back empty.
+    const info = (await getPlatformInfo()) || {};
+    let extVersion = null;
+    try {
+      extVersion = chrome.runtime.getManifest().version || null;
+    } catch {}
+    return { ...info, extVersion };
+  });
   registerMessage(
     "get-diagnostic-log",
     async (_message, _sender, sendResponse) => {
@@ -2458,6 +2581,43 @@ export const setupHandlers = () => {
     await chrome.storage.local.set({ bannerSupport: false });
     chrome.runtime.sendMessage({ type: "hide-banner" });
   });
+  registerMessage("check-review-prompt", async () => {
+    // This router uses the handler's RETURN value as the response (it calls
+    // handler(message, sender, sendResponse), so the 2nd arg is `sender`, not a
+    // response callback). So return the object; do not call sendResponse.
+    return { showReview: await shouldShowReviewPrompt() };
+  });
+  registerMessage("review-prompt-action", async (message) => {
+    const action = message?.action;
+    const { reviewPromptState } = await chrome.storage.local.get([
+      "reviewPromptState",
+    ]);
+    const next = { ...(reviewPromptState || {}) };
+    if (action === "shown") {
+      next.lastShownAt = Date.now();
+      next.shownCount = (next.shownCount || 0) + 1;
+    } else if (action === "later") {
+      // Thumbs-up but not now, so snooze for a long while.
+      next.snoozedUntil = Date.now() + REVIEW_GATE.snoozeDays * DAY_MS;
+    } else if (
+      action === "reviewed" ||
+      action === "dismiss" ||
+      action === "feedback"
+    ) {
+      // Reviewed, opted out, or routed to feedback (unhappy): don't ask again.
+      next.done = true;
+    }
+    await chrome.storage.local.set({ reviewPromptState: next });
+  });
+  // Thumbs-down opens the same feedback form as "Report a bug", tagged as
+  // coming from the review prompt.
+  registerMessage("review-feedback", async () => {
+    const qs = await supportContextQuery({
+      includeRecordingState: true,
+      source: "review-prompt",
+    });
+    createTab(`https://tally.so/r/3ElpXq?${qs}`, true);
+  });
   registerMessage("clear-recording-alarm", async () => {
     await chrome.alarms.clear("recording-alarm");
   });
@@ -2469,6 +2629,20 @@ export const setupHandlers = () => {
         sendMessageTab(activeTab, {
           type: "show-toast",
           message: message.message,
+          timeout: message.timeout,
+        }).catch(() => {});
+      }
+    } catch {}
+  });
+  // Offscreen recorder can't mount the styled "record computer audio" Warning,
+  // so it relays here and we forward to the content script's Warning component.
+  registerMessage("show-audio-warning", async (message) => {
+    try {
+      const { activeTab } = await chrome.storage.local.get(["activeTab"]);
+      if (activeTab) {
+        sendMessageTab(activeTab, {
+          type: "show-audio-warning",
+          variant: message.variant,
           timeout: message.timeout,
         }).catch(() => {});
       }

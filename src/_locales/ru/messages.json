@@ -1,4 +1,48 @@
 {
+  "reviewAskTitle": {
+    "message": "Как вам Screenity?",
+    "description": "Review prompt step 1 question (sentiment check) in the editor"
+  },
+  "reviewAskGood": {
+    "message": "Всё отлично",
+    "description": "Review prompt positive sentiment button label / tooltip"
+  },
+  "reviewAskBad": {
+    "message": "Не очень",
+    "description": "Review prompt negative sentiment button label / tooltip"
+  },
+  "reviewThanksTitle": {
+    "message": "Вы сделали мой день!",
+    "description": "Review prompt happy-branch title in the editor"
+  },
+  "reviewThanksDescription": {
+    "message": "Я Alyssa, создательница Screenity, работаю в одиночку. Первую версию я создала ещё в 2020 году и до сих пор активно поддерживаю бесплатное расширение.\n\nЕсли Screenity вам помогло, короткий отзыв, это один из лучших способов его поддержать ❤️",
+    "description": "Review prompt happy-branch description (founder voice) in the editor. Paragraphs separated by a blank line."
+  },
+  "reviewThanksButton": {
+    "message": "Оставьте отзыв",
+    "description": "Review prompt button that opens the Chrome Web Store review page"
+  },
+  "reviewThanksLater": {
+    "message": "Может быть, позже",
+    "description": "Review prompt snooze button on the happy branch"
+  },
+  "reviewSorryTitle": {
+    "message": "Жаль это слышать",
+    "description": "Review prompt unhappy-branch title in the editor"
+  },
+  "reviewSorryDescription": {
+    "message": "Я Alyssa, создательница Screenity, и я сама читаю каждое сообщение. Напишите, что пошло не так, и я сделаю всё возможное, чтобы это исправить.",
+    "description": "Review prompt unhappy-branch description in the editor"
+  },
+  "reviewSorryButton": {
+    "message": "Отправить отзыв",
+    "description": "Review prompt button that opens the private feedback form"
+  },
+  "reviewSorryDismiss": {
+    "message": "Нет, спасибо",
+    "description": "Review prompt dismiss button on the unhappy branch"
+  },
   "extName": {
     "message": "Screenity - Запись экрана & Аннотации",
     "description": "Название расширения"

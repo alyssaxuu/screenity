@@ -2670,11 +2670,16 @@ const Recorder = () => {
           "[Recorder] helperVideoStream video track ended",
           diagnosticInfo,
         );
-        chrome.runtime.sendMessage({
-          type: "recording-error",
-          error: "stream-ended",
-          why: chrome.i18n.getMessage("videoTrackEndedToast"),
-        }).catch(() => {});
+        // User hit Chrome's "Stop sharing" after capturing frames: save it as
+        // a normal stop. Only error if nothing was captured.
+        const noChunks = savedCount.current === 0 && !hasChunks.current;
+        if (noChunks) {
+          chrome.runtime.sendMessage({
+            type: "recording-error",
+            error: "stream-ended",
+            why: chrome.i18n.getMessage("videoTrackEndedToast"),
+          }).catch(() => {});
+        }
         chrome.storage.local.set({
           recording: false,
           restarting: false,
@@ -4067,6 +4072,9 @@ const Recorder = () => {
     perfMark("Recorder getStreamID.enter", { tabId: id });
     debug("getStreamID()", id);
     tabIDError.current = null;
+    // Track mint latency (lastTabStreamMintMs) so a tabStreamUnavailableError
+    // report shows whether the mint was slow or genuinely hung.
+    const mintStartedAt = Date.now();
     let streamId;
     try {
       if (IS_OFFSCREEN_HOST) {
@@ -4113,6 +4121,13 @@ const Recorder = () => {
         ok: Boolean(tabID.current),
         error: tabIDError.current,
       });
+      try {
+        chrome.storage.local.set({
+          lastTabStreamMintMs: Date.now() - mintStartedAt,
+          lastTabStreamMintOk: Boolean(tabID.current),
+          lastTabStreamMintOffscreen: IS_OFFSCREEN_HOST,
+        });
+      } catch {}
     }
   };
 
@@ -4155,7 +4170,9 @@ const Recorder = () => {
     if (tabID.current) return tabID.current;
     const endWait = perfSpan("Recorder waitForTabStreamId");
     let attempts = 0;
-    for (let i = 0; i < 30; i += 1) {
+    // 6s (60 x 100ms). The mint can take >3s on slow devices and the old 3s cap
+    // failed those spuriously; fast mints still return the instant the id lands.
+    for (let i = 0; i < 60; i += 1) {
       attempts = i + 1;
       await new Promise((resolve) => setTimeout(resolve, 100));
       if (tabID.current) {
