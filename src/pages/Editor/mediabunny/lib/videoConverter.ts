@@ -21,6 +21,10 @@ export interface ConversionOptions {
   audioCodec?: AudioCodec;
   onProgress?: (progress: number) => void;
   verbose?: boolean;
+  // When provided (e.g. a StreamTarget writing to OPFS), output streams to it
+  // and convert() resolves to null; the caller owns the written file. Used by
+  // the offscreen worker to re-encode large files with bounded memory.
+  target?: any;
 }
 
 export interface CodecInfo {
@@ -130,7 +134,7 @@ export class VideoConverter {
         ? new Mp4OutputFormat({ fastStart: false })
         : new WebMOutputFormat();
 
-    const target = new BufferTarget();
+    const target = options.target || new BufferTarget();
     const output = new Output({ format: outputFormat, target });
 
     const conversion = await Conversion.init({
@@ -150,6 +154,10 @@ export class VideoConverter {
     if (onProgress) conversion.onProgress = onProgress;
 
     await conversion.execute();
+
+    // Streamed to a caller-provided target (e.g. OPFS): the caller owns the
+    // output file, so there's no in-memory buffer to wrap.
+    if (options.target) return null;
 
     if (!target.buffer) throw new Error("Conversion failed - no output buffer");
 

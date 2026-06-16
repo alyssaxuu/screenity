@@ -1682,5 +1682,33 @@
   "unsupportedVideoCodecError": {
     "message": "브라우저가 필요한 비디오 코덱을 지원하지 않아요. Chrome을 업데이트하고 다시 시도해 주세요.",
     "description": "Shown when no supported MediaRecorder mimeType is available"
+  },
+  "cancelLabel": {
+    "message": "취소",
+    "description": "Cancel button on the download-in-progress banner"
+  },
+  "webmSlowTitle": {
+    "message": "WebM으로 변환하는 데 시간이 걸릴 수 있습니다",
+    "description": "Title of the modal warning that MP4 to WebM conversion is slow"
+  },
+  "webmSlowDescription": {
+    "message": "WebM으로 저장하면 전체 영상을 다시 인코딩하므로 긴 녹화의 경우 몇 분이 걸릴 수 있습니다. MP4는 즉시 저장됩니다.",
+    "description": "Body of the slow-WebM warning modal"
+  },
+  "webmSlowMp4": {
+    "message": "대신 MP4 다운로드",
+    "description": "Primary button: download MP4 instead of the slow WebM conversion"
+  },
+  "webmSlowContinue": {
+    "message": "WebM으로 계속",
+    "description": "Secondary button: proceed with the slow WebM conversion"
+  },
+  "downloadProcessingTitle": {
+    "message": "다운로드 준비 중",
+    "description": "Title of the download-in-progress banner with the Cancel button"
+  },
+  "downloadProcessingDescription": {
+    "message": "긴 녹화의 경우 시간이 걸릴 수 있습니다.",
+    "description": "Body of the download-in-progress banner"
   }
 }

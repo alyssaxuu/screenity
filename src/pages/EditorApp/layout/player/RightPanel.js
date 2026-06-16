@@ -531,7 +531,34 @@ const RightPanel = () => {
                 </div>
               </div>
             )}
+          {(contentState.downloadingWEBM || contentState.downloading) && (
+            <div className={styles.alert}>
+              <div className={styles.buttonLeft}>
+                <ReactSVG src={URL + "editor/icons/alert.svg"} />
+              </div>
+              <div className={styles.buttonMiddle}>
+                <div className={styles.buttonTitle}>
+                  {chrome.i18n.getMessage("downloadProcessingTitle")}
+                </div>
+                <div className={styles.buttonDescription}>
+                  {contentState.processingProgress > 0
+                    ? `${chrome.i18n.getMessage(
+                        "downloadProcessingDescription",
+                      )} (${contentState.processingProgress}%)`
+                    : chrome.i18n.getMessage("downloadProcessingDescription")}
+                </div>
+              </div>
+              <div
+                className={styles.buttonRight}
+                onClick={() => contentState.cancelDownload?.()}
+              >
+                {chrome.i18n.getMessage("cancelLabel")}
+              </div>
+            </div>
+          )}
           {(!contentState.mp4ready || contentState.isFfmpegRunning) &&
+            !contentState.downloadingWEBM &&
+            !contentState.downloading &&
             (contentState.duration <= contentState.editLimit ||
               contentState.override) &&
             !contentState.offline &&

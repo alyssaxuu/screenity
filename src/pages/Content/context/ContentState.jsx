@@ -43,6 +43,11 @@ const deriveCursorMode = (effects, fallbackMode) => {
   return effects[0] || "none";
 };
 
+// Scope the recording toolbar + camera bubble to the recorded tab for
+// tab/region recordings (they leak into other tabs today). Computation errs
+// toward showing; setting this false restores the prior always-show behavior.
+const ENABLE_TAB_SCOPED_UI = true;
+
 const ContentState = (props) => {
   const [timer, setTimerInternal] = React.useState(0);
   const CLOUD_FEATURES_ENABLED =
@@ -95,6 +100,44 @@ const ContentState = (props) => {
     return true;
   }, []);
 
+  // Whether THIS tab may render the recording UI. For tab/region recordings the
+  // toolbar + camera belong to the recorded tab only; desktop/screen/camera-only
+  // and idle are unaffected (always allowed). Errs toward showing while the tab
+  // id is still unknown so the recorded tab never flashes blank on navigation.
+  // The render gate in Wrapper reads contentState.recordingUiAllowed.
+  const recomputeRecordingUiAllowed = useCallback(
+    (reason) => {
+      const s = contentStateRef.current;
+      const type = s?.recordingType;
+      const tabBoundFlow =
+        (type === "tab" || type === "region") &&
+        Boolean(
+          s?.recording ||
+            s?.countdownActive ||
+            s?.isCountdownVisible ||
+            s?.preparingRecording ||
+            s?.pendingRecording,
+        );
+      let allowed = true;
+      if (ENABLE_TAB_SCOPED_UI && tabBoundFlow && tabIdRef.current != null) {
+        allowed = isTargetTab();
+      }
+      if (s?.recordingUiAllowed !== allowed) {
+        lifecycle("Content.ContentState", "recording-ui-allowed", {
+          allowed,
+          reason,
+          tabId: tabIdRef.current,
+          tabRecordedID: tabRecordedIdRef.current,
+          recordingUiTabId: recordingUiTabRef.current,
+          recordingType: type,
+          tabBoundFlow,
+        });
+        setContentState((prev) => ({ ...prev, recordingUiAllowed: allowed }));
+      }
+    },
+    [isTargetTab],
+  );
+
   const verifyUser = useCallback(async () => {
     if (!CLOUD_FEATURES_ENABLED) return;
     // Don't force a cookie-based re-login from the popup: a fresh install with
@@ -134,6 +177,7 @@ const ContentState = (props) => {
     chrome.runtime.sendMessage({ type: "get-tab-id" }, (response) => {
       if (response?.tabId !== undefined && response?.tabId !== null) {
         tabIdRef.current = response.tabId;
+        recomputeRecordingUiAllowed("tab-id");
       }
     });
 
@@ -152,9 +196,27 @@ const ContentState = (props) => {
         recordingUiTabRef.current = result.recordingUiTabId ?? null;
         recordingStartTimeRef.current = result.recordingStartTime ?? null;
         recordingBeepTabIdRef.current = result.recordingBeepTabId ?? null;
+        recomputeRecordingUiAllowed("storage-mount");
       },
     );
-  }, []);
+  }, [recomputeRecordingUiAllowed]);
+
+  // Recompute the recording-UI scope on visibility/focus. Unlike
+  // reconcileOnVisible (which bails during active recording), this runs during
+  // recording too, so a tab the user switches to mid-recording re-scopes. Flow
+  // changes (recording/type/scoping) trigger a recompute from the storage
+  // onChanged listener below. Deps are the stable callback only; this effect
+  // runs before `contentState` is declared, so it must not reference it.
+  useEffect(() => {
+    recomputeRecordingUiAllowed("mount");
+    const onVisible = () => recomputeRecordingUiAllowed("visibility");
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", onVisible);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", onVisible);
+    };
+  }, [recomputeRecordingUiAllowed]);
 
   // Permissions-Policy: camera=(), microphone=() on the host page disables
   // those APIs in every iframe including ours, surfacing as NotAllowedError;
@@ -1225,6 +1287,21 @@ const ContentState = (props) => {
     },
   });
   contentStateRef.current = contentState;
+
+  // Re-scope the recording UI when the recording flow changes (recording / type
+  // / countdown / preparing). Placed after `contentState` is declared so it can
+  // depend on it; recompute reads fresh state via contentStateRef.
+  useEffect(() => {
+    recomputeRecordingUiAllowed("flow");
+  }, [
+    recomputeRecordingUiAllowed,
+    contentState.recording,
+    contentState.recordingType,
+    contentState.countdownActive,
+    contentState.isCountdownVisible,
+    contentState.preparingRecording,
+    contentState.pendingRecording,
+  ]);
 
   setContentState = (updater) => {
     if (typeof updater === "function") {

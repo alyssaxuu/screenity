@@ -1700,5 +1700,33 @@
   "recordingCorruptToast": {
     "message": "This recording can't be played back. The file may be incomplete or corrupted. Try downloading the raw file from the Save menu.",
     "description": "Toast shown when the editor's video element fails to decode the recording (corrupt or zero-byte file)"
+  },
+  "cancelLabel": {
+    "message": "Cancel",
+    "description": "Cancel button on the download-in-progress banner"
+  },
+  "webmSlowTitle": {
+    "message": "Converting to WebM may take a while",
+    "description": "Title of the modal warning that MP4 to WebM conversion is slow"
+  },
+  "webmSlowDescription": {
+    "message": "Saving as WebM re-encodes the whole video, so it can take a few minutes for long recordings. MP4 saves instantly.",
+    "description": "Body of the slow-WebM warning modal"
+  },
+  "webmSlowMp4": {
+    "message": "Download MP4 instead",
+    "description": "Primary button: download MP4 instead of the slow WebM conversion"
+  },
+  "webmSlowContinue": {
+    "message": "Continue to WebM",
+    "description": "Secondary button: proceed with the slow WebM conversion"
+  },
+  "downloadProcessingTitle": {
+    "message": "Preparing your download",
+    "description": "Title of the download-in-progress banner with the Cancel button"
+  },
+  "downloadProcessingDescription": {
+    "message": "This can take a while for long recordings.",
+    "description": "Body of the download-in-progress banner"
   }
 }

@@ -1677,5 +1677,33 @@
   "unsupportedVideoCodecError": {
     "message": "Il tuo browser non supporta i codec video richiesti. Aggiorna Chrome e riprova.",
     "description": "Shown when no supported MediaRecorder mimeType is available"
+  },
+  "cancelLabel": {
+    "message": "Annulla",
+    "description": "Cancel button on the download-in-progress banner"
+  },
+  "webmSlowTitle": {
+    "message": "La conversione in WebM potrebbe richiedere del tempo",
+    "description": "Title of the modal warning that MP4 to WebM conversion is slow"
+  },
+  "webmSlowDescription": {
+    "message": "Il salvataggio come WebM ricodifica l'intero video, quindi può richiedere alcuni minuti per le registrazioni lunghe. L'MP4 viene salvato all'istante.",
+    "description": "Body of the slow-WebM warning modal"
+  },
+  "webmSlowMp4": {
+    "message": "Scarica invece l'MP4",
+    "description": "Primary button: download MP4 instead of the slow WebM conversion"
+  },
+  "webmSlowContinue": {
+    "message": "Continua con WebM",
+    "description": "Secondary button: proceed with the slow WebM conversion"
+  },
+  "downloadProcessingTitle": {
+    "message": "Preparazione del download",
+    "description": "Title of the download-in-progress banner with the Cancel button"
+  },
+  "downloadProcessingDescription": {
+    "message": "Questo può richiedere del tempo per le registrazioni lunghe.",
+    "description": "Body of the download-in-progress banner"
   }
 }

@@ -1189,13 +1189,17 @@ export const setupHandlers = () => {
       };
     }
     try {
-      // deterministic timeout so a wedged offscreen can't hang the caller forever
-      const REMUX_TIMEOUT_MS = 60_000;
+      // deterministic timeout so a wedged offscreen can't hang the caller
+      // forever. WebM is a full re-encode (minutes on large files), so it gets
+      // a far longer ceiling than the packet-copy remux; the editor's
+      // progress-reset stall guard catches a genuinely wedged conversion first.
+      const isWebm = message.kind === "webm";
+      const TIMEOUT_MS = isWebm ? 30 * 60_000 : 60_000;
       let timeoutId = null;
       try {
         const response = await Promise.race([
           chrome.runtime.sendMessage({
-            type: "remux-start",
+            type: isWebm ? "webm-start" : "remux-start",
             requestId: message.requestId,
             inputFileName: message.inputFileName,
             outputFileName: message.outputFileName,
@@ -1203,7 +1207,7 @@ export const setupHandlers = () => {
           new Promise((_, reject) => {
             timeoutId = setTimeout(
               () => reject(new Error("remux-offscreen-timeout")),
-              REMUX_TIMEOUT_MS,
+              TIMEOUT_MS,
             );
           }),
         ]);

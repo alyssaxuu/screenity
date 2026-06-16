@@ -16,6 +16,7 @@ import {
   EncodedAudioPacketSource,
 } from "mediabunny";
 import { createOpfsWritable } from "./opfsTarget";
+import { videoConverter } from "../Editor/mediabunny/lib/videoConverter";
 
 const TEMP_FILE_PREFIX = "remux-";
 const STALE_AGE_MS = 5 * 60 * 1000;
@@ -247,8 +248,86 @@ const remuxToOpfs = async ({ requestId, inputFileName, outputFileName }) => {
   }
 };
 
+// Re-encodes an MP4 (H.264) to WebM (VP9) from OPFS to OPFS, streaming output
+// so memory stays bounded on large files (the in-editor BufferTarget path OOMs
+// past ~2 GB). Far slower than the remux (it fully decodes and re-encodes
+// every frame), but it can't passthrough since WebM can't hold H.264.
+const convertWebmToOpfs = async ({ requestId, inputFileName, outputFileName }) => {
+  const startedAt = Date.now();
+  devLog("webm-start", { requestId, inputFileName, outputFileName });
+  await sweepOpfsStaleFiles();
+
+  let dir;
+  let outputHandle;
+  let syncHandle;
+  let handleReleased = false;
+
+  try {
+    dir = await navigator.storage.getDirectory();
+    const inputHandle = await dir.getFileHandle(inputFileName);
+    const inputFile = await inputHandle.getFile();
+
+    outputHandle = await dir.getFileHandle(outputFileName, { create: true });
+    syncHandle = await (async () => {
+      const delaysMs = [0, 200, 400, 600, 800];
+      let lastErr = null;
+      for (let i = 0; i < delaysMs.length; i += 1) {
+        if (delaysMs[i] > 0) {
+          await new Promise((r) => setTimeout(r, delaysMs[i]));
+        }
+        try {
+          return await outputHandle.createSyncAccessHandle();
+        } catch (err) {
+          lastErr = err;
+          if (err?.name !== "NoModificationAllowedError") break;
+        }
+      }
+      throw lastErr;
+    })();
+    syncHandle.truncate(0);
+
+    const writable = createOpfsWritable(syncHandle);
+
+    await videoConverter.convertToWebM(inputFile, {
+      target: new StreamTarget(writable),
+      onProgress: (p) => postProgress(requestId, p),
+    });
+
+    try {
+      await writable.close();
+    } catch {}
+    syncHandle.flush();
+    const finalSize = syncHandle.getSize();
+    syncHandle.close();
+    handleReleased = true;
+
+    devLog("webm-done", {
+      durationMs: Date.now() - startedAt,
+      outputBytes: finalSize,
+    });
+    postDone(requestId, outputFileName);
+  } catch (err) {
+    devLog("webm-error", {
+      err: String(err?.message || err).slice(0, 200),
+      durationMs: Date.now() - startedAt,
+    });
+    postError(requestId, err);
+    if (syncHandle && !handleReleased) {
+      try {
+        syncHandle.close();
+      } catch {}
+    }
+    if (dir && outputFileName) {
+      try {
+        await dir.removeEntry(outputFileName).catch(() => {});
+      } catch {}
+    }
+  }
+};
+
 self.onmessage = (e) => {
   const msg = e.data;
-  if (!msg || msg.type !== "remux") return;
-  remuxToOpfs(msg);
+  if (!msg) return;
+  if (msg.type === "remux") remuxToOpfs(msg);
+  else if (msg.type === "webm") convertWebmToOpfs(msg);
 };

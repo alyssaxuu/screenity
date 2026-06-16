@@ -13,6 +13,12 @@ import {
 } from "../CloudRecorder/recorderStorage/opfsKvStore";
 import { handleGetStreamingData } from "./recording/recordingHelpers";
 
+// Don't tear down an in-flight start on SW restart: a fresh start is
+// mid-setup (recorder tab not loaded yet), not dead. Mirrors the alarm
+// watchdog's recordingStartingAt window (handleAlarm.js).
+const ENABLE_START_GRACE_ON_INIT = true;
+const START_GRACE_MS = 30_000;
+
 // Must run before any message/alarm handler can bail on a stale lock.
 const clearStaleLocks = async () => {
   try {
@@ -27,6 +33,7 @@ const clearStaleLocks = async () => {
       offscreen,
       multiMode,
       region,
+      recordingStartingAt,
     } = await chrome.storage.local.get([
       "sendingChunks",
       "postStopEditorOpening",
@@ -38,6 +45,7 @@ const clearStaleLocks = async () => {
       "offscreen",
       "multiMode",
       "region",
+      "recordingStartingAt",
     ]);
 
     const stale = {};
@@ -81,7 +89,26 @@ const clearStaleLocks = async () => {
           );
         } catch {}
       }
-      if (!recorderAlive) {
+      // A start younger than START_GRACE_MS is mid-setup, not dead: the SW
+      // restarted before the recorder tab came up. Wiping it here is what
+      // surfaces as REC_START_FAILED under SW instability. Leave it; the
+      // alarm watchdog (same window) and the recorder's 12s start gate
+      // still catch a genuinely dead start.
+      const startIsFresh =
+        ENABLE_START_GRACE_ON_INIT &&
+        typeof recordingStartingAt === "number" &&
+        Date.now() - recordingStartingAt < START_GRACE_MS;
+      if (!recorderAlive && startIsFresh) {
+        console.warn(
+          "[Screenity][BG] Stale-looking start on startup but within start grace, keeping",
+          { recordingStartingAt, ageMs: Date.now() - recordingStartingAt },
+        );
+        diagEvent("sw-init-start-grace-kept", {
+          ageMs: Date.now() - recordingStartingAt,
+          recordingTab: recordingTab || null,
+        });
+      }
+      if (!recorderAlive && !startIsFresh) {
         stale.recording = false;
         stale.pendingRecording = false;
         stale.restarting = false;

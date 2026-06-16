@@ -1682,5 +1682,33 @@
   "unsupportedVideoCodecError": {
     "message": "आपका ब्राउज़र ज़रूरी वीडियो कोडेक्स का समर्थन नहीं करता। Chrome को अपडेट करें और फिर से कोशिश करें।",
     "description": "Shown when no supported MediaRecorder mimeType is available"
+  },
+  "cancelLabel": {
+    "message": "रद्द करें",
+    "description": "Cancel button on the download-in-progress banner"
+  },
+  "webmSlowTitle": {
+    "message": "WebM में बदलने में कुछ समय लग सकता है",
+    "description": "Title of the modal warning that MP4 to WebM conversion is slow"
+  },
+  "webmSlowDescription": {
+    "message": "WebM के रूप में सहेजने पर पूरा वीडियो फिर से एन्कोड होता है, इसलिए लंबी रिकॉर्डिंग में कुछ मिनट लग सकते हैं। MP4 तुरंत सहेजा जाता है।",
+    "description": "Body of the slow-WebM warning modal"
+  },
+  "webmSlowMp4": {
+    "message": "इसके बजाय MP4 डाउनलोड करें",
+    "description": "Primary button: download MP4 instead of the slow WebM conversion"
+  },
+  "webmSlowContinue": {
+    "message": "WebM के साथ जारी रखें",
+    "description": "Secondary button: proceed with the slow WebM conversion"
+  },
+  "downloadProcessingTitle": {
+    "message": "आपका डाउनलोड तैयार किया जा रहा है",
+    "description": "Title of the download-in-progress banner with the Cancel button"
+  },
+  "downloadProcessingDescription": {
+    "message": "लंबी रिकॉर्डिंग में इसमें कुछ समय लग सकता है।",
+    "description": "Body of the download-in-progress banner"
   }
 }

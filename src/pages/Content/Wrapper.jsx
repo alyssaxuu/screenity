@@ -331,7 +331,8 @@ const Wrapper = () => {
 
       {contentState.zoomEnabled && <ZoomContainer />}
       <BlurTool />
-      {contentState.showExtension || contentState.recording ? (
+      {(contentState.showExtension || contentState.recording) &&
+      contentState.recordingUiAllowed !== false ? (
         <div>
           {!contentState.recording &&
             !contentState.drawingMode &&

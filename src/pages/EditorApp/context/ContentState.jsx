@@ -34,6 +34,18 @@ const loadMb = () => {
   return _mbPromise;
 };
 
+// Pre-finalize the downloadable standard MP4 in the background on editor-ready
+// so the MP4 download is an instant file-save instead of an on-click remux that
+// can stall on large recordings. Flag-gated; download falls back to the on-
+// demand remux and the fragmented file if disabled or if the finalize fails.
+const ENABLE_EAGER_MP4_FINALIZE = true;
+
+// Route the MP4 -> WebM re-encode through the offscreen worker (OPFS-streamed,
+// bounded memory) instead of the in-editor BufferTarget path that OOMs on large
+// files. On failure (incl. a 60s no-progress stall) the download falls back to
+// delivering the source file, so it's safe to leave on.
+const ENABLE_OFFSCREEN_WEBM = true;
+
 localforage.config({
   driver: localforage.INDEXEDDB,
   name: "screenity",
@@ -382,20 +394,38 @@ const ContentState = (props) => {
     // A finalized OPFS recording is download-ready once the OPFS writer stamps
     // lastRecordingFinalizedFileName (a reliable write). The freeFinalizeStatus
     // "ready" below is fire-and-forget and often never lands, so use the marker.
+    // The marker is a single write a SW restart mid-finalize can wipe, so when
+    // it's missing we fall back to the OPFS file itself: if the session
+    // completed and the file exists with content, it's finalized regardless.
+    // This avoids the 60s freeFinalizeStatus timeout + the premature "stuck"
+    // error when the marker is lost.
     const isOpfsFinalized = async () => {
       try {
-        const { lastRecordingBackendRef, lastRecordingFinalizedFileName } =
-          await chrome.storage.local.get([
-            "lastRecordingBackendRef",
-            "lastRecordingFinalizedFileName",
-          ]);
+        const {
+          lastRecordingBackendRef,
+          lastRecordingFinalizedFileName,
+          freeRecorderSession,
+        } = await chrome.storage.local.get([
+          "lastRecordingBackendRef",
+          "lastRecordingFinalizedFileName",
+          "freeRecorderSession",
+        ]);
         const fileName = lastRecordingBackendRef?.fileName;
-        return (
-          lastRecordingBackendRef?.backend === "opfs" &&
-          Boolean(fileName) &&
-          lastRecordingFinalizedFileName === fileName &&
-          String(fileName).includes(recordingId)
-        );
+        if (
+          lastRecordingBackendRef?.backend !== "opfs" ||
+          !fileName ||
+          !String(fileName).includes(recordingId)
+        ) {
+          return false;
+        }
+        if (lastRecordingFinalizedFileName === fileName) return true;
+        // Marker missing: trust a completed session + the on-disk file.
+        const status = freeRecorderSession?.status;
+        if (status !== "completed" && status !== "complete") return false;
+        const dir = await navigator.storage.getDirectory();
+        const handle = await dir.getFileHandle(fileName);
+        const file = await handle.getFile();
+        return file.size > 0;
       } catch {
         return false;
       }
@@ -1208,14 +1238,20 @@ const ContentState = (props) => {
             });
             await reader.close().catch(() => {});
             if (!rawBlob) throw new Error("opfs-readblob-empty");
-            // use the OPFS Blob directly; arrayBuffer copy was 30-60s on slow
-            // disks for 100MB+ ("stuck at 90%"). materialize in the background.
+            // Use the disk-backed OPFS blob directly: <video> streams it from
+            // disk and mediabunny reads it lazily (~8MB cache), so the editor
+            // loads at O(1) memory regardless of size.
             const blob = rawBlob;
             diagForward("sandbox-opfs-materialize-deferred", {
               bytes: rawBlob.size,
             });
-            // fire-and-forget; swaps in once done, video keeps original src
-            if (rawBlob.size <= 1_500_000_000) {
+            // Only small recordings get an in-memory copy. Its only benefit is
+            // surviving a later "new recording" sweep of the OPFS file; above
+            // ~100MB the arrayBuffer copy itself spikes memory and janks the tab
+            // (the 873MB "can't load the recording" reports), so large files
+            // stay disk-backed and load instantly.
+            const MATERIALIZE_MAX_BYTES = 100_000_000;
+            if (rawBlob.size <= MATERIALIZE_MAX_BYTES) {
               const materializeStart = Date.now();
               (async () => {
                 try {
@@ -2855,7 +2891,11 @@ const ContentState = (props) => {
   };
 
   // OPFS sync access handle in an offscreen worker; bypasses BufferTarget's 2 GB cap
-  const remuxViaOffscreenOpfs = async (fragmentedBlob, onProgress) => {
+  const remuxViaOffscreenOpfs = async (
+    fragmentedBlob,
+    onProgress,
+    kind = "remux",
+  ) => {
     const requestId =
       (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
         ? crypto.randomUUID()
@@ -2883,7 +2923,9 @@ const ContentState = (props) => {
 
     // sendMessage's structured clone is lossy for Blobs across the SW
     // (BlobSource rejects with "blob must be a Blob"); transport via OPFS+filename
-    const outputFileName = `remux-${requestId}.mp4`;
+    const outputFileName = `remux-${requestId}.${
+      kind === "webm" ? "webm" : "mp4"
+    }`;
     let opfsDir;
     try {
       opfsDir = await navigator.storage.getDirectory();
@@ -2943,6 +2985,7 @@ const ContentState = (props) => {
 
       const response = await chrome.runtime.sendMessage({
         type: "remux-request",
+        kind,
         requestId,
         inputFileName,
         outputFileName,
@@ -2954,7 +2997,9 @@ const ContentState = (props) => {
 
       const outputHandle = await opfsDir.getFileHandle(outputFileName);
       const file = await outputHandle.getFile();
-      const outputBlob = new Blob([file], { type: "video/mp4" });
+      const outputBlob = new Blob([file], {
+        type: kind === "webm" ? "video/webm" : "video/mp4",
+      });
       devLog("offscreen-remux-ok", { outputBytes: outputBlob.size });
       return outputBlob;
     } finally {
@@ -2969,37 +3014,85 @@ const ContentState = (props) => {
     }
   };
 
-  const download = async () => {
-    // ref: rapid clicks fire before state propagates
-    const latest = contentStateRef.current || contentState;
-    // isFfmpegRunning leaks from bg poll handlers and swallows real clicks;
-    // downloading is the real lock
-    if (latest.downloading) return;
+  // A remux can stall indefinitely on a huge file (offscreen worker wedged,
+  // slow disk): reject if no progress lands within the window so download()
+  // falls through to the next tier or the raw-fMP4 fallback instead of hanging.
+  // Resets on every progress tick, so a slow-but-advancing remux is never cut.
+  const REMUX_STALL_MS = 60000;
+  const runRemuxWithStallGuard = (startFn, baseProgress) =>
+    new Promise((resolve, reject) => {
+      let timer = null;
+      let settled = false;
+      const arm = () => {
+        if (timer) clearTimeout(timer);
+        timer = setTimeout(() => {
+          if (settled) return;
+          settled = true;
+          reject(new Error(`remux-stalled-${REMUX_STALL_MS}ms`));
+        }, REMUX_STALL_MS);
+      };
+      const onProgress = (p) => {
+        arm();
+        if (typeof baseProgress === "function") baseProgress(p);
+      };
+      arm();
+      Promise.resolve(startFn(onProgress)).then(
+        (v) => {
+          if (settled) return;
+          settled = true;
+          if (timer) clearTimeout(timer);
+          resolve(v);
+        },
+        (e) => {
+          if (settled) return;
+          settled = true;
+          if (timer) clearTimeout(timer);
+          reject(e);
+        },
+      );
+    });
 
+  const standardMp4Ref = useRef(null);
+  const downloadCancelledRef = useRef(false);
+
+  // Cancel an in-progress download/conversion so the user isn't stuck waiting on
+  // a slow WebM re-encode. Resets the UI immediately and best-effort aborts the
+  // offscreen worker; the pending conversion's deliver step is skipped below.
+  const cancelDownload = () => {
+    downloadCancelledRef.current = true;
+    chrome.runtime.sendMessage({ type: "cancel-remux" }).catch(() => {});
     setContentState((prev) => ({
       ...prev,
-      downloading: true,
-      isFfmpegRunning: true,
+      downloading: false,
+      downloadingWEBM: false,
+      isFfmpegRunning: false,
       processingProgress: 0,
     }));
+  };
 
-    const progressHandler = (p) =>
-      setContentState((prev) => ({
-        ...prev,
-        processingProgress: Math.round(p * 100),
-      }));
+  // Only surface finalize progress while a download is actually in flight, so
+  // the background pre-warm doesn't flash a progress bar during editing.
+  const sharedFinalizeProgress = (p) => {
+    if (!contentStateRef.current?.downloading) return;
+    setContentState((prev) => ({
+      ...prev,
+      processingProgress: Math.round(p * 100),
+    }));
+  };
 
-    const inputSize = contentState.blob?.size || 0;
-    const remuxStartedAt = Date.now();
+  // Remux the fragmented recording MP4 to a standard (moov-at-end) MP4 the way
+  // QuickTime/Premiere/upload widgets expect. Two tiers: offscreen OPFS
+  // streaming (bounded memory, any size), then in-editor BufferTarget. Returns
+  // { blob, path }; blob is null if both tiers fail (caller serves fragmented).
+  const produceStandardMp4 = async (blob) => {
+    const inputSize = blob?.size || 0;
     let remuxedBlob = null;
     let remuxPath = null;
-
-    // tier 1: offscreen+OPFS, bounded memory
     try {
       diagForward("remux-offscreen-start", { inputBytes: inputSize });
-      remuxedBlob = await remuxViaOffscreenOpfs(
-        contentState.blob,
-        progressHandler,
+      remuxedBlob = await runRemuxWithStallGuard(
+        (pg) => remuxViaOffscreenOpfs(blob, pg),
+        sharedFinalizeProgress,
       );
       remuxPath = "offscreen-opfs";
       diagForward("remux-offscreen-ok", { inputBytes: inputSize });
@@ -3010,13 +3103,15 @@ const ContentState = (props) => {
         err: String(err?.message || err).slice(0, 200),
       });
     }
-
-    // tier 2: in-sandbox BufferTarget, capped at ~2 GB
-    if (!remuxedBlob) {
+    // tier 2 is an in-editor BufferTarget remux the offscreen cancel-remux
+    // can't reach, so skip it if the user already cancelled; otherwise a
+    // cancel during tier 1 still kicks off a full in-editor remux. download()
+    // resets the flag and re-runs this if the cache shows failed.
+    if (!remuxedBlob && !downloadCancelledRef.current) {
       try {
-        remuxedBlob = await remuxFragmentedToStandardMp4(
-          contentState.blob,
-          progressHandler,
+        remuxedBlob = await runRemuxWithStallGuard(
+          (pg) => remuxFragmentedToStandardMp4(blob, pg),
+          sharedFinalizeProgress,
         );
         remuxPath = "buffer-target";
         diagForward("remux-buffer-target-ok", { inputBytes: inputSize });
@@ -3030,6 +3125,81 @@ const ContentState = (props) => {
           err: String(err?.message || err).slice(0, 200),
         });
       }
+    }
+    return { blob: remuxedBlob, path: remuxPath };
+  };
+
+  // Cache + dedupe the standard-MP4 finalize, keyed on the exact source blob so
+  // an edit (which produces a new blob) re-finalizes. Lets the result be pre-
+  // warmed in the background on editor-ready and reused instantly on download.
+  const ensureStandardMp4 = () => {
+    const blob = contentStateRef.current?.blob;
+    if (!blob || blob.type !== "video/mp4") {
+      return Promise.resolve({ blob: null, path: null });
+    }
+    const cur = standardMp4Ref.current;
+    if (
+      cur &&
+      cur.forBlob === blob &&
+      (cur.status === "ready" || cur.status === "pending")
+    ) {
+      return cur.promise;
+    }
+    const promise = produceStandardMp4(blob).then((res) => {
+      standardMp4Ref.current = {
+        status: res.blob ? "ready" : "failed",
+        promise,
+        forBlob: blob,
+        blob: res.blob,
+        path: res.path,
+      };
+      return res;
+    });
+    standardMp4Ref.current = { status: "pending", promise, forBlob: blob };
+    return promise;
+  };
+
+  // Pre-warm the standard MP4 in the background once the editor is ready so the
+  // download is an instant file-save. Failures are cached; download() falls
+  // back to the fragmented file. Skipped when the flag is off.
+  useEffect(() => {
+    if (!ENABLE_EAGER_MP4_FINALIZE) return;
+    if (!contentState.ready) return;
+    if (contentState.blob?.type !== "video/mp4") return;
+    if (standardMp4Ref.current?.forBlob === contentState.blob) return;
+    ensureStandardMp4().catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [contentState.ready, contentState.blob]);
+
+  const download = async () => {
+    // ref: rapid clicks fire before state propagates
+    const latest = contentStateRef.current || contentState;
+    // isFfmpegRunning leaks from bg poll handlers and swallows real clicks;
+    // downloading is the real lock
+    if (latest.downloading) return;
+    downloadCancelledRef.current = false;
+
+    setContentState((prev) => ({
+      ...prev,
+      downloading: true,
+      isFfmpegRunning: true,
+      processingProgress: 0,
+    }));
+
+    const inputSize = contentState.blob?.size || 0;
+    const remuxStartedAt = Date.now();
+    let remuxedBlob = null;
+    let remuxPath = null;
+
+    // Reuse the background pre-warm if it finished (instant) or is in flight
+    // (await it); otherwise this runs the finalize now. Keyed on the blob, so
+    // an edited recording re-finalizes before download.
+    try {
+      const res = await ensureStandardMp4();
+      remuxedBlob = res.blob;
+      remuxPath = res.path;
+    } catch (err) {
+      console.warn("[Screenity] standard mp4 finalize failed", err);
     }
 
     const remuxDurationMs = Date.now() - remuxStartedAt;
@@ -3053,6 +3223,7 @@ const ContentState = (props) => {
       },
     }));
 
+    if (downloadCancelledRef.current) return;
     try {
       if (remuxedBlob) {
         const url = URL.createObjectURL(remuxedBlob);
@@ -3090,6 +3261,7 @@ const ContentState = (props) => {
 
   const downloadWEBM = async () => {
     if (contentState.downloadingWEBM) return;
+    downloadCancelledRef.current = false;
 
     const sourceBlob = contentState.blob || contentState.webm;
 
@@ -3126,6 +3298,29 @@ const ContentState = (props) => {
       return;
     }
 
+    // MP4 -> WebM here is a software VP9 re-encode (no hardware encoder on most
+    // setups), so it can take minutes on a long recording. Warn first and offer
+    // the instant MP4 instead.
+    const webmChoice = await new Promise((resolve) => {
+      const open = contentStateRef.current?.openModal;
+      if (typeof open !== "function") {
+        resolve("webm");
+        return;
+      }
+      open(
+        chrome.i18n.getMessage("webmSlowTitle"),
+        chrome.i18n.getMessage("webmSlowDescription"),
+        chrome.i18n.getMessage("webmSlowMp4"),
+        chrome.i18n.getMessage("webmSlowContinue"),
+        () => resolve("mp4"),
+        () => resolve("webm"),
+      );
+    });
+    if (webmChoice === "mp4") {
+      download();
+      return;
+    }
+
     setContentState((prevState) => ({
       ...prevState,
       downloadingWEBM: true,
@@ -3133,20 +3328,106 @@ const ContentState = (props) => {
       processingProgress: 0,
     }));
 
+    // Offscreen re-encode (OPFS-streamed, bounded memory) so large MP4s don't
+    // OOM the in-editor BufferTarget path. On any failure (incl. a 60s no-
+    // progress stall) we deliver the source so the user is never stuck.
+    if (ENABLE_OFFSCREEN_WEBM) {
+      let webmBlob = null;
+      try {
+        webmBlob = await runRemuxWithStallGuard(
+          (pg) => remuxViaOffscreenOpfs(sourceBlob, pg, "webm"),
+          (p) =>
+            setContentState((prev) => ({
+              ...prev,
+              processingProgress: Math.round(p * 100),
+            })),
+        );
+      } catch (err) {
+        console.warn(
+          "[Screenity] offscreen webm convert failed, falling back",
+          err,
+        );
+      }
+      if (downloadCancelledRef.current) return;
+      const blobToSave = webmBlob || sourceBlob;
+      const ext = blobToSave.type === "video/webm" ? ".webm" : ".mp4";
+      try {
+        const url = URL.createObjectURL(blobToSave);
+        await requestDownload(url, ext);
+        URL.revokeObjectURL(url);
+      } catch (err) {
+        console.error("[Screenity] webm download failed", err);
+      }
+      setContentState((prevState) => ({
+        ...prevState,
+        downloadingWEBM: false,
+        isFfmpegRunning: false,
+        saved: true,
+      }));
+      return;
+    }
+
     sendMessage({
       type: "to-webm",
       blob: sourceBlob,
       duration: contentState.duration,
     });
 
-    await waitForUpdatedBlob();
+    // The transcode delivers the file via the "download-webm" message handler
+    // and progress via "ffmpeg-progress". Guard against a stalled or failed
+    // transcode (large MP4s can exhaust ffmpeg): if no progress or completion
+    // lands within the window, deliver the source as-is so the user isn't stuck
+    // on an endless "processing". Resets on every progress tick.
+    const WEBM_STALL_MS = 60000;
+    const completed = await new Promise((resolve) => {
+      let timer = null;
+      const cleanup = () => {
+        if (timer) clearTimeout(timer);
+        window.removeEventListener("message", handler);
+      };
+      const arm = () => {
+        if (timer) clearTimeout(timer);
+        timer = setTimeout(() => {
+          cleanup();
+          resolve(false);
+        }, WEBM_STALL_MS);
+      };
+      function handler(event) {
+        const t = event.data?.type;
+        if (t === "ffmpeg-progress") {
+          arm();
+        } else if (t === "download-webm") {
+          cleanup();
+          resolve(true);
+        } else if (t === "ffmpeg-error") {
+          cleanup();
+          resolve(false);
+        }
+      }
+      window.addEventListener("message", handler);
+      arm();
+    });
 
-    setContentState((prevState) => ({
-      ...prevState,
-      downloadingWEBM: false,
-      isFfmpegRunning: false,
-      saved: true,
-    }));
+    if (!completed) {
+      // Stalled or failed: deliver the source as-is so the user isn't stuck.
+      // It's already a finalized, playable file; use its real extension.
+      const ext = sourceBlob.type === "video/webm" ? ".webm" : ".mp4";
+      try {
+        const url = URL.createObjectURL(sourceBlob);
+        await requestDownload(url, ext);
+        URL.revokeObjectURL(url);
+      } catch (err) {
+        console.error("[Screenity] webm fallback download failed", err);
+      }
+      setContentState((prevState) => ({
+        ...prevState,
+        downloadingWEBM: false,
+        isFfmpegRunning: false,
+        saved: true,
+      }));
+    }
+    // On success the "download-webm" handler delivered the file and cleared the
+    // downloading flags, so there is nothing more to do here.
   };
 
   const downloadGIF = async () => {
@@ -3201,6 +3482,7 @@ const ContentState = (props) => {
   contentState.handleTrim = handleTrim;
   contentState.handleMute = handleMute;
   contentState.download = download;
+  contentState.cancelDownload = cancelDownload;
   contentState.handleCrop = handleCrop;
   contentState.handleReencode = handleReencode;
   contentState.getFrame = getImage;

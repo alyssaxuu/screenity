@@ -14,27 +14,39 @@ export const ensureRemuxOffscreen = async () => {
     throw new Error("offscreen-api-unavailable");
   }
 
-  const contexts = await chrome.runtime.getContexts({});
-  const existing = contexts.find(
-    (c) => c.contextType === "OFFSCREEN_DOCUMENT",
-  );
-  if (existing) {
+  // The recorder offscreen tears down asynchronously right after a recording
+  // stops, so a download fired immediately after can still see it present.
+  // Poll for it to finish closing (~7s) before giving up, so a just-recorded
+  // download still gets the streaming OPFS remux/encode instead of the slow
+  // in-editor BufferTarget fallback. We never displace the recorder ourselves:
+  // closing it mid-capture kills the recording and aborts TUS finalize.
+  const waitDelaysMs = [0, 500, 1000, 1500, 2000, 2000];
+  for (let i = 0; i < waitDelaysMs.length; i += 1) {
+    if (waitDelaysMs[i] > 0) {
+      await new Promise((r) => setTimeout(r, waitDelaysMs[i]));
+    }
+    const contexts = await chrome.runtime.getContexts({});
+    const existing = contexts.find(
+      (c) => c.contextType === "OFFSCREEN_DOCUMENT",
+    );
+    if (!existing) break;
     const existingUrl =
       typeof existing.documentUrl === "string" ? existing.documentUrl : "";
-    const alreadyRemux = existingUrl.endsWith(REMUX_OFFSCREEN_URL);
-    if (alreadyRemux) return;
-    // never displace the recorder offscreen; closing it mid-capture kills the
-    // recording and mid-upload aborts TUS finalize. editor download() falls back.
+    if (existingUrl.endsWith(REMUX_OFFSCREEN_URL)) return;
     if (existingUrl.includes("offscreenrecorder.html")) {
-      throw new Error("offscreen-busy-recorder");
+      // Recorder still closing; wait and retry. Give up only on the last try.
+      if (i === waitDelaysMs.length - 1) {
+        throw new Error("offscreen-busy-recorder");
+      }
+      continue;
     }
+    // A different offscreen (audio beep / upload resume): close it and proceed.
     try {
       await chrome.offscreen.closeDocument();
     } catch (err) {
-      // If closeDocument fails we still try to proceed; createDocument
-      // will surface a clearer error if the state is actually bad.
       console.warn("ensureRemuxOffscreen: closeDocument failed", err);
     }
+    break;
   }
 
   await chrome.offscreen.createDocument({

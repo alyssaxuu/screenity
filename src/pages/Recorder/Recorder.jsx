@@ -993,6 +993,12 @@ const Recorder = () => {
     // only; storage cache keeps subsequent recordings instant.
   }, []);
 
+  // Preserve-and-recover instead of discarding when the abandonment watchdog
+  // fires on a recording that actually captured content (a slow stop under
+  // contention, not a true teardown). Flag-gated since it's on the recorder
+  // critical path.
+  const ENABLE_ABANDON_FINALIZE = true;
+
   // Grace before acting on a recording=false flag flip: a normal stop
   // flips storage a beat before its stop-recording-tab message reaches
   // this tab, so wait that window out before declaring abandonment.
@@ -1005,6 +1011,29 @@ const Recorder = () => {
   const abortAbandonedRecording = (detail) => {
     if (abandonHandled.current) return;
     abandonHandled.current = true;
+
+    // If real content was captured, the stop signal just didn't reach us in
+    // time (slow stop under contention) rather than a genuine teardown. Finalize
+    // through the normal stop path so the file is closed, recoverable, and the
+    // editor can open, instead of silently discarding the recording.
+    if (
+      ENABLE_ABANDON_FINALIZE &&
+      (savedCount.current > 0 || hasChunks.current)
+    ) {
+      lifecycle("Recorder", "abandoned-finalize", {
+        ...detail,
+        savedCount: savedCount.current,
+        recorderType: useWebCodecs.current ? "webcodecs" : "mediarecorder",
+      });
+      try {
+        slLog("abandoned-finalize", detail);
+      } catch {}
+      stopRecording().catch((err) => {
+        debugError("abandoned-finalize: stopRecording failed", err);
+      });
+      return;
+    }
+
     localStopInitiated.current = true;
     isRecording.current = false;
     // Invalidate the run so any late ondataavailable is dropped.
@@ -4068,6 +4097,13 @@ const Recorder = () => {
     });
   }, []);
 
+  // A fresh start under SW instability can hit a transient mint failure: the
+  // SW restart racing the call, or the just-closed previous recording's
+  // tab-capture binding not released yet ("active stream"). The mint was
+  // single-shot, so one transient miss surfaced as REC_START_FAILED. Retry a
+  // few times with backoff; a permanent failure (no API) breaks out at once.
+  const ENABLE_TAB_STREAM_MINT_RETRY = true;
+
   const getStreamID = async (id) => {
     perfMark("Recorder getStreamID.enter", { tabId: id });
     debug("getStreamID()", id);
@@ -4075,60 +4111,79 @@ const Recorder = () => {
     // Track mint latency (lastTabStreamMintMs) so a tabStreamUnavailableError
     // report shows whether the mint was slow or genuinely hung.
     const mintStartedAt = Date.now();
-    let streamId;
-    try {
-      if (IS_OFFSCREEN_HOST) {
-        // chrome.tabCapture isn't callable from offscreen; delegate to SW.
-        const endOff = perfSpan("Recorder offscreen-request-stream(tab)");
-        const response = await chrome.runtime
-          .sendMessage({
-            type: "offscreen-request-stream",
-            mode: "tab",
-            targetTabId: id,
-          })
-          .catch((err) => ({ ok: false, error: String(err) }));
-        endOff({ ok: Boolean(response?.ok) });
-        if (!response?.ok || !response.streamId) {
-          debug("Offscreen tab stream acquisition failed", response);
-          tabIDError.current =
-            response?.error || "offscreen-tab-stream-empty-response";
-          return;
-        }
-        streamId = response.streamId;
-      } else {
-        if (!chrome?.tabCapture?.getMediaStreamId) {
-          tabIDError.current = "chrome.tabCapture.getMediaStreamId unavailable";
-          return;
-        }
-        const endTc = perfSpan("Recorder tabCapture.getMediaStreamId");
-        streamId = await chrome.tabCapture.getMediaStreamId({
-          targetTabId: id,
-        });
-        endTc({ hasStreamId: Boolean(streamId) });
-        if (!streamId) {
-          tabIDError.current = "tabCapture.getMediaStreamId returned empty";
-          return;
-        }
+    const maxAttempts = ENABLE_TAB_STREAM_MINT_RETRY ? 3 : 1;
+    const backoffMs = [0, 400, 900];
+    // Hold the error locally until we give up: waitForTabStreamId bails the
+    // moment tabIDError is set, so a per-attempt write would abort the retry.
+    let lastErr = null;
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      if (backoffMs[attempt] > 0) {
+        await new Promise((r) => setTimeout(r, backoffMs[attempt]));
       }
-      debug("Resolved tabCapture streamId", streamId);
-      tabID.current = streamId;
-    } catch (err) {
-      const errStr = String(err?.message || err);
-      debugWarn("getStreamID failed", errStr);
-      tabIDError.current = errStr;
-    } finally {
-      perfMark("Recorder getStreamID.done", {
-        ok: Boolean(tabID.current),
-        error: tabIDError.current,
-      });
+      let streamId;
+      let permanent = false;
       try {
-        chrome.storage.local.set({
-          lastTabStreamMintMs: Date.now() - mintStartedAt,
-          lastTabStreamMintOk: Boolean(tabID.current),
-          lastTabStreamMintOffscreen: IS_OFFSCREEN_HOST,
+        if (IS_OFFSCREEN_HOST) {
+          // chrome.tabCapture isn't callable from offscreen; delegate to SW.
+          const endOff = perfSpan("Recorder offscreen-request-stream(tab)");
+          const response = await chrome.runtime
+            .sendMessage({
+              type: "offscreen-request-stream",
+              mode: "tab",
+              targetTabId: id,
+            })
+            .catch((err) => ({ ok: false, error: String(err) }));
+          endOff({ ok: Boolean(response?.ok) });
+          if (!response?.ok || !response.streamId) {
+            debug("Offscreen tab stream acquisition failed", response);
+            lastErr = response?.error || "offscreen-tab-stream-empty-response";
+          } else {
+            streamId = response.streamId;
+          }
+        } else if (!chrome?.tabCapture?.getMediaStreamId) {
+          lastErr = "chrome.tabCapture.getMediaStreamId unavailable";
+          permanent = true;
+        } else {
+          const endTc = perfSpan("Recorder tabCapture.getMediaStreamId");
+          streamId = await chrome.tabCapture.getMediaStreamId({
+            targetTabId: id,
+          });
+          endTc({ hasStreamId: Boolean(streamId) });
+          if (!streamId) {
+            lastErr = "tabCapture.getMediaStreamId returned empty";
+          }
+        }
+        if (streamId) {
+          debug("Resolved tabCapture streamId", streamId);
+          tabID.current = streamId;
+          break;
+        }
+      } catch (err) {
+        lastErr = String(err?.message || err);
+        debugWarn("getStreamID failed", lastErr);
+      }
+      if (permanent) break;
+      if (attempt + 1 < maxAttempts) {
+        slLog("tab-stream-mint-retry", {
+          attempt,
+          err: String(lastErr || "").slice(0, 120),
         });
-      } catch {}
+      }
     }
+    if (!tabID.current) {
+      tabIDError.current = lastErr || "tab-stream-mint-failed";
+    }
+    perfMark("Recorder getStreamID.done", {
+      ok: Boolean(tabID.current),
+      error: tabIDError.current,
+    });
+    try {
+      chrome.storage.local.set({
+        lastTabStreamMintMs: Date.now() - mintStartedAt,
+        lastTabStreamMintOk: Boolean(tabID.current),
+        lastTabStreamMintOffscreen: IS_OFFSCREEN_HOST,
+      });
+    } catch {}
   };
 
   // chromeMediaSource constraints have no "no padding" knob: any combo

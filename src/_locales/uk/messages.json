@@ -1680,5 +1680,33 @@
   "unsupportedVideoCodecError": {
     "message": "Ваш браузер не підтримує потрібні відеокодеки. Оновіть Chrome і спробуйте знову.",
     "description": "Shown when no supported MediaRecorder mimeType is available"
+  },
+  "cancelLabel": {
+    "message": "Скасувати",
+    "description": "Cancel button on the download-in-progress banner"
+  },
+  "webmSlowTitle": {
+    "message": "Перетворення на WebM може зайняти деякий час",
+    "description": "Title of the modal warning that MP4 to WebM conversion is slow"
+  },
+  "webmSlowDescription": {
+    "message": "Збереження у форматі WebM повторно кодує все відео, тож для довгих записів це може зайняти кілька хвилин. MP4 зберігається миттєво.",
+    "description": "Body of the slow-WebM warning modal"
+  },
+  "webmSlowMp4": {
+    "message": "Завантажити MP4 натомість",
+    "description": "Primary button: download MP4 instead of the slow WebM conversion"
+  },
+  "webmSlowContinue": {
+    "message": "Продовжити з WebM",
+    "description": "Secondary button: proceed with the slow WebM conversion"
+  },
+  "downloadProcessingTitle": {
+    "message": "Підготовка завантаження",
+    "description": "Title of the download-in-progress banner with the Cancel button"
+  },
+  "downloadProcessingDescription": {
+    "message": "Для довгих записів це може зайняти деякий час.",
+    "description": "Body of the download-in-progress banner"
   }
 }

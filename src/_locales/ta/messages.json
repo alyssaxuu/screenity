@@ -1682,5 +1682,33 @@
   "unsupportedVideoCodecError": {
     "message": "உங்கள் உலாவி தேவையான வீடியோ கோடெக்குகளை ஆதரிக்கவில்லை. Chrome ஐ புதுப்பித்து மீண்டும் முயற்சிக்கவும்.",
     "description": "Shown when no supported MediaRecorder mimeType is available"
+  },
+  "cancelLabel": {
+    "message": "ரத்து செய்",
+    "description": "Cancel button on the download-in-progress banner"
+  },
+  "webmSlowTitle": {
+    "message": "WebM ஆக மாற்றுவதற்கு சிறிது நேரம் ஆகலாம்",
+    "description": "Title of the modal warning that MP4 to WebM conversion is slow"
+  },
+  "webmSlowDescription": {
+    "message": "WebM ஆகச் சேமிக்கும்போது முழு வீடியோவும் மீண்டும் குறியாக்கம் செய்யப்படுகிறது, எனவே நீண்ட பதிவுகளுக்கு சில நிமிடங்கள் ஆகலாம். MP4 உடனடியாகச் சேமிக்கப்படும்.",
+    "description": "Body of the slow-WebM warning modal"
+  },
+  "webmSlowMp4": {
+    "message": "மாறாக MP4 ஐப் பதிவிறக்கவும்",
+    "description": "Primary button: download MP4 instead of the slow WebM conversion"
+  },
+  "webmSlowContinue": {
+    "message": "WebM உடன் தொடரவும்",
+    "description": "Secondary button: proceed with the slow WebM conversion"
+  },
+  "downloadProcessingTitle": {
+    "message": "உங்கள் பதிவிறக்கம் தயாராகிறது",
+    "description": "Title of the download-in-progress banner with the Cancel button"
+  },
+  "downloadProcessingDescription": {
+    "message": "நீண்ட பதிவுகளுக்கு இதற்கு சிறிது நேரம் ஆகலாம்.",
+    "description": "Body of the download-in-progress banner"
   }
 }

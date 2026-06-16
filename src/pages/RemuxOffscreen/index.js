@@ -77,23 +77,48 @@ const ensureWorker = () => {
   return worker;
 };
 
+chrome.runtime.onMessage.addListener((message) => {
+  if (!message || message.type !== "cancel-remux") return undefined;
+  // Editor cancelled the download: kill the worker so it stops encoding.
+  if (worker) {
+    try {
+      worker.terminate();
+    } catch {
+      // already gone
+    }
+    worker = null;
+  }
+  for (const [, entry] of pending) {
+    entry?.sendResponse?.({ ok: false, error: "cancelled" });
+  }
+  pending.clear();
+  return false;
+});
+
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
-  if (!message || message.type !== "remux-start") return undefined;
+  if (
+    !message ||
+    (message.type !== "remux-start" && message.type !== "webm-start")
+  ) {
+    return undefined;
+  }
   const { requestId, inputFileName, outputFileName } = message;
   if (!requestId || !inputFileName || !outputFileName) {
     sendResponse({ ok: false, error: "invalid-remux-start-payload" });
     return false;
   }
+  const workerType = message.type === "webm-start" ? "webm" : "remux";
   try {
     const w = ensureWorker();
     devLog("remux-start-received", {
       requestId,
       inputFileName,
       outputFileName,
+      kind: workerType,
     });
     pending.set(requestId, { sendResponse });
     w.postMessage({
-      type: "remux",
+      type: workerType,
       requestId,
       inputFileName,
       outputFileName,

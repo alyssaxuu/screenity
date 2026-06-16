@@ -232,25 +232,9 @@ export const handleAlarm = async (alarm) => {
     const { recording } = await chrome.storage.local.get(["recording"]);
     if (recording) {
       diagEvent("error", { note: "first-chunk-watchdog-fired" });
-      // If the fast (WebCodecs) recorder was in use, a missing first chunk
-      // is almost always a silently-failed WebCodecs encoder (the
-      // "28-byte ftyp" stall). Sticky-disable it now so the user's retry
-      // falls back to MediaRecorder and succeeds, instead of hitting
-      // WebCodecs again and failing identically. (markFastRecorderFailure
-      // ignores transient stream errors via its own pattern list.)
-      try {
-        const { fastRecorderInUse } = await chrome.storage.local.get([
-          "fastRecorderInUse",
-        ]);
-        if (fastRecorderInUse) {
-          await markFastRecorderFailure("webcodecs-no-first-chunk", {
-            error: "WebCodecs produced no first chunk within 8s (watchdog)",
-          });
-        }
-      } catch (err) {
-        console.warn("[Screenity][BG] watchdog sticky-disable failed", err);
-      }
-      // 1500ms cap so a wedged tab can't delay the user-facing error
+      // Snapshot the recorder first (1500ms cap so a wedged tab can't delay the
+      // user-facing error) so the disable and stop decisions can read the
+      // capture track's state.
       let snapshot = null;
       let snapshotError = null;
       try {
@@ -276,15 +260,44 @@ export const handleAlarm = async (alarm) => {
           },
         });
       } catch {}
-      // handleRecordingError (not sendMessageRecord) so the editor gets notified
-      try {
-        await handleRecordingError({
-          error: "stream-error",
-          why: "Recording failed: no video data received within 8 seconds. The tab may have been throttled. Please try again.",
-          errorCode: "no-first-chunk",
-        });
-      } catch (err) {
-        console.warn("[Screenity][BG] first-chunk watchdog handler failed", err);
+
+      const vt = snapshot?.stream?.videoTrack || null;
+      if (vt && vt.readyState === "live" && vt.muted === true) {
+        // Capture track is live but muted: the recorded tab is backgrounded,
+        // focus was lost, or the display slept, so no frames are arriving. That
+        // is not an encoder defect, so don't disable WebCodecs and don't fail
+        // the recording. It keeps running and the first chunk cancels this
+        // watchdog once the user returns and frames resume.
+        diagEvent("warning", { note: "first-chunk-watchdog-capture-muted" });
+      } else {
+        // Sticky-disable WebCodecs for the device only when the capture track
+        // was live and unmuted yet produced no chunk (the genuine "28-byte
+        // ftyp" silent-encoder defect). An ended track or no snapshot is
+        // ambiguous: fail the recording but leave the fast path enabled.
+        try {
+          const { fastRecorderInUse } = await chrome.storage.local.get([
+            "fastRecorderInUse",
+          ]);
+          const realEncoderDefect =
+            Boolean(vt) && vt.readyState === "live" && vt.muted === false;
+          if (fastRecorderInUse && realEncoderDefect) {
+            await markFastRecorderFailure("webcodecs-no-first-chunk", {
+              error: "WebCodecs produced no first chunk within 8s (watchdog)",
+            });
+          }
+        } catch (err) {
+          console.warn("[Screenity][BG] watchdog sticky-disable failed", err);
+        }
+        // handleRecordingError (not sendMessageRecord) so the editor gets notified
+        try {
+          await handleRecordingError({
+            error: "stream-error",
+            why: "Recording failed: no video data received within 8 seconds. The tab may have been throttled. Please try again.",
+            errorCode: "no-first-chunk",
+          });
+        } catch (err) {
+          console.warn("[Screenity][BG] first-chunk watchdog handler failed", err);
+        }
       }
     }
     await chrome.alarms.clear(FIRST_CHUNK_WATCHDOG_ALARM);

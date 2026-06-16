@@ -1682,5 +1682,33 @@
   "unsupportedVideoCodecError": {
     "message": "Browser Anda tidak mendukung codec video yang diperlukan. Perbarui Chrome lalu coba lagi.",
     "description": "Shown when no supported MediaRecorder mimeType is available"
+  },
+  "cancelLabel": {
+    "message": "Batal",
+    "description": "Cancel button on the download-in-progress banner"
+  },
+  "webmSlowTitle": {
+    "message": "Mengonversi ke WebM mungkin memakan waktu",
+    "description": "Title of the modal warning that MP4 to WebM conversion is slow"
+  },
+  "webmSlowDescription": {
+    "message": "Menyimpan sebagai WebM mengodekan ulang seluruh video, sehingga bisa memakan waktu beberapa menit untuk rekaman panjang. MP4 disimpan secara instan.",
+    "description": "Body of the slow-WebM warning modal"
+  },
+  "webmSlowMp4": {
+    "message": "Unduh MP4 saja",
+    "description": "Primary button: download MP4 instead of the slow WebM conversion"
+  },
+  "webmSlowContinue": {
+    "message": "Lanjutkan ke WebM",
+    "description": "Secondary button: proceed with the slow WebM conversion"
+  },
+  "downloadProcessingTitle": {
+    "message": "Menyiapkan unduhan Anda",
+    "description": "Title of the download-in-progress banner with the Cancel button"
+  },
+  "downloadProcessingDescription": {
+    "message": "Ini bisa memakan waktu untuk rekaman panjang.",
+    "description": "Body of the download-in-progress banner"
   }
 }

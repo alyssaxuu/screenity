@@ -1682,5 +1682,33 @@
   "unsupportedVideoCodecError": {
     "message": "Tarayıcınız gerekli video codec'lerini desteklemiyor. Chrome'u güncelleyip tekrar deneyin.",
     "description": "Shown when no supported MediaRecorder mimeType is available"
+  },
+  "cancelLabel": {
+    "message": "İptal",
+    "description": "Cancel button on the download-in-progress banner"
+  },
+  "webmSlowTitle": {
+    "message": "WebM'e dönüştürme biraz zaman alabilir",
+    "description": "Title of the modal warning that MP4 to WebM conversion is slow"
+  },
+  "webmSlowDescription": {
+    "message": "WebM olarak kaydetmek videonun tamamını yeniden kodlar, bu nedenle uzun kayıtlarda birkaç dakika sürebilir. MP4 anında kaydedilir.",
+    "description": "Body of the slow-WebM warning modal"
+  },
+  "webmSlowMp4": {
+    "message": "Bunun yerine MP4 indir",
+    "description": "Primary button: download MP4 instead of the slow WebM conversion"
+  },
+  "webmSlowContinue": {
+    "message": "WebM ile devam et",
+    "description": "Secondary button: proceed with the slow WebM conversion"
+  },
+  "downloadProcessingTitle": {
+    "message": "İndirmeniz hazırlanıyor",
+    "description": "Title of the download-in-progress banner with the Cancel button"
+  },
+  "downloadProcessingDescription": {
+    "message": "Uzun kayıtlarda bu biraz zaman alabilir.",
+    "description": "Body of the download-in-progress banner"
   }
 }
