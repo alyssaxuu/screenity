@@ -229,7 +229,7 @@ const Countdown = () => {
         finishTimeoutRef.current = null;
       }, END_HOLD_MS);
     }
-  }, [count, setContentState]);
+  }, [count]);
 
   // Log every visible digit so UI ticks correlate with BG events.
   useEffect(() => {

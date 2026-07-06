@@ -1526,8 +1526,8 @@
     "description": "Shown when the screen capture stream is missing or can't be accessed (no streamId returned, getDisplayMedia threw, etc.)"
   },
   "tabStreamUnavailableError": {
-    "message": "Couldn't access this tab's video. Reload the tab and try again.",
-    "description": "Shown when Chrome won't return a tab capture stream for the chosen tab"
+    "message": "Couldn't record this tab. Some pages like browser settings, the Web Store, or extension pages can't be captured. Try reloading the tab, switching to a different tab, or recording your screen instead.",
+    "description": "Shown when Chrome won't return a tab capture stream for the chosen tab or region recording"
   },
   "streamingDataTimeoutError": {
     "message": "Recording didn't start in time. Please try again.",

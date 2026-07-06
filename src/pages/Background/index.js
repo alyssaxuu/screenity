@@ -6,6 +6,7 @@ import {
 } from "../../messaging/messageRouter";
 import { hydrateDiagnosticLog, diagEvent } from "../utils/diagnosticLog";
 import { initCountdownFallback } from "./recording/countdownFallback";
+import { initKeepAwake } from "./recording/keepAwake";
 import { initLifecycleObserver } from "./lifecycleObserver";
 import {
   listSessionDirs,
@@ -329,6 +330,7 @@ messageRouter();
 initializeListeners();
 setupHandlers();
 initCountdownFallback();
+initKeepAwake();
 initLifecycleObserver();
 
 // Recovery must run AFTER clearStaleLocks: if the recorder tab died

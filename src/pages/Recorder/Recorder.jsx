@@ -3824,6 +3824,9 @@ const Recorder = () => {
             silentSamples += 1;
             if (silentSamples >= SAMPLES_BEFORE_ALERT && !alreadyReported) {
               alreadyReported = true;
+              const hasMic = !!helperAudioStream.current?.getAudioTracks?.()
+                ?.length;
+              const hasSystemAudio = sysTracks.length > 0 && data.systemAudio;
               try {
                 chrome.runtime.sendMessage({
                   type: "diag-forward",
@@ -3832,10 +3835,8 @@ const Recorder = () => {
                     elapsedRecordingMs: recordingStartTime.current
                       ? Date.now() - recordingStartTime.current
                       : null,
-                    hasMic: !!helperAudioStream.current?.getAudioTracks?.()
-                      ?.length,
-                    hasSystemAudio:
-                      sysTracks.length > 0 && data.systemAudio,
+                    hasMic,
+                    hasSystemAudio,
                     audioContextState: aCtx.current?.state ?? null,
                     docVisibility:
                       typeof document !== "undefined"
@@ -3844,14 +3845,8 @@ const Recorder = () => {
                   },
                 });
               } catch {}
-              // Surface but don't stop: silence may be intentional.
-              try {
-                chrome.runtime.sendMessage({
-                  type: "show-toast",
-                  message: chrome.i18n.getMessage("audioSilentToast"),
-                  timeout: 8000,
-                }).catch(() => {});
-              } catch {}
+              // No toast: silence is normal (nobody speaking, or no audio), so a
+              // mid-recording warning just gets in the way. Diag above still logs it.
             }
           } else {
             silentSamples = 0;
@@ -4502,7 +4497,11 @@ const Recorder = () => {
       const timeoutMs = Number(request.timeoutMs) || 20000;
       (async () => {
         try {
-          if (isRecording.current) stopRecording();
+          if (isRecording.current) {
+            stopRecording();
+          }
+          // Don't stop capture tracks here: it raced a slow start (isRecording
+          // not yet flipped, tracks live) and killed the screen track mid-start.
           await new Promise((resolve) => setTimeout(resolve, 1000));
         } catch (err) {
           console.warn("[Recorder] offscreen-shutdown error", err);

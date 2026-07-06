@@ -2,6 +2,7 @@ import React, { useContext, useEffect, useState, useRef } from "react";
 import styles from "../../styles/player/_RightPanel.module.scss";
 
 import { buildDiagnosticZip } from "../../../utils/buildDiagnosticZip";
+import { downloadResolvedRecording } from "../../recorderStorage/resolveRecordingFile";
 
 import { ReactSVG } from "react-svg";
 
@@ -246,10 +247,16 @@ const RightPanel = () => {
           const s = contentStateRef.current;
           const blob = s.rawBlob || s.blob;
           if (!blob) {
-            console.error("[Screenity] raw download: no rawBlob available");
-            chrome.runtime.sendMessage({
-              type: "show-toast",
-              message: chrome.i18n.getMessage("rawRecordingModalTitle") + ": no data",
+            // In-memory blob never loaded (e.g. an orphaned OPFS pointer left
+            // the editor unable to load). Recover straight from the OPFS file.
+            await downloadResolvedRecording(s.title, (status) => {
+              if (status === "started") return;
+              chrome.runtime.sendMessage({
+                type: "show-toast",
+                message:
+                  chrome.i18n.getMessage("rawRecordingModalTitle") +
+                  (status === "active" ? "" : ": no data"),
+              });
             });
             return;
           }

@@ -136,39 +136,24 @@ const Camera = () => {
   };
 
   useEffect(() => {
-    // Acquire the stream only when camera is enabled AND a recording is
-    // pending or active. Mounting alone must not trigger getUserMedia.
-    chrome.storage.local.get(
-      ["recording", "pendingRecording", "cameraActive"],
-      (result) => {
-        if (
-          result.cameraActive &&
-          (result.recording || result.pendingRecording)
-        ) {
-          acquireStream();
-        }
-      },
-    );
+    // Acquire the preview whenever the camera is enabled, so the user sees
+    // their camera before recording too, not only during a recording.
+    chrome.storage.local.get(["cameraActive"], (result) => {
+      if (result.cameraActive) {
+        acquireStream();
+      }
+    });
   }, [videoRef.current]);
 
-  // Release the camera light when no recording is active. The iframe stays
-  // mounted to cache OS permissions, but holding getUserMedia keeps the
-  // camera indicator on with no visible UI.
+  // Hold the camera while the bubble is on (cameraActive), release it when off.
+  // This is what shows the preview before recording, not only during it.
   useEffect(() => {
     let inflightAcquire = false;
     const evaluate = async () => {
-      const { recording, pendingRecording, cameraActive } =
-        await chrome.storage.local.get([
-          "recording",
-          "pendingRecording",
-          "cameraActive",
-        ]);
-      // Hold the stream only when cameraActive AND a recording is
-      // active/pending. Without the gate, tab recordings without camera
-      // would re-acquire and surface camera-denied errors.
-      const wantStream = Boolean(
-        cameraActive && (recording || pendingRecording),
-      );
+      const { cameraActive } = await chrome.storage.local.get(["cameraActive"]);
+      // The camera iframe only mounts when cameraActive is true, so a tab
+      // recording without camera never reaches here and can't re-acquire.
+      const wantStream = Boolean(cameraActive);
       const hasStream = Boolean(streamRef.current?.active);
       if (!wantStream && hasStream) {
         stopCameraStream(streamRef, videoRef);
@@ -187,11 +172,7 @@ const Camera = () => {
     };
     const listener = (changes, area) => {
       if (area !== "local") return;
-      if (
-        "recording" in changes ||
-        "pendingRecording" in changes ||
-        "cameraActive" in changes
-      ) {
+      if ("cameraActive" in changes) {
         evaluate();
       }
     };

@@ -170,6 +170,16 @@ export const isFastRecorderFailureTransient = (
   ) {
     return true;
   }
+  // No frames off the capture track (starvation/track-ended/cancel) = capture
+  // failed, not the encoder: don't sticky-disable. A real defect has framesFromMSTP > 0.
+  if (
+    reasonCode === "webcodecs-zero-frames" &&
+    detail &&
+    detail.framesEncoded === 0 &&
+    detail.framesFromMSTP === 0
+  ) {
+    return true;
+  }
   return false;
 };
 
@@ -879,13 +889,15 @@ export const validateFastRecorderOutputBlob = async (
   details.canPlayType = safeCanPlayType(playMime);
   details.mediaSourceSupported = safeMseSupport(playMime);
 
+  // blob-too-small is informational: a short clip is legitimately tiny (~15KB).
+  // The empty-encoder case surfaces as demuxer-no-video-track, not size.
+  const defectReasons = reasons.filter((r) => r !== "blob-too-small");
   const hardFail =
-    reasons.includes("no-blob") ||
-    reasons.includes("blob-too-small") ||
-    reasons.includes("unexpected-mime") ||
-    reasons.includes("demuxer-no-video-track");
+    defectReasons.includes("no-blob") ||
+    defectReasons.includes("unexpected-mime") ||
+    defectReasons.includes("demuxer-no-video-track");
 
-  const ok = reasons.length === 0;
+  const ok = defectReasons.length === 0;
 
   debugLog("validation result", { ok, hardFail, reasons, details });
 

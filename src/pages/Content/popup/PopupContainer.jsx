@@ -71,7 +71,7 @@ const PopupContainer = (props) => {
         showProSplash: nextShowProSplash,
       }));
     });
-  }, [setContentState]);
+  }, []);
 
   useEffect(() => {
     if (contentState.isLoggedIn) {

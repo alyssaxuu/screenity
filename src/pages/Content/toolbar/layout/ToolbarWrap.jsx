@@ -73,7 +73,7 @@ const ToolbarWrap = () => {
       setToolbarMode: setMode,
       toolbarMode: mode,
     }));
-  }, [mode, setContentState]);
+  }, [mode]);
 
   useEffect(() => {
     if (contentState.toolbarHover && contentState.hideUI) {

@@ -691,8 +691,17 @@ const clearRecordingSession = () => {
 const clearRecordingSessionSafe = async (reason = "unknown", details = {}) => {
   const prev = activeRecordingSession;
   clearRecordingSession();
+  // Remove the stored session (not just the in-memory var) when done, so a 2nd
+  // recording on the same tab doesn't route to a stale one. Kept on interruption.
+  const recordingIsDone =
+    reason === "video-ready" ||
+    reason === "non-recording-session-conflict" ||
+    reason === "stale-conflict-recovered";
   try {
     await chrome.storage.local.set({
+      ...(recordingIsDone
+        ? { recorderSession: null, pendingRecording: false }
+        : {}),
       lastRecordingSessionClear: {
         ts: Date.now(),
         reason,

@@ -151,6 +151,12 @@ export const classifyError = (errorStr = "", errorType = "") => {
     return REC_START_NOT_READY;
   }
 
+  // Tab/region capture failures (often wrapped in a getUserMedia error). Match
+  // before STREAM so the user gets the actionable tab message, not a generic one.
+  if (lower.includes("tab capture") || lower.includes("this tab's video")) {
+    return REC_START_TAB;
+  }
+
   if (STREAM_PATTERNS.some((p) => lower.includes(p))) {
     return REC_START_STREAM;
   }

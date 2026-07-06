@@ -93,7 +93,11 @@ const RadialMenu = (props) => {
         </Popover.Trigger>
       </TooltipWrap>
       <Popover.Portal forceMount container={ref.current}>
-        <Popover.Content avoidCollisions={false} asChild onOpenAutoFocus>
+        <Popover.Content
+          avoidCollisions={false}
+          asChild
+          onOpenAutoFocus={(e) => e.preventDefault()}
+        >
           <div
             className={fullwheel ? "radial-menu color-wheel" : "radial-menu"}
             ref={radialMenuRef}

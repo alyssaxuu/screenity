@@ -78,7 +78,7 @@ export const emitRecordingTelemetry = async (eventType, extra = {}) => {
         os: getOsName(),
         browser: getBrowserName(),
         browserMajor: getBrowserMajor(),
-        appVersion: null,
+        appVersion: extVersion || null,
       },
       event: {
         type: eventType,

@@ -8,6 +8,7 @@ import React, {
 } from "react";
 
 import { updateFromStorage } from "./utils/updateFromStorage";
+import { shouldResendCropTarget } from "./cropTargetGate";
 import { lifecycle } from "../../utils/lifecycleLog";
 import { perfMark, perfReset } from "../../utils/perfMarks";
 
@@ -788,20 +789,25 @@ const ContentState = (props) => {
       tabRecordedID: null,
     });
 
-    if (
-      contentStateRef.current.recordingType === "region" &&
-      contentStateRef.current.cropTarget
-    ) {
-      contentStateRef.current.regionCaptureRef.contentWindow.postMessage(
-        {
-          type: "crop-target",
-          target: contentStateRef.current.cropTarget,
-          width: contentStateRef.current.regionWidth,
-          height: contentStateRef.current.regionHeight,
-        },
-        "*",
-      );
-    }
+    // Sent only after the mic-muted modal is confirmed: this makes the recorder
+    // call getDisplayMedia, so sending it earlier pops the picker behind the modal.
+    const sendRegionCropTarget = () => {
+      if (
+        contentStateRef.current.recordingType === "region" &&
+        contentStateRef.current.cropTarget &&
+        contentStateRef.current.regionCaptureRef?.contentWindow
+      ) {
+        contentStateRef.current.regionCaptureRef.contentWindow.postMessage(
+          {
+            type: "crop-target",
+            target: contentStateRef.current.cropTarget,
+            width: contentStateRef.current.regionWidth,
+            height: contentStateRef.current.regionHeight,
+          },
+          "*",
+        );
+      }
+    };
 
     setContentState((prevContentState) => ({
       ...prevContentState,
@@ -818,6 +824,9 @@ const ContentState = (props) => {
         chrome.i18n.getMessage("micMutedModalAction"),
         chrome.i18n.getMessage("micMutedModalCancel"),
         () => {
+          // Crop target first (after the user confirmed mic-off): this flushes
+          // the recorder's deferred streaming-data and starts getDisplayMedia.
+          sendRegionCropTarget();
           chrome.runtime.sendMessage({
             type: "desktop-capture",
             region:
@@ -857,6 +866,9 @@ const ContentState = (props) => {
         },
       );
     } else {
+      // Crop target first: flushes the recorder's deferred streaming-data and
+      // starts getDisplayMedia (no mic modal to gate behind in this branch).
+      sendRegionCropTarget();
       perfMark("Content desktop-capture.sent");
       // Sync recordingType to storage so the cloudrecorder tab reads
       // the current pick, not a stale value from a prior session.
@@ -2197,6 +2209,51 @@ const ContentState = (props) => {
       }));
     }
   }, [contentState.hideUI]);
+
+  // Recorder sets regionAwaitingCropTarget when its crop-target is missing; we
+  // re-send it over storage (postMessage can drop). Gated to an active start.
+  const cropTargetWantedRef = useRef(false);
+  const sendCropTargetToRecorder = useCallback(() => {
+    const s = contentStateRef.current;
+    // Hard gate (see cropTargetGate): only answer the recorder during an actual
+    // start, never on an idle region toggle/tweak.
+    if (!shouldResendCropTarget(s)) return;
+    const regionWin = s.regionCaptureRef?.contentWindow || null;
+    if (!regionWin) return;
+    regionWin.postMessage(
+      {
+        type: "crop-target",
+        target: s.cropTarget,
+        width: s.regionWidth,
+        height: s.regionHeight,
+      },
+      "*",
+    );
+  }, []);
+
+  useEffect(() => {
+    const onChanged = (changes, area) => {
+      if (area !== "local" || !changes.regionAwaitingCropTarget) return;
+      // Mirror the recorder's "waiting" flag: reset on clear so the re-send
+      // below can't fire on an idle region tweak and start outside a real one.
+      if (!changes.regionAwaitingCropTarget.newValue) {
+        cropTargetWantedRef.current = false;
+        return;
+      }
+      cropTargetWantedRef.current = true;
+      sendCropTargetToRecorder();
+    };
+    chrome.storage.onChanged.addListener(onChanged);
+    return () => chrome.storage.onChanged.removeListener(onChanged);
+  }, [sendCropTargetToRecorder]);
+
+  // The recorder can ask before the async derivation resolves; send once it
+  // does, but only while it is actually waiting (cropTargetWantedRef).
+  useEffect(() => {
+    if (!cropTargetWantedRef.current) return;
+    if (!contentState.cropTarget) return;
+    sendCropTargetToRecorder();
+  }, [contentState.cropTarget, sendCropTargetToRecorder]);
 
   useEffect(() => {
     updateFromStorage();

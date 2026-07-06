@@ -656,7 +656,9 @@ const CloudRecorder = () => {
         os: getOsName(),
         browser: getBrowserName(),
         browserMajor,
-        appVersion: null,
+        // Carry the version on env.appVersion so it's queryable. Was hardcoded
+        // null, so per-version upload attribution only had the event/header.
+        appVersion: eventPayload.extensionVersion || null,
       },
       event: {
         type: eventPayload.event,
@@ -6977,6 +6979,8 @@ const CloudRecorder = () => {
               request.reason || "offscreen-shutdown"
             );
           }
+          // Don't stop capture tracks here: it raced a slow start (isInit not
+          // yet flipped, tracks live) and killed the capture mid-start.
           const drainPromise = Promise.all([
             screenUploader.current?.waitForPendingUploads?.() ??
               Promise.resolve(),

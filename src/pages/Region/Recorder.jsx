@@ -152,6 +152,11 @@ const Recorder = () => {
       // crop-target not here yet; replayed by flushPendingStreamingData.
       pendingStreamingData.current = dataStr;
       perfMark("Region.Recorder streaming-data.deferred");
+      // Signal the content script to re-send the crop-target if the original
+      // postMessage dropped (the region "stuck until restart" hang). No-op for tab.
+      try {
+        chrome.storage.local.set({ regionAwaitingCropTarget: Date.now() });
+      } catch {}
     }
   };
 
@@ -163,6 +168,10 @@ const Recorder = () => {
     if (dataStr == null) return;
     pendingStreamingData.current = null;
     perfMark("Region.Recorder streaming-data.flushed");
+    // Crop-target arrived; stop the content script re-sending it.
+    try {
+      chrome.storage.local.set({ regionAwaitingCropTarget: null });
+    } catch {}
     try {
       startStreaming(JSON.parse(dataStr));
     } catch (e) {

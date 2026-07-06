@@ -25,6 +25,7 @@ import { diagForward } from "../../utils/diagForward";
 import { perfMark, perfSpan } from "../../utils/perfMarks";
 import { triggerSupportDownload } from "../../utils/triggerSupportDownload";
 import { chooseReader } from "../recorderStorage/chooseReader";
+import { downloadResolvedRecording } from "../recorderStorage/resolveRecordingFile";
 import { runEditorOp } from "../editorOps";
 // mediabunny is ~630KB, only used by export/remux/conversion on user action.
 // Lazy-load to keep parse cost off editor mount. Cached promise.
@@ -45,6 +46,10 @@ const ENABLE_EAGER_MP4_FINALIZE = true;
 // files. On failure (incl. a 60s no-progress stall) the download falls back to
 // delivering the source file, so it's safe to leave on.
 const ENABLE_OFFSCREEN_WEBM = true;
+
+// Fail an empty editor fast: a failed start can open an editor with no
+// recording, so error at the first heartbeat instead of the ~3 min timeout.
+const ENABLE_FAST_EMPTY_EDITOR_FAIL = true;
 
 localforage.config({
   driver: localforage.INDEXEDDB,
@@ -119,6 +124,76 @@ const ContentState = (props) => {
 
     const MAX_HEARTBEATS = 6;
     const HEARTBEAT_MS = 30000;
+
+    // isFfmpegRunning/processingProgress are set while waitForFinalizeReady
+    // runs, so a slow finalize counts as activity and isn't read as empty.
+    const hasLoadActivity = (s) =>
+      Boolean(
+        s?.ready ||
+          s?.rawBlob ||
+          s?.blob ||
+          (s?.chunkCount ?? 0) > 0 ||
+          s?.isFfmpegRunning ||
+          s?.finalizingRecording ||
+          (s?.processingProgress ?? 0) > 0,
+      );
+
+    // Show the same "couldn't load" error the load-failure paths use instead of
+    // spinning forever.
+    const showStuckError = (s, reason) => {
+      if (
+        s?.ready ||
+        editorErrorShownRef.current ||
+        typeof s?.openModal !== "function"
+      ) {
+        return;
+      }
+      editorErrorShownRef.current = true;
+      diagForward("sandbox-stuck-timeout-error", { reason });
+      s.openModal(
+        chrome.i18n.getMessage("opfsLoadErrorTitle"),
+        chrome.i18n.getMessage("opfsLoadErrorDescription"),
+        // Primary action: recover the recording off disk. The editor couldn't
+        // load it (usually an orphaned OPFS pointer) but the file is still there.
+        chrome.i18n.getMessage("rawRecordingModalButton"),
+        chrome.i18n.getMessage("permissionsModalDismiss"),
+        () => {
+          downloadResolvedRecording(
+            contentStateRef.current?.title,
+            (status) => {
+              if (status === "started") return;
+              chrome.runtime.sendMessage({
+                type: "show-toast",
+                message:
+                  chrome.i18n.getMessage("rawRecordingModalTitle") +
+                  (status === "active" ? "" : ": no data"),
+              });
+            },
+          );
+        },
+        () => {},
+        null,
+        null,
+        null,
+        true,
+        chrome.i18n.getMessage("getHelpButton"),
+        () => {
+          triggerSupportDownload({ source: "editor-stuck-timeout" });
+          chrome.runtime.sendMessage({
+            type: "report-error",
+            source: "editor-stuck-timeout",
+            errorCode: "EDITOR_STUCK_TIMEOUT",
+            zipBundled: true,
+          });
+        },
+      );
+      setContentState((prev) => ({
+        ...prev,
+        ready: true,
+        recordingFailed: true,
+      }));
+    };
+
     const interval = setInterval(() => {
       const s = contentStateRef.current;
       if (s?.ready) {
@@ -126,44 +201,9 @@ const ContentState = (props) => {
         return;
       }
       if (diagHeartbeatCountRef.current >= MAX_HEARTBEATS) {
+        // Stuck with no data after ~3 min.
         clearInterval(interval);
-        // Stuck with no data after ~3 min. Show the same "couldn't load" error
-        // the load-failure paths use instead of spinning forever.
-        if (
-          !s?.ready &&
-          !editorErrorShownRef.current &&
-          typeof s?.openModal === "function"
-        ) {
-          editorErrorShownRef.current = true;
-          diagForward("sandbox-stuck-timeout-error", {});
-          s.openModal(
-            chrome.i18n.getMessage("opfsLoadErrorTitle"),
-            chrome.i18n.getMessage("opfsLoadErrorDescription"),
-            null,
-            chrome.i18n.getMessage("permissionsModalDismiss"),
-            () => {},
-            () => {},
-            null,
-            null,
-            null,
-            true,
-            chrome.i18n.getMessage("getHelpButton"),
-            () => {
-              triggerSupportDownload({ source: "editor-stuck-timeout" });
-              chrome.runtime.sendMessage({
-                type: "report-error",
-                source: "editor-stuck-timeout",
-                errorCode: "EDITOR_STUCK_TIMEOUT",
-                zipBundled: true,
-              });
-            },
-          );
-          setContentState((prev) => ({
-            ...prev,
-            ready: true,
-            recordingFailed: true,
-          }));
-        }
+        showStuckError(s, "timeout");
         return;
       }
       diagHeartbeatCountRef.current += 1;
@@ -176,6 +216,12 @@ const ContentState = (props) => {
           (Date.now() - (diagMountAtRef.current || Date.now())) / 1000,
         ),
       });
+      // Empty editor (failed-start orphan): nothing loading or finalizing, so
+      // don't wait the full ~3 min.
+      if (ENABLE_FAST_EMPTY_EDITOR_FAIL && !hasLoadActivity(s)) {
+        clearInterval(interval);
+        showStuckError(s, "no-load-activity");
+      }
     }, HEARTBEAT_MS);
 
     return () => clearInterval(interval);

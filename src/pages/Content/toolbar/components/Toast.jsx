@@ -15,7 +15,10 @@ const Toast = () => {
   const [contentState, setContentState] = useContext(contentStateContext);
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
-  const [trigger, setTrigger] = useState(() => {});
+  // useState(() => fn) treats fn as a lazy initializer and stores its return,
+  // so the default must return a function or `trigger` ends up undefined.
+  const noop = () => {};
+  const [trigger, setTrigger] = useState(() => noop);
   const triggerRef = useRef(trigger);
   const openRef = useRef(open);
   const contentStateRef = useRef(contentState);
@@ -29,7 +32,8 @@ const Toast = () => {
     if (contentStateRef.current.hideUI) return;
     setTitle(title);
     setOpen(true);
-    setTrigger(() => action);
+    // Keep trigger callable even when a toast is opened without an action.
+    setTrigger(() => (typeof action === "function" ? action : noop));
     setToastDuration(durationMs);
   });
 
@@ -68,7 +72,7 @@ const Toast = () => {
         onEscapeKeyDown={(e) => {
           e.stopPropagation();
           e.preventDefault();
-          triggerRef.current();
+          triggerRef.current?.();
           setOpen(false);
         }}
       >
@@ -78,14 +82,14 @@ const Toast = () => {
           asChild
           altText="Escape"
           onClick={() => {
-            trigger();
+            trigger?.();
           }}
         >
           <button
             className="Button"
             onClick={(e) => {
               e.stopPropagation();
-              trigger();
+              trigger?.();
             }}
           >
             Esc
