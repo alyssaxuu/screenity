@@ -11,6 +11,7 @@
  */
 import { perfMark, perfSpan } from "../../utils/perfMarks";
 import { diagForward } from "../../utils/diagForward";
+import { computeLetterboxRect } from "./letterbox";
 import {
   AAC_SUPPORTED_RATES,
   AVC_MAX_PIXELS,
@@ -104,6 +105,7 @@ export class WebCodecsRecorder {
 
     this.resizeCanvas = null;
     this.resizeCtx = null;
+    this._loggedLetterbox = false;
 
     this.justResumed = false;
     this.paused = false;
@@ -2286,6 +2288,36 @@ export class WebCodecsRecorder {
     throw new Error("WebCodecsRecorder: No supported H.264 encoder");
   }
 
+  // Geometry lives in letterbox.js; this just paints it.
+  drawFrameToResizeCanvas(frame) {
+    const tw = this.targetWidth;
+    const th = this.targetHeight;
+    const rect = computeLetterboxRect({
+      sw: frame.codedWidth,
+      sh: frame.codedHeight,
+      tw,
+      th,
+    });
+
+    if (rect.fills) {
+      this.resizeCtx.drawImage(frame, 0, 0, tw, th);
+      return;
+    }
+
+    if (!this._loggedLetterbox) {
+      this._loggedLetterbox = true;
+      this.log(
+        `[WCR] surface aspect changed; letterboxing ${frame.codedWidth}x${frame.codedHeight} into ${tw}x${th}`,
+      );
+    }
+
+    // A fitted draw doesn't cover every pixel; without this the previous surface
+    // stays frozen in the bars around the new one.
+    this.resizeCtx.fillStyle = "#000";
+    this.resizeCtx.fillRect(0, 0, tw, th);
+    this.resizeCtx.drawImage(frame, rect.x, rect.y, rect.w, rect.h);
+  }
+
   async readVideoLoop() {
     this.log("[WCR] video loop start");
     if (!this.videoReader || !this.videoEncoder) return;
@@ -2431,13 +2463,7 @@ export class WebCodecsRecorder {
 
           ensureResizeCanvas();
 
-          this.resizeCtx.drawImage(
-            frame,
-            0,
-            0,
-            this.targetWidth,
-            this.targetHeight,
-          );
+          this.drawFrameToResizeCanvas(frame);
 
           if (!this._videoStartUs) {
             this._videoStartUs = performance.now() * 1000;

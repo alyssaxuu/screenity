@@ -19,7 +19,10 @@ import {
 import { traceStep } from "../utils/startFlowTrace";
 import { IS_OFFSCREEN_HOST } from "../utils/recordingHost";
 import { sendSystemAudioGuidanceToast } from "../utils/systemAudioGuidance";
-import { shouldUseDisplayMediaForScreen } from "../utils/screenCaptureMode";
+import {
+  shouldUseDisplayMediaForScreen,
+  screenSurfaceSwitching,
+} from "../utils/screenCaptureMode";
 import { acquireDisplayMediaWithFocusRetry } from "../utils/acquireDisplayMedia";
 import { startPrewarm, stopPrewarm } from "../Recorder/streamWarmup";
 import { preloadWebCodecsModules } from "../Recorder/webcodecs/WebCodecsRecorder";
@@ -6112,6 +6115,8 @@ const CloudRecorder = () => {
             const targetHeight = height;
             const isTabModeRequest =
               data.recordingType === "region" || isTab.current;
+            const { disableSurfaceSwitching } =
+              await chrome.storage.local.get(["disableSurfaceSwitching"]);
             const displayConstraints = {
               audio: data.systemAudio ? true : false,
               video: {
@@ -6122,14 +6127,16 @@ const CloudRecorder = () => {
                 // tab/region. Hint only; the user can still switch panes.
                 displaySurface: isTabModeRequest ? "browser" : "monitor",
               },
-              // systemAudio:"include" (default may hide the toggle);
-              // surfaceSwitching:"exclude" dodges crbug 344876285 (switch ends
-              // mac audio). Screen-only; these throw TypeError w/ preferCurrentTab.
+              // systemAudio:"include" (default may hide the toggle).
+              // surfaceSwitching keeps Chrome's "Share this tab instead" button.
+              // Screen-only; these throw TypeError w/ preferCurrentTab.
               ...(isTabModeRequest
                 ? {}
                 : {
                     systemAudio: "include",
-                    surfaceSwitching: "exclude",
+                    surfaceSwitching: screenSurfaceSwitching({
+                      disableSurfaceSwitching,
+                    }),
                     selfBrowserSurface: "exclude",
                   }),
             };
@@ -6298,6 +6305,34 @@ const CloudRecorder = () => {
             surface: surface,
             subscribed: true,
             instantMode: instantMode.current || false,
+          });
+
+          // A surface switch swaps the source in place: the track stays live, so
+          // nothing above re-runs and anything read from getSettings() goes
+          // stale. The cursor overlay maps click coords against `surface`, so a
+          // stale one misplaces click effects for the rest of the recording.
+          let boundSurface = surface;
+          track.addEventListener("configurationchange", () => {
+            const next = track.getSettings();
+            chrome.storage.local.set({
+              surface: next.displaySurface,
+              recordedStreamDimensions: {
+                width: next.width,
+                height: next.height,
+              },
+            });
+            if (next.displaySurface === boundSurface) return;
+            traceStep("surfaceSwitched", {
+              from: boundSurface || null,
+              to: next.displaySurface || null,
+            });
+            boundSurface = next.displaySurface;
+            chrome.runtime.sendMessage({
+              type: "set-surface",
+              surface: next.displaySurface,
+              subscribed: true,
+              instantMode: instantMode.current || false,
+            });
           });
 
           if (isTab.current) {

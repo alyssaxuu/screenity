@@ -38,3 +38,11 @@ export function shouldUseDisplayMediaForScreen(settings = {}) {
     disabled: settings.macSystemAudioCapture === false,
   });
 }
+
+// Chrome's "Share this tab instead" button; on by default, with
+// disableSurfaceSwitching as a storage kill-switch. Not gated on mac/systemAudio
+// (crbug 344876285 is Won't Fix, and sysTrack.onended keeps the take alive).
+// Region/crop never reaches here (cropTo is bound to the original tab).
+export function screenSurfaceSwitching(settings = {}) {
+  return settings.disableSurfaceSwitching === true ? "exclude" : "include";
+}

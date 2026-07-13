@@ -21,7 +21,10 @@ import { shouldAcquireMicAtStart } from "../utils/micAcquisitionPolicy";
 import { attachAudioContextWatchdog } from "../utils/audioContextWatchdog";
 import { IS_OFFSCREEN_HOST } from "../utils/recordingHost";
 import { sendSystemAudioGuidanceToast } from "../utils/systemAudioGuidance";
-import { shouldUseDisplayMediaForScreen } from "../utils/screenCaptureMode";
+import {
+  shouldUseDisplayMediaForScreen,
+  screenSurfaceSwitching,
+} from "../utils/screenCaptureMode";
 import { acquireDisplayMediaWithFocusRetry } from "../utils/acquireDisplayMedia";
 import { chooseWriter } from "./recorderStorage/chooseWriter";
 import { chooseReader } from "./recorderStorage/chooseReader";
@@ -3502,6 +3505,9 @@ const Recorder = () => {
     } else if (useDisplayMedia) {
       // macOS + Chrome 141+ screen path: getDisplayMedia for system audio.
       // Falls through to the shared mixing/recorder setup below.
+      const { disableSurfaceSwitching } = await chrome.storage.local.get([
+        "disableSurfaceSwitching",
+      ]);
       const displayConstraints = {
         audio: data.systemAudio ? true : false,
         video: {
@@ -3510,11 +3516,11 @@ const Recorder = () => {
           height: { ideal: height, max: height },
           displaySurface: "monitor",
         },
-        // systemAudio:"include" (default may hide the toggle);
-        // surfaceSwitching:"exclude" dodges crbug 344876285 (switch ends mac
-        // audio). Screen-only; these throw TypeError w/ preferCurrentTab.
+        // systemAudio:"include" (default may hide the toggle). surfaceSwitching
+        // keeps Chrome's "Share this tab instead" button. Screen-only; these
+        // throw TypeError w/ preferCurrentTab.
         systemAudio: "include",
-        surfaceSwitching: "exclude",
+        surfaceSwitching: screenSurfaceSwitching({ disableSurfaceSwitching }),
         selfBrowserSurface: "exclude",
       };
       debug("getDisplayMedia screen constraints", displayConstraints);
