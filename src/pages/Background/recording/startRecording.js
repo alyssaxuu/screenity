@@ -232,6 +232,8 @@ const _startRecordingInner = async (caller) => {
     editorRecordingError: null,
     editorReadyAt: null,
     editorReadyPath: null,
+    // re-arm count is per-attempt; a leaked one would fail this recording early
+    firstChunkWatchdogState: null,
     // prior sandboxTab would route this attempt's errors to the wrong editor
     sandboxTab: null,
     // paused leak from a prior errored recording would mis-account duration

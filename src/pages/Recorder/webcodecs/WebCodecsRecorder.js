@@ -129,6 +129,10 @@ export class WebCodecsRecorder {
     this._videoLoopError = null;
     this._firstChunkSeen = false;
     this._firstChunkWatchdog = null;
+    this._hiddenRearmCount = 0;
+    // Matches FIRST_CHUNK_WATCHDOG_MAX_REARMS in the background watchdog;
+    // ~48s of hidden, output-free recording at the 12s default.
+    this._maxHiddenRearms = 3;
     // 12s covers NVENC / VideoToolbox cold-start (5-7s on first encode).
     // Shorter values false-fired into the MediaRecorder fallback.
     this._firstChunkWatchdogMs = Number.isFinite(options.firstChunkWatchdogMs)
@@ -360,6 +364,7 @@ export class WebCodecsRecorder {
     // reused instance can salvage again on a second recording.
     this._didSwRetry = false;
     this._swRetryReason = null;
+    this._hiddenRearmCount = 0;
     this._lastChunkAt = null;
     this._lastFailureCode = null;
     this._forceNextKeyframe = false;
@@ -686,6 +691,26 @@ export class WebCodecsRecorder {
     }
 
     return this._startPromise;
+  }
+
+  // Lets the background watchdog tell "fed but not emitting yet" (cold start,
+  // 5-7s on NVENC / VideoToolbox) from "no frames arriving at all".
+  getProgressStats() {
+    let muxerEmits = null;
+    let muxerBytes = null;
+    try {
+      const s = this.muxer?.getStats?.();
+      muxerEmits = s?.emitCount ?? null;
+      muxerBytes = s?.totalEmittedBytes ?? null;
+    } catch {}
+    return {
+      frameCount: this.frameCount,
+      framesFromMSTP: this._framesFromMSTP,
+      chunksOut: this._chunksOut,
+      firstChunkSeen: this._firstChunkSeen,
+      muxerEmits,
+      muxerBytes,
+    };
   }
 
   async stop() {
@@ -1281,6 +1306,8 @@ export class WebCodecsRecorder {
         !this._stopping &&
         !this._firstChunkSeen
       ) {
+        // back in the foreground, so throttling no longer explains the silence
+        this._hiddenRearmCount = 0;
         this._armFirstChunkWatchdog();
       }
     };
@@ -1357,11 +1384,20 @@ export class WebCodecsRecorder {
       this._firstChunkWatchdog = null;
       if (!this.running || this._stopping || this._firstChunkSeen) return;
       // tab is hidden so the encoder may be throttled; re-arm and let the
-      // visibilitychange handler restart the clock on return.
+      // visibilitychange handler restart the clock on return. Bounded: the
+      // region recorder is an injected iframe that stays hidden for the whole
+      // recording, so an unbounded re-arm never fires. Resets on visible.
       if (
         typeof document !== "undefined" &&
-        document.visibilityState === "hidden"
+        document.visibilityState === "hidden" &&
+        this._hiddenRearmCount < this._maxHiddenRearms
       ) {
+        this._hiddenRearmCount += 1;
+        this.warn("[WCR] first-chunk watchdog re-armed while hidden", {
+          attempt: this._hiddenRearmCount,
+          max: this._maxHiddenRearms,
+          frameCount: this.frameCount,
+        });
         this._armFirstChunkWatchdog();
         return;
       }

@@ -16,6 +16,7 @@ import { contentStateContext } from "../../context/ContentState";
 import {
   probeFastRecorderSupport,
   shouldUseFastRecorder,
+  resolveFastRecorderUserSetting,
   getFastRecorderStickyState,
 } from "../../../../media/fastRecorderGate";
 import { resetOnboardingSeen } from "../onboarding/storage";
@@ -134,12 +135,9 @@ const SettingsMenu = (props) => {
 
   const runFastRecorderProbe = async (source = "auto") => {
     if (!contentState) return;
-    const userSetting =
-      contentState.useWebCodecsRecorder === true
-        ? true
-        : contentState.useWebCodecsRecorder === false
-        ? false
-        : null;
+    const userSetting = resolveFastRecorderUserSetting(
+      contentState.useWebCodecsRecorder,
+    );
     const sticky = await getFastRecorderStickyState();
     const probe = await probeFastRecorderSupport();
     const useFast = shouldUseFastRecorder(userSetting, probe, sticky);

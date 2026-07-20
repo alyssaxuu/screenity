@@ -73,6 +73,25 @@ const FAST_RECORDER_KEYS = [
   "lastSubscriptionLoss",
 ];
 
+// navigator.userAgent is reduced to Chrome/150.0.0.0; only the high-entropy
+// hints carry the real build.
+const readBrowserVersionDetail = async () => {
+  try {
+    const uaData = navigator.userAgentData;
+    if (!uaData?.getHighEntropyValues) return null;
+    const hints = await uaData.getHighEntropyValues([
+      "fullVersionList",
+      "platformVersion",
+    ]);
+    return {
+      fullVersionList: hints?.fullVersionList || null,
+      platformVersion: hints?.platformVersion || null,
+    };
+  } catch {
+    return null;
+  }
+};
+
 export const buildDiagnosticZip = async ({
   extraConfig = {},
   source = "unknown",
@@ -138,6 +157,7 @@ export const buildDiagnosticZip = async ({
 
   files["environment.json"] = JSON.stringify({
     userAgent,
+    browserVersionDetail: await readBrowserVersionDetail(),
     platformInfo,
     screen: {
       width: window.screen.availWidth,

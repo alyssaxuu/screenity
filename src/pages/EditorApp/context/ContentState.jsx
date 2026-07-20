@@ -57,6 +57,25 @@ localforage.config({
   version: 1,
 });
 
+// Codes meaning "ended early or never started", not "unreadable". The bytes
+// are usually fine, and if they aren't the OPFS/IDB read path raises the modal
+// itself with the real cause.
+const NON_LOAD_FAILURE_CODES = new Set([
+  // user dismissed Chrome's picker
+  "REC_START_CANCEL",
+  // watchdog stopped the take; whatever was captured is still on disk
+  "no-first-chunk",
+]);
+
+// These call sites hardcoded opfs-load-failed, so a picker-cancel was reported
+// as a storage fault.
+const supportSourceForCode = (code) =>
+  code === "OPFS_LOAD_FAILED" ? "opfs-load-failed" : "editor-recording-error";
+
+// Long enough for a normal OPFS open + read to land before we believe a stored
+// error.
+const DEFERRED_ERROR_MODAL_MS = 4000;
+
 const chunksStore = localforage.createInstance({
   name: "chunks",
   storeName: "keyvaluepairs",
@@ -1567,12 +1586,19 @@ const ContentState = (props) => {
           why: String(message?.why || "").slice(0, 240),
           errorCode: message?.errorCode || null,
         });
+        if (NON_LOAD_FAILURE_CODES.has(message?.errorCode)) {
+          diagForward("sandbox-recording-error-not-load-failure", {
+            errorCode: message?.errorCode || null,
+            source: "runtime",
+          });
+          return;
+        }
         if (
           !editorErrorShownRef.current &&
           typeof contentStateRef.current?.openModal === "function"
         ) {
           editorErrorShownRef.current = true;
-          const errCode = message?.errorCode || "OPFS_LOAD_FAILED";
+          const errCode = message?.errorCode || "UNKNOWN";
           contentStateRef.current.openModal(
             chrome.i18n.getMessage("opfsLoadErrorTitle"),
             // Never surface the raw internal `why` (e.g. "WebCodecs produced
@@ -1589,10 +1615,11 @@ const ContentState = (props) => {
             true,
             chrome.i18n.getMessage("getHelpButton"),
             () => {
-              triggerSupportDownload({ source: "opfs-load-failed" });
+              const src = supportSourceForCode(errCode);
+              triggerSupportDownload({ source: src });
               chrome.runtime.sendMessage({
                 type: "report-error",
-                source: "opfs-load-failed",
+                source: src,
                 errorCode: errCode,
                 zipBundled: true,
               });
@@ -1894,6 +1921,13 @@ const ContentState = (props) => {
               why: String(payload?.why || "").slice(0, 240),
               errorCode: payload?.errorCode || null,
             });
+            if (NON_LOAD_FAILURE_CODES.has(payload?.errorCode)) {
+              diagForward("sandbox-recording-error-not-load-failure", {
+                errorCode: payload?.errorCode || null,
+                source: "storage",
+              });
+              return;
+            }
             if (
               !editorErrorShownRef.current &&
               typeof contentStateRef.current?.openModal === "function"
@@ -2022,6 +2056,42 @@ const ContentState = (props) => {
     };
   }, []);
 
+  const showParentRecordingErrorModal = (payload) => {
+    if (editorErrorShownRef.current) return;
+    if (typeof contentStateRef.current?.openModal !== "function") return;
+    editorErrorShownRef.current = true;
+    const errCode = payload?.errorCode || "UNKNOWN";
+    contentStateRef.current.openModal(
+      chrome.i18n.getMessage("opfsLoadErrorTitle"),
+      // Never surface the raw internal `why` to users (see above).
+      chrome.i18n.getMessage("opfsLoadErrorDescription"),
+      null,
+      chrome.i18n.getMessage("permissionsModalDismiss"),
+      () => {},
+      () => {},
+      null,
+      null,
+      null,
+      true,
+      chrome.i18n.getMessage("getHelpButton"),
+      () => {
+        const src = supportSourceForCode(errCode);
+        triggerSupportDownload({ source: src });
+        chrome.runtime.sendMessage({
+          type: "report-error",
+          source: src,
+          errorCode: errCode,
+          zipBundled: true,
+        });
+      },
+    );
+    setContentState((prev) => ({
+      ...prev,
+      ready: true,
+      recordingFailed: true,
+    }));
+  };
+
   const onMessage = async (event) => {
     // legacy window-message path; editor-force-close now arrives via
     // chrome.runtime.onMessage. harmless no-op clearing beforeunload.
@@ -2038,46 +2108,43 @@ const ContentState = (props) => {
         Boolean(contentStateRef.current?.ready) ||
         Boolean(contentStateRef.current?.blob);
       if (editorAlreadyLoaded) return;
+      // The storage listener filters by sandboxTab; this path never did, so it
+      // replayed errors stamped for a different editor tab.
+      const bridgeTabId = tabIdRef.current;
+      if (
+        bridgeTabId != null &&
+        payload?.sandboxTab != null &&
+        payload.sandboxTab !== bridgeTabId
+      ) {
+        return;
+      }
       diagForward("sandbox-recording-error-received-via-parent", {
         error: String(payload?.error || "").slice(0, 120),
         why: String(payload?.why || "").slice(0, 240),
         errorCode: payload?.errorCode || null,
       });
-      if (
-        !editorErrorShownRef.current &&
-        typeof contentStateRef.current?.openModal === "function"
-      ) {
-        editorErrorShownRef.current = true;
-        const errCode = payload?.errorCode || "OPFS_LOAD_FAILED";
-        contentStateRef.current.openModal(
-          chrome.i18n.getMessage("opfsLoadErrorTitle"),
-          // Never surface the raw internal `why` to users (see above).
-          chrome.i18n.getMessage("opfsLoadErrorDescription"),
-          null,
-          chrome.i18n.getMessage("permissionsModalDismiss"),
-          () => {},
-          () => {},
-          null,
-          null,
-          null,
-          true,
-          chrome.i18n.getMessage("getHelpButton"),
-          () => {
-            triggerSupportDownload({ source: "opfs-load-failed" });
-            chrome.runtime.sendMessage({
-              type: "report-error",
-              source: "opfs-load-failed",
-              errorCode: errCode,
-              zipBundled: true,
-            });
-          },
-        );
-        setContentState((prev) => ({
-          ...prev,
-          ready: true,
-          recordingFailed: true,
-        }));
+      if (NON_LOAD_FAILURE_CODES.has(payload?.errorCode)) {
+        diagForward("sandbox-recording-error-not-load-failure", {
+          errorCode: payload?.errorCode || null,
+          source: "parent",
+        });
+        return;
       }
+      // ready/blob are always false at mount (the blob needs a BG round-trip
+      // plus an OPFS read), so deciding here always showed the modal, including
+      // over recordings that load fine a moment later. Re-check instead.
+      setTimeout(() => {
+        const loaded =
+          Boolean(contentStateRef.current?.ready) ||
+          Boolean(contentStateRef.current?.blob);
+        if (loaded) {
+          diagForward("sandbox-recording-error-superseded-by-load", {
+            errorCode: payload?.errorCode || null,
+          });
+          return;
+        }
+        showParentRecordingErrorModal(payload);
+      }, DEFERRED_ERROR_MODAL_MS);
       return;
     }
     if (event.data.type === "updated-blob") {

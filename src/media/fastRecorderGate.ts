@@ -217,6 +217,9 @@ export const markFastRecorderFailure = async (
       [STORAGE_KEYS.stickyDetails]: details,
       [STORAGE_KEYS.lastFailureAt]: Date.now(),
     });
+    // A real failure outranks a cached probe pass, which would otherwise
+    // vouch for this machine for the rest of its TTL.
+    await invalidateCachedProbe();
   } catch {
     // ignore
   }
@@ -384,6 +387,16 @@ const PROBE_FAILURE_CACHE_TTL_MS = 60 * 1000;
 let _probeInMemory: FastRecorderProbeResult | null = null;
 let _probeInMemoryAt = 0;
 let _probeInFlight: Promise<FastRecorderProbeResult> | null = null;
+
+const invalidateCachedProbe = async () => {
+  _probeInMemory = null;
+  _probeInMemoryAt = 0;
+  try {
+    await chrome.storage.local.remove(STORAGE_KEYS.probe);
+  } catch {
+    // ignore
+  }
+};
 
 const tryReadCachedProbe = async (): Promise<FastRecorderProbeResult | null> => {
   if (_probeInMemory) {
@@ -793,6 +806,12 @@ const _probeFastRecorderSupportUncached = async (): Promise<FastRecorderProbeRes
     return result;
   }
 };
+
+// Unset must stay null: shouldUseFastRecorder lets an explicit `true` override
+// a sticky disable, so folding unset into true makes the disable unreachable.
+export const resolveFastRecorderUserSetting = (
+  raw: unknown
+): boolean | null => (raw === true ? true : raw === false ? false : null);
 
 export const shouldUseFastRecorder = (
   userSetting: boolean | null | undefined,

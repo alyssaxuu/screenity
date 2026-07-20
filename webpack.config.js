@@ -327,6 +327,11 @@ const config = {
           to: path.join(__dirname, "build/_locales"),
           force: true,
         },
+        {
+          from: "THIRD_PARTY_NOTICES.md",
+          to: path.join(__dirname, "build/THIRD_PARTY_NOTICES.md"),
+          force: true,
+        },
       ],
     }),
     ...htmlPlugins,

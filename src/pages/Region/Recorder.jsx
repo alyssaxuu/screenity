@@ -24,6 +24,7 @@ import {
 import {
   probeFastRecorderSupport,
   shouldUseFastRecorder,
+  resolveFastRecorderUserSetting,
   getFastRecorderStickyState,
   markFastRecorderFailure,
   validateFastRecorderOutputBlob,
@@ -919,8 +920,7 @@ const Recorder = () => {
       const { useWebCodecsRecorder } = await chrome.storage.local.get([
         "useWebCodecsRecorder",
       ]);
-      // undefined defaults to enabled; only explicit `false` opts out.
-      const userSetting = useWebCodecsRecorder === false ? false : true;
+      const userSetting = resolveFastRecorderUserSetting(useWebCodecsRecorder);
       const stickyState = await getFastRecorderStickyState();
       const probeResult = await probeFastRecorderSupport();
       const shouldUseFast = shouldUseFastRecorder(

@@ -41,12 +41,5 @@ export function createMediaRecorder(
   // browser can normalize the string.
   recorder.__screenityContainer = containerForMime(mimeType);
   recorder.__screenityMime = mimeType;
-  // TEMP DEBUG (remove before commit): durable copy of the chosen mime so
-  // mp4test() can read it even after the 500-entry lifecycle log rotates.
-  try {
-    chrome?.storage?.local?.set({
-      __mp4dbg: { mime: mimeType, container: containerForMime(mimeType), at: Date.now() },
-    });
-  } catch {}
   return recorder;
 }

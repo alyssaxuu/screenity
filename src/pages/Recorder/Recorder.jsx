@@ -49,6 +49,7 @@ import {
 import {
   probeFastRecorderSupport,
   shouldUseFastRecorder,
+  resolveFastRecorderUserSetting,
   getFastRecorderStickyState,
   markFastRecorderFailure,
   validateFastRecorderOutputBlob,
@@ -1266,7 +1267,7 @@ const Recorder = () => {
     }
   }
 
-  async function startRecording() {
+  async function startRecording({ forceMediaRecorder = false } = {}) {
     if (process.env.SCREENITY_DEV_MODE === "true") {
       console.log("[recorder-opfs][recorder] startRecording entry");
     }
@@ -1429,13 +1430,15 @@ const Recorder = () => {
       getFastRecorderStickyState(),
       probeFastRecorderSupport(),
     ]);
-    // Default-on: undefined means enabled; only explicit `false` opts out.
-    const userSetting = userSettingRaw.useWebCodecsRecorder === false ? false : true;
-    const shouldUseFast = shouldUseFastRecorder(
-      userSetting,
-      probeResult,
-      stickyState,
+    const userSetting = resolveFastRecorderUserSetting(
+      userSettingRaw.useWebCodecsRecorder,
     );
+    // A fallback re-entry must not re-pick WebCodecs: the sticky write races
+    // this read.
+    const shouldUseFast =
+      forceMediaRecorder
+        ? false
+        : shouldUseFastRecorder(userSetting, probeResult, stickyState);
     // Extension must match the recorder that runs, not the probe. Fast path
     // uses the probe container; MediaRecorder resolves its own from its mime.
     const mediaRecorderContainer = containerForMime(selectRecorderMime(liveStream.current));
@@ -2304,7 +2307,7 @@ const Recorder = () => {
                 // recorder.current null and isStarting.current false).
                 isStarting.current = false;
                 try {
-                  await startRecording();
+                  await startRecording({ forceMediaRecorder: true });
                 } catch (e) {
                   debugError("In-session swap startRecording threw", e);
                   chrome.runtime.sendMessage({
@@ -2372,9 +2375,9 @@ const Recorder = () => {
           });
           recorder.current = null;
           // Abort the OPFS writer opened for the WebCodecs path. The recursive
-          // startRecording() will pick IDB (userSetting=false now), but it
-          // also nulls chunkWriter.current without closing; leaving the OPFS
-          // file handle dangling.
+          // startRecording() picks IDB because forceMediaRecorder short-circuits
+          // the gate, but it also nulls chunkWriter.current without closing;
+          // leaving the OPFS file handle dangling.
           if (chunkWriter.current) {
             try {
               await chunkWriter.current.abort();
@@ -2385,7 +2388,7 @@ const Recorder = () => {
           // Top-of-startRecording guard requires both recorder null AND
           // isStarting false; without this reset the recursive call bails.
           isStarting.current = false;
-          return await startRecording();
+          return await startRecording({ forceMediaRecorder: true });
         }
         await chrome.storage.local.set({ fastRecorderInUse: true });
 
@@ -2613,6 +2616,14 @@ const Recorder = () => {
               recorderState: recorder.current?.state || null,
               savedCount: savedCount.current,
             });
+            // An empty blob still proves MediaRecorder is firing on schedule,
+            // and this branch returns before handleChunk, the only other
+            // canceller.
+            if (!hasChunks.current) {
+              chrome.runtime
+                .sendMessage({ type: "cancel-first-chunk-watchdog" })
+                .catch(() => {});
+            }
             if (
               recorder.current instanceof MediaRecorder &&
               recorder.current.state === "inactive"
@@ -4603,6 +4614,12 @@ const Recorder = () => {
             pendingBytes: pendingBytes.current ?? 0,
             hasChunks: Boolean(hasChunks.current),
           },
+          // Lets the watchdog tell a cold-starting encoder from one receiving
+          // nothing. Null on the MediaRecorder path.
+          progress:
+            r && useWebCodecs.current && typeof r.getProgressStats === "function"
+              ? r.getProgressStats()
+              : null,
           stream: {
             hasLive: Boolean(liveStream.current),
             hasHelper: Boolean(helperVideoStream.current),

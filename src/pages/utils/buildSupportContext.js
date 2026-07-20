@@ -31,6 +31,26 @@ const shortBrowser = () => {
   return "Unknown";
 };
 
+// shortBrowser() can only say Chrome/150; the high-entropy hint has the real
+// build. Brand order mirrors shortBrowser().
+const fullBrowserVersion = async () => {
+  try {
+    const uaData = navigator.userAgentData;
+    if (!uaData?.getHighEntropyValues) return null;
+    const { fullVersionList } = await uaData.getHighEntropyValues([
+      "fullVersionList",
+    ]);
+    if (!Array.isArray(fullVersionList)) return null;
+    for (const wanted of [/^Microsoft Edge$/i, /^Google Chrome$/i, /^Chromium$/i]) {
+      const hit = fullVersionList.find((b) => wanted.test(b?.brand || ""));
+      if (hit?.version) return String(hit.version);
+    }
+    return null;
+  } catch {
+    return null;
+  }
+};
+
 /** Build support context. Returns flat key-value pairs for URLSearchParams. */
 export const buildSupportContext = async (opts = {}) => {
   const ctx = {};
@@ -38,6 +58,8 @@ export const buildSupportContext = async (opts = {}) => {
   ctx.v = chrome.runtime.getManifest().version;
   ctx.lang = chrome.i18n.getMessage("@@ui_locale") || "unknown";
   ctx.br = shortBrowser();
+  const brFull = await fullBrowserVersion();
+  if (brFull) ctx.brFull = brFull;
 
   // Coarse device class, to see if stuck-recording reports cluster on low-RAM
   // or low-core devices. Both are already exposed to every page, no PII.
