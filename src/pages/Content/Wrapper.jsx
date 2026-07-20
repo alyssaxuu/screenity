@@ -154,12 +154,9 @@ const Wrapper = () => {
   // visibility-hidden gate below never fires. Without this flag the
   // toolbar would just freeze.
   const inRestartWait = Boolean(contentState.restartingRecording);
-  // The real "starting" gap is the post-acquisition preparing window: stream
-  // acquired → cloud project created → countdown. preparingRecording is true
-  // throughout it, the popup is already closed, document is visible, and no
-  // recorder tab exists — so show the loader here (bypassing the hide gate).
-  // pendingRecording/inPreCountdownWait is only true for ~10ms before the
-  // countdown, so it can't drive this. Gate on the offscreen host (default ON).
+  // The real "starting" gap is the preparing window between stream acquisition
+  // and countdown, where the popup is closed and no recorder tab exists, so the
+  // loader shows here. pendingRecording lasts ~10ms and can't drive it.
   const inPreparingWait =
     Boolean(contentState.preparingRecording) &&
     !contentState.countdownActive &&
@@ -308,7 +305,7 @@ const Wrapper = () => {
           }}
           ref={permissionsRef}
           src={chrome.runtime.getURL("permissions.html")}
-          allow="camera *; microphone *"
+          allow="camera *; microphone *; display-capture *"
         ></iframe>
       )}
       {contentState.hasOpenedBefore && (

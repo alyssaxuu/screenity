@@ -90,6 +90,36 @@
   }
 }
 
+// Bottom-anchored variant so a toast isn't hidden under the screen-share picker.
+.WarningViewport--bottom {
+  top: auto;
+  bottom: 0;
+}
+.WarningViewport--bottom .warning-root[data-state="open"] {
+  animation: slideInBottom 150ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.WarningViewport--bottom .warning-root[data-swipe="end"] {
+  animation: swipeOutBottom 100ms ease-out;
+}
+
+@keyframes slideInBottom {
+  from {
+    transform: translateY(calc(100% + var(--viewport-padding)));
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+@keyframes swipeOutBottom {
+  from {
+    transform: translateY(var(--radix-toast-swipe-end-y));
+  }
+  to {
+    transform: translateY(calc(100% + var(--viewport-padding)));
+  }
+}
+
 .warning-title {
   color: $color-text-contrast;
   font-family: $font-medium;

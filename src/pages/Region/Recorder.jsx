@@ -29,6 +29,7 @@ import {
   validateFastRecorderOutputBlob,
   isFastRecorderFailureTransient,
 } from "../../media/fastRecorderGate";
+import { getResolutionForQuality } from "../Recorder/recorderConfig";
 import { chooseWriter } from "../Recorder/recorderStorage/chooseWriter";
 import { chooseReader } from "../Recorder/recorderStorage/chooseReader";
 import { lifecycle } from "../utils/lifecycleLog";
@@ -241,6 +242,9 @@ const Recorder = () => {
   const lastEstimateAt = useRef(0);
   const ESTIMATE_INTERVAL_MS = 5000;
   const MIN_HEADROOM = 25 * 1024 * 1024;
+  // Aborting still writes a tail chunk and finalizes, so the reserve has to
+  // cover the bytes in flight, not just a flat floor.
+  const HEADROOM_CHUNKS = 4;
   const MAX_PENDING_BYTES = 8 * 1024 * 1024;
   const pendingBytes = useRef(0);
   const recordingIdRef = useRef(null);
@@ -363,7 +367,11 @@ const Recorder = () => {
     try {
       const { usage = 0, quota = 0 } = await navigator.storage.estimate();
       const remaining = quota - usage;
-      return remaining > MIN_HEADROOM + (byteLength || 0);
+      const reserve = Math.max(
+        MIN_HEADROOM,
+        (byteLength || 0) * HEADROOM_CHUNKS,
+      );
+      return remaining > reserve + (byteLength || 0);
     } catch {
       return !lowStorageAbort.current;
     }
@@ -888,9 +896,11 @@ const Recorder = () => {
         console.error(
           "[Region.Recorder] no supported MediaRecorder mimeType",
         );
-        sendRecordingError(
-          chrome.i18n.getMessage("unsupportedVideoCodecError"),
-        );
+        chrome.runtime.sendMessage({
+          type: "recording-error",
+          error: "stream-error",
+          why: chrome.i18n.getMessage("unsupportedVideoCodecError"),
+        });
         return;
       }
 
@@ -1006,7 +1016,7 @@ const Recorder = () => {
 
       const handleWebCodecsChunk = async (blob, timestampUs) => {
         if (lowStorageAbort.current) return;
-        // First chunk landed — cancel the BG watchdog so it doesn't fire
+        // First chunk landed, cancel the BG watchdog so it doesn't fire
         // a spurious recording-error. hasChunks is set later in saveChunk
         // for the MR path; we set it here for WebCodecs.
         if (!hasChunks.current) {
@@ -1304,7 +1314,7 @@ const Recorder = () => {
                 }
                 let swapped = false;
                 try {
-                  swapped = await startMediaRecorderWithCodec("vp9");
+                  swapped = await startMediaRecorderWithCodec("mp4");
                 } catch (e) {
                   swapped = false;
                 }
@@ -1406,7 +1416,7 @@ const Recorder = () => {
       };
 
       const startMediaRecorderWithCodec = async (codec) => {
-        const mimeType = selectMimeType(codec);
+        const mimeType = selectMimeType(codec, liveStream.current);
         lifecycle("Region.Recorder", "startMediaRecorderWithCodec", {
           codec,
           mimeType,
@@ -1641,7 +1651,10 @@ const Recorder = () => {
             !isFinishing.current &&
             !isRestarting.current
           ) {
-            if (derivedMbps < 5 && getCodecLabel(mimeType) !== "vp8") {
+            // A broken encoder emits ~28 bytes (empty-stream failure). H.264
+            // encodes static screens at 1-4 Mbps, so the old <5 threshold
+            // downgraded normal recordings to VP8 and dropped the first ~3s.
+            if (derivedMbps < 0.05 && getCodecLabel(mimeType) !== "vp8") {
               codecFallbackTriggered = true;
               lifecycle("Region.Recorder", "codec-fallback", {
                 from: getCodecLabel(mimeType),
@@ -1720,7 +1733,7 @@ const Recorder = () => {
         if (!ok) {
           useWebCodecs.current = false;
           await chrome.storage.local.set({ fastRecorderInUse: false });
-          await startMediaRecorderWithCodec("vp9");
+          await startMediaRecorderWithCodec("mp4");
           persistRegionStartDebug({ stage: "start-recorder-fallback-vp9" });
         } else {
           persistRegionStartDebug({ stage: "start-recorder-webcodecs-ok" });
@@ -1728,7 +1741,7 @@ const Recorder = () => {
       } else {
         useWebCodecs.current = false;
         await chrome.storage.local.set({ fastRecorderInUse: false });
-        await startMediaRecorderWithCodec("vp9");
+        await startMediaRecorderWithCodec("mp4");
         persistRegionStartDebug({ stage: "start-recorder-mediarecorder-vp9" });
       }
     } catch (err) {
@@ -2264,30 +2277,7 @@ const Recorder = () => {
     try {
       const endStorageReads = perfSpan("Region.Recorder storage.reads");
       const { qualityValue } = await chrome.storage.local.get(["qualityValue"]);
-
-      let width = 1920;
-      let height = 1080;
-
-      if (qualityValue === "4k") {
-        width = 4096;
-        height = 2160;
-      } else if (qualityValue === "1080p") {
-        width = 1920;
-        height = 1080;
-      } else if (qualityValue === "720p") {
-        width = 1280;
-        height = 720;
-      } else if (qualityValue === "480p") {
-        width = 854;
-        height = 480;
-      } else if (qualityValue === "360p") {
-        width = 640;
-        height = 360;
-      } else if (qualityValue === "240p") {
-        width = 426;
-        height = 240;
-      }
-
+      const { width, height } = getResolutionForQuality(qualityValue);
       const { fpsValue } = await chrome.storage.local.get(["fpsValue"]);
       let fps = parseInt(fpsValue);
 

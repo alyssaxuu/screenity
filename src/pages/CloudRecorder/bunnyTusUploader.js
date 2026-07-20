@@ -123,6 +123,9 @@ export default class BunnyTusUploader {
     this.status = "idle";
     this.error = null;
     this.isFinalizing = false;
+    // Lets finalize's own drain keep running once isFinalizing is set.
+    // write() still checks isFinalizing alone, so new writes stay out.
+    this.isDrainingForFinalize = false;
     this.isPaused = false;
     this.metadata = {};
     this.pendingUploads = [];
@@ -1143,7 +1146,10 @@ export default class BunnyTusUploader {
     }
   }
   async uploadChunk(chunk) {
-    if (this.isFinalizing) return;
+    // processQueue already shifted this chunk off the queue, so bailing here
+    // drops it for good. Finalize's drain is exactly when the queue still
+    // holds bytes we are about to declare.
+    if (this.isFinalizing && !this.isDrainingForFinalize) return;
     let data = new Uint8Array(await chunk.arrayBuffer());
     const chunkStartOffset = this.offset;
     // One-shot 401 refresh per chunk. Re-armed each chunk so a token
@@ -1441,7 +1447,15 @@ export default class BunnyTusUploader {
     this.isProcessingQueue = true;
 
     try {
-      while (this.chunkQueue.length && !this.isPaused && !this.isFinalizing) {
+      // isFinalizing alone used to stop this loop, which deadlocked finalize:
+      // it sets the flag, then waits on a queue nothing was allowed to drain.
+      // Short recordings lost the final chunk and uploaded a header Bunny
+      // could not transcode.
+      while (
+        this.chunkQueue.length &&
+        !this.isPaused &&
+        (!this.isFinalizing || this.isDrainingForFinalize)
+      ) {
         const chunk = this.chunkQueue.shift();
         this.queuedBytes -= chunk.size;
 
@@ -1516,7 +1530,23 @@ export default class BunnyTusUploader {
     this.emitTelemetry("upload_finalize_started");
     this.scheduleJournalPersist({ force: true });
     try {
-      await this.waitForPendingUploads();
+      // Lets processQueue and uploadChunk run while isFinalizing is set.
+      this.isDrainingForFinalize = true;
+      try {
+        await this.waitForPendingUploads();
+      } finally {
+        this.isDrainingForFinalize = false;
+      }
+
+      // Never declare the length with bytes still queued. Bunny accepts a
+      // short upload, transcoding then fails, and the recording is gone with
+      // no error anywhere. Failing here keeps the retry path alive.
+      if (this.chunkQueue.length > 0) {
+        this.setUploaderError("finalize-queue-not-drained");
+        throw new Error(
+          `Finalize blocked: ${this.chunkQueue.length} chunk(s) (${this.queuedBytes} bytes) still queued after drain.`,
+        );
+      }
 
       if (this.bytesLostAfterFinalize > 0) {
         this.status = "error";
@@ -1579,46 +1609,35 @@ export default class BunnyTusUploader {
         throw new Error("Finalize failed: server has 0 bytes.");
       }
 
-      if (serverOffset < this.totalBytes) {
-        this.status = "error";
-        this.error = `incomplete-upload server=${serverOffset} expected=${this.totalBytes}`;
-        this.lastErrorAt = Date.now();
-        this.lastErrorCode = "finalize-incomplete-upload";
-        this.emitTelemetry("upload_error", {
-          errorCode: "finalize-incomplete-upload",
-          serverOffset,
-          expectedBytes: this.totalBytes,
-        });
-        this.scheduleJournalPersist({ force: true });
-        throw new Error(
-          `Finalize blocked: upload incomplete (server ${serverOffset} / expected ${this.totalBytes}).`,
-        );
-      }
-
+      // Server's Upload-Offset is the source of truth for the final length:
+      // re-sends at a stale offset get 409'd and trimmed (see uploadChunk), so
+      // stored bytes are always a clean prefix and drift is bookkeeping skew.
+      let recoveredBytes = 0;
+      let truncatedBytes = 0;
       if (serverOffset > this.totalBytes) {
-        this.status = "error";
-        this.error = `invalid-length server=${serverOffset} expected=${this.totalBytes}`;
-        this.lastErrorAt = Date.now();
-        this.lastErrorCode = "finalize-invalid-length";
-        this.emitTelemetry("upload_error", {
-          errorCode: "finalize-invalid-length",
-          serverOffset,
-          expectedBytes: this.totalBytes,
-        });
-        this.scheduleJournalPersist({ force: true });
-        throw new Error(
-          `Finalize blocked: serverOffset (${serverOffset}) exceeds expected totalBytes (${this.totalBytes}).`,
-        );
+        // Server holds more than the client counted: bytes PATCHed in a prior
+        // session after the last journal write. Those are durably on Bunny, so
+        // recover them by trusting the server.
+        recoveredBytes = serverOffset - this.totalBytes;
+        this.totalBytes = serverOffset;
+      } else if (serverOffset < this.totalBytes) {
+        // Server holds less: the tail is stranded (stalled uplink or a failed
+        // chunk; bytes past a tus gap are unrecoverable anyway). Declare the
+        // clean prefix instead of looping. truncatedBytes tracks the cost.
+        truncatedBytes = this.totalBytes - serverOffset;
+        this.totalBytes = serverOffset;
       }
 
-      // Complete the tus upload by declaring final length.
+      // Upload-Length must equal Upload-Offset to complete, and can never be
+      // below it. Declaring the client tally when the two disagreed was what
+      // Bunny rejected.
       const res = await fetch(this.uploadUrl, {
         method: "PATCH",
         headers: {
           "Tus-Resumable": "1.0.0",
           "Content-Type": "application/offset+octet-stream",
           "Upload-Offset": String(serverOffset),
-          "Upload-Length": String(this.totalBytes),
+          "Upload-Length": String(serverOffset),
           AuthorizationSignature: this.signature,
           AuthorizationExpire: String(this.expires),
           LibraryId: String(this.libraryId),
@@ -1638,9 +1657,15 @@ export default class BunnyTusUploader {
       this.emitTelemetry("upload_finalize_completed", {
         finalizedBytes: this.totalBytes,
         alreadyFinalized: alreadyFinalized || undefined,
+        // Reconciled a prior session's unjournaled bytes back in (no loss).
+        recoveredBytes: recoveredBytes || undefined,
+        // Finalized a truncated clean prefix; this many tail bytes were
+        // stranded and lost. > 0 here is the signal to watch.
+        truncatedBytes: truncatedBytes || undefined,
       });
       this.emitTelemetry("upload_complete_client", {
         finalizedBytes: this.totalBytes,
+        truncatedBytes: truncatedBytes || undefined,
       });
       this.stopHeartbeat();
       await this.clearUploadJournal();

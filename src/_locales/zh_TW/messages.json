@@ -1710,5 +1710,13 @@
   "downloadProcessingDescription": {
     "message": "長時間錄製可能需要一些時間。",
     "description": "Body of the download-in-progress banner"
+  },
+  "cameraMicBlockedTitle": {
+    "message": "無法使用相機和麥克風",
+    "description": "Toast title shown when the current page's Permissions-Policy blocks the extension's camera and microphone"
+  },
+  "cameraMicBlockedDescription": {
+    "message": "此網站禁止存取您的相機和麥克風。您仍然可以在此處錄製，但您的相機將不會顯示。",
+    "description": "Toast description shown when the current page's Permissions-Policy blocks the extension's camera and microphone"
   }
 }

@@ -3,8 +3,18 @@ import { createDebugLogger } from "../utils/recorderDebug";
 import { selectMimeType, getCodecLabel, buildTrackSnapshot } from "../utils/recorderCodec";
 import localforage from "localforage";
 import RecorderUI from "./RecorderUI";
-import { createMediaRecorder } from "./mediaRecorderUtils";
+import {
+  createMediaRecorder,
+  selectRecorderMime,
+  containerForMime,
+} from "./mediaRecorderUtils";
 import { sendRecordingError, sendStopRecording } from "../utils/recorderMessaging";
+import {
+  computeCaptureCap,
+  isOversampleDisabled,
+  constrainTrackDown,
+  enforceOversampleRatio,
+} from "../utils/captureResolution";
 import { getBitrates, getResolutionForQuality } from "./recorderConfig";
 import {
   WebCodecsRecorder,
@@ -160,8 +170,9 @@ const getFreeCaptureCaps = async () => {
   }
 };
 
-// bits/pixel/sec. Pro gets higher quality, Free smaller files.
-const VIDEO_BPP_FPS_PRO = 0.10;
+// bits/pixel/sec. 0.10 put 1080p30 at 6.2 Mbps, under the 0.15-0.25 screen
+// content wants, and text edges are the first thing H.264 discards.
+const VIDEO_BPP_FPS_PRO = 0.15;
 const VIDEO_BPP_FPS_FREE = 0.08;
 const VIDEO_BPS_MIN = 4_000_000;
 const VIDEO_BPS_MAX = 24_000_000;
@@ -185,6 +196,9 @@ const Recorder = () => {
   const hasChunks = useRef(false);
 
   const recdbgSessionRef = useRef(null);
+  // What the capture was actually asked for, so the MediaRecorder path can
+  // constrain a supersampled track back down before it starts encoding.
+  const captureCapRef = useRef(null);
 
   const lastSize = useRef(0);
   const index = useRef(0);
@@ -338,6 +352,10 @@ const Recorder = () => {
   const lastEstimateAt = useRef(0);
   const ESTIMATE_INTERVAL_MS = 5000;
   const MIN_HEADROOM = 25 * 1024 * 1024;
+  // Aborting still writes a tail chunk and finalizes, so the reserve has to
+  // cover the bytes in flight, not just a flat floor. No-op for WebCodecs
+  // (~1MB fragments); binds on MediaRecorder above 1080p30.
+  const HEADROOM_CHUNKS = 4;
   const WARN_HEADROOM = 100 * 1024 * 1024;
   const MAX_PENDING_BYTES = 8 * 1024 * 1024;
   const pendingBytes = useRef(0);
@@ -392,13 +410,18 @@ const Recorder = () => {
       const { usage = 0, quota = 0 } = await navigator.storage.estimate();
       estimateFailed.current = false;
       const remaining = quota - usage;
-      const ok = remaining > MIN_HEADROOM + (byteLength || 0);
+      const reserve = Math.max(
+        MIN_HEADROOM,
+        (byteLength || 0) * HEADROOM_CHUNKS,
+      );
+      const ok = remaining > reserve + (byteLength || 0);
       if (DEBUG_RECORDER) {
         debug("Storage estimate", {
           usage,
           quota,
           remaining,
           byteLength,
+          reserve,
           ok,
         });
       }
@@ -1413,8 +1436,14 @@ const Recorder = () => {
       probeResult,
       stickyState,
     );
-    const recordingExtension =
-      probeResult?.details?.containerKind === "webm" ? "webm" : "mp4";
+    // Extension must match the recorder that runs, not the probe. Fast path
+    // uses the probe container; MediaRecorder resolves its own from its mime.
+    const mediaRecorderContainer = containerForMime(selectRecorderMime(liveStream.current));
+    const recordingExtension = shouldUseFast
+      ? probeResult?.details?.containerKind === "webm"
+        ? "webm"
+        : "mp4"
+      : mediaRecorderContainer;
 
     chunkWriter.current = null;
     chunkWriterBackend.current = null;
@@ -1567,8 +1596,49 @@ const Recorder = () => {
       getResolutionForQuality(effectiveQualityValue);
     const trackWidth = settings.width ?? qualityWidth ?? 1920;
     const trackHeight = settings.height ?? qualityHeight ?? 1080;
-    const width = Math.min(trackWidth, qualityWidth ?? trackWidth);
-    const height = Math.min(trackHeight, qualityHeight ?? trackHeight);
+    // Fit inside the tier with aspect preserved, matching the encoder. Clamping
+    // each axis separately overstated the pixel count on non-16:9 sources
+    // (3440x1440 encodes to 1920x804), and the bitrate below derives from these.
+    const fitScale = Math.min(
+      (qualityWidth ?? trackWidth) / trackWidth,
+      (qualityHeight ?? trackHeight) / trackHeight,
+      1,
+    );
+    const width = Math.max(2, Math.round((trackWidth * fitScale) / 2) * 2);
+    const height = Math.max(2, Math.round((trackHeight * fitScale) / 2) * 2);
+
+    // MediaRecorder encodes the track as-is, so lower it back to the tier or a
+    // 1080p recording ships as 3840x2160. Runs after the probe, so a decision
+    // that disagreed with the pre-capture guess still lands right.
+    let oversampleOutcome = null;
+    if (videoTrack) {
+      // MediaRecorder has no resize stage so it always wants the encode size: a
+      // 4K webcam or an unconstrained desktop capture would otherwise ship 4K at
+      // a bitrate computed for the tier. WebCodecs downscales on its canvas, so
+      // it only needs the ratio resolved when we actually supersampled.
+      const outcome = !canUseWebCodecs
+        ? await constrainTrackDown(videoTrack, width, height)
+        : captureCapRef.current?.oversampled
+          ? await enforceOversampleRatio(videoTrack, width, height)
+          : "not-needed";
+      oversampleOutcome = outcome;
+      // Which branch a user lands on depends on their display, so the outcome
+      // has to be visible in the field. debug() is stripped from prod builds.
+      chrome.runtime
+        .sendMessage({
+          type: "diag-forward",
+          event: "recorder-oversample",
+          data: {
+            outcome,
+            trackW: settings.width ?? null,
+            trackH: settings.height ?? null,
+            encodeW: width,
+            encodeH: height,
+            webcodecs: canUseWebCodecs,
+          },
+        })
+        .catch(() => {});
+    }
 
     const { fpsValue } = await chrome.storage.local.get(["fpsValue"]);
     let fps = parseInt(fpsValue);
@@ -1577,7 +1647,16 @@ const Recorder = () => {
     if (!isPro) {
       fps = Math.min(fps, maxFps);
     }
-    const computedBps = computeTargetVideoBps(width, height, fps, isPro);
+    // If the constrain-down was rejected, MediaRecorder still encodes the full
+    // supersampled track, so budget for that rather than the tier it ignored.
+    const constrainRejected =
+      oversampleOutcome === "failed" && !canUseWebCodecs;
+    const computedBps = computeTargetVideoBps(
+      constrainRejected ? trackWidth : width,
+      constrainRejected ? trackHeight : height,
+      fps,
+      isPro,
+    );
     videoBitsPerSecond = !isPro
       ? Math.min(computedBps, bitratePreset)
       : computedBps;
@@ -1952,6 +2031,19 @@ const Recorder = () => {
                     chunkCount: closeResult?.chunkCount,
                   });
                 }
+                // Recorder's view of the finalized artifact + editor's backend.
+                // Pairs with opfs-close-ok/fail to locate header-only files.
+                chrome.runtime
+                  .sendMessage({
+                    type: "diag-forward",
+                    event: "recorder-writer-close-result",
+                    data: {
+                      backend: chunkBackendRef.current?.backend || null,
+                      byteSize: closeResult?.byteSize ?? null,
+                      chunkCount: closeResult?.chunkCount ?? null,
+                    },
+                  })
+                  .catch(() => {});
               } catch (err) {
                 debugWarn("chunkWriter.close failed before validate", err);
                 if (err?.code === "opfs-writer-failed" && err?.fileName) {
@@ -1963,6 +2055,17 @@ const Recorder = () => {
                 } else {
                   chunkBackendRef.current = { backend: "idb" };
                 }
+                chrome.runtime
+                  .sendMessage({
+                    type: "diag-forward",
+                    event: "recorder-writer-close-result",
+                    data: {
+                      backend: chunkBackendRef.current?.backend || null,
+                      closeError: String(err?.message || err).slice(0, 160),
+                      closeErrorCode: err?.code || null,
+                    },
+                  })
+                  .catch(() => {});
               }
               chunkWriter.current = null;
               chunkWriterBackend.current = null;
@@ -1987,9 +2090,32 @@ const Recorder = () => {
             (async () => {
               let validation = null;
               const endValidate = perfSpan("Recorder.onFinalized.validate");
+              // Start marker so a validation that never finishes shows up as a
+              // start with no done (the unwritten-verdict case in field reports).
+              chrome.runtime
+                .sendMessage({
+                  type: "diag-forward",
+                  event: "recorder-validation-start",
+                  data: { backend: chunkBackendRef.current?.backend || null },
+                })
+                .catch(() => {});
               try {
                 const endRebuild = perfSpan("Recorder.onFinalized.rebuildBlob");
-                const blob = await rebuildBlobFromChunks();
+                // rebuildBlobFromChunks can hang for minutes on OPFS if the
+                // finalize marker never lands. Bound it so we always get a verdict.
+                const REBUILD_TIMEOUT_MS = 30000;
+                let rebuildTimer = null;
+                const blob = await Promise.race([
+                  rebuildBlobFromChunks(),
+                  new Promise((_, reject) => {
+                    rebuildTimer = setTimeout(
+                      () => reject(new Error("rebuild-timeout")),
+                      REBUILD_TIMEOUT_MS,
+                    );
+                  }),
+                ]).finally(() => {
+                  if (rebuildTimer) clearTimeout(rebuildTimer);
+                });
                 endRebuild({ bytes: blob?.size ?? 0 });
                 validation = await validateFastRecorderOutputBlob(blob, {
                   minBytes: 64 * 1024,
@@ -2002,15 +2128,43 @@ const Recorder = () => {
                   validation,
                 });
               } catch (err) {
+                const isRebuildTimeout = String(err?.message || err).includes(
+                  "rebuild-timeout",
+                );
+                // Timeout means slow reassembly (multi-GB take in a throttled
+                // tab), not a bad recording, and it already shipped. Mark it
+                // inconclusive so it neither fails the take nor penalizes fast.
                 validation = {
                   ok: false,
-                  hardFail: true,
-                  reasons: ["validation-exception"],
+                  hardFail: !isRebuildTimeout,
+                  inconclusive: isRebuildTimeout,
+                  reasons: [
+                    isRebuildTimeout ? "rebuild-timeout" : "validation-exception",
+                  ],
                   details: { error: String(err) },
                 };
               }
               endValidate({ ok: !!(validation && validation.ok) });
-              if (validation && !validation.ok) {
+              // Done marker. A start with no done now pins a hang past the
+              // guard rather than a validator that never ran.
+              chrome.runtime
+                .sendMessage({
+                  type: "diag-forward",
+                  event: "recorder-validation-done",
+                  data: {
+                    ok: !!(validation && validation.ok),
+                    hardFail: !!(validation && validation.hardFail),
+                    reason:
+                      validation && Array.isArray(validation.reasons)
+                        ? validation.reasons[0] || null
+                        : null,
+                    sizeKb: validation?.details?.size
+                      ? Math.round(validation.details.size / 1024)
+                      : null,
+                  },
+                })
+                .catch(() => {});
+              if (validation && !validation.ok && !validation.inconclusive) {
                 await markFastRecorderFailure("validation-failed", validation);
                 await chrome.storage.local.set({
                   lastWebCodecsFailureAt: Date.now(),
@@ -2060,13 +2214,9 @@ const Recorder = () => {
               typeof err?.code === "string" && err.code
                 ? err.code
                 : "webcodecs-error";
-            // Late teardown error fired after video-ready already shipped:
-            // the recording is finalized on disk and the sandbox is mid
-            // OPFS read. Surfacing as recording-error races that read and
-            // pops a spurious "Can't load your recording" modal — and
-            // would flip the sticky-disable on a recording that succeeded.
-            // Log a breadcrumb and drop. (err.finalized handles the salvage
-            // path below; this handles the normal-finalize path.)
+            // Late teardown error after video-ready shipped: the file is
+            // finalized and the sandbox is mid OPFS read, so surfacing it races
+            // that read and pops a spurious modal. Breadcrumb and drop.
             if (sentLast.current && !err?.finalized) {
               chrome.runtime
                 .sendMessage({
@@ -3303,6 +3453,9 @@ const Recorder = () => {
 
   async function startStream(data, id, options, permissions, permissions2, streamOpts = {}) {
     const useDisplayMedia = !!streamOpts.useDisplayMedia;
+    // Only the screen/desktop branches supersample; clear it so a camera-only
+    // take can't inherit a previous screen recording's value.
+    captureCapRef.current = null;
     perfMark("Recorder startStream.enter", {
       recordingType: data?.recordingType,
       hasId: Boolean(id),
@@ -3508,12 +3661,20 @@ const Recorder = () => {
       const { disableSurfaceSwitching } = await chrome.storage.local.get([
         "disableSurfaceSwitching",
       ]);
+      // Capture at 2x the tier and let the resize canvas do the 2:1 downscale
+      // (see captureResolution.js). Only `max` matters: a large `ideal` next to
+      // a `max` was measured to change nothing.
+      const captureCap =
+        computeCaptureCap(width, height, {
+          disabled: await isOversampleDisabled(),
+        }) || { width, height, oversampled: false };
+      captureCapRef.current = captureCap;
       const displayConstraints = {
         audio: data.systemAudio ? true : false,
         video: {
           frameRate: { ideal: fps, max: fps },
-          width: { ideal: width, max: width },
-          height: { ideal: height, max: height },
+          width: { max: captureCap.width },
+          height: { max: captureCap.height },
           displaySurface: "monitor",
         },
         // systemAudio:"include" (default may hide the toggle). surfaceSwitching
@@ -4500,11 +4661,47 @@ const Recorder = () => {
       sendResponse?.({ ok: true, woke: true });
       return true;
     } else if (request.type === "offscreen-shutdown") {
+      // Default true so a plain shutdown (stop path) still salvages via finalize.
+      // Discard/cancel pass false: skip finalize, which would emit video-ready
+      // and open the editor on the discarded take.
+      const shouldFinalize = request.shouldFinalize !== false;
       const timeoutMs = Number(request.timeoutMs) || 20000;
       (async () => {
         try {
           if (isRecording.current) {
-            stopRecording();
+            if (shouldFinalize) {
+              stopRecording();
+            } else {
+              // Quiet teardown mirroring dismissRecording()'s guards: halt
+              // capture without the finalize/video-ready path. uiClosing +
+              // localStopInitiated also suppress the abandonment watchdog.
+              localStopInitiated.current = true;
+              uiClosing.current = true;
+              isRecording.current = false;
+              recordingGeneration.current += 1;
+              try {
+                const r = recorder.current;
+                if (r instanceof MediaRecorder) {
+                  r.ondataavailable = null;
+                  r.onstop = null;
+                  r.onerror = null;
+                  if (r.state !== "inactive") r.stop();
+                } else if (r instanceof WebCodecsRecorder) {
+                  r.running = false;
+                  r.paused = false;
+                  await Promise.resolve(r.cleanup?.()).catch(() => {});
+                }
+              } catch (err) {
+                debugWarn("offscreen-shutdown discard teardown failed", err);
+              }
+              if (chunkWriter.current) {
+                try {
+                  await chunkWriter.current.abort();
+                } catch {}
+                chunkWriter.current = null;
+                chunkWriterBackend.current = null;
+              }
+            }
           }
           // Don't stop capture tracks here: it raced a slow start (isRecording
           // not yet flipped, tracks live) and killed the screen track mid-start.

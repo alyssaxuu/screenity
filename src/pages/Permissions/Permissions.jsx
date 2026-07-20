@@ -8,6 +8,24 @@ const Recorder = () => {
       },
       "*"
     );
+
+    // Cross-origin iframe, so allowsFeature reflects what the page actually
+    // delegated to us. Pages with feature=(self) (e.g. facebook.com) don't
+    // delegate, so this reads false. Report up so the UI can warn.
+    try {
+      const pp = document.permissionsPolicy || document.featurePolicy;
+      if (pp && typeof pp.allowsFeature === "function") {
+        window.parent.postMessage(
+          {
+            type: "screenity-site-policy",
+            cameraAllowed: pp.allowsFeature("camera"),
+            microphoneAllowed: pp.allowsFeature("microphone"),
+            displayCaptureAllowed: pp.allowsFeature("display-capture"),
+          },
+          "*"
+        );
+      }
+    } catch (e) {}
   }, []);
 
   useEffect(() => {

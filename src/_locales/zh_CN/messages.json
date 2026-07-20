@@ -1709,5 +1709,13 @@
   "downloadProcessingDescription": {
     "message": "长录制可能需要一些时间。",
     "description": "Body of the download-in-progress banner"
+  },
+  "cameraMicBlockedTitle": {
+    "message": "摄像头和麦克风不可用",
+    "description": "Toast title shown when the current page's Permissions-Policy blocks the extension's camera and microphone"
+  },
+  "cameraMicBlockedDescription": {
+    "message": "此网站阻止访问您的摄像头和麦克风。您仍然可以在此处录制，但您的摄像头画面不会显示。",
+    "description": "Toast description shown when the current page's Permissions-Policy blocks the extension's camera and microphone"
   }
 }

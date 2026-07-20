@@ -1710,5 +1710,13 @@
   "downloadProcessingDescription": {
     "message": "लंबी रिकॉर्डिंग में इसमें कुछ समय लग सकता है।",
     "description": "Body of the download-in-progress banner"
+  },
+  "cameraMicBlockedTitle": {
+    "message": "कैमरा और माइक्रोफोन की अनुमति नहीं है",
+    "description": "Toast title shown when the current page's Permissions-Policy blocks the extension's camera and microphone"
+  },
+  "cameraMicBlockedDescription": {
+    "message": "यह वेबसाइट आपके कैमरा और माइक्रोफोन तक पहुँच को रोकती है। आप यहाँ फिर भी रिकॉर्ड कर सकते हैं, लेकिन आपका कैमरा दिखाई नहीं देगा।",
+    "description": "Toast description shown when the current page's Permissions-Policy blocks the extension's camera and microphone"
   }
 }

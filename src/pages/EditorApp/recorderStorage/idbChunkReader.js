@@ -41,7 +41,13 @@ export class IdbChunkReader {
       c.chunk instanceof Blob ? c.chunk : new Blob([c.chunk]),
     );
     const byteSize = parts.reduce((s, p) => s + (p?.size || 0), 0);
-    const inferredType = parts[0]?.type || "video/mp4";
+    // MediaRecorder tags chunks "video/mp4;codecs=...", but the editor matches
+    // blob.type exactly, so a suffixed MP4 misses the fast path. Bare container, like OpfsChunkReader.
+    const rawType = (parts[0]?.type || "").toLowerCase();
+    const inferredType =
+      rawType.includes("webm") || rawType.includes("matroska")
+        ? "video/webm"
+        : "video/mp4";
     const blob = parts.length
       ? new Blob(parts, { type: inferredType })
       : new Blob([], { type: inferredType });

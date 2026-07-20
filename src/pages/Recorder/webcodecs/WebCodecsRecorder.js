@@ -356,6 +356,10 @@ export class WebCodecsRecorder {
     this._failureReported = false;
     this._videoLoopError = null;
     this._firstChunkSeen = false;
+    // no-first-chunk SW salvage is one-shot (guarded by _didSwRetry); reset so a
+    // reused instance can salvage again on a second recording.
+    this._didSwRetry = false;
+    this._swRetryReason = null;
     this._lastChunkAt = null;
     this._lastFailureCode = null;
     this._forceNextKeyframe = false;
@@ -867,8 +871,10 @@ export class WebCodecsRecorder {
     // of the file is already in chunksStore (fragmented MP4);
     // flushPending() preserves the rest.
     let muxerFinalizeOk = false;
+    let ranFlushPending = false;
     if (this.muxer && !this._failureReported) {
       const endFinalize = perfSpan("WCR.stop.muxer.finalize");
+      const finalizeStartedAt = performance.now();
       try {
         await Promise.race([
           this.muxer.finalize().then(() => {
@@ -882,15 +888,51 @@ export class WebCodecsRecorder {
           ),
         ]);
         endFinalize({ ok: true });
+        diagForward("recorder-muxer-finalize-ok", {
+          ms: Math.round(performance.now() - finalizeStartedAt),
+          chunksOut: this._chunksOut,
+          frameCount: this.frameCount,
+        });
       } catch (err) {
         endFinalize({ ok: false, err: String(err?.message || err).slice(0, 80) });
         this.err("[WCR] muxer.finalize:", err);
         this.options.onError?.(err);
         try {
           await this.muxer.flushPending();
+          ranFlushPending = true;
         } catch {}
+        // finalize() timed out or threw: moov trailer may be missing, file could
+        // be a header-only fragment. Record whether we force-flushed for salvage.
+        diagForward("recorder-muxer-finalize-fail", {
+          ms: Math.round(performance.now() - finalizeStartedAt),
+          err: String(err?.message || err).slice(0, 120),
+          ranFlushPending,
+          chunksOut: this._chunksOut,
+          frameCount: this.frameCount,
+        });
       }
     }
+
+    // Capture-to-disk breadcrumb at stop: splits "encoder produced nothing"
+    // (muxerBytes ~= header) from "bytes lost after the muxer" (big muxerBytes,
+    // tiny file). ALWAYS_FLUSH survives SW teardown.
+    try {
+      const muxerStats = this.muxer?.getStats?.() || null;
+      diagForward("recorder-finalize-summary", {
+        frameCount: this.frameCount,
+        chunksOut: this._chunksOut,
+        firstChunkSeen: this._firstChunkSeen,
+        framesFromMSTP: this._framesFromMSTP,
+        syntheticFirstFrameCount: this._syntheticFirstFrameCount,
+        muxerBytes: muxerStats?.totalEmittedBytes ?? null,
+        muxerEmits: muxerStats?.emitCount ?? null,
+        muxerFinalizeOk,
+        ranFlushPending,
+        videoEncoderStateAtStop: this._videoEncoderStateAtStop,
+        failureReported: this._failureReported,
+        lastFailureCode: this._lastFailureCode || null,
+      });
+    } catch {}
 
     // Always invoke onFinalized: skipping on finalize-fail caused the
     // stuck-at-90% bug on stream-end. Recorder layer decides next steps
@@ -1322,6 +1364,44 @@ export class WebCodecsRecorder {
       ) {
         this._armFirstChunkWatchdog();
         return;
+      }
+      // HW encoder can configure() fine yet emit no chunk: screen+camera both on
+      // HW WebCodecs contend for macOS VideoToolbox sessions, yielding a 28-byte
+      // ftyp-only file. Nothing throws, so rebuild prefer-software once first.
+      const cfg = this._activeVideoConfig;
+      const isHwConfig =
+        cfg &&
+        (cfg.hardwareAcceleration === "prefer-hardware" ||
+          !cfg.hardwareAcceleration);
+      if (
+        this.running &&
+        !this._stopping &&
+        isHwConfig &&
+        !this._didSwRetry &&
+        this._encoderReclaimCount < this._maxEncoderReclaims
+      ) {
+        this._encoderReclaimCount += 1;
+        this.warn(
+          "[WCR] no first chunk on hardware encoder; rebuilding prefer-software",
+          { withinMs: this._firstChunkWatchdogMs, attempt: this._encoderReclaimCount },
+        );
+        try {
+          diagForward("recorder-no-first-chunk-sw-rebuild", {
+            withinMs: this._firstChunkWatchdogMs,
+            attempt: this._encoderReclaimCount,
+          });
+        } catch {}
+        const swConfig = {
+          ...cfg,
+          hardwareAcceleration: "prefer-software",
+        };
+        if (this._rebuildVideoEncoder(swConfig)) {
+          this._didSwRetry = true;
+          this._swRetryReason = this._swRetryReason || "no-first-chunk";
+          this._forceNextKeyframe = true;
+          this._armFirstChunkWatchdog();
+          return;
+        }
       }
       this.warn(
         `[WCR] no encoded video chunk within ${this._firstChunkWatchdogMs}ms`,
@@ -2372,7 +2452,14 @@ export class WebCodecsRecorder {
             gapMs: Math.round(_nowLoopTick - this._lastFrameArrivalAt),
             recoveries: this._postSleepRecoveries,
           });
-          this._lastChunkAt = _nowLoopTick;
+          // Sleep can invalidate the VideoToolbox session (crbug 477895).
+          // Backdate _lastChunkAt to give the stall watchdog 8s grace, not 15s:
+          // clears HW cold-start yet rebuilds a dead session promptly.
+          const POST_SLEEP_GRACE_MS = 8000;
+          this._lastChunkAt =
+            this._midStreamWatchdogMs > POST_SLEEP_GRACE_MS
+              ? _nowLoopTick - (this._midStreamWatchdogMs - POST_SLEEP_GRACE_MS)
+              : _nowLoopTick;
           this._forceNextKeyframe = true;
           try {
             diagForward("recorder-sleep-detected", {

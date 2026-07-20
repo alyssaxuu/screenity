@@ -90,8 +90,10 @@ export const cancelRecording = async () => {
       sendMessageTab(id, { type: "stop-pending" }).catch(() => {});
     });
     focusTab(activeTab);
+    // shouldFinalize:false: cancel throws the take away, so the offscreen
+    // recorder must not finalize into a video-ready / editor open.
     try {
-      await discardOffscreenDocuments();
+      await discardOffscreenDocuments({ reason: "cancel", shouldFinalize: false });
     } catch {}
     await resetWatchdogState();
     chrome.runtime.sendMessage({ type: "turn-off-pip" });

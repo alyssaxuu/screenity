@@ -609,7 +609,6 @@ const ContentState = (props) => {
       await reader.close().catch(() => {});
     }
     if (!readResult || readResult.chunkCount === 0) {
-      debug("No chunks found in chunk reader");
       if (DEBUG_POSTSTOP)
         console.warn(
           "[Screenity][Sandbox] buildBlobFromChunks: no parts found",

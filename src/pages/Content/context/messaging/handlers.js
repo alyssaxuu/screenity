@@ -2,7 +2,7 @@ import {
   registerMessage,
   messageRouter,
 } from "../../../../messaging/messageRouter";
-import { setContentState, contentStateRef } from "../ContentState";
+import { setContentState, contentStateRef, setTimer } from "../ContentState";
 import { updateFromStorage } from "../utils/updateFromStorage";
 
 import { checkAuthStatus } from "../utils/checkAuthStatus";
@@ -876,7 +876,7 @@ export const setupHandlers = () => {
     if (!description) return;
     const timeout = message?.timeout || 10000;
     if (typeof state.openWarning === "function") {
-      state.openWarning(title, description, "AudioIcon", timeout);
+      state.openWarning(title, description, "AudioIcon", timeout, "bottom");
     } else if (typeof state.openToast === "function") {
       state.openToast(description, () => {}, timeout);
     }

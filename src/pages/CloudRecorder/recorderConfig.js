@@ -1,11 +1,5 @@
-export const MIME_TYPES = [
-  "video/webm;codecs=vp9,opus",
-  "video/webm;codecs=vp8,opus",
-  "video/webm;codecs=h264",
-  "video/webm",
-  "video/mp4",
-  "video/webm;codecs=avc1",
-];
+// MIME_TYPES lived here but was never imported. Cloud codec/container choice
+// is in encoder/chooseEncoder.js (inspectTrackPlan).
 
 export function getBitrates(quality) {
   switch (quality) {

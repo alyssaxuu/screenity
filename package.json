@@ -1,6 +1,6 @@
 {
   "name": "screenity",
-  "version": "4.5.6",
+  "version": "4.6.0",
   "description": "The free and privacy-friendly screen recorder with no sign in needed.",
   "scripts": {
     "build": "cross-env NODE_ENV=production node utils/build.js",
@@ -26,7 +26,7 @@
     "release:cws:publish:10": "dotenv -e .env.local -- chrome-webstore-upload publish --deploy-percentage 10",
     "release:cws:publish:50": "dotenv -e .env.local -- chrome-webstore-upload publish --deploy-percentage 50",
     "clean": "rm -rf build && mkdir build",
-    "lint": "eslint src/**/*.js --fix",
+    "lint": "eslint src",
     "build:content-css": "sass src/pages/Content/styles/app.scss src/pages/Content/styles/app.css --no-source-map",
     "check:i18n": "node scripts/check-i18n.mjs",
     "verify:zip": "node scripts/verify-no-secrets.mjs",
@@ -96,7 +96,10 @@
     "cross-env": "^7.0.3",
     "css-loader": "^6.7.2",
     "dotenv-cli": "^11.0.0",
+    "eslint": "10.7.0",
+    "eslint-plugin-react-hooks": "7.1.1",
     "fs-extra": "^10.1.0",
+    "globals": "17.7.0",
     "html-loader": "^3.1.0",
     "html-webpack-plugin": "^5.5.0",
     "prettier": "^2.7.1",

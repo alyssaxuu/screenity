@@ -45,7 +45,11 @@ const RecordingTab = (props) => {
 
   useEffect(() => {
     const currentUrl = window.location.href;
-    const isBlocked = currentUrl.includes(process.env.SCREENITY_APP_BASE);
+    // facebook.com and similar: Permissions-Policy won't delegate
+    // display-capture to our region iframe, so region capture can't start.
+    const isBlocked =
+      currentUrl.includes(process.env.SCREENITY_APP_BASE) ||
+      contentState.siteDisplayCaptureBlocked === true;
 
     setTabRecordingDisabled(isBlocked);
 
@@ -60,7 +64,7 @@ const RecordingTab = (props) => {
         4000
       );
     }
-  }, [contentState.recordingType]);
+  }, [contentState.recordingType, contentState.siteDisplayCaptureBlocked]);
 
   const onValueChange = (tab) => {
     setContentState((prevContentState) => ({

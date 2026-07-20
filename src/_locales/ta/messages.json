@@ -1710,5 +1710,13 @@
   "downloadProcessingDescription": {
     "message": "நீண்ட பதிவுகளுக்கு இதற்கு சிறிது நேரம் ஆகலாம்.",
     "description": "Body of the download-in-progress banner"
+  },
+  "cameraMicBlockedTitle": {
+    "message": "கேமரா மற்றும் மைக்ரோஃபோன் அனுமதிக்கப்படவில்லை",
+    "description": "Toast title shown when the current page's Permissions-Policy blocks the extension's camera and microphone"
+  },
+  "cameraMicBlockedDescription": {
+    "message": "இந்த வலைத்தளம் உங்கள் கேமரா மற்றும் மைக்ரோஃபோன் அணுகலைத் தடுக்கிறது. நீங்கள் இங்கே இன்னும் பதிவு செய்யலாம், ஆனால் உங்கள் கேமரா தெரியாது.",
+    "description": "Toast description shown when the current page's Permissions-Policy blocks the extension's camera and microphone"
   }
 }

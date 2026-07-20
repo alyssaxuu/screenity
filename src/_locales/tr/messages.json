@@ -1710,5 +1710,13 @@
   "downloadProcessingDescription": {
     "message": "Uzun kayıtlarda bu biraz zaman alabilir.",
     "description": "Body of the download-in-progress banner"
+  },
+  "cameraMicBlockedTitle": {
+    "message": "Kamera ve mikrofona izin verilmiyor",
+    "description": "Toast title shown when the current page's Permissions-Policy blocks the extension's camera and microphone"
+  },
+  "cameraMicBlockedDescription": {
+    "message": "Bu web sitesi kameranıza ve mikrofonunuza erişimi engelliyor. Yine de burada kayıt yapabilirsiniz, ancak kameranız görünmeyecek.",
+    "description": "Toast description shown when the current page's Permissions-Policy blocks the extension's camera and microphone"
   }
 }

@@ -1710,5 +1710,13 @@
   "downloadProcessingDescription": {
     "message": "Això pot trigar una estona en gravacions llargues.",
     "description": "Body of the download-in-progress banner"
+  },
+  "cameraMicBlockedTitle": {
+    "message": "Càmera i micròfon no permesos",
+    "description": "Toast title shown when the current page's Permissions-Policy blocks the extension's camera and microphone"
+  },
+  "cameraMicBlockedDescription": {
+    "message": "Aquest lloc web bloqueja l'accés a la càmera i el micròfon. Encara pots gravar aquí, però la càmera no es veurà.",
+    "description": "Toast description shown when the current page's Permissions-Policy blocks the extension's camera and microphone"
   }
 }

@@ -13,7 +13,8 @@ async function cropVideo(
     top: cropOptions.y,
     width: cropOptions.width,
     height: cropOptions.height,
-    outputFormat: "webm",
+    // Omit outputFormat so the crop follows the input container, like the trimmer.
+    // Forcing "webm" cropped MP4 recordings to WebM, then mislabelled downstream.
     videoBitrate: 5_000_000,
     audioBitrate: 128_000,
     onProgress,

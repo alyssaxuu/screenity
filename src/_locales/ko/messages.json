@@ -1710,5 +1710,13 @@
   "downloadProcessingDescription": {
     "message": "긴 녹화의 경우 시간이 걸릴 수 있습니다.",
     "description": "Body of the download-in-progress banner"
+  },
+  "cameraMicBlockedTitle": {
+    "message": "카메라와 마이크가 허용되지 않아요",
+    "description": "Toast title shown when the current page's Permissions-Policy blocks the extension's camera and microphone"
+  },
+  "cameraMicBlockedDescription": {
+    "message": "이 웹사이트가 카메라와 마이크 접근을 차단하고 있어요. 여기서 녹화는 계속할 수 있지만, 카메라는 표시되지 않아요.",
+    "description": "Toast description shown when the current page's Permissions-Policy blocks the extension's camera and microphone"
   }
 }

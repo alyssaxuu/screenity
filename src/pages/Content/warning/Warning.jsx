@@ -11,6 +11,7 @@ import {
   CameraCloseIcon,
   NotSupportedIcon,
   CameraIcon,
+  VideoOffIcon,
 } from "../toolbar/components/SVG";
 
 import * as ToastEl from "@radix-ui/react-toast";
@@ -25,14 +26,19 @@ const Warning = () => {
   const [description, setDescription] = useState("");
   const [icon, setIcon] = useState("AudioIcon");
   const [duration, setDuration] = useState(10000);
+  const [position, setPosition] = useState("top");
 
-  const openWarning = useCallback((title, description, icon, duration) => {
-    setTitle(title);
-    setDescription(description);
-    setIcon(icon);
-    setDuration(duration);
-    setOpen(true);
-  }, []);
+  const openWarning = useCallback(
+    (title, description, icon, duration, position = "top") => {
+      setTitle(title);
+      setDescription(description);
+      setIcon(icon);
+      setDuration(duration);
+      setPosition(position);
+      setOpen(true);
+    },
+    [],
+  );
 
   useEffect(() => {
     setContentState((prevContentState) => ({
@@ -56,14 +62,35 @@ const Warning = () => {
     }
   }, [contentState.recordingType]);
 
+  // Close once the stream exists rather than waiting for recording to flip: the
+  // capture is already live through the countdown, so a toast still on screen at
+  // 3-2-1 lands in the opening frames.
+  useEffect(() => {
+    if (contentState.countdownActive) {
+      setOpen(false);
+    }
+  }, [contentState.countdownActive]);
+
+  // With the countdown off, recording is the earliest signal available.
   useEffect(() => {
     if (contentState.recording) {
       setOpen(false);
     }
   }, [contentState.recording]);
 
+  // Flow ended without recording (picker cancelled, stream error). Scoped to the
+  // audio guidance so a warning explaining the failure isn't yanked away.
+  useEffect(() => {
+    if (!contentState.pendingRecording && icon === "AudioIcon") {
+      setOpen(false);
+    }
+  }, [contentState.pendingRecording]);
+
   return (
-    <ToastEl.Provider swipeDirection="up" duration={duration}>
+    <ToastEl.Provider
+      swipeDirection={position === "bottom" ? "down" : "up"}
+      duration={duration}
+    >
       <ToastEl.Root
         className="warning-root"
         open={open}
@@ -76,6 +103,7 @@ const Warning = () => {
           {icon === "AudioIcon" && <AudioIcon />}
           {icon === "NotSupportedIcon" && <NotSupportedIcon />}
           {icon === "CameraIcon" && <CameraIcon />}
+          {icon === "VideoOffIcon" && <VideoOffIcon />}
         </div>
         <div className="warning-content">
           <ToastEl.Title className="warning-title">{title}</ToastEl.Title>
@@ -92,7 +120,13 @@ const Warning = () => {
           <CameraCloseIcon />
         </ToastEl.Close>
       </ToastEl.Root>
-      <ToastEl.Viewport className="WarningViewport" />
+      <ToastEl.Viewport
+        className={
+          position === "bottom"
+            ? "WarningViewport WarningViewport--bottom"
+            : "WarningViewport"
+        }
+      />
     </ToastEl.Provider>
   );
 };

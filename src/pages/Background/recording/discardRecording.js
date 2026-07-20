@@ -33,9 +33,11 @@ export const discardRecording = async ({
   );
   chrome.action.setIcon({ path: "assets/icon-34.png" });
 
-  // await teardown before recording:false; otherwise handleAlarm fires against torn-down offscreen
+  // await teardown before recording:false; otherwise handleAlarm fires against torn-down offscreen.
+  // shouldFinalize:false so the recorder halts without a finalize that would
+  // emit video-ready and open the editor on the discarded take.
   try {
-    await discardOffscreenDocuments();
+    await discardOffscreenDocuments({ reason: "discard", shouldFinalize: false });
   } catch {}
   await resetWatchdogState();
 

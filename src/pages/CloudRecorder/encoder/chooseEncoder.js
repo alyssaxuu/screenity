@@ -10,6 +10,54 @@ import {
 } from "../../../media/fastRecorderGate";
 import { WebCodecsTrackRecorder } from "./WebCodecsTrackRecorder";
 import { probeHwSlots } from "./hwSlotProbe";
+import { canStartMp4Recorder } from "../../utils/recorderCodec";
+
+// Prefer H.264/MP4 fallback (Chrome/Edge 126+, not Firefox); VP9-WebM breaks
+// downstream (Bunny drops frames, node-av SIGSEGVs). false = VP9-WebM.
+const PREFER_MP4_MEDIARECORDER = true;
+
+// H.264 Baseline + AAC-LC. Video-only variant for audioless tracks;
+// isTypeSupported answers differently for the two, so probe both.
+const MP4_MR_WITH_AUDIO = "video/mp4;codecs=avc1.42E01E,mp4a.40.2";
+const MP4_MR_VIDEO_ONLY = "video/mp4;codecs=avc1.42E01E";
+
+let _mp4MrSupport = null;
+const probeMp4MediaRecorder = () => {
+  if (_mp4MrSupport !== null) return _mp4MrSupport;
+  const supported = (mime) => {
+    try {
+      return (
+        typeof MediaRecorder !== "undefined" &&
+        typeof MediaRecorder.isTypeSupported === "function" &&
+        MediaRecorder.isTypeSupported(mime)
+      );
+    } catch {
+      return false;
+    }
+  };
+  _mp4MrSupport = PREFER_MP4_MEDIARECORDER
+    ? {
+        withAudio: supported(MP4_MR_WITH_AUDIO),
+        videoOnly: supported(MP4_MR_VIDEO_ONLY),
+      }
+    : { withAudio: false, videoOnly: false };
+  return _mp4MrSupport;
+};
+
+// Only claim MP4 when both variants record: the container is fixed before we
+// know whether this track carries audio.
+const mediaRecorderVideoPlan = () => {
+  const s = probeMp4MediaRecorder();
+  return s.withAudio && s.videoOnly
+    ? { container: "video/mp4", codec: "avc1.42E01E" }
+    : { container: "video/webm", codec: "vp9" };
+};
+
+// Null for WebM: callers pass their existing mime through unchanged.
+export const mediaRecorderMimeFor = ({ container, enableAudio }) => {
+  if (container !== "video/mp4") return null;
+  return enableAudio ? MP4_MR_WITH_AUDIO : MP4_MR_VIDEO_ONLY;
+};
 
 // Encoded dims (capped at 1080p), not source-native. WebCodecs only;
 // MediaRecorder records native, so it skips this.
@@ -91,8 +139,7 @@ export const inspectTrackPlan = async ({ track, probeOptions }) => {
   if (sticky?.disabled) {
     return {
       kind: "mediarecorder",
-      container: "video/webm",
-      codec: "vp9",
+      ...mediaRecorderVideoPlan(),
       hwSlots: hwSlots.summary,
       reason: "fastRecorderGate-sticky-disabled",
     };
@@ -101,8 +148,7 @@ export const inspectTrackPlan = async ({ track, probeOptions }) => {
   if (!trackHw?.supported) {
     return {
       kind: "mediarecorder",
-      container: "video/webm",
-      codec: "vp9",
+      ...mediaRecorderVideoPlan(),
       hwSlots: hwSlots.summary,
       reason: `hw-probe-${track}-unsupported`,
     };
@@ -116,8 +162,7 @@ export const inspectTrackPlan = async ({ track, probeOptions }) => {
   if (hwSlots.summary.aacSupported === false) {
     return {
       kind: "mediarecorder",
-      container: "video/webm",
-      codec: "vp9",
+      ...mediaRecorderVideoPlan(),
       hwSlots: hwSlots.summary,
       reason: "aac-unsupported",
     };
@@ -125,8 +170,7 @@ export const inspectTrackPlan = async ({ track, probeOptions }) => {
   if (track === "camera" && hwSlots.summary.mode === "screen-hw-camera-mr") {
     return {
       kind: "mediarecorder",
-      container: "video/webm",
-      codec: "vp9",
+      ...mediaRecorderVideoPlan(),
       hwSlots: hwSlots.summary,
       reason: "screen-hw-camera-mr-mode",
     };
@@ -137,6 +181,10 @@ export const inspectTrackPlan = async ({ track, probeOptions }) => {
   const cameraPreferSoftware =
     track === "camera" &&
     hwSlots.summary.mode === "dual-webcodecs-camera-sw";
+  // HW encoder failed the output-liveness probe: use software H.264 (same MP4)
+  // rather than risk a silent zero-chunk recording. Off until the probe ships.
+  const screenPreferSoftware =
+    track === "screen" && Boolean(hwSlots.summary.screenPreferSoftware);
   return {
     kind: "webcodecs",
     container: "video/mp4",
@@ -145,7 +193,12 @@ export const inspectTrackPlan = async ({ track, probeOptions }) => {
     codec: "avc1.64002A",
     hwSlots: hwSlots.summary,
     cameraPreferSoftware,
-    reason: cameraPreferSoftware ? "dual-webcodecs-camera-sw-mode" : "ok",
+    screenPreferSoftware,
+    reason: cameraPreferSoftware
+      ? "dual-webcodecs-camera-sw-mode"
+      : screenPreferSoftware
+        ? "screen-hw-no-output-sw"
+        : "ok",
   };
 };
 
@@ -163,9 +216,29 @@ export const chooseTrackEncoder = async ({
   const plan = await inspectTrackPlan({ track, probeOptions });
 
   if (plan.kind === "mediarecorder") {
+    // Use the plan's mime so bytes match the container we already reported (TUS
+    // filetype / editor blob type). Null = WebM: pass the caller's mime unchanged.
+    let planMime = mediaRecorderMimeFor({
+      container: plan.container,
+      enableAudio,
+    });
+    // isTypeSupported can advertise MP4 on boxes whose MediaRecorder throws from
+    // start(). Probe the real stream and fall back to WebM rather than lose the
+    // recording; plan.container follows so the reported filetype stays truthful.
+    if (planMime && !canStartMp4Recorder(stream, planMime)) {
+      planMime = null;
+      plan.container = "video/webm";
+      plan.codec = "vp9";
+      plan.reason = `${plan.reason}+mp4-start-probe-failed`;
+    }
     return {
       ...plan,
-      recorder: createMediaRecorder(stream, { mimeType }, onDataAvailable, track),
+      recorder: createMediaRecorder(
+        stream,
+        { mimeType: planMime || mimeType },
+        onDataAvailable,
+        track,
+      ),
     };
   }
 
@@ -186,7 +259,10 @@ export const chooseTrackEncoder = async ({
     videoBitsPerSecond,
     audioBitsPerSecond,
     enableAudio,
-    preferSoftware: forceSoftware || Boolean(plan.cameraPreferSoftware),
+    preferSoftware:
+      forceSoftware ||
+      Boolean(plan.cameraPreferSoftware) ||
+      Boolean(plan.screenPreferSoftware),
     trackKind: track,
   });
   recorder.ondataavailable = (event) => {

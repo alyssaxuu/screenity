@@ -1,6 +1,8 @@
-// Pair video + audio codec explicitly (w3c/mediacapture-record#194):
-// Chrome mis-tags blob.type for unqualified codecs string variants.
+// Pair video + audio codec explicitly (w3c/mediacapture-record#194); Chrome
+// mis-tags blob.type otherwise. MP4 (H.264+AAC) first since VFR VP9/WebM breaks
+// downstream (Bunny drops frames, node-av SIGSEGVs); isTypeSupported gates it.
 export const MIME_TYPES = [
+  "video/mp4;codecs=avc1.42E01E,mp4a.40.2",
   "video/webm;codecs=vp9,opus",
   "video/webm;codecs=vp8,opus",
   "video/webm;codecs=h264,opus",

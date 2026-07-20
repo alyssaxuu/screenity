@@ -219,19 +219,23 @@ const ContentState = (props) => {
     };
   }, [recomputeRecordingUiAllowed]);
 
-  // Permissions-Policy: camera=(), microphone=() on the host page disables
-  // those APIs in every iframe including ours, surfacing as NotAllowedError;
-  // distinguish from a real permission issue.
+  // Permissions-Policy camera=()/microphone=() surfaces as NotAllowedError, not a
+  // real permission issue. This top-page probe misses feature=(self) (facebook.com);
+  // that's caught by the permissions.html iframe message. display-capture blocks only region.
   useEffect(() => {
     try {
       const pp = document.permissionsPolicy || document.featurePolicy;
       if (!pp || typeof pp.allowsFeature !== "function") return;
       const cameraBlocked = !pp.allowsFeature("camera");
       const micBlocked = !pp.allowsFeature("microphone");
-      if (cameraBlocked || micBlocked) {
+      const displayCaptureBlocked = !pp.allowsFeature("display-capture");
+      if (cameraBlocked || micBlocked || displayCaptureBlocked) {
         setContentState((prev) => ({
           ...prev,
-          sitePermissionsBlocked: true,
+          sitePermissionsBlocked:
+            prev.sitePermissionsBlocked || cameraBlocked || micBlocked,
+          siteDisplayCaptureBlocked:
+            prev.siteDisplayCaptureBlocked || displayCaptureBlocked,
         }));
       }
     } catch {}
@@ -582,6 +586,20 @@ const ContentState = (props) => {
       "restarting",
     ]);
     if (snap.pendingRecording || snap.recording || snap.restarting) {
+      return;
+    }
+
+    // Region capture runs getDisplayMedia in our in-page iframe, so a host page
+    // that won't delegate display-capture (e.g. facebook.com) rejects it before any
+    // picker. The popup disables this, but the shortcut path doesn't, so backstop it.
+    if (
+      contentStateRef.current?.recordingType === "region" &&
+      contentStateRef.current?.siteDisplayCaptureBlocked
+    ) {
+      contentStateRef.current.openToast?.(
+        chrome.i18n.getMessage("tabRecordingDisabledToast"),
+        4000,
+      );
       return;
     }
 
@@ -1034,18 +1052,14 @@ const ContentState = (props) => {
       }));
       if (contentStateRef.current.askForPermissions) {
         if (contentStateRef.current.sitePermissionsBlocked) {
-          contentStateRef.current.openModal(
-            chrome.i18n.getMessage("sitePermissionsBlockedTitle"),
-            chrome.i18n.getMessage("sitePermissionsBlockedDescription"),
-            null,
-            chrome.i18n.getMessage("permissionsModalDismiss"),
-            () => {},
-            () => {},
-            null,
-            chrome.i18n.getMessage("learnMoreDot"),
-            "https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Permissions-Policy",
-            true,
-            false,
+          // Site's Permissions-Policy blocks camera/mic; not user-grantable. Warn
+          // instead of the "check your permissions" modal that implies the user
+          // can fix it in the address bar.
+          contentStateRef.current.openWarning?.(
+            chrome.i18n.getMessage("cameraMicBlockedTitle"),
+            chrome.i18n.getMessage("cameraMicBlockedDescription"),
+            "VideoOffIcon",
+            10000,
           );
         } else {
           contentStateRef.current.openModal(
@@ -1085,6 +1099,21 @@ const ContentState = (props) => {
           ...prevContentState,
           permissionsLoaded: true,
         }));
+      } else if (event.data.type === "screenity-site-policy") {
+        // Accurate host-page Permissions-Policy read from the cross-origin
+        // permissions.html iframe: feature=(self) (e.g. facebook.com) blocks
+        // our iframe even though the top-page probe above sees it as allowed.
+        const camMicBlocked =
+          event.data.cameraAllowed === false ||
+          event.data.microphoneAllowed === false;
+        const displayBlocked = event.data.displayCaptureAllowed === false;
+        setContentState((prevContentState) => ({
+          ...prevContentState,
+          sitePermissionsBlocked:
+            prevContentState.sitePermissionsBlocked || camMicBlocked,
+          siteDisplayCaptureBlocked:
+            prevContentState.siteDisplayCaptureBlocked || displayBlocked,
+        }));
       }
     };
 
@@ -1110,7 +1139,7 @@ const ContentState = (props) => {
     recording: false,
     // True between stop click and editor-open (or watchdog fire).
     // Drives the toolbar "Saving recording…" state during finalize.
-    // for 1–6s in the background.
+    // for 1-6s in the background.
     finalizingRecording: false,
     // True between restart click and next countdown / recording.
     // Drives the RecordingLoader during the restart gap. Cleared by
@@ -1137,8 +1166,12 @@ const ContentState = (props) => {
     openModal: null,
     openToast: null,
     // Page-level Permissions-Policy disallows camera/mic. Lets us show a
-    // site-specific modal instead of the misleading "check your permissions" one.
+    // site-specific warning instead of the misleading "check your permissions" one.
     sitePermissionsBlocked: false,
+    // Page-level Permissions-Policy disallows display-capture (e.g.
+    // facebook.com). Region capture runs getDisplayMedia in-page, so it can't
+    // start here; lets us disable the tab-area tab instead of failing silently.
+    siteDisplayCaptureBlocked: false,
     timeWarning: false,
     audioInput: [],
     videoInput: [],
@@ -1198,7 +1231,6 @@ const ContentState = (props) => {
     cameraPermission: true,
     microphonePermission: true,
     askMicrophone: true,
-    recordingShortcut: "⌥⇧W",
     recordingShortcut: "⌥⇧D",
     toggleDrawingModeShortcut: "",
     toggleBlurModeShortcut: "",
@@ -1558,6 +1590,9 @@ const ContentState = (props) => {
 
       if (
         !contentState.recording &&
+        // The capture is already live through the countdown, so re-opening here
+        // on a dep change would put the toast in the recording's first frames.
+        !contentState.countdownActive &&
         isMac &&
         warningList.some((el) => window.location.href.includes(el)) &&
         contentState.recordingType != "region" &&
@@ -1571,6 +1606,7 @@ const ContentState = (props) => {
           ),
           "AudioIcon",
           10000,
+          "bottom",
         );
       } else if (
         window.location.href.includes("playground.html") &&
@@ -1583,12 +1619,27 @@ const ContentState = (props) => {
           "NotSupportedIcon",
           10000,
         );
+      } else if (
+        !contentState.recording &&
+        contentState.sitePermissionsBlocked &&
+        contentState.recordingType === "camera"
+      ) {
+        // Host page's Permissions-Policy blocks camera/mic in our cross-origin iframe
+        // (e.g. facebook.com), which the viewer can't grant; warn instead of the modal.
+        // Only camera recordings touch in-page camera/mic; others route through the request flow.
+        contentState.openWarning(
+          chrome.i18n.getMessage("cameraMicBlockedTitle"),
+          chrome.i18n.getMessage("cameraMicBlockedDescription"),
+          "VideoOffIcon",
+          10000,
+        );
       }
     }
   }, [
     contentState.openWarning,
     contentState.recording,
     contentState.recordingType,
+    contentState.sitePermissionsBlocked,
   ]);
 
   useEffect(() => {

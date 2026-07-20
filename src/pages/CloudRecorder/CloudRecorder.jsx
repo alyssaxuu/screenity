@@ -40,7 +40,15 @@ import {
   chooseTrackEncoder,
   resetEncoderProbeCache,
   computeEncodedDimensions,
+  WEBCODECS_CAP_WIDTH,
+  WEBCODECS_CAP_HEIGHT,
 } from "./encoder/chooseEncoder";
+import {
+  computeCaptureCap,
+  isOversampleDisabled,
+  constrainTrackDown,
+  enforceOversampleRatio,
+} from "../utils/captureResolution";
 import { getCompressedLifecycleLog } from "../utils/lifecycleLog";
 
 localforage.config({
@@ -119,6 +127,12 @@ let trackContainers = {
 };
 let trackCodecs = { screen: "vp9", audio: "opus", camera: "vp9" };
 let encoderHwSlots = null;
+// Per-track encoder-selection reason from inspectTrackPlan ("ok",
+// "aac-unsupported", "fastRecorderGate-sticky-disabled", ...). null until start.
+let encoderReasons = { screen: null, audio: null, camera: null };
+// WebCodecs sticky-disable device state at plan time, from
+// getFastRecorderStickyState().
+let encoderSticky = { disabled: null, reason: null };
 
 // Diagnostic-only snapshot taken once at session start. userAgent is
 // fingerprinting-grade but is already covered by the crash-reports
@@ -198,6 +212,9 @@ const CloudRecorder = () => {
   const tabPreferred = useRef(false);
 
   const screenStream = useRef(null);
+  // What the capture was asked for, so a MediaRecorder fallback can constrain a
+  // supersampled track back down before it encodes at 2x the intended size.
+  const captureCapRef = useRef(null);
   const prewarmRef = useRef(null);
   const cameraStream = useRef(null);
   const micStream = useRef(null);
@@ -699,6 +716,24 @@ const CloudRecorder = () => {
           encoderKinds.camera ||
           null,
         encoderHwSlots: eventPayload.encoderHwSlots || encoderHwSlots || null,
+        // Why this track's encoder was chosen (fallback attribution). Falls
+        // back to the per-track module global keyed off the event's track,
+        // then screen, so post-selection events carry it without threading.
+        encoderReason:
+          eventPayload.encoderReason ||
+          encoderReasons[eventPayload.trackType] ||
+          encoderReasons.screen ||
+          encoderReasons.camera ||
+          null,
+        // Device WebCodecs sticky-disable state at plan time.
+        encoderStickyDisabled:
+          typeof eventPayload.encoderStickyDisabled === "boolean"
+            ? eventPayload.encoderStickyDisabled
+            : typeof encoderSticky.disabled === "boolean"
+            ? encoderSticky.disabled
+            : null,
+        encoderStickyReason:
+          eventPayload.encoderStickyReason || encoderSticky.reason || null,
         storageBackend: eventPayload.storageBackend || null,
         storageInitMs:
           typeof eventPayload.storageInitMs === "number"
@@ -716,6 +751,17 @@ const CloudRecorder = () => {
         audioDiag: eventPayload.audioDiag || null,
         lifecycleBundle: eventPayload.lifecycleBundle || null,
         status: eventPayload.status || null,
+        // Finalize reconciliation from bunnyTusUploader: tail bytes lost to a
+        // truncated prefix, prior-session bytes recovered from the server
+        // offset. Undefined on normal events; truncatedBytes > 0 means loss.
+        truncatedBytes:
+          typeof eventPayload.truncatedBytes === "number"
+            ? eventPayload.truncatedBytes
+            : null,
+        recoveredBytes:
+          typeof eventPayload.recoveredBytes === "number"
+            ? eventPayload.recoveredBytes
+            : null,
       },
     };
   };
@@ -1224,9 +1270,11 @@ const CloudRecorder = () => {
     // Capture identity from the bound track (fires on every acquisition path).
     // Enums and booleans only, no track.label/title/URL.
     try {
+      const trackSettings = track.getSettings?.() || {};
       captureContextRef.current = {
         recordingType: recordingType.current || null,
-        displaySurface: track.getSettings?.().displaySurface || null,
+        displaySurface: trackSettings.displaySurface || null,
+        screenSurface: trackSettings.displaySurface || null,
         isTab: !!isTab.current,
         region: Boolean(regionRef.current),
       };
@@ -1871,17 +1919,9 @@ const CloudRecorder = () => {
     return true;
   };
 
-  // Audio (mic) diagnostic snapshot for the MediaRecorder audio path.
-  // The WebCodecs recorders expose getDiagSnapshot(); MediaRecorder does
-  // not, so we assemble an equivalent from the existing sessionTrackState
-  // counters plus the live mic-track + intent state. This is the one path
-  // the WebCodecs telemetry never covered, which is exactly where the
-  // silent empty-audio failures live.
-  //
-  // Returns null ONLY when the mic was not part of this recording (nothing
-  // to observe). When the user chose the mic we always return a snapshot,
-  // even at zero bytes, so an empty audio track stays observable. Pure
-  // reads — never mutates state, never throws.
+  // MediaRecorder has no getDiagSnapshot(), so assemble the equivalent from
+  // sessionTrackState plus the live mic track. Null only when the mic wasn't
+  // part of the recording; zero bytes still returns a snapshot.
   const getAudioDiagSnapshot = () => {
     try {
       const micChosen = audioIntent.current?.micActive === true;
@@ -1893,7 +1933,7 @@ const CloudRecorder = () => {
       const audioState = sessionTrackState.current?.audio || {};
       const uploaderMeta = audioUploader.current?.getMeta?.() || null;
       return {
-        // Authoritative user intent — the disambiguator that keeps a
+        // Authoritative user intent, the disambiguator that keeps a
         // user-disabled mic from ever being read as a failure.
         micChosen,
         encoderKind: encoderKinds.audio || null,
@@ -1946,13 +1986,9 @@ const CloudRecorder = () => {
       const cameraDiag = cameraRecorder.current?.getDiagSnapshot?.() || null;
       const audioDiag = getAudioDiagSnapshot();
       if (screenDiag || cameraDiag || audioDiag) {
-        // Mic was chosen but the audio track produced zero bytes while
-        // another track recorded fine — the silent-audio failure. We read
-        // "did another track record" from sessionTrackState (populated for
-        // every encoder kind) rather than the WebCodecs diags, so this
-        // still fires when screen/camera run on MediaRecorder (no diag).
-        // Requiring otherTrackRecorded keeps trivially-short / fully-failed
-        // recordings from being flagged here.
+        // Silent-audio failure: mic chosen, zero audio bytes, another track
+        // fine. Reads from sessionTrackState not the WebCodecs diags, so it
+        // still fires on MediaRecorder, and skips fully-failed recordings.
         const otherTrackRecorded =
           (sessionTrackState.current.screen?.bytesRecorded || 0) > 0 ||
           (sessionTrackState.current.camera?.bytesRecorded || 0) > 0;
@@ -2039,6 +2075,8 @@ const CloudRecorder = () => {
         audio: "mediarecorder",
         camera: "mediarecorder",
       };
+      encoderReasons = { screen: null, audio: null, camera: null };
+      encoderSticky = { disabled: null, reason: null };
       trackContainers = {
         screen: "video/webm",
         audio: "video/webm",
@@ -3058,9 +3096,6 @@ const CloudRecorder = () => {
       } catch {}
       return;
     }
-    try {
-      window.parent.postMessage({ type: "screenity-exit", mode }, "*");
-    } catch {}
     window.location.reload();
   };
 
@@ -3124,6 +3159,9 @@ const CloudRecorder = () => {
   const initializeUploaders = async ({ forceNewSceneId = false } = {}) => {
     try {
       emptyCleanupRef.current = false;
+      // Set when a supersampled screen track is lowered for MediaRecorder, so the
+      // reported dims don't depend on applyConstraints having landed yet.
+      let constrainedScreenDims = null;
       const { projectId } = await chrome.storage.local.get(["projectId"]);
       const sessionId = ensureRecordingSessionId();
 
@@ -3207,6 +3245,67 @@ const CloudRecorder = () => {
       encoderKinds.screen = screenPlan.kind;
       encoderKinds.camera = cameraPlan.kind;
       encoderKinds.audio = audioPlan.kind;
+      // Constrain here, not at start(): the dims reported below are read off this
+      // track, and MediaRecorder has no resize stage. Target the cloud tier, not
+      // the WebCodecs 1080p cap, or the fallback silently loses its 1440p.
+      if (captureCapRef.current?.oversampled) {
+        const screenVideoTrack = screenStream.current?.getVideoTracks?.()[0];
+        const before = screenVideoTrack?.getSettings?.() || {};
+        let outcome;
+        if (encoderKinds.screen === "mediarecorder") {
+          const cloudTier = getResolutionForQuality();
+          outcome = await constrainTrackDown(
+            screenVideoTrack,
+            cloudTier.width,
+            cloudTier.height,
+          );
+          // Aspect is preserved on the way down, so derive the dims rather than
+          // assuming the tier: an ultrawide lands at 2560x1072, not 2560x1440.
+          if (outcome === "lowered") {
+            const fitted = computeEncodedDimensions({
+              width: before.width,
+              height: before.height,
+              capWidth: cloudTier.width,
+              capHeight: cloudTier.height,
+            });
+            if (fitted.width > 0) constrainedScreenDims = fitted;
+          }
+        } else {
+          outcome = await enforceOversampleRatio(
+            screenVideoTrack,
+            WEBCODECS_CAP_WIDTH,
+            WEBCODECS_CAP_HEIGHT,
+          );
+        }
+        chrome.runtime
+          .sendMessage({
+            type: "diag-forward",
+            event: "cloudrecorder-oversample",
+            data: {
+              outcome,
+              kind: encoderKinds.screen,
+              trackW: before.width ?? null,
+              trackH: before.height ?? null,
+            },
+          })
+          .catch(() => {});
+      }
+      encoderReasons.screen = screenPlan.reason || null;
+      encoderReasons.camera = cameraPlan.reason || null;
+      encoderReasons.audio = audioPlan.reason || null;
+      // Best-effort: never let this read block recording start.
+      try {
+        const { getFastRecorderStickyState } = await import(
+          "../../media/fastRecorderGate"
+        );
+        const sticky = await getFastRecorderStickyState();
+        encoderSticky = {
+          disabled: sticky?.disabled === true,
+          reason: sticky?.reason || null,
+        };
+      } catch {
+        encoderSticky = { disabled: null, reason: null };
+      }
       trackContainers.screen = screenPlan.container;
       trackContainers.camera = cameraPlan.container;
       trackContainers.audio = audioPlan.container;
@@ -3279,8 +3378,14 @@ const CloudRecorder = () => {
         const track = screenStream.current.getVideoTracks()[0];
         let width, height;
         if (regionRef.current && target.current) {
+          // CSS pixels from the resize handle, so half the encoded frame on a 2x
+          // display. Known issue: getSettings() after cropTo() reports the
+          // uncropped tab size until frames flow, so it is no safer.
           width = regionWidth.current;
           height = regionHeight.current;
+        } else if (constrainedScreenDims) {
+          width = constrainedScreenDims.width;
+          height = constrainedScreenDims.height;
         } else {
           const settings = track.getSettings();
           width = settings.width;
@@ -3502,6 +3607,10 @@ const CloudRecorder = () => {
       // Opus-in-webm is the floor for audio; nothing safer to fall to.
       return null;
     }
+    // Don't fall from MP4 to WebM: the container was already sent as the TUS
+    // filetype and drives the editor's <video> type, so WebM bytes here play as
+    // a mislabelled MP4. Surface the error instead, like the VP8 floor below.
+    if (m.includes("mp4") || m.includes("avc1")) return null;
     if (m.includes("vp8") || m === "video/webm") return null;
     return "video/webm;codecs=vp8,opus";
   };
@@ -3586,15 +3695,9 @@ const CloudRecorder = () => {
           return;
         }
 
-        // EncodingError: the encoder passed isTypeSupported() at construction
-        // but failed once real frames arrived (known on older Android H.264
-        // and high-res getDisplayMedia encoder init). Chrome surfaces it as
-        // EncodingError or one of these messages. If no bytes were captured
-        // yet, transparently rebuild on VP8 and restart on the same stream —
-        // nothing was recorded or uploaded, so the swap loses nothing and the
-        // user barely notices. If data already flowed, we do NOT restart
-        // (that would discard it); we fall through to the normal surface +
-        // graceful stop, keeping what was recorded.
+        // Encoder passed isTypeSupported() but failed on real frames (older
+        // Android H.264, high-res getDisplayMedia init). With no bytes yet,
+        // rebuild on VP8; once data has flowed, stop gracefully and keep it.
         const isEncodingError =
           errName === "EncodingError" ||
           errMsg.includes("video encoding failed") ||
@@ -5859,11 +5962,13 @@ const CloudRecorder = () => {
     const canCaptureSourceAudio =
       streamOpts.canRequestAudioTrack !== false;
     const useDisplayMedia = !!streamOpts.useDisplayMedia;
+    // Only the screen branch supersamples; clear it so a later take can't
+    // inherit a previous recording's value.
+    captureCapRef.current = null;
     const prewarmedStream = streamOpts.prewarmedStream || null;
     const { width = 1920, height = 1080 } = getResolutionForQuality() || {};
 
-    const { fpsValue } = await chrome.storage.local.get(["fpsValue"]);
-    const fps = parseInt(fpsValue) || 30;
+    const fps = 30;
 
     const { instantMode: instant } = await chrome.storage.local.get([
       "instantMode",
@@ -5926,7 +6031,7 @@ const CloudRecorder = () => {
             video: {
               width: { max: 2560 },
               height: { max: 1440 },
-              frameRate: { ideal: 30, max: 60 },
+              frameRate: { ideal: fps, max: fps },
             },
             audio: data.systemAudio,
           };
@@ -6117,12 +6222,32 @@ const CloudRecorder = () => {
               data.recordingType === "region" || isTab.current;
             const { disableSurfaceSwitching } =
               await chrome.storage.local.get(["disableSurfaceSwitching"]);
+            // Supersample against the fixed 1920x1080 encode size, not the tier.
+            // Region is excluded because it crops instead of downscaling. The
+            // kill-switch restores the tier, not the encode cap, to keep 1440p.
+            const isRegionRequest = data.recordingType === "region";
+            const screenCap =
+              isRegionRequest || (await isOversampleDisabled())
+                ? null
+                : computeCaptureCap(WEBCODECS_CAP_WIDTH, WEBCODECS_CAP_HEIGHT);
+            const cloudCap = screenCap || {
+              width: targetWidth,
+              height: targetHeight,
+              oversampled: false,
+            };
+            captureCapRef.current = cloudCap;
             const displayConstraints = {
               audio: data.systemAudio ? true : false,
               video: {
                 frameRate: { ideal: targetFps, max: targetFps },
-                width: { ideal: targetWidth, max: targetWidth },
-                height: { ideal: targetHeight, max: targetHeight },
+                // Not oversampling (region, or the kill-switch): keep the tier as
+                // `ideal` so those requests look exactly like they always did.
+                width: cloudCap.oversampled
+                  ? { max: cloudCap.width }
+                  : { ideal: cloudCap.width, max: cloudCap.width },
+                height: cloudCap.oversampled
+                  ? { max: cloudCap.height }
+                  : { ideal: cloudCap.height, max: cloudCap.height },
                 // Open the picker on Entire Screen for screen, Chrome Tab for
                 // tab/region. Hint only; the user can still switch panes.
                 displaySurface: isTabModeRequest ? "browser" : "monitor",

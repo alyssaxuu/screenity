@@ -1,3 +1,5 @@
+import { sendMessageRecord } from "../recording/sendMessageRecord";
+
 export const setMicActiveTab = async (request) => {
   // The recorder (offscreen doc or in-tab iframe) owns the mic track for ALL
   // modes, so the mid-recording mic toggle must reach it regardless of mode.

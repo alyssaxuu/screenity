@@ -57,6 +57,14 @@ const ALWAYS_FLUSH = [
   "sandbox-opfs-materialize-deferred",
   "session-deferred-end",
   "editor-route-decision",
+  "recorder-finalize-summary",
+  "recorder-muxer-finalize-ok",
+  "recorder-muxer-finalize-fail",
+  "recorder-writer-close-result",
+  "opfs-close-fail",
+  "opfs-finalize-marker-set",
+  "recorder-validation-start",
+  "recorder-validation-done",
 ];
 
 let _log = null;

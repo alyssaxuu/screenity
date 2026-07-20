@@ -1710,5 +1710,13 @@
   "downloadProcessingDescription": {
     "message": "Ini bisa memakan waktu untuk rekaman panjang.",
     "description": "Body of the download-in-progress banner"
+  },
+  "cameraMicBlockedTitle": {
+    "message": "Kamera dan mikrofon tidak diizinkan",
+    "description": "Toast title shown when the current page's Permissions-Policy blocks the extension's camera and microphone"
+  },
+  "cameraMicBlockedDescription": {
+    "message": "Situs web ini memblokir akses ke kamera dan mikrofon Anda. Anda tetap dapat merekam di sini, tetapi kamera Anda tidak akan terlihat.",
+    "description": "Toast description shown when the current page's Permissions-Policy blocks the extension's camera and microphone"
   }
 }

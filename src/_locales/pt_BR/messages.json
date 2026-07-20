@@ -1710,5 +1710,13 @@
   "downloadProcessingDescription": {
     "message": "Isso pode demorar um pouco em gravações longas.",
     "description": "Body of the download-in-progress banner"
+  },
+  "cameraMicBlockedTitle": {
+    "message": "Câmera e microfone não permitidos",
+    "description": "Toast title shown when the current page's Permissions-Policy blocks the extension's camera and microphone"
+  },
+  "cameraMicBlockedDescription": {
+    "message": "Este site bloqueia o acesso à sua câmera e ao microfone. Você ainda pode gravar aqui, mas sua câmera não ficará visível.",
+    "description": "Toast description shown when the current page's Permissions-Policy blocks the extension's camera and microphone"
   }
 }

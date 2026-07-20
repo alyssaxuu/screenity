@@ -208,6 +208,16 @@ export class OpfsChunkWriter {
         byteSize: this._byteSize,
         chunkCount: this._chunkCount,
       });
+    } catch (err) {
+      // close rejected (worker timeout/crash/quota mid-flush). Log it so a
+      // never-finalized recording points at close, not a silent finalized=0.
+      opfsDiag("close-fail", {
+        message: String(err?.message || err).slice(0, 200),
+        byteSize: this._byteSize,
+        chunkCount: this._chunkCount,
+        fileName: this._fileName,
+      });
+      throw err;
     } finally {
       // Fire-and-forget; the storage.set under SW contention added 2s
       // to close() and delayed the editor open. The editor reads this
@@ -216,6 +226,13 @@ export class OpfsChunkWriter {
         try {
           chrome.storage.local.set({
             lastRecordingFinalizedFileName: this._fileName,
+          });
+          // Log which file the marker named, so a finalized=0 report can tell
+          // an unwritten marker from one pointing at the wrong file.
+          opfsDiag("finalize-marker-set", {
+            fileName: this._fileName,
+            byteSize: this._byteSize,
+            chunkCount: this._chunkCount,
           });
         } catch {}
       }

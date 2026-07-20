@@ -57,6 +57,11 @@ export class Mp4MuxerWrapper {
   private _pendingFlush: Promise<void> = Promise.resolve();
   private _closed = false;
 
+  // Bytes streamed to onChunk. When the file ends up empty, near-zero blames the
+  // encoder (header only); large here means the loss is in the OPFS write/close path.
+  private _totalEmittedBytes = 0;
+  private _emitCount = 0;
+
   private debug: boolean;
   private log: (...args: any[]) => void;
   private warn: (...args: any[]) => void;
@@ -201,6 +206,14 @@ export class Mp4MuxerWrapper {
     await this._pendingFlush;
   }
 
+  // Read at stop to blame an empty file on the encoder (near-zero) vs the write path.
+  getStats() {
+    return {
+      totalEmittedBytes: this._totalEmittedBytes,
+      emitCount: this._emitCount,
+    };
+  }
+
   // No-op: WebCodecsRecorder already subtracts paused time; double-subtract
   // would break monotonicity. Kept for API compat.
   setPausedOffset(_offsetUs: number) {}
@@ -210,6 +223,8 @@ export class Mp4MuxerWrapper {
   }
 
   private emitChunk(chunk: Uint8Array, timestampUs: number | null) {
+    this._totalEmittedBytes += chunk.byteLength;
+    this._emitCount += 1;
     try {
       const res = this.options.onChunk?.(chunk, timestampUs ?? null);
       if (res instanceof Promise) {

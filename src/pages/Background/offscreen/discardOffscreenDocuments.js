@@ -4,12 +4,15 @@ import { perfSpan } from "../../utils/perfMarks";
 export const discardOffscreenDocuments = async ({
   reason = "discard",
   flush = true,
+  // Discard/cancel callers pass false so the recorder halts without finalizing;
+  // a finalize emits video-ready and opens the editor on the discarded take.
+  shouldFinalize = true,
 } = {}) => {
-  console.warn("[Screenity][discardOffscreenDocuments]", { reason, flush, stack: new Error().stack });
+  console.warn("[Screenity][discardOffscreenDocuments]", { reason, flush, shouldFinalize, stack: new Error().stack });
   const endFlush = perfSpan("BG.offscreen discardOffscreenDocuments", { reason, flush });
   try {
     if (flush) {
-      await closeOffscreenDocumentWithFlush({ reason });
+      await closeOffscreenDocumentWithFlush({ reason, shouldFinalize });
     } else {
       const existingContexts = await chrome.runtime.getContexts({});
       const offscreenDocument = existingContexts.find(
