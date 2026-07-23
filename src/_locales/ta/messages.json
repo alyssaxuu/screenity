@@ -1718,5 +1718,53 @@
   "cameraMicBlockedDescription": {
     "message": "இந்த வலைத்தளம் உங்கள் கேமரா மற்றும் மைக்ரோஃபோன் அணுகலைத் தடுக்கிறது. நீங்கள் இங்கே இன்னும் பதிவு செய்யலாம், ஆனால் உங்கள் கேமரா தெரியாது.",
     "description": "Toast description shown when the current page's Permissions-Policy blocks the extension's camera and microphone"
+  },
+  "downloadFailedModalTitle": {
+    "message": "பதிவிறக்கம் முடியவில்லை",
+    "description": "Modal title when a download to disk times out or fails"
+  },
+  "downloadFailedModalDescription": {
+    "message": "மீண்டும் முயற்சிக்கவும்.",
+    "description": "Toast->modal description: what to do after a failed download"
+  },
+  "driveGenericModalTitle": {
+    "message": "Google Drive இல் சேமிக்க முடியவில்லை",
+    "description": "Modal title for a generic Google Drive save failure"
+  },
+  "driveGenericModalDescription": {
+    "message": "மீண்டும் முயற்சிக்கவும்.",
+    "description": "Modal description for a generic Google Drive save failure"
+  },
+  "driveQuotaModalTitle": {
+    "message": "உங்கள் Google Drive நிரம்பிவிட்டது",
+    "description": "Modal title when the Google Drive account is out of storage"
+  },
+  "driveQuotaModalDescription": {
+    "message": "இடத்தைக் காலி செய்து மீண்டும் முயற்சிக்கவும்.",
+    "description": "Modal description when the Google Drive account is out of storage"
+  },
+  "driveTooLargeModalTitle": {
+    "message": "பதிவு மிகப் பெரியது",
+    "description": "Modal title when a recording exceeds Google Drive limits"
+  },
+  "driveTooLargeModalDescription": {
+    "message": "இந்தப் பதிவு Google Drive இல் சேமிக்க முடியாத அளவுக்குப் பெரியது.",
+    "description": "Modal description when a recording exceeds Google Drive limits"
+  },
+  "driveAuthModalTitle": {
+    "message": "Google Drive ஐ அணுக முடியவில்லை",
+    "description": "Modal title when Google Drive authentication expired or was revoked"
+  },
+  "driveAuthModalDescription": {
+    "message": "மீண்டும் உள்நுழையவும்.",
+    "description": "Modal description when Google Drive authentication expired or was revoked"
+  },
+  "emptyRecordingTitle": {
+    "message": "இந்தப் பதிவு காலியாக உள்ளது",
+    "description": "Modal title when the recording file contains no video"
+  },
+  "emptyRecordingDescription": {
+    "message": "எந்த வீடியோவும் பதிவாகவில்லை. மீண்டும் பதிவு செய்ய முயற்சிக்கவும்.",
+    "description": "Modal description when the recording file contains no video"
   }
 }

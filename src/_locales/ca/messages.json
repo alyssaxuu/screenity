@@ -1718,5 +1718,53 @@
   "cameraMicBlockedDescription": {
     "message": "Aquest lloc web bloqueja l'accés a la càmera i el micròfon. Encara pots gravar aquí, però la càmera no es veurà.",
     "description": "Toast description shown when the current page's Permissions-Policy blocks the extension's camera and microphone"
+  },
+  "downloadFailedModalTitle": {
+    "message": "La descàrrega no s'ha completat",
+    "description": "Modal title when a download to disk times out or fails"
+  },
+  "downloadFailedModalDescription": {
+    "message": "Torna-ho a provar.",
+    "description": "Toast->modal description: what to do after a failed download"
+  },
+  "driveGenericModalTitle": {
+    "message": "No s'ha pogut desar a Google Drive",
+    "description": "Modal title for a generic Google Drive save failure"
+  },
+  "driveGenericModalDescription": {
+    "message": "Torna-ho a provar.",
+    "description": "Modal description for a generic Google Drive save failure"
+  },
+  "driveQuotaModalTitle": {
+    "message": "El teu Google Drive és ple",
+    "description": "Modal title when the Google Drive account is out of storage"
+  },
+  "driveQuotaModalDescription": {
+    "message": "Allibera espai i torna-ho a provar.",
+    "description": "Modal description when the Google Drive account is out of storage"
+  },
+  "driveTooLargeModalTitle": {
+    "message": "Gravació massa gran",
+    "description": "Modal title when a recording exceeds Google Drive limits"
+  },
+  "driveTooLargeModalDescription": {
+    "message": "Aquesta gravació és massa gran per desar-la a Google Drive.",
+    "description": "Modal description when a recording exceeds Google Drive limits"
+  },
+  "driveAuthModalTitle": {
+    "message": "No s'ha pogut accedir a Google Drive",
+    "description": "Modal title when Google Drive authentication expired or was revoked"
+  },
+  "driveAuthModalDescription": {
+    "message": "Torna a iniciar la sessió.",
+    "description": "Modal description when Google Drive authentication expired or was revoked"
+  },
+  "emptyRecordingTitle": {
+    "message": "Aquesta gravació és buida",
+    "description": "Modal title when the recording file contains no video"
+  },
+  "emptyRecordingDescription": {
+    "message": "No s'ha capturat cap vídeo. Torna a provar la gravació.",
+    "description": "Modal description when the recording file contains no video"
   }
 }

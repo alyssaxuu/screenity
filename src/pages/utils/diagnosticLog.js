@@ -36,6 +36,12 @@ const ALWAYS_FLUSH = [
   "drive-upload-fail",
   "drive-save-fail",
   "drive-auth-fail",
+  // Client-side save/download breadcrumbs (forwarded from the editor). The
+  // trigger + delivery steps were console-only, so a failed save left no trace.
+  "editor-drive-save-start",
+  "editor-drive-save-fail",
+  "editor-download-start",
+  "editor-download-fail",
   "editor-load-ready",
   // OPFS load + video element handoff: critical for diagnosing
   // editor-stuck-at-90% reports. If any of these is the last event
@@ -54,6 +60,7 @@ const ALWAYS_FLUSH = [
   "sandbox-video-load-error",
   "sandbox-opfs-wait-finalize-timeout",
   "sandbox-opfs-writer-dead-detected",
+  "sandbox-opfs-empty-recording",
   "sandbox-opfs-materialize-deferred",
   "session-deferred-end",
   "editor-route-decision",

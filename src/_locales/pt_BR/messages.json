@@ -1718,5 +1718,53 @@
   "cameraMicBlockedDescription": {
     "message": "Este site bloqueia o acesso à sua câmera e ao microfone. Você ainda pode gravar aqui, mas sua câmera não ficará visível.",
     "description": "Toast description shown when the current page's Permissions-Policy blocks the extension's camera and microphone"
+  },
+  "downloadFailedModalTitle": {
+    "message": "O download não foi concluído",
+    "description": "Modal title when a download to disk times out or fails"
+  },
+  "downloadFailedModalDescription": {
+    "message": "Tente novamente.",
+    "description": "Toast->modal description: what to do after a failed download"
+  },
+  "driveGenericModalTitle": {
+    "message": "Não foi possível salvar no Google Drive",
+    "description": "Modal title for a generic Google Drive save failure"
+  },
+  "driveGenericModalDescription": {
+    "message": "Tente novamente.",
+    "description": "Modal description for a generic Google Drive save failure"
+  },
+  "driveQuotaModalTitle": {
+    "message": "Seu Google Drive está cheio",
+    "description": "Modal title when the Google Drive account is out of storage"
+  },
+  "driveQuotaModalDescription": {
+    "message": "Libere espaço e tente novamente.",
+    "description": "Modal description when the Google Drive account is out of storage"
+  },
+  "driveTooLargeModalTitle": {
+    "message": "Gravação muito grande",
+    "description": "Modal title when a recording exceeds Google Drive limits"
+  },
+  "driveTooLargeModalDescription": {
+    "message": "Esta gravação é muito grande para ser salva no Google Drive.",
+    "description": "Modal description when a recording exceeds Google Drive limits"
+  },
+  "driveAuthModalTitle": {
+    "message": "Não foi possível acessar o Google Drive",
+    "description": "Modal title when Google Drive authentication expired or was revoked"
+  },
+  "driveAuthModalDescription": {
+    "message": "Faça login novamente.",
+    "description": "Modal description when Google Drive authentication expired or was revoked"
+  },
+  "emptyRecordingTitle": {
+    "message": "Esta gravação está vazia",
+    "description": "Modal title when the recording file contains no video"
+  },
+  "emptyRecordingDescription": {
+    "message": "Nenhum vídeo foi capturado. Tente gravar novamente.",
+    "description": "Modal description when the recording file contains no video"
   }
 }

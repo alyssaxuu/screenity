@@ -44,8 +44,21 @@ export const initLifecycleObserver = () => {
     for (const key of Object.keys(changes)) {
       if (!TRACKED_KEYS.has(key)) continue;
       const { oldValue, newValue } = changes[key];
-      // Skip no-op writes (same value).
+      // Skip no-op writes. `===` alone only catches primitives: storage hands
+      // back a fresh object each time, so object-valued keys (e.g.
+      // lastRecordingBackendRef) compared unequal on every rewrite and logged
+      // even when nothing changed.
       if (oldValue === newValue) continue;
+      if (
+        oldValue !== null &&
+        newValue !== null &&
+        typeof oldValue === "object" &&
+        typeof newValue === "object"
+      ) {
+        try {
+          if (JSON.stringify(oldValue) === JSON.stringify(newValue)) continue;
+        } catch {}
+      }
       lifecycle("BG.storage", "set", {
         key,
         from: summarizeValue(oldValue),

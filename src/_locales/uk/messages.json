@@ -1716,5 +1716,53 @@
   "cameraMicBlockedDescription": {
     "message": "Цей сайт блокує доступ до камери та мікрофона. Ви все одно можете записувати тут, але вашу камеру не буде видно.",
     "description": "Toast description shown when the current page's Permissions-Policy blocks the extension's camera and microphone"
+  },
+  "downloadFailedModalTitle": {
+    "message": "Завантаження не завершилося",
+    "description": "Modal title when a download to disk times out or fails"
+  },
+  "downloadFailedModalDescription": {
+    "message": "Спробуйте ще раз.",
+    "description": "Toast->modal description: what to do after a failed download"
+  },
+  "driveGenericModalTitle": {
+    "message": "Не вдалося зберегти на Google Drive",
+    "description": "Modal title for a generic Google Drive save failure"
+  },
+  "driveGenericModalDescription": {
+    "message": "Спробуйте ще раз.",
+    "description": "Modal description for a generic Google Drive save failure"
+  },
+  "driveQuotaModalTitle": {
+    "message": "На вашому Google Drive закінчилося місце",
+    "description": "Modal title when the Google Drive account is out of storage"
+  },
+  "driveQuotaModalDescription": {
+    "message": "Звільніть місце та спробуйте ще раз.",
+    "description": "Modal description when the Google Drive account is out of storage"
+  },
+  "driveTooLargeModalTitle": {
+    "message": "Запис завеликий",
+    "description": "Modal title when a recording exceeds Google Drive limits"
+  },
+  "driveTooLargeModalDescription": {
+    "message": "Цей запис завеликий, щоб зберегти його на Google Drive.",
+    "description": "Modal description when a recording exceeds Google Drive limits"
+  },
+  "driveAuthModalTitle": {
+    "message": "Не вдалося отримати доступ до Google Drive",
+    "description": "Modal title when Google Drive authentication expired or was revoked"
+  },
+  "driveAuthModalDescription": {
+    "message": "Увійдіть знову.",
+    "description": "Modal description when Google Drive authentication expired or was revoked"
+  },
+  "emptyRecordingTitle": {
+    "message": "Цей запис порожній",
+    "description": "Modal title when the recording file contains no video"
+  },
+  "emptyRecordingDescription": {
+    "message": "Відео не записано. Спробуйте записати ще раз.",
+    "description": "Modal description when the recording file contains no video"
   }
 }

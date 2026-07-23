@@ -1705,6 +1705,46 @@
     "message": "Download interrupted. The recording is too large to retry automatically. Try saving again from the editor.",
     "description": "Toast shown when a download is interrupted and the file is too large for the in-process base64 retry path"
   },
+  "downloadFailedModalTitle": {
+    "message": "The download didn't finish",
+    "description": "Modal title when a download to disk times out or fails"
+  },
+  "downloadFailedModalDescription": {
+    "message": "Please try again.",
+    "description": "Toast->modal description: what to do after a failed download"
+  },
+  "driveGenericModalTitle": {
+    "message": "Couldn't save to Google Drive",
+    "description": "Modal title for a generic Google Drive save failure"
+  },
+  "driveGenericModalDescription": {
+    "message": "Please try again.",
+    "description": "Modal description for a generic Google Drive save failure"
+  },
+  "driveQuotaModalTitle": {
+    "message": "Your Google Drive is full",
+    "description": "Modal title when the Google Drive account is out of storage"
+  },
+  "driveQuotaModalDescription": {
+    "message": "Free up space and try again.",
+    "description": "Modal description when the Google Drive account is out of storage"
+  },
+  "driveTooLargeModalTitle": {
+    "message": "Recording too large",
+    "description": "Modal title when a recording exceeds Google Drive limits"
+  },
+  "driveTooLargeModalDescription": {
+    "message": "This recording is too large to save to Google Drive.",
+    "description": "Modal description when a recording exceeds Google Drive limits"
+  },
+  "driveAuthModalTitle": {
+    "message": "Couldn't access Google Drive",
+    "description": "Modal title when Google Drive authentication expired or was revoked"
+  },
+  "driveAuthModalDescription": {
+    "message": "Please sign in again.",
+    "description": "Modal description when Google Drive authentication expired or was revoked"
+  },
   "recordingCorruptToast": {
     "message": "This recording can't be played back. The file may be incomplete or corrupted. Try downloading the raw file from the Save menu.",
     "description": "Toast shown when the editor's video element fails to decode the recording (corrupt or zero-byte file)"
@@ -1736,5 +1776,13 @@
   "downloadProcessingDescription": {
     "message": "This can take a while for long recordings.",
     "description": "Body of the download-in-progress banner"
+  },
+  "emptyRecordingTitle": {
+    "message": "This recording is empty",
+    "description": "Modal title when the recording file contains no video"
+  },
+  "emptyRecordingDescription": {
+    "message": "No video was captured. Please try recording again.",
+    "description": "Modal description when the recording file contains no video"
   }
 }

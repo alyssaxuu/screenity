@@ -1718,5 +1718,53 @@
   "cameraMicBlockedDescription": {
     "message": "Ce site bloque l'accès à votre caméra et à votre microphone. Vous pouvez quand même enregistrer ici, mais votre caméra ne sera pas visible.",
     "description": "Toast description shown when the current page's Permissions-Policy blocks the extension's camera and microphone"
+  },
+  "downloadFailedModalTitle": {
+    "message": "Le téléchargement ne s'est pas terminé",
+    "description": "Modal title when a download to disk times out or fails"
+  },
+  "downloadFailedModalDescription": {
+    "message": "Veuillez réessayer.",
+    "description": "Toast->modal description: what to do after a failed download"
+  },
+  "driveGenericModalTitle": {
+    "message": "Impossible d'enregistrer sur Google Drive",
+    "description": "Modal title for a generic Google Drive save failure"
+  },
+  "driveGenericModalDescription": {
+    "message": "Veuillez réessayer.",
+    "description": "Modal description for a generic Google Drive save failure"
+  },
+  "driveQuotaModalTitle": {
+    "message": "Votre Google Drive est plein",
+    "description": "Modal title when the Google Drive account is out of storage"
+  },
+  "driveQuotaModalDescription": {
+    "message": "Libérez de l'espace et réessayez.",
+    "description": "Modal description when the Google Drive account is out of storage"
+  },
+  "driveTooLargeModalTitle": {
+    "message": "Enregistrement trop volumineux",
+    "description": "Modal title when a recording exceeds Google Drive limits"
+  },
+  "driveTooLargeModalDescription": {
+    "message": "Cet enregistrement est trop volumineux pour être enregistré sur Google Drive.",
+    "description": "Modal description when a recording exceeds Google Drive limits"
+  },
+  "driveAuthModalTitle": {
+    "message": "Impossible d'accéder à Google Drive",
+    "description": "Modal title when Google Drive authentication expired or was revoked"
+  },
+  "driveAuthModalDescription": {
+    "message": "Veuillez vous reconnecter.",
+    "description": "Modal description when Google Drive authentication expired or was revoked"
+  },
+  "emptyRecordingTitle": {
+    "message": "Cet enregistrement est vide",
+    "description": "Modal title when the recording file contains no video"
+  },
+  "emptyRecordingDescription": {
+    "message": "Aucune vidéo n'a été capturée. Veuillez réessayer l'enregistrement.",
+    "description": "Modal description when the recording file contains no video"
   }
 }

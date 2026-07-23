@@ -7,6 +7,27 @@
 const STORAGE_KEY = "lifecycleLog";
 const MAX_EVENTS = 500;
 
+// High-volume, low-value events: 73% of every buffer across the diag-zip
+// corpus, with 58% of zips already at the cap, so countdowns and errors were
+// being evicted for storage breadcrumbs. These go first on overflow. Anything
+// not listed stays protected, so new events are safe unless demoted here.
+const LOW_VALUE_EVENTS = new Set([
+  "set",
+  "recording-ui-allowed",
+  "recording-flag-observed",
+  "ui-tick",
+]);
+
+const evictOne = (list) => {
+  for (let i = 0; i < list.length; i += 1) {
+    if (LOW_VALUE_EVENTS.has(list[i]?.ev)) {
+      list.splice(i, 1);
+      return;
+    }
+  }
+  list.shift();
+};
+
 // Serialized so back-to-back lifecycle() calls don't race the read-modify-write.
 let _writeChain = Promise.resolve();
 
@@ -41,7 +62,7 @@ export const lifecycleEvent = async (src, ev, data = null) => {
         ? result[STORAGE_KEY]
         : [];
       current.push(entry);
-      while (current.length > MAX_EVENTS) current.shift();
+      while (current.length > MAX_EVENTS) evictOne(current);
       await chrome.storage.local.set({ [STORAGE_KEY]: current });
     } catch {}
   });

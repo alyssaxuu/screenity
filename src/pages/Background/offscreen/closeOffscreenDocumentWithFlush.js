@@ -23,6 +23,14 @@ export const closeOffscreenDocumentWithFlush = async ({
     offDoc.documentUrl.includes("cloud=1");
   const effectiveTimeoutMs = isCloudDoc ? timeoutMs : Math.min(timeoutMs, 3000);
 
+  // A resume doc is draining journalled TUS uploads and answers only
+  // "resume-pending-uploads", so it never acks a shutdown even though it is
+  // busy. Give it the full wait rather than the early close below.
+  const isResumeDoc =
+    typeof offDoc.documentUrl === "string" &&
+    offDoc.documentUrl.includes("resume=1");
+
+  let cleanupAck = () => {};
   const ackPromise = new Promise((resolve) => {
     const timer = setTimeout(() => {
       chrome.runtime.onMessage.removeListener(listener);
@@ -36,18 +44,30 @@ export const closeOffscreenDocumentWithFlush = async ({
       }
     };
     chrome.runtime.onMessage.addListener(listener);
+    cleanupAck = () => {
+      clearTimeout(timer);
+      chrome.runtime.onMessage.removeListener(listener);
+    };
   });
 
-  chrome.runtime
-    .sendMessage({
-      type: "offscreen-shutdown",
-      reason,
-      shouldFinalize,
-      timeoutMs: Math.max(2000, effectiveTimeoutMs - 2000),
-    })
-    .catch(() => {});
+  const sendPromise = chrome.runtime.sendMessage({
+    type: "offscreen-shutdown",
+    reason,
+    shouldFinalize,
+    timeoutMs: Math.max(2000, effectiveTimeoutMs - 2000),
+  });
 
-  const result = await ackPromise;
+  // A rejected send means nobody answered, so no ack is coming and waiting out
+  // the timeout only stalls the next picker. It also fires for a live doc whose
+  // listeners ignore the message, hence the resume guard above. A resolved send
+  // proves nothing (any context may answer), so it keeps the normal wait.
+  const noReceiver = sendPromise.then(
+    () => new Promise(() => {}),
+    () => (isResumeDoc ? new Promise(() => {}) : { ok: false, noReceiver: true }),
+  );
+
+  const result = await Promise.race([ackPromise, noReceiver]);
+  cleanupAck();
 
   try {
     await chrome.offscreen.closeDocument();

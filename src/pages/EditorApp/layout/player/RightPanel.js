@@ -3,6 +3,9 @@ import styles from "../../styles/player/_RightPanel.module.scss";
 
 import { buildDiagnosticZip } from "../../../utils/buildDiagnosticZip";
 import { downloadResolvedRecording } from "../../recorderStorage/resolveRecordingFile";
+import { stageBlobToOpfs } from "../../recorderStorage/stageBlobToOpfs";
+import { diagForward } from "../../../utils/diagForward";
+import { showEditorToast } from "../../utils/editorToast";
 
 import { ReactSVG } from "react-svg";
 
@@ -18,6 +21,11 @@ const RightPanel = () => {
   const [contentState, setContentState] = useContext(ContentStateContext);
   const contentStateRef = useRef(contentState);
   const consoleErrorRef = useRef([]);
+  // `disabled` on a <div role="button"> is inert, so the click still fires
+  // while a save is in flight. contentStateRef lags a render, so hold the
+  // in-flight lock in its own ref and clear it when saveDrive goes false
+  // (failWith, or the "saved-to-drive" message on success).
+  const saveDriveInFlight = useRef(false);
 
   useEffect(() => {
     console.error = (error) => {
@@ -28,6 +36,10 @@ const RightPanel = () => {
   useEffect(() => {
     contentStateRef.current = contentState;
   }, [contentState]);
+
+  useEffect(() => {
+    if (!contentState.saveDrive) saveDriveInFlight.current = false;
+  }, [contentState.saveDrive]);
 
   const getNotAvailableLabel = () => {
     if (contentState.fallback && contentState.noffmpeg && contentState.editLimit === 0) {
@@ -48,100 +60,161 @@ const RightPanel = () => {
     return base;
   };
 
-  const saveToDrive = () => {
+  // sendMessage rejects past ~64 MB, and base64 inflates ~1.33x, so a base64
+  // Drive upload is unsafe above ~48 MB. The OPFS path has no such limit; this
+  // only gates the fallback when OPFS staging is unavailable.
+  const DRIVE_BASE64_MAX_BYTES = 48 * 1024 * 1024;
+
+  const saveToDrive = async () => {
+    if (saveDriveInFlight.current) return;
+    saveDriveInFlight.current = true;
     setContentState((prevContentState) => ({
       ...prevContentState,
       saveDrive: true,
     }));
 
-    const handleDriveResponse = (response) => {
-      if (!response || response.status === "ew" || response.error) {
-        console.error("[Drive] drive_save_failed:", response?.error || "unknown error");
-        setContentState((prevContentState) => ({
-          ...prevContentState,
-          saveDrive: false,
-        }));
+    // Modal rather than a toast: the editor is an extension page, and the
+    // background's show-toast relay only reaches the content script of the
+    // active tab, so a toast raised here is never seen by someone sitting in
+    // the editor. A modal also carries the recovery action for each cause.
+    const failWith = (errorCode) => {
+      const code = errorCode || "drive-generic";
+      diagForward("editor-drive-save-fail", { errorCode: code });
+      const base =
+        {
+          "drive-quota": "driveQuota",
+          "drive-too-large": "driveTooLarge",
+          "drive-auth": "driveAuth",
+        }[code] || "driveGeneric";
+
+      const openModal = contentStateRef.current?.openModal;
+      if (typeof openModal === "function") {
+        // Quota is the one cause retrying can't clear, so it links out to
+        // Drive storage instead. Too-large has no recovery from here.
+        let buttonLabel = chrome.i18n.getMessage("offlineLabelTryAgain");
+        let action = () => runSaveToDrive();
+        if (code === "drive-quota") {
+          buttonLabel = chrome.i18n.getMessage("manageStorageButtonLabel");
+          action = () =>
+            window.open("https://drive.google.com/settings/storage", "_blank");
+        } else if (code === "drive-too-large") {
+          buttonLabel = null;
+          action = () => {};
+        }
+        openModal(
+          chrome.i18n.getMessage(`${base}ModalTitle`),
+          chrome.i18n.getMessage(`${base}ModalDescription`),
+          buttonLabel,
+          chrome.i18n.getMessage("closeModalLabel"),
+          action,
+          () => {},
+        );
       }
-      // On success, saveDrive is reset by the "saved-to-drive" message from background.
+
+      setContentState((prevContentState) => ({
+        ...prevContentState,
+        saveDrive: false,
+        driveError: code,
+      }));
     };
 
+    const handleDriveResponse = (response) => {
+      if (!response || response.status === "ew" || response.error) {
+        console.error(
+          "[Drive] drive_save_failed:",
+          response?.error || "unknown error",
+        );
+        failWith(response?.errorCode);
+      }
+      // On success, saveDrive is reset by the "saved-to-drive" message.
+    };
     const handleDriveError = (err) => {
       console.error("[Drive] drive_save_error:", err);
+      failWith("drive-generic");
+    };
+
+    // Pick the source: the MP4 export when ready, else the duration-fixed webm.
+    // With neither, the background rebuilds from IndexedDB chunks itself (no
+    // base64 transfer), so route straight to the fallback.
+    const useMp4 =
+      !contentState.noffmpeg && contentState.mp4ready && contentState.blob;
+    const source = useMp4 ? contentState.blob : contentState.webm;
+    const isWebm = !useMp4;
+
+    if (!(source instanceof Blob) || source.size === 0) {
+      chrome.runtime
+        .sendMessage({ type: "save-to-drive-fallback", title: contentState.title })
+        .then(handleDriveResponse)
+        .catch(handleDriveError);
+      return;
+    }
+
+    diagForward("editor-drive-save-start", {
+      bytes: source.size,
+      isWebm,
+      transport: "opfs",
+    });
+
+    // Preferred: stage into OPFS and send only the filename. Streams to disk,
+    // so it's memory-safe at any size — this is the large-file fix.
+    const opfsFileName = await stageBlobToOpfs(source, isWebm ? "webm" : "mp4");
+    if (opfsFileName) {
+      chrome.runtime
+        .sendMessage({
+          type: "save-to-drive",
+          opfsFileName,
+          isWebm,
+          title: contentState.title,
+        })
+        .then(handleDriveResponse)
+        .catch(handleDriveError);
+      return;
+    }
+
+    // OPFS unavailable: fall back to base64, but only when small enough to
+    // survive the message-size cap. Above it, tell the user instead of failing
+    // silently the way this used to.
+    if (source.size > DRIVE_BASE64_MAX_BYTES) {
+      // Not a Drive limit: OPFS staging failed and the base64 fallback can't
+      // carry this much over sendMessage. Drive would accept the file, so
+      // don't tell the user it's too large for Drive; retrying can restage it.
+      failWith("drive-generic");
+      return;
+    }
+    diagForward("editor-drive-save-start", {
+      bytes: source.size,
+      isWebm,
+      transport: "base64",
+    });
+    const reader = new FileReader();
+    reader.onload = () => {
+      const base64 = String(reader.result).split(",")[1];
+      chrome.runtime
+        .sendMessage({
+          type: "save-to-drive",
+          base64,
+          title: contentState.title,
+          isWebm,
+        })
+        .then(handleDriveResponse)
+        .catch(handleDriveError);
+    };
+    reader.onerror = () => failWith("drive-generic");
+    reader.readAsDataURL(source);
+  };
+
+  // Safety net: every failure path inside saveToDrive calls failWith, but an
+  // unexpected throw would leave saveDrive stuck true and, now that the button
+  // is genuinely gated, permanently dead.
+  const runSaveToDrive = () => {
+    saveToDrive().catch((err) => {
+      console.error("[Drive] drive_save_unhandled:", err);
+      saveDriveInFlight.current = false;
       setContentState((prevContentState) => ({
         ...prevContentState,
         saveDrive: false,
       }));
-    };
-
-    if (contentState.noffmpeg || !contentState.mp4ready || !contentState.blob) {
-      // Prefer duration-fixed webm over rebuilding from raw chunks.
-      const fixedWebm = contentState.webm;
-      if (fixedWebm && fixedWebm instanceof Blob && fixedWebm.size > 0) {
-        const reader = new FileReader();
-        reader.onload = () => {
-          const dataUrl = reader.result;
-          const base64 = dataUrl.split(",")[1];
-          chrome.runtime
-            .sendMessage({
-              type: "save-to-drive",
-              base64: base64,
-              title: contentState.title,
-              isWebm: true,
-            })
-            .then(handleDriveResponse)
-            .catch(handleDriveError);
-        };
-        reader.onerror = () => {
-          chrome.runtime
-            .sendMessage({
-              type: "save-to-drive-fallback",
-              title: contentState.title,
-            })
-            .then(handleDriveResponse)
-            .catch(handleDriveError);
-        };
-        reader.readAsDataURL(fixedWebm);
-      } else {
-        chrome.runtime
-          .sendMessage({
-            type: "save-to-drive-fallback",
-            title: contentState.title,
-          })
-          .then(handleDriveResponse)
-          .catch(handleDriveError);
-      }
-    } else {
-      const reader = new FileReader();
-      reader.onload = () => {
-        const dataUrl = reader.result;
-        const base64 = dataUrl.split(",")[1];
-
-        chrome.runtime
-          .sendMessage({
-            type: "save-to-drive",
-            base64: base64,
-            title: contentState.title,
-          })
-          .then(handleDriveResponse)
-          .catch(handleDriveError);
-      };
-      reader.onerror = () => {
-        console.error("[Drive] FileReader failed to read blob for Drive upload");
-        setContentState((prevContentState) => ({
-          ...prevContentState,
-          saveDrive: false,
-        }));
-      };
-      if (
-        !contentState.noffmpeg &&
-        contentState.mp4ready &&
-        contentState.blob
-      ) {
-        reader.readAsDataURL(contentState.blob);
-      } else {
-        reader.readAsDataURL(contentState.webm);
-      }
-    }
+    });
   };
 
   const signOutDrive = () => {
@@ -251,12 +324,11 @@ const RightPanel = () => {
             // the editor unable to load). Recover straight from the OPFS file.
             await downloadResolvedRecording(s.title, (status) => {
               if (status === "started") return;
-              chrome.runtime.sendMessage({
-                type: "show-toast",
-                message:
-                  chrome.i18n.getMessage("rawRecordingModalTitle") +
+              showEditorToast(
+                contentStateRef.current,
+                chrome.i18n.getMessage("rawRecordingModalTitle") +
                   (status === "active" ? "" : ": no data"),
-              });
+              );
             });
             return;
           }
@@ -333,10 +405,10 @@ const RightPanel = () => {
                 "[Screenity] raw download fallback failed:",
                 fallbackErr,
               );
-              chrome.runtime.sendMessage({
-                type: "show-toast",
-                message: chrome.i18n.getMessage("rawRecordingModalTitle") + ": failed",
-              });
+              showEditorToast(
+                contentStateRef.current,
+                chrome.i18n.getMessage("rawRecordingModalTitle") + ": failed",
+              );
             }
           }
         },
@@ -804,7 +876,8 @@ const RightPanel = () => {
               <div
                 role="button"
                 className={styles.button}
-                onClick={saveToDrive}
+                onClick={runSaveToDrive}
+                aria-disabled={contentState.saveDrive}
                 disabled={contentState.saveDrive}
               >
                 <div className={styles.buttonLeft}>

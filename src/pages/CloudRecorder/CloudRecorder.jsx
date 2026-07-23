@@ -30,7 +30,7 @@ import {
   startEncoderPrewarm,
   closeActiveEncoderPrewarm,
 } from "../Recorder/encoderPrewarm";
-import { perfMark } from "../utils/perfMarks";
+import { perfMark, perfSpan } from "../utils/perfMarks";
 import {
   chooseChunksStore,
   openExistingChunksStore,
@@ -425,6 +425,18 @@ const CloudRecorder = () => {
   const maybeStartRecording = (reason = "unknown") => {
     if (!pendingStartRef.current || isFinishing.current) return;
     if (canBeginRecording()) {
+      if (pendingStartAttempts.current > 0) {
+        perfMark("CloudRecorder capture-late-recovered", {
+          polls: pendingStartAttempts.current,
+          approxLostMs: pendingStartAttempts.current * 200,
+        });
+        // Not a step in the trace's t map, so this merges the counts without
+        // stamping a timestamp. Survives the perf timeline's event cap.
+        traceStep("captureLate", {
+          captureLatePolls: pendingStartAttempts.current,
+          captureLateApproxMs: pendingStartAttempts.current * 200,
+        });
+      }
       clearPendingStart();
       startRecording();
       return;
@@ -432,6 +444,12 @@ const CloudRecorder = () => {
 
     const attempt = pendingStartAttempts.current + 1;
     pendingStartAttempts.current = attempt;
+    if (attempt === 1) {
+      // The countdown finished before the recorder was ready, so capture
+      // starts late and the user loses the head of the recording. Each poll
+      // is 200ms; the attempt count at start tells us how much was lost.
+      perfMark("CloudRecorder capture-late-after-countdown", { reason });
+    }
     if (attempt > 75) {
       clearPendingStart();
       sendRecordingError(
@@ -6588,6 +6606,34 @@ const CloudRecorder = () => {
 
       setInitProject(true);
 
+      // Kicked off here so the POST overlaps mic acquisition instead of sitting
+      // in front of the countdown. Deliberately after the stream resolves, so a
+      // cancelled picker can't mint a project for a recording that never runs.
+      let projectCreateMs = null;
+      const projectPrefetch = (async () => {
+        const { projectId, multiProjectId } = await chrome.storage.local.get([
+          "projectId",
+          "multiProjectId",
+        ]);
+        if (projectId || multiProjectId) return null;
+        const now = new Date();
+        const options = { day: "2-digit", month: "short", year: "numeric" };
+        const endCreate = perfSpan("CloudRecorder createVideoProject");
+        const startedAt = Date.now();
+        try {
+          return await createVideoProject({
+            title: `Untitled video - ${now.toLocaleString("en-GB", options)}`,
+            instantMode: instantMode.current,
+          });
+        } finally {
+          projectCreateMs = Date.now() - startedAt;
+          endCreate();
+        }
+      })();
+      // Mark handled; the rejection is re-thrown at the await site below.
+      projectPrefetch.catch(() => {});
+
+
       // If the user disabled the mic, skip getUserMedia: gain-muting still
       // wakes iPhone Continuity etc. Toggle-on mid-recording goes via setMic().
       if (shouldAcquireMicAtStart(data)) {
@@ -6723,23 +6769,38 @@ const CloudRecorder = () => {
         const reusedProject = Boolean(videoId);
 
         if (videoId) {
+          // A write landing between the prefetch's read and this one (restart
+          // restoring a multi snapshot, back-to-back reuse) routes us here, so
+          // settle the prefetch rather than leaving whatever it created adrift.
+          const orphan = await projectPrefetch.catch(() => null);
+          if (orphan && orphan !== videoId) {
+            void emitUploadTelemetry("project_state_change", {
+              source: "cloudrecorder-prefetch-orphaned",
+              from: orphan,
+              to: videoId,
+              multiMode: Boolean(multiMode),
+            });
+          }
           if (multiMode) {
             await chrome.storage.local.set({
               multiSceneCount: multiSceneCount || 0,
             });
           }
         } else {
-          const now = new Date();
-          const options = { day: "2-digit", month: "short", year: "numeric" };
-          const title = `Untitled video - ${now.toLocaleString(
-            "en-GB",
-            options,
-          )}`;
-
-          videoId = await createVideoProject({
-            title,
-            instantMode: instantMode.current,
-          });
+          // Usually already resolved by the prefetch kicked off before mic
+          // acquisition; falls back to a fresh create if the prefetch saw a
+          // project in storage that has since been cleared.
+          videoId = await projectPrefetch;
+          if (!videoId) {
+            const now = new Date();
+            const options = { day: "2-digit", month: "short", year: "numeric" };
+            const startedAt = Date.now();
+            videoId = await createVideoProject({
+              title: `Untitled video - ${now.toLocaleString("en-GB", options)}`,
+              instantMode: instantMode.current,
+            });
+            projectCreateMs = Date.now() - startedAt;
+          }
           if (!videoId) throw new Error("Failed to create video project");
 
           if (multiMode) {
@@ -6751,7 +6812,10 @@ const CloudRecorder = () => {
         }
 
         await chrome.storage.local.set({ projectId: videoId });
-        traceStep("apiProjectCreated");
+        traceStep("apiProjectCreated", {
+          projectCreateMs,
+          projectReused: reusedProject,
+        });
         void emitUploadTelemetry("project_state_change", {
           source: reusedProject
             ? "cloudrecorder-reused"
@@ -6775,11 +6839,24 @@ const CloudRecorder = () => {
         traceStep("resetActiveTabSent");
         chrome.runtime.sendMessage({ type: "reset-active-tab" });
 
+        // Races the countdown; if it loses, capture is delayed in 200ms polls
+        // (canBeginRecording).
+        const endUploaderInit = perfSpan("CloudRecorder initializeUploaders");
+        const uploaderInitStartedAt = Date.now();
         uploadersInitialized.current = await initializeUploaders();
+        const uploaderInitMs = Date.now() - uploaderInitStartedAt;
+        endUploaderInit({ ok: Boolean(uploadersInitialized.current) });
         if (!uploadersInitialized.current) {
           throw new Error("Failed to initialize uploaders");
         }
-        traceStep("apiUploadersReady");
+        traceStep("apiUploadersReady", {
+          uploaderInitMs,
+          uploaderCreateMs: {
+            screen: screenUploader.current?.createPostMs ?? null,
+            camera: cameraUploader.current?.createPostMs ?? null,
+            audio: audioUploader.current?.createPostMs ?? null,
+          },
+        });
 
         setStarted(true);
         setInitProject(false);
@@ -6808,7 +6885,10 @@ const CloudRecorder = () => {
     startStreamingInFlight.current = true;
     startTabKeepAlive();
 
-    if (document.visibilityState === "hidden") {
+    // Offscreen docs are always visibilityState "hidden" and have no
+    // sender.tab, so the handler's tabs.update can't do anything. It only
+    // cost a SW round-trip on every cloud start. Tab hosts still need it.
+    if (!IS_OFFSCREEN_HOST && document.visibilityState === "hidden") {
       if (globalThis.SCREENITY_VERBOSE_LOGS) {
         console.warn("[CloudRecorder] Tab is hidden at recording start, requesting activation");
       }

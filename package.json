@@ -1,6 +1,6 @@
 {
   "name": "screenity",
-  "version": "4.6.1",
+  "version": "4.6.2",
   "description": "The free and privacy-friendly screen recorder with no sign in needed.",
   "scripts": {
     "build": "cross-env NODE_ENV=production node utils/build.js",
@@ -33,7 +33,8 @@
     "release": "node scripts/release.mjs",
     "test:unit": "node --test tests/unit/*.test.mjs",
     "test:e2e": "playwright test --config tests/playwright.config.ts",
-    "test:e2e:fast": "SCREENITY_E2E_HEADLESS=1 playwright test --config tests/playwright.config.ts"
+    "test:e2e:fast": "SCREENITY_E2E_HEADLESS=1 playwright test --config tests/playwright.config.ts",
+    "check:source": "node scripts/check-source-hygiene.mjs"
   },
   "dependencies": {
     "@babel/plugin-transform-react-jsx": "^7.27.1",

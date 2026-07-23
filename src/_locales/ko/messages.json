@@ -1718,5 +1718,53 @@
   "cameraMicBlockedDescription": {
     "message": "이 웹사이트가 카메라와 마이크 접근을 차단하고 있어요. 여기서 녹화는 계속할 수 있지만, 카메라는 표시되지 않아요.",
     "description": "Toast description shown when the current page's Permissions-Policy blocks the extension's camera and microphone"
+  },
+  "downloadFailedModalTitle": {
+    "message": "다운로드가 완료되지 않았어요",
+    "description": "Modal title when a download to disk times out or fails"
+  },
+  "downloadFailedModalDescription": {
+    "message": "다시 시도해 주세요.",
+    "description": "Toast->modal description: what to do after a failed download"
+  },
+  "driveGenericModalTitle": {
+    "message": "Google Drive에 저장하지 못했어요",
+    "description": "Modal title for a generic Google Drive save failure"
+  },
+  "driveGenericModalDescription": {
+    "message": "다시 시도해 주세요.",
+    "description": "Modal description for a generic Google Drive save failure"
+  },
+  "driveQuotaModalTitle": {
+    "message": "Google Drive 저장 공간이 가득 찼어요",
+    "description": "Modal title when the Google Drive account is out of storage"
+  },
+  "driveQuotaModalDescription": {
+    "message": "공간을 확보한 후 다시 시도해 주세요.",
+    "description": "Modal description when the Google Drive account is out of storage"
+  },
+  "driveTooLargeModalTitle": {
+    "message": "녹화본이 너무 커요",
+    "description": "Modal title when a recording exceeds Google Drive limits"
+  },
+  "driveTooLargeModalDescription": {
+    "message": "이 녹화본은 너무 커서 Google Drive에 저장할 수 없어요.",
+    "description": "Modal description when a recording exceeds Google Drive limits"
+  },
+  "driveAuthModalTitle": {
+    "message": "Google Drive에 접근하지 못했어요",
+    "description": "Modal title when Google Drive authentication expired or was revoked"
+  },
+  "driveAuthModalDescription": {
+    "message": "다시 로그인해 주세요.",
+    "description": "Modal description when Google Drive authentication expired or was revoked"
+  },
+  "emptyRecordingTitle": {
+    "message": "이 녹화본은 비어 있어요",
+    "description": "Modal title when the recording file contains no video"
+  },
+  "emptyRecordingDescription": {
+    "message": "영상이 녹화되지 않았어요. 다시 녹화해 주세요.",
+    "description": "Modal description when the recording file contains no video"
   }
 }

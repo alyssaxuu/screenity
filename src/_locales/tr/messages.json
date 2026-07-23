@@ -1718,5 +1718,53 @@
   "cameraMicBlockedDescription": {
     "message": "Bu web sitesi kameranıza ve mikrofonunuza erişimi engelliyor. Yine de burada kayıt yapabilirsiniz, ancak kameranız görünmeyecek.",
     "description": "Toast description shown when the current page's Permissions-Policy blocks the extension's camera and microphone"
+  },
+  "downloadFailedModalTitle": {
+    "message": "İndirme tamamlanmadı",
+    "description": "Modal title when a download to disk times out or fails"
+  },
+  "downloadFailedModalDescription": {
+    "message": "Lütfen tekrar deneyin.",
+    "description": "Toast->modal description: what to do after a failed download"
+  },
+  "driveGenericModalTitle": {
+    "message": "Google Drive'a kaydedilemedi",
+    "description": "Modal title for a generic Google Drive save failure"
+  },
+  "driveGenericModalDescription": {
+    "message": "Lütfen tekrar deneyin.",
+    "description": "Modal description for a generic Google Drive save failure"
+  },
+  "driveQuotaModalTitle": {
+    "message": "Google Drive'ınız dolu",
+    "description": "Modal title when the Google Drive account is out of storage"
+  },
+  "driveQuotaModalDescription": {
+    "message": "Yer açıp tekrar deneyin.",
+    "description": "Modal description when the Google Drive account is out of storage"
+  },
+  "driveTooLargeModalTitle": {
+    "message": "Kayıt çok büyük",
+    "description": "Modal title when a recording exceeds Google Drive limits"
+  },
+  "driveTooLargeModalDescription": {
+    "message": "Bu kayıt Google Drive'a kaydedilemeyecek kadar büyük.",
+    "description": "Modal description when a recording exceeds Google Drive limits"
+  },
+  "driveAuthModalTitle": {
+    "message": "Google Drive'a erişilemedi",
+    "description": "Modal title when Google Drive authentication expired or was revoked"
+  },
+  "driveAuthModalDescription": {
+    "message": "Lütfen tekrar giriş yapın.",
+    "description": "Modal description when Google Drive authentication expired or was revoked"
+  },
+  "emptyRecordingTitle": {
+    "message": "Bu kayıt boş",
+    "description": "Modal title when the recording file contains no video"
+  },
+  "emptyRecordingDescription": {
+    "message": "Görüntü kaydedilmedi. Lütfen tekrar kaydetmeyi deneyin.",
+    "description": "Modal description when the recording file contains no video"
   }
 }

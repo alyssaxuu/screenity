@@ -101,6 +101,7 @@ export class OpfsChunkReader {
       const SIZE_STABLE_MS = 3000;
       const SIZE_STABLE_MIN_WAIT_MS = 1500;
       let writerDead = false;
+      let writerEmpty = false;
       while (true) {
         const elapsed = Date.now() - startedAt;
         // only time out once the size stops changing; a still-growing file
@@ -130,20 +131,26 @@ export class OpfsChunkReader {
           } else if (
             sizeStableSince > 0 &&
             Date.now() - sizeStableSince >= SIZE_STABLE_MS &&
-            Date.now() - startedAt >= SIZE_STABLE_MIN_WAIT_MS &&
-            probe.size >= MIN_VALID_RECORDING_BYTES
+            Date.now() - startedAt >= SIZE_STABLE_MIN_WAIT_MS
           ) {
-            writerDead = true;
+            // A file stuck below the minimum (usually 0 bytes, from a session
+            // that never captured) used to be excluded here, so it waited out
+            // the full 60s finalize timeout and then failed the size check
+            // anyway. Nothing is coming; fail fast with an accurate reason.
+            if (probe.size >= MIN_VALID_RECORDING_BYTES) writerDead = true;
+            else writerEmpty = true;
             break;
           }
         } catch {}
       }
-      if (timedOut || writerDead) {
+      if (timedOut || writerDead || writerEmpty) {
         try {
           chrome.runtime
             .sendMessage({
               type: "diag-forward",
-              event: writerDead
+              event: writerEmpty
+                ? "sandbox-opfs-empty-recording"
+                : writerDead
                 ? "sandbox-opfs-writer-dead-detected"
                 : "sandbox-opfs-wait-finalize-timeout",
               data: {
@@ -162,7 +169,9 @@ export class OpfsChunkReader {
       const err = new Error(
         `opfs-file-too-small: ${file.size} bytes < ${MIN_VALID_RECORDING_BYTES}`,
       );
-      err.code = "opfs-file-too-small";
+      // Distinct code so the editor can say "this recording is empty" rather
+      // than a generic load failure; retrying a 0-byte file is pointless.
+      err.code = file.size === 0 ? "opfs-empty-recording" : "opfs-file-too-small";
       throw err;
     }
     const isWebm = /\.webm$/i.test(this._fileName || "");

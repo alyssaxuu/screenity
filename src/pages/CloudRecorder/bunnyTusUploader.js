@@ -1,3 +1,5 @@
+import { perfSpan } from "../utils/perfMarks";
+
 const API_BASE = process.env.SCREENITY_API_BASE_URL;
 
 // Guard so uploaders in the same page session don't sweep concurrently.
@@ -783,10 +785,19 @@ export default class BunnyTusUploader {
         // Retry transient failures so a backend blip doesn't abort the
         // recording. A 4xx is a real rejection, so don't retry it.
         let res = null;
+        // This POST gates capture start (canBeginRecording waits on uploader
+        // init), so its server time is start latency.
+        const endCreatePost = perfSpan("Uploader POST /bunny/videos", { type });
+        // Also kept on the instance: the perf timeline is capped and evicts
+        // the start phase on long recordings, so CloudRecorder mirrors these
+        // into the start-flow trace, which is a single uncapped object.
+        const createPostStartedAt = Date.now();
+        let postAttempts = 0;
         for (let attempt = 0; attempt < 3; attempt += 1) {
           if (attempt > 0) {
             await new Promise((r) => setTimeout(r, 500 * attempt));
           }
+          postAttempts = attempt + 1;
           try {
             res = await fetch(`${API_BASE}/bunny/videos`, {
               method: "POST",
@@ -812,6 +823,14 @@ export default class BunnyTusUploader {
           const transient = res.status >= 500 || res.status === 429;
           if (!transient) break;
         }
+        this.createPostMs = Date.now() - createPostStartedAt;
+        this.createPostAttempts = postAttempts;
+        this.createPostStatus = res ? res.status : null;
+        endCreatePost({
+          attempts: postAttempts,
+          status: res ? res.status : null,
+          ok: Boolean(res && res.ok),
+        });
 
         if (!res || !res.ok) {
           // PROBE: persist failure shape so post-mortem can see what

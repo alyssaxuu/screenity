@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import Plyr from "plyr-react";
 import "../../styles/plyr.css";
 import { ContentStateContext } from "../../context/ContentState";
+import { showEditorToast } from "../../utils/editorToast";
 
 import Title from "./Title";
 
@@ -123,11 +124,11 @@ const VideoPlayer = (props) => {
       if (errorSurfaced) return;
       errorSurfaced = true;
       try {
-        chrome.runtime.sendMessage({
-          type: "show-toast",
-          message: chrome.i18n.getMessage("recordingCorruptToast"),
-          timeout: 8000,
-        });
+        showEditorToast(
+          contentStateRef.current,
+          chrome.i18n.getMessage("recordingCorruptToast"),
+          8000,
+        );
       } catch {}
       try {
         chrome.runtime.sendMessage({

@@ -27,6 +27,7 @@ import { triggerSupportDownload } from "../../utils/triggerSupportDownload";
 import { chooseReader } from "../recorderStorage/chooseReader";
 import { downloadResolvedRecording } from "../recorderStorage/resolveRecordingFile";
 import { runEditorOp } from "../editorOps";
+import { showEditorToast } from "../utils/editorToast";
 // mediabunny is ~630KB, only used by export/remux/conversion on user action.
 // Lazy-load to keep parse cost off editor mount. Cached promise.
 let _mbPromise = null;
@@ -181,12 +182,11 @@ const ContentState = (props) => {
             contentStateRef.current?.title,
             (status) => {
               if (status === "started") return;
-              chrome.runtime.sendMessage({
-                type: "show-toast",
-                message:
-                  chrome.i18n.getMessage("rawRecordingModalTitle") +
+              showEditorToast(
+                contentStateRef.current,
+                chrome.i18n.getMessage("rawRecordingModalTitle") +
                   (status === "active" ? "" : ": no data"),
-              });
+              );
             },
           );
         },
@@ -1251,6 +1251,7 @@ const ContentState = (props) => {
     } catch {}
     let directBlob = null;
     let opfsReadFailed = false;
+    let opfsEmpty = false;
     let backendRefForThisLoad = null;
     try {
       const { lastRecordingBackendRef } = await chrome.storage.local.get([
@@ -1361,6 +1362,13 @@ const ContentState = (props) => {
               "[Screenity][Sandbox] OPFS direct read failed",
               { attempt, err },
             );
+            // A 0-byte file has nothing to wait for; retrying twice more just
+            // delays an error we can already state precisely.
+            if (err?.code === "opfs-empty-recording") {
+              opfsEmpty = true;
+              opfsReadFailed = true;
+              break;
+            }
             if (attempt < MAX_OPFS_READ_ATTEMPTS) {
               setContentState((prev) =>
                 prev.finalizingRecording ? prev : { ...prev, finalizingRecording: true },
@@ -1417,8 +1425,12 @@ const ContentState = (props) => {
         makeVideoCheck.current = false;
         if (typeof contentStateRef.current?.openModal === "function") {
           contentStateRef.current.openModal(
-            chrome.i18n.getMessage("opfsLoadErrorTitle"),
-            chrome.i18n.getMessage("opfsLoadErrorDescription"),
+            chrome.i18n.getMessage(
+              opfsEmpty ? "emptyRecordingTitle" : "opfsLoadErrorTitle",
+            ),
+            chrome.i18n.getMessage(
+              opfsEmpty ? "emptyRecordingDescription" : "opfsLoadErrorDescription",
+            ),
             null,
             chrome.i18n.getMessage("permissionsModalDismiss"),
             () => {},
@@ -1441,6 +1453,7 @@ const ContentState = (props) => {
         }
         diagForward("sandbox-recording-load-failed", {
           backend: backendRefForThisLoad?.backend || "unknown",
+          empty: opfsEmpty,
         });
       }
     }
@@ -2897,6 +2910,22 @@ const ContentState = (props) => {
             downloadInProgress: false,
           }));
         } catch {}
+        diagForward("editor-download-fail", { reason: "timeout" });
+        try {
+          // Modal, not the relayed toast: show-toast only reaches the active
+          // tab's content script, which is never the editor page.
+          const openModal = contentStateRef.current?.openModal;
+          if (typeof openModal === "function") {
+            openModal(
+              chrome.i18n.getMessage("downloadFailedModalTitle"),
+              chrome.i18n.getMessage("downloadFailedModalDescription"),
+              null,
+              chrome.i18n.getMessage("closeModalLabel"),
+              () => {},
+              () => {},
+            );
+          }
+        } catch {}
         resolve();
       }, timeoutMs);
 
@@ -2930,13 +2959,11 @@ const ContentState = (props) => {
                 }));
               } catch {}
               try {
-                chrome.runtime.sendMessage({
-                  type: "show-toast",
-                  message: chrome.i18n.getMessage(
-                    "downloadInterruptedLargeToast",
-                  ),
-                  timeout: 8000,
-                });
+                showEditorToast(
+                  contentStateRef.current,
+                  chrome.i18n.getMessage("downloadInterruptedLargeToast"),
+                  8000,
+                );
               } catch {}
             } else {
               await new Promise((res) => {
@@ -3290,6 +3317,10 @@ const ContentState = (props) => {
     // downloading is the real lock
     if (latest.downloading) return;
     downloadCancelledRef.current = false;
+    diagForward("editor-download-start", {
+      kind: "mp4",
+      bytes: latest.blob?.size ?? null,
+    });
 
     setContentState((prev) => ({
       ...prev,
@@ -3360,6 +3391,28 @@ const ContentState = (props) => {
         setContentState((prev) => ({ ...prev, saved: true }));
       } catch (fallbackErr) {
         console.error("MP4 fallback download failed:", fallbackErr);
+        // Both the remux and the raw-fMP4 fallback failed: the user got no
+        // file. Silent before, so a "download does nothing" report had nothing
+        // to go on.
+        diagForward("editor-download-fail", {
+          kind: "mp4",
+          reason: String(err?.message || err).slice(0, 80),
+        });
+        try {
+          // Modal, not the relayed toast: show-toast only reaches the active
+          // tab's content script, which is never the editor page.
+          const openModal = contentStateRef.current?.openModal;
+          if (typeof openModal === "function") {
+            openModal(
+              chrome.i18n.getMessage("downloadFailedModalTitle"),
+              chrome.i18n.getMessage("downloadFailedModalDescription"),
+              null,
+              chrome.i18n.getMessage("closeModalLabel"),
+              () => {},
+              () => {},
+            );
+          }
+        } catch {}
       }
     } finally {
       setContentState((prev) => ({
@@ -3551,11 +3604,11 @@ const ContentState = (props) => {
     }
     if (latest.duration > 30) {
       try {
-        chrome.runtime.sendMessage({
-          type: "show-toast",
-          message: chrome.i18n.getMessage("downloadGIFTooLongToast"),
-          timeout: 6000,
-        });
+        showEditorToast(
+          contentStateRef.current,
+          chrome.i18n.getMessage("downloadGIFTooLongToast"),
+          6000,
+        );
       } catch {}
       return;
     }

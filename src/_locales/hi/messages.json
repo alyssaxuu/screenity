@@ -1718,5 +1718,53 @@
   "cameraMicBlockedDescription": {
     "message": "यह वेबसाइट आपके कैमरा और माइक्रोफोन तक पहुँच को रोकती है। आप यहाँ फिर भी रिकॉर्ड कर सकते हैं, लेकिन आपका कैमरा दिखाई नहीं देगा।",
     "description": "Toast description shown when the current page's Permissions-Policy blocks the extension's camera and microphone"
+  },
+  "downloadFailedModalTitle": {
+    "message": "डाउनलोड पूरा नहीं हुआ",
+    "description": "Modal title when a download to disk times out or fails"
+  },
+  "downloadFailedModalDescription": {
+    "message": "कृपया फिर से कोशिश करें।",
+    "description": "Toast->modal description: what to do after a failed download"
+  },
+  "driveGenericModalTitle": {
+    "message": "Google ड्राइव में सहेजा नहीं जा सका",
+    "description": "Modal title for a generic Google Drive save failure"
+  },
+  "driveGenericModalDescription": {
+    "message": "कृपया फिर से कोशिश करें।",
+    "description": "Modal description for a generic Google Drive save failure"
+  },
+  "driveQuotaModalTitle": {
+    "message": "आपका Google ड्राइव भर गया है",
+    "description": "Modal title when the Google Drive account is out of storage"
+  },
+  "driveQuotaModalDescription": {
+    "message": "जगह खाली करें और फिर से कोशिश करें।",
+    "description": "Modal description when the Google Drive account is out of storage"
+  },
+  "driveTooLargeModalTitle": {
+    "message": "रिकॉर्डिंग बहुत बड़ी है",
+    "description": "Modal title when a recording exceeds Google Drive limits"
+  },
+  "driveTooLargeModalDescription": {
+    "message": "यह रिकॉर्डिंग Google ड्राइव में सहेजने के लिए बहुत बड़ी है।",
+    "description": "Modal description when a recording exceeds Google Drive limits"
+  },
+  "driveAuthModalTitle": {
+    "message": "Google ड्राइव तक नहीं पहुँचा जा सका",
+    "description": "Modal title when Google Drive authentication expired or was revoked"
+  },
+  "driveAuthModalDescription": {
+    "message": "कृपया फिर से साइन इन करें।",
+    "description": "Modal description when Google Drive authentication expired or was revoked"
+  },
+  "emptyRecordingTitle": {
+    "message": "यह रिकॉर्डिंग खाली है",
+    "description": "Modal title when the recording file contains no video"
+  },
+  "emptyRecordingDescription": {
+    "message": "कोई वीडियो कैप्चर नहीं हुआ। कृपया दोबारा रिकॉर्ड करें।",
+    "description": "Modal description when the recording file contains no video"
   }
 }

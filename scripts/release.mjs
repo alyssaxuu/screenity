@@ -92,6 +92,17 @@ writeFileSync(MANIFEST_PATH, JSON.stringify(manifest, null, 2) + "\n");
 writeFileSync(PACKAGE_PATH, JSON.stringify(pkg, null, 2) + "\n");
 console.log("Wrote manifest.json + package.json.\n");
 
+console.log("Running source hygiene check...");
+try {
+  sh("node scripts/check-source-hygiene.mjs");
+} catch {
+  console.error(
+    "\nControl bytes in source. Those files are undiffable in git, so changes ship unreviewed. Fix before release.",
+  );
+  process.exit(1);
+}
+console.log("");
+
 console.log("Running i18n drift check...");
 try {
   sh("node scripts/check-i18n.mjs");

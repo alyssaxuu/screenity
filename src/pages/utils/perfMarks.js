@@ -35,6 +35,24 @@ const buildDevImpl = () => {
 
   const CTX = detectContext();
   const STORAGE_KEY = `${STORAGE_KEY_BASE}.${CTX}`;
+
+  // Progress marks run continuously during a recording (~35% of every timeline
+  // in the diag-zip corpus), so head eviction drops the start-phase spans on
+  // any long recording. Evict these first instead. Suffix-matched so future
+  // progress marks are demoted automatically.
+  const isLowValueLabel = (label) =>
+    typeof label === "string" && label.endsWith(".progress");
+
+  const evictOne = (list) => {
+    for (let i = 0; i < list.length; i += 1) {
+      if (isLowValueLabel(list[i]?.label)) {
+        list.splice(i, 1);
+        return;
+      }
+    }
+    list.shift();
+  };
+
   const localBuf = [];
   let lastMarkPerfNow = null;
   let pendingFlush = null;
@@ -61,7 +79,7 @@ const buildDevImpl = () => {
           const res = await chrome.storage.local.get([STORAGE_KEY]);
           const cur = Array.isArray(res?.[STORAGE_KEY]) ? res[STORAGE_KEY] : [];
           for (const e of batch) cur.push(e);
-          while (cur.length > MAX_EVENTS) cur.shift();
+          while (cur.length > MAX_EVENTS) evictOne(cur);
           await chrome.storage.local.set({ [STORAGE_KEY]: cur });
         } catch {}
       })
