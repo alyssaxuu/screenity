@@ -30,8 +30,10 @@ const postProgress = (requestId, progress) => {
   self.postMessage({ type: "progress", requestId, progress });
 };
 
-const postDone = (requestId, outputFileName) => {
-  self.postMessage({ type: "done", requestId, outputFileName });
+// audioCarried: true = audio present, false = audio dropped, null = unknown
+// (paths that don't measure it, e.g. the full re-encode).
+const postDone = (requestId, outputFileName, audioCarried = null) => {
+  self.postMessage({ type: "done", requestId, outputFileName, audioCarried });
 };
 
 const postError = (requestId, error) => {
@@ -109,9 +111,7 @@ const remuxToOpfs = async ({ requestId, inputFileName, outputFileName }) => {
     // Pipe encoded packets through the muxer for bounded memory (~8 MiB
     // cache); the Conversion API buffers a full sample table upfront.
     const videoTrack = await input.getPrimaryVideoTrack();
-    const audioTrack = await input
-      .getPrimaryAudioTrack()
-      .catch(() => null);
+    const audioTrack = await input.getPrimaryAudioTrack().catch(() => null);
 
     if (!videoTrack) {
       throw new Error("remux-no-video-track");
@@ -208,10 +208,26 @@ const remuxToOpfs = async ({ requestId, inputFileName, outputFileName }) => {
     if (videoResult.status === "rejected") {
       throw videoResult.reason;
     }
-    if (pipeResults[1].status === "rejected") {
-      devLog("audio-pipe-failed", {
-        err: String(pipeResults[1].reason?.message || pipeResults[1].reason).slice(0, 200),
-      });
+    // Report whether audio actually made it into the file, so the editor can
+    // fall back to the audio-correct source instead of silently shipping a
+    // video-only MP4. Audio is "carried" only if a track existed and its packets
+    // piped without error. Distinguish "no audio to carry" (null, a video-only
+    // recording) from "audio was lost" (false) so the editor only falls back on
+    // a real drop, never on a source that simply had no audio.
+    let audioCarried = null;
+    if (audioTrack) {
+      if (audioSource && pipeResults[1].status === "fulfilled") {
+        audioCarried = true;
+      } else {
+        if (pipeResults[1].status === "rejected") {
+          devLog("audio-pipe-failed", {
+            err: String(
+              pipeResults[1].reason?.message || pipeResults[1].reason
+            ).slice(0, 200),
+          });
+        }
+        audioCarried = false;
+      }
     }
 
     await output.finalize();
@@ -227,8 +243,9 @@ const remuxToOpfs = async ({ requestId, inputFileName, outputFileName }) => {
     devLog("done", {
       durationMs: Date.now() - startedAt,
       outputBytes: finalSize,
+      audioCarried,
     });
-    postDone(requestId, outputFileName);
+    postDone(requestId, outputFileName, audioCarried);
   } catch (err) {
     devLog("error", {
       err: String(err?.message || err).slice(0, 200),
@@ -252,7 +269,7 @@ const remuxToOpfs = async ({ requestId, inputFileName, outputFileName }) => {
 // so it's a full re-encode. Streams OPFS to OPFS since BufferTarget OOMs past ~2GB.
 const convertViaEncoder = async (
   { requestId, inputFileName, outputFileName, videoBitrate },
-  targetFormat = "webm",
+  targetFormat = "webm"
 ) => {
   const startedAt = Date.now();
   devLog(`${targetFormat}-start`, { requestId, inputFileName, outputFileName });
@@ -289,9 +306,15 @@ const convertViaEncoder = async (
 
     const writable = createOpfsWritable(syncHandle);
 
+    // A transcode that drops audio must not pass silently: download() falls
+    // back to the audio-correct source when audioCarried === false.
+    let audioDropped = false;
     const convertOptions = {
       target: new StreamTarget(writable),
       onProgress: (p) => postProgress(requestId, p),
+      onAudioDropped: () => {
+        audioDropped = true;
+      },
     };
     // Without this the converter falls back to its 5 Mbps default, which is a
     // 1080p figure: a 4K screencast came back visibly blocky on text.
@@ -315,8 +338,9 @@ const convertViaEncoder = async (
     devLog(`${targetFormat}-done`, {
       durationMs: Date.now() - startedAt,
       outputBytes: finalSize,
+      audioCarried: audioDropped ? false : null,
     });
-    postDone(requestId, outputFileName);
+    postDone(requestId, outputFileName, audioDropped ? false : null);
   } catch (err) {
     devLog(`${targetFormat}-error`, {
       err: String(err?.message || err).slice(0, 200),

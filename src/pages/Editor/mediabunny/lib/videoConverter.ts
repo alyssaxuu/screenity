@@ -20,6 +20,10 @@ export interface ConversionOptions {
   preferredVideoCodec?: VideoCodec;
   audioCodec?: AudioCodec;
   onProgress?: (progress: number) => void;
+  // Called if the conversion discarded the source's audio track (e.g. mediabunny
+  // can't decode it in this browser). The output has no audio; the caller should
+  // fall back rather than ship a silent file.
+  onAudioDropped?: () => void;
   verbose?: boolean;
   // When provided (e.g. a StreamTarget writing to OPFS), output streams to it
   // and convert() resolves to null; the caller owns the written file. Used by
@@ -45,11 +49,17 @@ export class VideoConverter {
   private cachedMP4Codec: VideoCodec | null = null;
   private cachedWebMCodec: VideoCodec | null = null;
 
-  async convertToMP4(sourceBlob: Blob, options: ConversionOptions = {}): Promise<Blob> {
+  async convertToMP4(
+    sourceBlob: Blob,
+    options: ConversionOptions = {}
+  ): Promise<Blob> {
     return this.convert(sourceBlob, "mp4", options);
   }
 
-  async convertToWebM(sourceBlob: Blob, options: ConversionOptions = {}): Promise<Blob> {
+  async convertToWebM(
+    sourceBlob: Blob,
+    options: ConversionOptions = {}
+  ): Promise<Blob> {
     return this.convert(sourceBlob, "webm", options);
   }
 
@@ -101,13 +111,18 @@ export class VideoConverter {
       preferredVideoCodec,
       audioCodec,
       onProgress,
+      onAudioDropped,
     } = options;
 
-    const cache = targetFormat === "mp4" ? this.cachedMP4Codec : this.cachedWebMCodec;
+    const cache =
+      targetFormat === "mp4" ? this.cachedMP4Codec : this.cachedWebMCodec;
     let videoCodec: VideoCodec | null = cache;
 
     if (!videoCodec) {
-      if (preferredVideoCodec && (await this.canEncodeCodec(preferredVideoCodec))) {
+      if (
+        preferredVideoCodec &&
+        (await this.canEncodeCodec(preferredVideoCodec))
+      ) {
         videoCodec = preferredVideoCodec;
       } else {
         const codecInfo = await this.detectBestCodec(targetFormat);
@@ -122,7 +137,8 @@ export class VideoConverter {
       else this.cachedWebMCodec = videoCodec;
     }
 
-    const finalAudioCodec = audioCodec || (targetFormat === "mp4" ? "aac" : "opus");
+    const finalAudioCodec =
+      audioCodec || (targetFormat === "mp4" ? "aac" : "opus");
 
     const input = new Input({
       formats: ALL_FORMATS,
@@ -143,6 +159,32 @@ export class VideoConverter {
       video: { codec: videoCodec, bitrate: videoBitrate },
       audio: { codec: finalAudioCodec, bitrate: audioBitrate },
     });
+
+    // mediabunny can validate a conversion while silently discarding an audio
+    // track. On Linux Chromium the source Opus decodes fine, but the browser
+    // has no AAC encoder, so MP4 audio (which must be AAC) can't be re-encoded
+    // and mediabunny drops it with reason `no_encodable_target_codec`. Surface
+    // that so callers never ship a video-only file.
+    const droppedAudio = conversion.discardedTracks.filter(
+      (t) => t.track.type === "audio"
+    );
+    if (droppedAudio.length > 0) {
+      if (onAudioDropped) onAudioDropped();
+      // Log the concrete discard reason + codec as a plain string. mediabunny's
+      // own warning only prints "[object Object]", hiding WHY
+      // (undecodable_source_codec vs no_encodable_target_codec) — two different
+      // root causes that need different fixes. Console DevTools collapses an
+      // object arg into "[object Object]", so serialize it into the message.
+      for (const t of droppedAudio) {
+        const codec =
+          t.track.codec ?? (await t.track.getCodec().catch(() => null));
+        console.warn(
+          `[screenity-transcode] audio track discarded | reason=${
+            t.reason
+          } | codec=${String(codec)}`
+        );
+      }
+    }
 
     if (!conversion.isValid) {
       const reasons = conversion.discardedTracks
@@ -181,10 +223,16 @@ export class VideoConverter {
 
 export const videoConverter = new VideoConverter();
 
-export async function convertToMP4(blob: Blob, options?: ConversionOptions): Promise<Blob> {
+export async function convertToMP4(
+  blob: Blob,
+  options?: ConversionOptions
+): Promise<Blob> {
   return videoConverter.convertToMP4(blob, options);
 }
 
-export async function convertToWebM(blob: Blob, options?: ConversionOptions): Promise<Blob> {
+export async function convertToWebM(
+  blob: Blob,
+  options?: ConversionOptions
+): Promise<Blob> {
   return videoConverter.convertToWebM(blob, options);
 }

@@ -47,9 +47,14 @@ const ensureWorker = () => {
       devLog("worker-done", {
         requestId: msg.requestId,
         outputFileName: msg.outputFileName,
+        audioCarried: msg.audioCarried,
       });
       pending.delete(msg.requestId);
-      entry?.sendResponse?.({ ok: true, outputFileName: msg.outputFileName });
+      entry?.sendResponse?.({
+        ok: true,
+        outputFileName: msg.outputFileName,
+        audioCarried: msg.audioCarried,
+      });
       return;
     }
     if (msg.type === "error") {
