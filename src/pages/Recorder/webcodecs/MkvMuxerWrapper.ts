@@ -45,6 +45,7 @@ export class MkvMuxerWrapper {
   private lastAudioTimestampUs = 0;
 
   private _lastDecoderConfig: any = null;
+  private _lastAudioDecoderConfig: any = null;
 
   private _writeBuffer: Uint8Array[] = [];
   private _writeBufferBytes = 0;
@@ -154,8 +155,20 @@ export class MkvMuxerWrapper {
   addAudioChunk(chunk: EncodedAudioChunk, meta: any) {
     if (!this.audioSource) return;
 
-    const packet = this.buildPacket(chunk, meta, "audio");
-    return this.audioSource.add(packet, meta);
+    // Mirror addVideoChunk's cache: the browser sends decoderConfig only on the
+    // first chunk after configure, so a later chunk lacking one must still carry
+    // the last known config or the audio track is written headerless.
+    if (meta?.decoderConfig) {
+      this._lastAudioDecoderConfig = meta.decoderConfig;
+    }
+
+    const effectiveMeta =
+      !meta?.decoderConfig && this._lastAudioDecoderConfig
+        ? { ...meta, decoderConfig: this._lastAudioDecoderConfig }
+        : meta;
+
+    const packet = this.buildPacket(chunk, effectiveMeta, "audio");
+    return this.audioSource.add(packet, effectiveMeta);
   }
 
   async start() {

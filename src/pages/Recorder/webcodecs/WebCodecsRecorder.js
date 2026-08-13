@@ -2251,7 +2251,10 @@ export class WebCodecsRecorder {
       // AudioSpecificConfig (under 2 bytes or audioObjectType=0).
       // Synthesize a correct 2-byte ASC when invalid.
       const fixed = this._maybeFixAacDescription(meta);
-      this.muxer.addAudioChunk(chunk, fixed || meta);
+      // If the browser omitted the decoderConfig entirely on the first chunk,
+      // build one from known settings so the track is never written headerless.
+      const withCfg = fixed || this._ensureAudioDecoderConfig(meta) || meta;
+      this.muxer.addAudioChunk(chunk, withCfg);
       // Reset audio reclaim counter after a healthy stretch.
       if (
         shouldResetReclaimCounter(
@@ -2341,6 +2344,38 @@ export class WebCodecsRecorder {
       synthesized: Array.from(synthesized).map((b) => b.toString(16)),
     });
     return { ...meta, decoderConfig: { ...dc, description: synthesized } };
+  }
+
+  // Guarantee the first audio chunk always carries a valid decoderConfig. The
+  // browser sends decoderConfig only on the first chunk after configure; if that
+  // one is missing entirely (not just broken), build one from known settings so
+  // the muxer never writes a headerless audio track. Returns null when meta is
+  // already valid or the codec needs no synthesized description (e.g. opus).
+  _ensureAudioDecoderConfig(meta) {
+    const dc = meta?.decoderConfig;
+    if (dc?.codec && dc?.description) return null;
+    const config = this._activeAudioConfig;
+    const codec = config?.codec || "mp4a.40.2";
+    const isAac = codec.startsWith("mp4a") || codec === "aac";
+    if (!isAac) return null;
+    const sampleRate = config?.sampleRate || this.audioSampleRate || 48000;
+    const numberOfChannels =
+      config?.numberOfChannels || this.audioChannelCount || 2;
+    const objectType = Number(codec.split(".")[2]) || 2;
+    const description = this._synthesizeAacDescription(
+      objectType,
+      sampleRate,
+      numberOfChannels,
+    );
+    return {
+      ...meta,
+      decoderConfig: {
+        codec,
+        sampleRate,
+        numberOfChannels,
+        description,
+      },
+    };
   }
 
   // Pack an AAC ASC: 5b objectType + 4b sampleRateIdx + 4b channels
