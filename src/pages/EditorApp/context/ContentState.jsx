@@ -3153,7 +3153,9 @@ const ContentState = (props) => {
         type: kind === "webm" ? "video/webm" : "video/mp4",
       });
       devLog("offscreen-remux-ok", { outputBytes: outputBlob.size });
-      return outputBlob;
+      // audioCarried is undefined for the transcode paths (webm/mp4x) that don't
+      // measure it; treat only an explicit false as a drop.
+      return { blob: outputBlob, audioCarried: response.audioCarried };
     } finally {
       chrome.runtime.onMessage.removeListener(progressListener);
       // never delete the recording itself
@@ -3240,12 +3242,15 @@ const ContentState = (props) => {
     const inputSize = blob?.size || 0;
     let remuxedBlob = null;
     let remuxPath = null;
+    let audioCarried = null;
     try {
       diagForward("remux-offscreen-start", { inputBytes: inputSize });
-      remuxedBlob = await runRemuxWithStallGuard(
+      const offscreen = await runRemuxWithStallGuard(
         (pg) => remuxViaOffscreenOpfs(blob, pg),
         sharedFinalizeProgress,
       );
+      remuxedBlob = offscreen?.blob || null;
+      audioCarried = offscreen?.audioCarried;
       remuxPath = "offscreen-opfs";
       diagForward("remux-offscreen-ok", { inputBytes: inputSize });
     } catch (err) {
@@ -3266,6 +3271,8 @@ const ContentState = (props) => {
           sharedFinalizeProgress,
         );
         remuxPath = "buffer-target";
+        // BufferTarget remux doesn't report audio status; leave it unknown.
+        audioCarried = null;
         diagForward("remux-buffer-target-ok", { inputBytes: inputSize });
       } catch (err) {
         console.warn(
@@ -3278,7 +3285,7 @@ const ContentState = (props) => {
         });
       }
     }
-    return { blob: remuxedBlob, path: remuxPath };
+    return { blob: remuxedBlob, path: remuxPath, audioCarried };
   };
 
   // Ask mediabunny, not a hardcoded profile string. isConfigSupported with
@@ -3305,9 +3312,13 @@ const ContentState = (props) => {
       );
       diagForward("editor-transcode-ok", {
         inputBytes,
-        outputBytes: out?.size || 0,
+        outputBytes: out?.blob?.size || 0,
       });
-      return { blob: out, path: "webm-transcode" };
+      return {
+        blob: out?.blob || null,
+        path: "webm-transcode",
+        audioCarried: out?.audioCarried,
+      };
     } catch (err) {
       diagForward("editor-transcode-fail", {
         inputBytes,
@@ -3321,7 +3332,7 @@ const ContentState = (props) => {
   // an edit (which produces a new blob) re-finalizes.
   const ensureStandardMp4 = () => {
     const blob = contentStateRef.current?.blob;
-    if (!blob) return Promise.resolve({ blob: null, path: null });
+    if (!blob) return Promise.resolve({ blob: null, path: null, audioCarried: null });
     if (blob.type !== "video/mp4") {
       const cur = standardMp4Ref.current;
       if (cur && cur.forBlob === blob && cur.status !== "failed") {
@@ -3334,6 +3345,7 @@ const ContentState = (props) => {
           forBlob: blob,
           blob: res.blob,
           path: res.path,
+          audioCarried: res.audioCarried,
         };
         return res;
       });
@@ -3355,6 +3367,7 @@ const ContentState = (props) => {
         forBlob: blob,
         blob: res.blob,
         path: res.path,
+        audioCarried: res.audioCarried,
       };
       return res;
     });
@@ -3378,6 +3391,24 @@ const ContentState = (props) => {
     return () => clearTimeout(settle);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [contentState.ready, contentState.blob]);
+
+  // The remux could not carry the recording's audio, so we fell back to the
+  // audio-correct source. Tell the user why their exported file may not be the
+  // fully-remuxed MP4, instead of letting them discover a difference silently.
+  const showAudioDroppedNotice = () => {
+    try {
+      const openModal = contentStateRef.current?.openModal;
+      if (typeof openModal !== "function") return;
+      openModal(
+        chrome.i18n.getMessage("audioDroppedTitle"),
+        chrome.i18n.getMessage("audioDroppedDescription"),
+        null,
+        chrome.i18n.getMessage("closeModalLabel"),
+        () => {},
+        () => {},
+      );
+    } catch {}
+  };
 
   const download = async () => {
     // ref: rapid clicks fire before state propagates
@@ -3429,6 +3460,7 @@ const ContentState = (props) => {
     const remuxStartedAt = Date.now();
     let remuxedBlob = null;
     let remuxPath = null;
+    let audioDropped = false;
 
     // Reuse the background pre-warm if it finished (instant) or is in flight
     // (await it); otherwise this runs the finalize now. Keyed on the blob, so
@@ -3437,6 +3469,12 @@ const ContentState = (props) => {
       const res = await ensureStandardMp4();
       remuxedBlob = res.blob;
       remuxPath = res.path;
+      // The remux could not carry the audio track. Never ship a silent file:
+      // fall back to the audio-correct source and tell the user.
+      if (res && res.audioCarried === false) {
+        audioDropped = true;
+        remuxedBlob = null;
+      }
     } catch (err) {
       console.warn("[Screenity] standard mp4 finalize failed", err);
     }
@@ -3464,7 +3502,24 @@ const ContentState = (props) => {
 
     if (downloadCancelledRef.current) return;
     try {
-      if (remuxedBlob) {
+      if (audioDropped) {
+        // Remux dropped audio — ship the audio-correct source instead of a
+        // silent file. Keep the real extension (MP4 for MP4 recordings, WebM
+        // for WebM recordings) so players open it correctly.
+        const fallbackBlob = contentState.blob;
+        const fallbackExt = String(fallbackBlob?.type || "").includes("webm")
+          ? ".webm"
+          : ".mp4";
+        const url = URL.createObjectURL(fallbackBlob);
+        await requestDownload(url, fallbackExt);
+        URL.revokeObjectURL(url);
+        setContentState((prev) => ({ ...prev, saved: true }));
+        showAudioDroppedNotice();
+        diagForward("audio-dropped-fallback-delivered", {
+          inputBytes: inputSize,
+          path: remuxPath,
+        });
+      } else if (remuxedBlob) {
         const url = URL.createObjectURL(remuxedBlob);
         await requestDownload(url, ".mp4");
         URL.revokeObjectURL(url);

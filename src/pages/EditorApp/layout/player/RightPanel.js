@@ -927,7 +927,11 @@ const RightPanel = () => {
                         : chrome.i18n.getMessage("downloadWEBMButtonTitle")}
                     </div>
                     <div className={styles.buttonDescription}>
-                      {chrome.i18n.getMessage("downloadWEBMButtonDescription")}
+                      {chrome.i18n.getMessage(
+                        contentState.blob?.type !== "video/mp4"
+                          ? "downloadWEBMButtonDescriptionRecommended"
+                          : "downloadWEBMButtonDescription"
+                      )}
                     </div>
                   </div>
                   <div className={styles.buttonRight}>
@@ -941,11 +945,13 @@ const RightPanel = () => {
                 // and noffmpeg gates don't apply.
                 const isNativeMp4 =
                   contentState.blob?.type === "video/mp4";
-                const mp4Disabled = isNativeMp4
-                  ? contentState.isFfmpegRunning || !contentState.mp4ready
-                  : contentState.isFfmpegRunning ||
-                    contentState.noffmpeg ||
-                    !contentState.mp4ready;
+                // On a WebM source (Linux) the browser has no AAC encoder, so
+                // MP4-with-sound is impossible; disable rather than silently
+                // hand back a .webm.
+                const mp4Disabled =
+                  !isNativeMp4 ||
+                  contentState.isFfmpegRunning ||
+                  !contentState.mp4ready;
                 const mp4ShowNotAvailable = isNativeMp4
                   ? false
                   : contentState.updateChrome ||
@@ -972,14 +978,21 @@ const RightPanel = () => {
                       : chrome.i18n.getMessage("downloadMP4ButtonTitle")}
                   </div>
                   <div className={styles.buttonDescription}>
-                    {contentState.offline &&
-                    !contentState.ffmpegLoaded &&
-                    !isNativeMp4
+                    {!isNativeMp4
+                      ? chrome.i18n.getMessage(
+                          "downloadMP4DisabledReason"
+                        )
+                      : contentState.offline &&
+                        !contentState.ffmpegLoaded &&
+                        !isNativeMp4
                       ? chrome.i18n.getMessage("noConnectionLabel")
                       : mp4ShowNotAvailable
                       ? getNotAvailableLabel()
-                      : contentState.mp4ready && !contentState.isFfmpegRunning
-                      ? chrome.i18n.getMessage("downloadMP4ButtonDescription")
+                      : contentState.mp4ready &&
+                        !contentState.isFfmpegRunning
+                      ? chrome.i18n.getMessage(
+                          "downloadMP4ButtonDescription"
+                        )
                       : getPreparingLabel()}
                   </div>
                 </div>
@@ -1008,7 +1021,9 @@ const RightPanel = () => {
                     <div className={styles.buttonDescription}>
                       {!contentState.isFfmpegRunning
                         ? chrome.i18n.getMessage(
-                            "downloadWEBMButtonDescription"
+                            contentState.blob?.type !== "video/mp4"
+                              ? "downloadWEBMButtonDescriptionRecommended"
+                              : "downloadWEBMButtonDescription"
                           )
                         : getPreparingLabel()}
                     </div>

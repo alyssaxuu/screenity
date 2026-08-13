@@ -671,6 +671,10 @@
     "message": "Esporta un video .mp4 (consigliato)",
     "description": "Etichetta di download MP4"
   },
+  "downloadMP4DisabledReason": {
+    "message": "MP4 isn't available here. Use .webm to keep your sound.",
+    "description": "Reason shown on the disabled Download MP4 button when the recording is WebM (Linux): the browser has no AAC encoder, so MP4-with-sound is impossible"
+  },
   "downloadGIFButtonTitle": {
     "message": "Scarica come .gif",
     "description": "Pulsante di download GIF"
@@ -1761,5 +1765,21 @@
   "emptyRecordingDescription": {
     "message": "Nessun video è stato acquisito. Prova a registrare di nuovo.",
     "description": "Modal description when the recording file contains no video"
+  },
+  "audioDroppedTitle": {
+    "message": "Video saved without sound",
+    "description": "Modal title shown when the recording's audio track could not be carried into the exported MP4"
+  },
+  "audioDroppedDescription": {
+    "message": "Screenity couldn't save the audio track from this recording, so the downloaded video has no sound. We gave you the original recording instead. If this keeps happening, contact us at support@screenity.io.",
+    "description": "Modal description shown when the recording's audio could not be carried into the exported MP4"
+  },
+  "downloadWEBMButtonDescriptionRecommended": {
+    "message": "Export a .webm video (recommended)",
+    "description": "Download WEBM label shown when the recording is WebM (Linux), where .webm is the reliable format"
+  },
+  "downloadMP4ButtonDescriptionWarning": {
+    "message": "Sound may not save. Use .webm instead.",
+    "description": "Download MP4 label shown when the recording is WebM (Linux), where the MP4 transcode can silently drop audio"
   }
 }

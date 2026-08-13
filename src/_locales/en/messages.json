@@ -79,6 +79,14 @@
     "message": "Looks like Screenity couldn't load the recording from your device's storage. It may have been cleared or moved. If this keeps happening, please contact us at support@screenity.io.",
     "description": "Modal description shown when the editor cannot read the recording file from the device's storage"
   },
+  "audioDroppedTitle": {
+    "message": "Video saved without sound",
+    "description": "Modal title shown when the recording's audio track could not be carried into the exported MP4"
+  },
+  "audioDroppedDescription": {
+    "message": "Screenity couldn't save the audio track from this recording, a known issue on Linux devices. The video has no sound, so we gave you the original recording instead. Use 'Download as .webm' to keep the audio. If this keeps happening, contact us at support@screenity.io.",
+    "description": "Modal description shown when the recording's audio could not be carried into the exported MP4"
+  },
   "editorStuckTitle": {
     "message": "Still preparing your recording…",
     "description": "Modal title shown when the editor has been waiting on the post-stop pipeline for too long"
@@ -651,6 +659,10 @@
     "message": "Export a .webm video",
     "description": "Download WEBM label"
   },
+  "downloadWEBMButtonDescriptionRecommended": {
+    "message": "Export a .webm video (recommended)",
+    "description": "Download WEBM label shown when the recording is WebM (Linux), where .webm is the reliable format"
+  },
   "downloadMP4ButtonTitle": {
     "message": "Download as .mp4",
     "description": "Download MP4 button"
@@ -658,6 +670,14 @@
   "downloadMP4ButtonDescription": {
     "message": "Export an .mp4 video (recommended)",
     "description": "Download MP4 label"
+  },
+  "downloadMP4ButtonDescriptionWarning": {
+    "message": "Sound may not save. Use .webm instead.",
+    "description": "Download MP4 label shown when the recording is WebM (Linux), where the MP4 transcode can silently drop audio"
+  },
+  "downloadMP4DisabledReason": {
+    "message": "MP4 isn't available here. Use .webm to keep your sound.",
+    "description": "Reason shown on the disabled Download MP4 button when the recording is WebM (Linux): the browser has no AAC encoder, so MP4-with-sound is impossible"
   },
   "downloadGIFButtonTitle": {
     "message": "Download as .gif",
