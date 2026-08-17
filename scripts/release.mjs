@@ -1,10 +1,10 @@
-#!/usr/bin/env node
+#!/usr/bin/env bun
 // release builder: bumps manifest + package version, runs i18n check,
 // builds self-hosted (no env), verifies no secrets in the zip, prints
 // the manual upload checklist. doesn't write release notes, push, or
 // upload, those stay manual.
 //
-// usage: node scripts/release.mjs <patch|minor|major> [--dry-run]
+// usage: bun scripts/release.mjs <patch|minor|major> [--dry-run]
 
 import { execSync } from "node:child_process";
 import { readFileSync, writeFileSync, statSync } from "node:fs";
@@ -23,7 +23,7 @@ const DRY_RUN = args.includes("--dry-run");
 const bumpKind = args.find((a) => ["patch", "minor", "major"].includes(a));
 
 if (!bumpKind) {
-  console.error("Usage: node scripts/release.mjs [--dry-run] patch|minor|major");
+  console.error("Usage: bun scripts/release.mjs [--dry-run] patch|minor|major");
   process.exit(2);
 }
 
@@ -94,7 +94,7 @@ console.log("Wrote manifest.json + package.json.\n");
 
 console.log("Running source hygiene check...");
 try {
-  sh("node scripts/check-source-hygiene.mjs");
+  sh("bun scripts/check-source-hygiene.mjs");
 } catch {
   console.error(
     "\nControl bytes in source. Those files are undiffable in git, so changes ship unreviewed. Fix before release.",
@@ -105,25 +105,25 @@ console.log("");
 
 console.log("Running i18n drift check...");
 try {
-  sh("node scripts/check-i18n.mjs");
+  sh("bun scripts/check-i18n.mjs");
 } catch {
   console.error(
-    "\ni18n drift detected. Run `npm run check:i18n -- --fix` to stub missing keys, then translate before release.",
+    "\ni18n drift detected. Run `bun run check:i18n -- --fix` to stub missing keys, then translate before release.",
   );
   process.exit(1);
 }
 console.log("");
 
 console.log("Building self-hosted bundle (build:release)...");
-sh("npm run build:release");
+sh("bun run build:release");
 console.log("");
 
 console.log("Verifying build/ for secret leaks...");
-sh("node scripts/verify-no-secrets.mjs");
+sh("bun scripts/verify-no-secrets.mjs");
 console.log("");
 
 console.log("Verifying build/ has no dev-server references...");
-sh("node scripts/assert-no-dev-env.mjs");
+sh("bun scripts/assert-no-dev-env.mjs");
 console.log("");
 
 console.log("Creating build.zip...");

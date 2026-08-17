@@ -1,8 +1,8 @@
-#!/usr/bin/env node
+#!/usr/bin/env bun
 // Release gate: refuse a build that points at a dev server. build:dev and build:local
 // bake in localhost, and build:local is indistinguishable from a release artifact.
 // Shipping one fails silently: installs, opens, reaches nothing. No --confirm escape.
-// usage: node scripts/assert-no-dev-env.mjs [build-dir] [--require-prod-origin]
+// usage: bun scripts/assert-no-dev-env.mjs [build-dir] [--require-prod-origin]
 
 import { readFileSync, readdirSync, statSync, existsSync } from "node:fs";
 import { join, dirname } from "node:path";
@@ -98,7 +98,7 @@ if (findings.length) {
     console.error(`    ${f.matches.join(", ")}`);
   }
   console.error(
-    "\nThis build must NOT be released. Rebuild with `npm run build`" +
+    "\nThis build must NOT be released. Rebuild with `bun run build`" +
       " (or `build:release` for the self-hosted zip).",
   );
   process.exit(1);
@@ -128,7 +128,7 @@ if (requireProdOrigin) {
     console.error(
       `FAIL: none of the production origins (${prodOrigins.join(", ")}) appear` +
         " in any bundle.\nThe env almost certainly failed to load; this build" +
-        " points at nothing. Rebuild with `npm run build`.",
+        " points at nothing. Rebuild with `bun run build`.",
     );
     process.exit(1);
   }

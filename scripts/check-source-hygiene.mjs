@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+#!/usr/bin/env bun
 // fails when git classifies a source file as binary, which happens when one
 // contains raw control bytes. those files can't be diffed, so changes to them
 // ship unreviewed.

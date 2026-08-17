@@ -214,13 +214,16 @@ const config = {
   performance: { hints: false },
   entry: entryPoints,
 
-  // Persistent filesystem cache for fast rebuilds
-  cache: {
-    type: "filesystem",
-    buildDependencies: {
-      config: [__filename],
-    },
-  },
+  // Persistent caching speeds up development rebuilds, but adds unnecessary
+  // serialization work to one-shot release and CI builds.
+  cache: isDev
+    ? {
+        type: "filesystem",
+        buildDependencies: {
+          config: [__filename],
+        },
+      }
+    : false,
 
   output: {
     filename: "[name].bundle.js",

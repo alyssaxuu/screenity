@@ -66,14 +66,14 @@ If you’re thinking of building a commercial product from this, feel free to [r
 
 > ❗️ Note that the license has changed to [GPLv3](https://github.com/alyssaxuu/screenity/blob/master/LICENSE) for the current MV3 version (Screenity version 3.0.0 and higher). Make sure to read the license and the [Terms of Service](https://screenity.io/en/terms/) regarding intellectual property.
 
-1. Check if your [Node.js](https://nodejs.org/) version is >= **14**.
+1. Install [Bun](https://bun.sh/) **1.3.11** or newer.
 2. Clone this repository.
-3. Run `npm install` to install dependencies.
-4. Run `npm start` to start the local development server.
+3. Run `bun install --frozen-lockfile` to install dependencies.
+4. Run `bun start` to start the local development server.
 5. Open `chrome://extensions/` in your browser and [enable developer mode](https://developer.chrome.com/docs/extensions/mv2/faq/#:~:text=You%20can%20start%20by%20turning,a%20packaged%20extension%2C%20and%20more.).
 6. Click **Load unpacked** and select the `build` folder.
 7. The extension should now be available locally.  
-   To rebuild after code changes, run `npm run build`.
+   To rebuild after code changes, run `bun run build`.
 
 ### Enabling Save to Google Drive
 

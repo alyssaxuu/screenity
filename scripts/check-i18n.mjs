@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+#!/usr/bin/env bun
 // validates non-en locale parity with en/messages.json so missing keys
 // don't ship as __MSG_xxx__ in the UI.
 // usage: --fix copies missing en keys in as untranslated stubs.
