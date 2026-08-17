@@ -1,5 +1,5 @@
-// Fabric v5 → v6 shim. v6 dropped the `fabric` namespace export, so
-// this re-exports v6's named exports under the legacy `fabric.X` shape
+// Fabric v5 → v6+ shim. v6 dropped the `fabric` namespace export, so
+// this re-exports modern Fabric's named exports under the legacy `fabric.X` shape
 // our call sites use.
 //
 // Only the names the canvas modules actually reference: webpack follows the

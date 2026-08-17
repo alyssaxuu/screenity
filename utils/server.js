@@ -50,7 +50,6 @@ const compiler = webpack(config);
 
 const server = new WebpackDevServer(
   {
-    https: false,
     hot: false, // We're handling HMR manually
     client: false,
     compress: false, // Important: Keep false for SSE to work
