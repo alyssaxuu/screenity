@@ -177,6 +177,8 @@ export class WebCodecsRecorder {
     // Mid-stream watchdog: encoder goes silent after producing chunks
     // (HW reclaim, hang). Triggers graceful finalize on the partial.
     this._lastChunkAt = null;
+    this._muxerAudioClosed = false;
+    this._muxErrorReported = false;
     this._midStreamWatchdog = null;
     this._midStreamWatchdogMs = Number.isFinite(options.midStreamWatchdogMs)
       ? options.midStreamWatchdogMs
@@ -445,6 +447,9 @@ export class WebCodecsRecorder {
     this._swRetryReason = null;
     this._hiddenRearmCount = 0;
     this._lastChunkAt = null;
+    // A reused instance gets a fresh muxer, so neither latch may carry over.
+    this._muxerAudioClosed = false;
+    this._muxErrorReported = false;
     this._lastFailureCode = null;
     this._forceNextKeyframe = false;
     this._startupWindowClosed = false;
@@ -712,6 +717,7 @@ export class WebCodecsRecorder {
             videoCodec: videoConfig.containerCodec,
             audioCodec: muxerAudioCodec,
             onChunk: this.options.onChunk,
+            onMuxError: (err, kind) => this._handleMuxError(err, kind),
           });
         } else {
           const endLoadMuxer = perfSpan("WCR.loadMp4MuxerWrapper");
@@ -726,6 +732,7 @@ export class WebCodecsRecorder {
             videoCodec: videoConfig.containerCodec,
             audioCodec: muxerAudioCodec,
             onChunk: this.options.onChunk,
+            onMuxError: (err, kind) => this._handleMuxError(err, kind),
           });
         }
 
@@ -2376,6 +2383,31 @@ export class WebCodecsRecorder {
     return new Uint8Array([byte0, byte1]);
   }
 
+  // A track never returns from "ended", so latching this is safe.
+  _closeMuxerAudio(reason) {
+    if (this._muxerAudioClosed) return;
+    this._muxerAudioClosed = true;
+    this.log("[WCR] closing muxer audio", reason);
+    try {
+      this.muxer?.closeAudio?.();
+    } catch (err) {
+      this.warn("[WCR] closeAudio threw", err);
+    }
+  }
+
+  // Dropped packets otherwise finalize as a valid but empty recording.
+  _handleMuxError(err, kind) {
+    if (this._muxErrorReported) return;
+    this._muxErrorReported = true;
+    this.warn("[WCR] muxer add failed", kind, err);
+    const wrapped = new Error(
+      `muxer ${kind} add failed: ${String(err?.message || err).slice(0, 200)}`,
+    );
+    wrapped.code = "webcodecs-mux-add-failed";
+    wrapped.detail = { kind };
+    this.options.onError?.(wrapped);
+  }
+
   // Handle VideoEncoder.error: rebuild on HW reclaim (capped by
   // _maxEncoderReclaims), or one HW→SW rebuild for pre-first-chunk
   // async errors. Otherwise surface to onError.
@@ -3567,6 +3599,7 @@ export class WebCodecsRecorder {
         if (readResult.timedOut) {
           const trackEnded =
             !this.audioTrack || this.audioTrack.readyState === "ended";
+          if (trackEnded) this._closeMuxerAudio("track-ended");
           if (
             !this._audioReady ||
             this.paused ||
@@ -3634,6 +3667,7 @@ export class WebCodecsRecorder {
         }
         if (!this.audioTrack || this.audioTrack.readyState === "ended") {
           this.warn("[WCR] audio lost");
+          this._closeMuxerAudio("audio-lost");
           this.options.onError?.({ type: "audio-lost" });
           break;
         }

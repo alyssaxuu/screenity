@@ -11,6 +11,15 @@ import { destroySessionDir } from "../../CloudRecorder/recorderStorage/opfsKvSto
 import { emitRecordingTelemetry } from "../recording/emitRecordingTelemetry";
 import { markFastRecorderFailure } from "../../../media/fastRecorderGate";
 import {
+  runMicRecoveryScan,
+  hasAwaitSceneMarkers,
+  MIC_AWAIT_SCENE_ALARM,
+} from "../../CloudRecorder/micRecovery";
+import {
+  tryResumePendingUploads,
+  RESUME_RETRY_ALARM,
+} from "../recording/resumePendingUploads";
+import {
   CLOUD_LOCAL_PLAYBACK_KEY,
   CLOUD_LOCAL_PLAYBACK_EVENT_KEY,
   CLOUD_LOCAL_PLAYBACK_ALARM,
@@ -89,6 +98,17 @@ const handleTabMessaging = async (tab) => {
 let _lastKeepaliveTickAt = 0;
 
 export const handleAlarm = async (alarm) => {
+  if (alarm.name === RESUME_RETRY_ALARM) {
+    await tryResumePendingUploads({ trigger: "retry-alarm" });
+    return;
+  }
+  if (alarm.name === MIC_AWAIT_SCENE_ALARM) {
+    await runMicRecoveryScan().catch(() => {});
+    if (!(await hasAwaitSceneMarkers())) {
+      await chrome.alarms.clear(MIC_AWAIT_SCENE_ALARM).catch(() => {});
+    }
+    return;
+  }
   if (alarm.name === RECORDER_KEEPALIVE_ALARM) {
     const now = Date.now();
     if (now - _lastKeepaliveTickAt < 30_000) {

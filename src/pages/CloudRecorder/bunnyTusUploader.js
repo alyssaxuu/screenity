@@ -437,6 +437,38 @@ export default class BunnyTusUploader {
     }
   }
 
+  // Tombstone rather than delete. Settle reads an absent journal as "nothing
+  // left to save" and reaps the local bytes, so a resume that never concluded
+  // has to leave one behind.
+  async invalidateUploadJournal(journal = null) {
+    if (typeof chrome === "undefined" || !chrome.storage?.local) return;
+    const mediaId = journal?.mediaId || this.mediaId || null;
+    const journalKey = journal?.key || this.getJournalKey(mediaId);
+    const lookupKey = journal?.lookupKey || this.journalLookupKey;
+    try {
+      const stored = journalKey
+        ? (await chrome.storage.local.get([journalKey]))[journalKey]
+        : null;
+      const base = stored || journal || null;
+      if (journalKey && base) {
+        await chrome.storage.local.set({
+          [journalKey]: {
+            ...base,
+            status: "invalidated",
+            uploadUrl: null,
+            invalidatedAt: Date.now(),
+          },
+        });
+      }
+      if (lookupKey) await chrome.storage.local.remove([lookupKey]);
+      this.notifyStateChange("journal-invalidated");
+    } catch (err) {
+      this.debugLog("Failed to invalidate upload journal", {
+        error: err?.message || err,
+      });
+    }
+  }
+
   async persistUploadJournal({ force = false } = {}) {
     if (
       typeof chrome === "undefined" ||
@@ -660,7 +692,8 @@ export default class BunnyTusUploader {
         sceneId,
         type,
       });
-      await this.clearUploadJournal({
+      await this.invalidateUploadJournal({
+        ...(candidate.journal || {}),
         key: candidate.key,
         lookupKey: candidate.lookupKey,
         mediaId: candidate.journal?.mediaId || null,
@@ -872,6 +905,9 @@ export default class BunnyTusUploader {
         }
         this.videoId = reuse.videoId;
         this.mediaId = reuse.mediaId;
+        // Crash recovery hands over the journal's upload so the HEAD below
+        // continues at the server's offset instead of a new upload at byte 0.
+        if (reuse.uploadUrl) this.uploadUrl = reuse.uploadUrl;
       } else if (resumeJournal?.videoId && resumeJournal?.mediaId) {
         this.initializedFromResume = true;
         this.videoId = resumeJournal.videoId;
@@ -1049,7 +1085,7 @@ export default class BunnyTusUploader {
             videoId: String(this.videoId || ""),
           });
           try {
-            await this.clearUploadJournal();
+            await this.invalidateUploadJournal();
           } catch {}
           try {
             const mapKey = this.getVideoMapKey(
@@ -1278,13 +1314,13 @@ export default class BunnyTusUploader {
       throw new Error(`Uploader in error state: ${this.error}`);
     }
 
-    await this.checkAuthExpiration();
     this.status = "uploading";
     if (!this.hasEmittedClientStarted) {
       this.hasEmittedClientStarted = true;
       this.emitTelemetry("upload_client_started");
     }
 
+    // Enqueue before any await, so concurrent write() calls keep call order.
     for (let i = 0; i < chunk.size; i += this.CHUNK_SIZE) {
       const subChunk = chunk.slice(i, i + this.CHUNK_SIZE);
       this.chunkQueue.push(subChunk);
@@ -1292,6 +1328,7 @@ export default class BunnyTusUploader {
       this.totalBytes += subChunk.size;
     }
     this.lastChunkQueuedAt = Date.now();
+    await this.checkAuthExpiration();
     this.scheduleJournalPersist();
 
     if (!this.isProcessingQueue) {

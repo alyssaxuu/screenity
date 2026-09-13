@@ -1782,5 +1782,25 @@
   "emptyRecordingDescription": {
     "message": "Görüntü kaydedilmedi. Lütfen tekrar kaydetmeyi deneyin.",
     "description": "Modal description when the recording file contains no video"
+  },
+  "unsavedRecordingModalTitle": {
+    "message": "Son kaydınız kaydedilmedi",
+    "description": "Title of the modal shown when starting a recording while the previous one is unsaved."
+  },
+  "unsavedRecordingModalDescription": {
+    "message": "Hâlâ başka bir sekmede açık ve o sekmeyi kapattığınızda kaybolacak. Saklamak için önce indirin.",
+    "description": "Body of the unsaved-previous-recording modal."
+  },
+  "unsavedRecordingModalAction": {
+    "message": "Yine de kayda başla",
+    "description": "Confirm button: start the new recording anyway."
+  },
+  "unsavedRecordingModalCancel": {
+    "message": "Kaydı aç",
+    "description": "Cancel button: bring the unsaved recording's tab forward instead."
+  },
+  "unsavedRecordingModalDismiss": {
+    "message": "Bir daha gösterme",
+    "description": "Side button: start the recording and stop prompting about unsaved recordings."
   }
 }

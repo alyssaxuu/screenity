@@ -123,8 +123,10 @@ export class OpfsChunkWriter {
       throw new Error("opfs-chunk-writer-reused");
     }
     const extension = opts.extension === "webm" ? "webm" : "mp4";
+    // Recordings whose editor tab is still open. The worker skips deleting them.
+    const keepNames = Array.isArray(opts.keepNames) ? opts.keepNames : [];
     const resp = await this._request(
-      { type: "open", recordingId, extension },
+      { type: "open", recordingId, extension, keepNames },
       OPEN_TIMEOUT_MS,
     );
     if (this._aborted || this._closed) {

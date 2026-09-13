@@ -1,15 +1,7 @@
 // IDB-backed ChunkWriter. Fallback when OPFS unavailable.
-import localforage from "localforage";
+import { activeChunksStore } from "../../utils/chunkStores";
 
-localforage.config({
-  driver: localforage.INDEXEDDB,
-  name: "screenity",
-  version: 1,
-});
-
-const chunksStore = localforage.createInstance({
-  name: "chunks",
-});
+const chunksStore = activeChunksStore;
 
 export class IdbChunkWriter {
   constructor() {

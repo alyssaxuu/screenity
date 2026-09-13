@@ -4,7 +4,45 @@ import { sendMessageRecord } from "./sendMessageRecord";
 import { sendChunks } from "./sendChunks";
 import { waitForContentScript } from "../utils/waitForContentScript";
 import { diagEvent, endDiagSession } from "../../utils/diagnosticLog";
+import { registerRetainable } from "./recordingRetention";
 import { perfMark, perfSpan } from "../../utils/perfMarks";
+
+// As soon as the editor tab exists, not inside the tab-load callbacks. Those
+// await the content script, and a slow load left the recording unprotected.
+const registerEditorTabForRetention = (tabId, recordingId) => {
+  if (typeof tabId !== "number") return;
+  chrome.storage.local
+    .get(["lastRecordingBackendRef", "activeChunkSlot", "recordingDuration"])
+    .then(async (r) => {
+      const fileName = r?.lastRecordingBackendRef?.fileName || null;
+      await registerRetainable({
+        recordingId: recordingId || null,
+        backend: r?.lastRecordingBackendRef?.backend || null,
+        fileName,
+        slot: r?.activeChunkSlot || null,
+        durationMs: r?.recordingDuration || 0,
+        tabId,
+      });
+      const { retainedRecordings } = await chrome.storage.local.get([
+        "retainedRecordings",
+      ]);
+      diagEvent("recorder-retention-registered", {
+        tabId,
+        recordingId: recordingId || null,
+        fileName,
+        backend: r?.lastRecordingBackendRef?.backend || null,
+        count: Array.isArray(retainedRecordings) ? retainedRecordings.length : 0,
+      });
+    })
+    .catch((err) => {
+      try {
+        diagEvent("recorder-retention-register-failed", {
+          tabId,
+          why: String(err).slice(0, 120),
+        });
+      } catch {}
+    });
+};
 
 // resolves via onReady, onTimeout (30s), or onClosed
 const onTabLoaded = (tabId, onReady, onTimeout = null, onClosed = null) => {
@@ -249,6 +287,7 @@ export const stopRecording = async () => {
           handleEditorOpenFailed(wcUrl, chrome.runtime.lastError?.message);
           return;
         }
+        registerEditorTabForRetention(tab.id, postStopRecordingId || null);
         onTabLoaded(
           tab.id,
           async () => {
@@ -301,6 +340,7 @@ export const stopRecording = async () => {
           handleEditorOpenFailed(viewerUrl, chrome.runtime.lastError?.message);
           return;
         }
+        registerEditorTabForRetention(tab.id, postStopRecordingId || null);
         onTabLoaded(
           tab.id,
           async () => {
@@ -350,6 +390,7 @@ export const stopRecording = async () => {
         handleEditorOpenFailed(editorUrl, chrome.runtime.lastError?.message);
         return;
       }
+      registerEditorTabForRetention(tab.id, postStopRecordingId || null);
       onTabLoaded(
         tab.id,
         async () => {
@@ -565,6 +606,7 @@ export const handleStopRecordingTab = async (request) => {
             handleEditorOpenFailed(fullUrl, errMsg);
             return;
           }
+          registerEditorTabForRetention(tab.id, recordingId);
           let settled = false;
           let onUpdatedListener = null;
           // 45s tolerates slow OPFS/editor mounts (saw 24s in prod); on fire
@@ -646,6 +688,7 @@ export const handleStopRecordingTab = async (request) => {
           return;
         }
         perfMark("BG.stopRecording editor-tab-create.done", { tabId: tab.id });
+        registerEditorTabForRetention(tab.id, null);
         let settled = false;
         let onUpdatedListener = null;
         // See matching block above for rationale (45s + final-check).

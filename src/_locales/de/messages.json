@@ -1782,5 +1782,25 @@
   "emptyRecordingDescription": {
     "message": "Es wurde kein Video aufgezeichnet. Bitte versuchen Sie die Aufnahme erneut.",
     "description": "Modal description when the recording file contains no video"
+  },
+  "unsavedRecordingModalTitle": {
+    "message": "Deine letzte Aufnahme ist nicht gespeichert",
+    "description": "Title of the modal shown when starting a recording while the previous one is unsaved."
+  },
+  "unsavedRecordingModalDescription": {
+    "message": "Sie ist noch in einem anderen Tab geöffnet und geht verloren, sobald du diesen Tab schließt. Lade sie zuerst herunter, um sie zu behalten.",
+    "description": "Body of the unsaved-previous-recording modal."
+  },
+  "unsavedRecordingModalAction": {
+    "message": "Trotzdem aufnehmen",
+    "description": "Confirm button: start the new recording anyway."
+  },
+  "unsavedRecordingModalCancel": {
+    "message": "Aufnahme öffnen",
+    "description": "Cancel button: bring the unsaved recording's tab forward instead."
+  },
+  "unsavedRecordingModalDismiss": {
+    "message": "Nicht mehr anzeigen",
+    "description": "Side button: start the recording and stop prompting about unsaved recordings."
   }
 }

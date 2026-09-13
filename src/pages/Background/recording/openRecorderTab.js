@@ -8,6 +8,7 @@ import { traceStep } from "../../utils/startFlowTrace.js";
 import { handleGetStreamingData } from "./recordingHelpers.js";
 import { perfMark, perfSpan } from "../../utils/perfMarks";
 import { sweepRecorderTabs } from "./sweepRecorderTabs";
+import { applyRetentionPlan } from "./recordingRetention";
 
 const openRecorderTab = async (
   activeTab,
@@ -330,6 +331,13 @@ export const startRecorderSession = async (request, tabId = null) => {
     camera: Boolean(request?.camera),
   });
   console.log("[Screenity][startRecorderSession] entered", { request, tabId });
+  // Before the recorder page exists. It clears the chunk store as it warms up,
+  // and that clear reads this plan to know which slot is free.
+  try {
+    await applyRetentionPlan();
+  } catch (err) {
+    console.warn("[Screenity][BG] retention plan failed", err);
+  }
   const endTab = perfSpan("BG.startRecorderSession getCurrentTab");
   let activeTab = await getCurrentTab();
   endTab({ tabId: activeTab?.id || null });

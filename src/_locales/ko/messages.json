@@ -1782,5 +1782,25 @@
   "emptyRecordingDescription": {
     "message": "영상이 녹화되지 않았어요. 다시 녹화해 주세요.",
     "description": "Modal description when the recording file contains no video"
+  },
+  "unsavedRecordingModalTitle": {
+    "message": "마지막 녹화본이 저장되지 않았습니다",
+    "description": "Title of the modal shown when starting a recording while the previous one is unsaved."
+  },
+  "unsavedRecordingModalDescription": {
+    "message": "아직 다른 탭에 열려 있으며 그 탭을 닫으면 사라집니다. 보관하려면 먼저 다운로드하세요.",
+    "description": "Body of the unsaved-previous-recording modal."
+  },
+  "unsavedRecordingModalAction": {
+    "message": "그래도 녹화",
+    "description": "Confirm button: start the new recording anyway."
+  },
+  "unsavedRecordingModalCancel": {
+    "message": "녹화본 열기",
+    "description": "Cancel button: bring the unsaved recording's tab forward instead."
+  },
+  "unsavedRecordingModalDismiss": {
+    "message": "다시 표시하지 않기",
+    "description": "Side button: start the recording and stop prompting about unsaved recordings."
   }
 }

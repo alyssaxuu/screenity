@@ -64,9 +64,12 @@ export class VideoTrimmer {
     if (!videoTrack) throw new Error("Trimming failed - no video track");
     const audioTrack = await input.getPrimaryAudioTrack().catch(() => null);
 
-    // Stream-copy needs a keyframe at the cut; output is rebased to 0.
+    // Stream-copy needs a keyframe at the cut, output rebased to 0. Containers can
+    // mislabel a delta packet as key, so verifyKeyPackets falls back to a real one.
     const videoSink = new EncodedPacketSink(videoTrack);
-    const startKey = await videoSink.getKeyPacket(startTime);
+    const startKey = await videoSink.getKeyPacket(startTime, {
+      verifyKeyPackets: true,
+    });
     if (!startKey) throw new Error("Trimming failed - no key packet at start");
     const baseTime = startKey.timestamp;
     const endVideoPacket = Number.isFinite(endTime)

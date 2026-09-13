@@ -3,9 +3,13 @@ import { removeTab } from "../tabManagement/removeTab";
 import { sendMessageRecord } from "../recording/sendMessageRecord";
 import { isRecordingStartInFlight } from "../recording/startRecording";
 import { diagEvent, endDiagSession } from "../../utils/diagnosticLog";
+import { forgetRetained } from "../recording/recordingRetention";
 
 export const onTabRemovedListener = () => {
   chrome.tabs.onRemoved.addListener(async (tabId) => {
+    // Drops the protection only. The bytes stay until the next cleanup, so
+    // closing a tab never destroys a recording on its own.
+    forgetRetained(tabId).catch(() => {});
     try {
       const flags = await chrome.storage.local.get([
         "recording",

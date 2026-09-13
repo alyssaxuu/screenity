@@ -608,19 +608,10 @@ const ContentState = (props) => {
   }, []);
 
   const startStreaming = useCallback(async () => {
-    // Double-click guard: a previous start may still be in flight.
-    const snap = await chrome.storage.local.get([
-      "pendingRecording",
-      "recording",
-      "restarting",
-    ]);
-    if (snap.pendingRecording || snap.recording || snap.restarting) {
-      return;
-    }
-
     // Region capture runs getDisplayMedia in our in-page iframe, so a host page
     // that won't delegate display-capture (e.g. facebook.com) rejects it before any
     // picker. The popup disables this, but the shortcut path doesn't, so backstop it.
+    // Synchronous, and ahead of the permission call so a blocked site never prompts.
     if (
       contentStateRef.current?.recordingType === "region" &&
       contentStateRef.current?.siteDisplayCaptureBlocked
@@ -632,13 +623,22 @@ const ContentState = (props) => {
       return;
     }
 
-    // Kick off synchronously: later awaits (initStartFlowTrace, Pro storage
-    // quota) would consume the click's user-gesture before it reaches
-    // chrome.permissions.request in the SW.
+    // Must fire before any await, including the storage read below: one spends
+    // the click's activation, so the SW's request() fails and reads as a denial.
     const isExtensionPage = window.location.href.includes("chrome-extension://");
     const permissionPromise = isExtensionPage
       ? null
       : checkChromeCapturePermissionsSW();
+
+    // Double-click guard: a previous start may still be in flight.
+    const snap = await chrome.storage.local.get([
+      "pendingRecording",
+      "recording",
+      "restarting",
+    ]);
+    if (snap.pendingRecording || snap.recording || snap.restarting) {
+      return;
+    }
 
     const attemptId = `ra-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
     await initStartFlowTrace(attemptId, {

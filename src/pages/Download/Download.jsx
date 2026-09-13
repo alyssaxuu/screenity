@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useEffect } from "react";
 
 import localforage from "localforage";
+import { activeChunksStore } from "../utils/chunkStores";
 import { openExistingChunksStore } from "../CloudRecorder/recorderStorage/chooseChunksStore";
 import { destroySessionDir } from "../CloudRecorder/recorderStorage/opfsKvStore";
 import {
@@ -15,9 +16,9 @@ localforage.config({
   version: 1,
 });
 
-// Default IDB instances for the legacy recover-indexed-db-mp4 path that
-// doesn't go through CloudRecorder's per-session backend choice.
-const chunksStore = localforage.createInstance({ name: "chunks" });
+// Legacy recover-indexed-db-mp4 path, outside CloudRecorder's per-session
+// backend choice. Always the newest recording, so it follows the live slot.
+const chunksStore = activeChunksStore;
 const cameraChunksStore = localforage.createInstance({ name: "cameraChunks" });
 const audioChunksStore = localforage.createInstance({ name: "audioChunks" });
 
@@ -207,8 +208,7 @@ const Download = () => {
         ]);
 
         // Remove stale TUS journal + scene keys so the next recording can't
-        // resume the crashed upload or reuse the old scene. Mirrors
-        // clearStaleUploadJournals() in CloudRecorder.jsx.
+        // resume the crashed upload or reuse the old scene.
         const journalKeysToRemove = ["sceneId", "sceneIdStatus"];
         const tracks = recorderSession?.tracks || {};
         for (const trackData of Object.values(tracks)) {

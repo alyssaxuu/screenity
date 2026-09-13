@@ -44,9 +44,23 @@ export const checkCapturePermissions = async ({ isLoggedIn, isSubscribed }) => {
   if (granted) {
     addAlarmListener();
     return { status: "ok" };
-  } else {
-    return { status: "error" };
   }
+
+  // Falsy is ambiguous: real denial, or a rejected call from a lost gesture.
+  // contains() needs no gesture, so it settles which, without re-prompting an
+  // already-granted profile.
+  const has = await new Promise((resolve) => {
+    chrome.permissions.contains({ permissions }, (result) =>
+      resolve(Boolean(result))
+    );
+  });
+
+  if (has) {
+    addAlarmListener();
+    return { status: "ok" };
+  }
+
+  return { status: "error" };
 };
 
 export const handlePip = async (started = false) => {

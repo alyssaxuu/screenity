@@ -35,13 +35,27 @@ const swKeepaliveTimer = setInterval(() => {
 }, SW_KEEPALIVE_MS);
 window.addEventListener("pagehide", () => clearInterval(swKeepaliveTimer));
 
+const IS_RESUME_DOC =
+  new URLSearchParams(window.location.search).get("resume") === "1";
+
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  // Resume can stop anywhere: the next pass re-reads the server offset and
+  // settles from the snapshot. Waiting only stalls the next recording's start.
+  if (msg?.type === "offscreen-shutdown" && IS_RESUME_DOC) {
+    chrome.runtime
+      .sendMessage({ type: "offscreen-shutdown-complete" })
+      .catch(() => {});
+    return false;
+  }
   if (msg?.type === "resume-pending-uploads" && Array.isArray(msg.journals)) {
     (async () => {
       try {
         const { resumeAllJournals } = await import("./resumeJournal");
-        const results = await resumeAllJournals(msg.journals);
-        sendResponse({ ok: true, results });
+        const { results, recovered } = await resumeAllJournals(
+          msg.journals,
+          Array.isArray(msg.sessions) ? msg.sessions : [],
+        );
+        sendResponse({ ok: true, results, recovered });
       } catch (err) {
         console.error("[OffscreenRecorder] resume failed:", err);
         sendResponse({ ok: false, error: err?.message || String(err) });

@@ -1782,5 +1782,25 @@
   "emptyRecordingDescription": {
     "message": "No s'ha capturat cap vídeo. Torna a provar la gravació.",
     "description": "Modal description when the recording file contains no video"
+  },
+  "unsavedRecordingModalTitle": {
+    "message": "El teu darrer enregistrament no està desat",
+    "description": "Title of the modal shown when starting a recording while the previous one is unsaved."
+  },
+  "unsavedRecordingModalDescription": {
+    "message": "Encara és obert en una altra pestanya i es perdrà quan la tanquis. Baixa'l primer per conservar-lo.",
+    "description": "Body of the unsaved-previous-recording modal."
+  },
+  "unsavedRecordingModalAction": {
+    "message": "Grava igualment",
+    "description": "Confirm button: start the new recording anyway."
+  },
+  "unsavedRecordingModalCancel": {
+    "message": "Obre l'enregistrament",
+    "description": "Cancel button: bring the unsaved recording's tab forward instead."
+  },
+  "unsavedRecordingModalDismiss": {
+    "message": "No ho tornis a mostrar",
+    "description": "Side button: start the recording and stop prompting about unsaved recordings."
   }
 }

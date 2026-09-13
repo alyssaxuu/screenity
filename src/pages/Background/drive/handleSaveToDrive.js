@@ -1,6 +1,11 @@
 import { base64ToUint8Array } from "../utils/base64ToUint8Array";
 import { sendMessageTab } from "../tabManagement";
 import { chunksStore } from "../recording/chunkHandler";
+import {
+  markRetainedSaved,
+  retainedEntryForTab,
+} from "../recording/recordingRetention";
+import { instanceForSlot } from "../../utils/chunkStores";
 import signIn from "../modules/signIn";
 import { diagEvent } from "../../utils/diagnosticLog";
 
@@ -379,7 +384,19 @@ const saveToDrive = async (videoBlob, fileName) => {
   }
 };
 
-const savedToDrive = async () => {
+const savedToDrive = async (tabId) => {
+  // A Drive save is a copy the user keeps, exactly like a download, so it
+  // releases retention and stops the unsaved-recording prompt.
+  try {
+    const { retainedRecordings } = await chrome.storage.local.get([
+      "retainedRecordings",
+    ]);
+    const list = Array.isArray(retainedRecordings) ? retainedRecordings : [];
+    // Only the saving tab's own entry. Guessing the newest unsaved one marked
+    // an unrelated recording saved and dropped its protection.
+    const mine = list.find((e) => e.tabId === tabId && !e.saved);
+    if (mine?.recordingId) await markRetainedSaved(mine.recordingId);
+  } catch {}
   const { sandboxTab } = await chrome.storage.local.get(["sandboxTab"]);
   if (!sandboxTab) {
     console.warn("[Drive] savedToDrive: sandboxTab not set, cannot notify UI");
@@ -433,7 +450,7 @@ const sweepStagedOpfsFiles = async (keepName = null) => {
   } catch {}
 };
 
-export const handleSaveToDrive = async (request, fallback = false) => {
+export const handleSaveToDrive = async (request, fallback = false, tabId = null) => {
   try {
     let response;
 
@@ -477,8 +494,22 @@ export const handleSaveToDrive = async (request, fallback = false) => {
       response = await saveToDrive(blob, fileName);
     } else {
       // viewer/recovery mode: rebuild blob from IndexedDB chunks
+      // Read the asking tab's own slot: the live one holds the newer recording.
+      const entry = await retainedEntryForTab(tabId);
+      // An entry holding no slot keeps its bytes elsewhere (OPFS, or a slot
+      // already reclaimed). chunksStore follows the live take, so it would
+      // upload that one under this recording's name.
+      if (entry && !entry.slot) {
+        return {
+          status: "ew",
+          url: null,
+          error: "No recording data found",
+          errorCode: "drive-generic",
+        };
+      }
+      const store = entry?.slot ? instanceForSlot(entry.slot) : chunksStore;
       const chunks = [];
-      await chunksStore.iterate((value) => chunks.push(value));
+      await store.iterate((value) => chunks.push(value));
 
       if (chunks.length === 0) {
         console.error("[Drive] drive_upload_failed: no chunks in IndexedDB");
@@ -500,7 +531,7 @@ export const handleSaveToDrive = async (request, fallback = false) => {
     }
 
     if (response.status === "ok") {
-      await savedToDrive();
+      await savedToDrive(tabId);
     }
     return response;
   } catch (err) {

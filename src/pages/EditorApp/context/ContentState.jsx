@@ -637,10 +637,44 @@ const ContentState = (props) => {
     }));
   }, [contentState.chunkIndex, contentState.chunkCount]);
 
-  const buildBlobFromChunks = async () => {
+  // lastRecordingBackendRef is one slot the next recording overwrites, so a tab
+  // re-reading it later loads a different recording. Resolve once and pin it.
+  const pinnedBackendRef = useRef(null);
+  const resolveOwnBackendRef = async () => {
+    if (pinnedBackendRef.current) return pinnedBackendRef.current;
+    // Ask what this tab owns before falling back to the shared pointer, which
+    // only ever names the newest recording.
+    try {
+      const owned = await chrome.runtime.sendMessage({
+        type: "resolve-editor-recording",
+      });
+      if (owned?.ref?.backend) {
+        pinnedBackendRef.current = owned.ref;
+        return owned.ref;
+      }
+    } catch {}
     const { lastRecordingBackendRef } = await chrome.storage.local.get([
       "lastRecordingBackendRef",
     ]);
+    const mine = launchRecordingIdRef.current;
+    if (
+      mine &&
+      lastRecordingBackendRef?.fileName &&
+      !String(lastRecordingBackendRef.fileName).includes(mine)
+    ) {
+      // The pointer has moved on. Ours may still be on disk, but it is not
+      // what this key names any more, so reading it would be the wrong file.
+      return null;
+    }
+    pinnedBackendRef.current = lastRecordingBackendRef || null;
+    return pinnedBackendRef.current;
+  };
+
+  const buildBlobFromChunks = async () => {
+    const lastRecordingBackendRef = await resolveOwnBackendRef();
+    if (!lastRecordingBackendRef) {
+      throw new Error("recording-no-longer-available");
+    }
     const reader = chooseReader(lastRecordingBackendRef);
     await reader.open(lastRecordingBackendRef);
     let readResult;
@@ -3007,6 +3041,18 @@ const ContentState = (props) => {
           delta.state.current === "complete" ||
           delta.state.current === "interrupted"
         ) {
+          if (delta.state.current === "complete") {
+            // The user now has their own copy, so retention can stop
+            // protecting this recording and stop warning about it.
+            try {
+              chrome.runtime
+                .sendMessage({
+                  type: "recording-saved",
+                  recordingId: launchRecordingIdRef.current || null,
+                })
+                .catch(() => {});
+            } catch {}
+          }
           done();
         }
       };

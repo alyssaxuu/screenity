@@ -18,14 +18,16 @@ let offset = 0;
 let chunkCount = 0;
 let closed = false;
 
-// Keep exactly one recoverable recording (matches chunksStore.clear()
-// on the IDB path); old recording stays until a new one actually starts.
-const clearPreviousRecordings = async (exceptName = null) => {
+// One recoverable recording, like chunksStore.clear() on IDB, kept until a new
+// one starts. keepNames (open editors) comes from the caller, never forces a delete.
+const clearPreviousRecordings = async (exceptName = null, keepNames = []) => {
   try {
+    const keep = new Set(Array.isArray(keepNames) ? keepNames : []);
     const dir = await navigator.storage.getDirectory();
     for await (const [name] of dir.entries()) {
       if (!name.startsWith(FILE_PREFIX)) continue;
       if (exceptName && name === exceptName) continue;
+      if (keep.has(name)) continue;
       await dir.removeEntry(name).catch(() => {});
     }
   } catch {}
@@ -54,7 +56,7 @@ const openSyncAccessHandleWithRetry = async (handle) => {
   throw lastErr;
 };
 
-const openFile = async (recordingId, extension) => {
+const openFile = async (recordingId, extension, keepNames = []) => {
   // Create NEW before deleting old: if creation fails, the previous
   // recording remains intact for recovery, and a recovery editor
   // already loading the old file doesn't lose it mid-load.
@@ -69,7 +71,7 @@ const openFile = async (recordingId, extension) => {
   offset = 0;
   chunkCount = 0;
   closed = false;
-  await clearPreviousRecordings(name);
+  await clearPreviousRecordings(name, keepNames);
   devLog("open", { fileName: name });
   return { fileName: name };
 };
@@ -163,7 +165,11 @@ self.onmessage = (e) => {
   if (msg.type === "open") {
     enqueue(async () => {
       try {
-        const { fileName: fn } = await openFile(msg.recordingId, msg.extension);
+        const { fileName: fn } = await openFile(
+          msg.recordingId,
+          msg.extension,
+          msg.keepNames,
+        );
         post({ type: "ready", requestId: msg.requestId, ok: true, fileName: fn });
       } catch (err) {
         post({

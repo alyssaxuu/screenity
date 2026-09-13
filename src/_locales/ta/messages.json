@@ -1782,5 +1782,25 @@
   "emptyRecordingDescription": {
     "message": "எந்த வீடியோவும் பதிவாகவில்லை. மீண்டும் பதிவு செய்ய முயற்சிக்கவும்.",
     "description": "Modal description when the recording file contains no video"
+  },
+  "unsavedRecordingModalTitle": {
+    "message": "உங்கள் கடைசி பதிவு சேமிக்கப்படவில்லை",
+    "description": "Title of the modal shown when starting a recording while the previous one is unsaved."
+  },
+  "unsavedRecordingModalDescription": {
+    "message": "அது இன்னும் மற்றொரு தாவலில் திறந்திருக்கிறது, அந்தத் தாவலை மூடியவுடன் இழக்கப்படும். வைத்திருக்க முதலில் பதிவிறக்குங்கள்.",
+    "description": "Body of the unsaved-previous-recording modal."
+  },
+  "unsavedRecordingModalAction": {
+    "message": "எப்படியும் பதிவுசெய்யுங்கள்",
+    "description": "Confirm button: start the new recording anyway."
+  },
+  "unsavedRecordingModalCancel": {
+    "message": "பதிவைத் திறங்கள்",
+    "description": "Cancel button: bring the unsaved recording's tab forward instead."
+  },
+  "unsavedRecordingModalDismiss": {
+    "message": "மீண்டும் காட்ட வேண்டாம்",
+    "description": "Side button: start the recording and stop prompting about unsaved recordings."
   }
 }

@@ -104,6 +104,42 @@ const DevHUD = ({ contentStateRef, setContentState }) => {
       fn: () => toast(chrome.i18n.getMessage("editorRecoveryToast"), 12000),
     },
     {
+      label: "Unsaved recording modal",
+      fn: () => {
+        const s = contentStateRef.current;
+        s?.openModal?.(
+          chrome.i18n.getMessage("unsavedRecordingModalTitle"),
+          chrome.i18n.getMessage("unsavedRecordingModalDescription"),
+          chrome.i18n.getMessage("unsavedRecordingModalAction"),
+          chrome.i18n.getMessage("unsavedRecordingModalCancel"),
+          () => {},
+          () => {},
+          null,
+          null,
+          null,
+          false,
+          chrome.i18n.getMessage("unsavedRecordingModalDismiss"),
+          () => {},
+        );
+      },
+    },
+    {
+      label: "Recovered session (live)",
+      fn: () => toast(chrome.i18n.getMessage("toastRecoveredSession"), 10000),
+    },
+    {
+      // Candidate copy, not in the locales. The live string names the event but
+      // not the outcome, and the file is already in Downloads by then.
+      label: "Recovered (alt A)",
+      fn: () =>
+        toast("Unsaved recording recovered. It's in your downloads.", 10000),
+    },
+    {
+      label: "Recovered (alt B)",
+      fn: () =>
+        toast("Recovered an unsaved recording. Saved to your downloads.", 10000),
+    },
+    {
       label: "Memory limit modal",
       fn: () => {
         const s = contentStateRef.current;
@@ -125,6 +161,35 @@ const DevHUD = ({ contentStateRef, setContentState }) => {
           preparingRecording: true,
           processingProgress: 42,
         }));
+      },
+    },
+    {
+      // Puts the profile back to never-granted so the first-run permission
+      // path can be tested. Granting again only works from an extension page.
+      label: "Wipe capture perms",
+      fn: async () => {
+        try {
+          const res = await chrome.runtime.sendMessage({
+            type: "reset-capture-permissions",
+          });
+          console.log("[DevHUD] wipe capture perms", res);
+          const left = (res?.remaining || []).filter((p) =>
+            ["desktopCapture", "offscreen", "alarms", "clipboardWrite"].includes(
+              p,
+            ),
+          );
+          const detail = Object.entries(res?.results || {})
+            .map(([k, v]) => `${k}: ${v}`)
+            .join(" | ");
+          toast(
+            left.length
+              ? `Still granted: ${left.join(", ")} (${detail})`
+              : "Capture perms wiped. Reload the page, then record.",
+            15000,
+          );
+        } catch (err) {
+          toast(`Wipe failed: ${String(err?.message || err).slice(0, 80)}`);
+        }
       },
     },
   ];

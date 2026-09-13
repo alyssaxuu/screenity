@@ -1781,5 +1781,25 @@
   "emptyRecordingDescription": {
     "message": "未捕获到视频。请重新录制。",
     "description": "Modal description when the recording file contains no video"
+  },
+  "unsavedRecordingModalTitle": {
+    "message": "上一个录制内容尚未保存",
+    "description": "Title of the modal shown when starting a recording while the previous one is unsaved."
+  },
+  "unsavedRecordingModalDescription": {
+    "message": "它仍在另一个标签页中打开，关闭该标签页后就会丢失。请先下载以保留。",
+    "description": "Body of the unsaved-previous-recording modal."
+  },
+  "unsavedRecordingModalAction": {
+    "message": "仍然录制",
+    "description": "Confirm button: start the new recording anyway."
+  },
+  "unsavedRecordingModalCancel": {
+    "message": "打开录制内容",
+    "description": "Cancel button: bring the unsaved recording's tab forward instead."
+  },
+  "unsavedRecordingModalDismiss": {
+    "message": "不再显示",
+    "description": "Side button: start the recording and stop prompting about unsaved recordings."
   }
 }

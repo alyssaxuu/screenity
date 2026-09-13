@@ -7,6 +7,7 @@ import {
 import { sendMessageRecord } from "../recording/sendMessageRecord.js";
 import { loginWithWebsite } from "../auth/loginWithWebsite.js";
 import { tryResumePendingUploads } from "../recording/resumePendingUploads";
+import { runMicRecoveryScan } from "../../CloudRecorder/micRecovery";
 import { clearInMemoryEditorLock } from "../recording/stopRecording";
 import { sendMessageEnsuringContentScript } from "../utils/executeScripts";
 
@@ -170,6 +171,8 @@ const isOffscreenAlive = async () => {
 export const onActionButtonClickedListener = () => {
   chrome.action.onClicked.addListener(async (tab) => {
     tryResumePendingUploads({ trigger: "actionClick" }).catch(() => {});
+    // A recovered take's mic waits for its scene, which appears minutes after upload.
+    runMicRecoveryScan().catch(() => {});
     try {
       const snap = await chrome.storage.local.get([
         "recording", "pendingRecording", "restarting", "recorderSession",

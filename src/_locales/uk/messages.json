@@ -1780,5 +1780,25 @@
   "emptyRecordingDescription": {
     "message": "Відео не записано. Спробуйте записати ще раз.",
     "description": "Modal description when the recording file contains no video"
+  },
+  "unsavedRecordingModalTitle": {
+    "message": "Останній запис не збережено",
+    "description": "Title of the modal shown when starting a recording while the previous one is unsaved."
+  },
+  "unsavedRecordingModalDescription": {
+    "message": "Він ще відкритий в іншій вкладці та зникне, щойно ви її закриєте. Спочатку завантажте його, щоб зберегти.",
+    "description": "Body of the unsaved-previous-recording modal."
+  },
+  "unsavedRecordingModalAction": {
+    "message": "Усе одно записати",
+    "description": "Confirm button: start the new recording anyway."
+  },
+  "unsavedRecordingModalCancel": {
+    "message": "Відкрити запис",
+    "description": "Cancel button: bring the unsaved recording's tab forward instead."
+  },
+  "unsavedRecordingModalDismiss": {
+    "message": "Більше не показувати",
+    "description": "Side button: start the recording and stop prompting about unsaved recordings."
   }
 }

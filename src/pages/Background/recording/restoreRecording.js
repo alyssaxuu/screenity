@@ -1,5 +1,10 @@
 import { sendMessageTab, getCurrentTab } from "../tabManagement";
-import { chunksStore } from "./chunkHandler";
+import { pruneRetained, registerRetainable } from "./recordingRetention";
+import {
+  CHUNK_SLOT_A,
+  CHUNK_SLOT_B,
+  instanceForSlot,
+} from "../../utils/chunkStores";
 
 // pass explicitTabId so toasts land on the original tab even after a switch
 const notifyRestoreToast = async (message, explicitTabId = null) => {
@@ -61,20 +66,44 @@ const listOpfsRecordings = async () => {
   }
 };
 
+// A recording with its editor still open is not lost. Recovering it would mean
+// two tabs claiming one file.
+const openInAnEditor = async () => {
+  const alive = await pruneRetained().catch(() => []);
+  return {
+    fileNames: new Set(
+      alive.filter((e) => e.fileName).map((e) => e.fileName),
+    ),
+    slots: new Set(alive.filter((e) => e.slot).map((e) => e.slot)),
+  };
+};
+
+// Both slots. Retention leaves a finished recording in whichever slot the live
+// one is not using, so the live slot alone would miss it.
+const findIdbChunks = async (busySlots) => {
+  for (const slot of [CHUNK_SLOT_B, CHUNK_SLOT_A]) {
+    if (busySlots.has(slot)) continue;
+    const chunks = [];
+    try {
+      await instanceForSlot(slot).iterate((value) => {
+        chunks.push(value);
+      });
+    } catch (err) {
+      console.warn("[Screenity][BG] restoreRecording iterate failed", slot, err);
+    }
+    if (chunks.length) return { slot, chunks };
+  }
+  return { slot: null, chunks: [] };
+};
+
 export const checkRestore = async () => {
-  const [idbChunkCount, opfsFiles] = await Promise.all([
-    (async () => {
-      let count = 0;
-      try {
-        await chunksStore.iterate(() => {
-          count += 1;
-        });
-      } catch {}
-      return count;
-    })(),
+  const busy = await openInAnEditor();
+  const [idb, opfsFiles] = await Promise.all([
+    findIdbChunks(busy.slots),
     listOpfsRecordings(),
   ]);
-  const restore = idbChunkCount > 0 || opfsFiles.length > 0;
+  const recoverable = opfsFiles.filter((f) => !busy.fileNames.has(f.name));
+  const restore = idb.chunks.length > 0 || recoverable.length > 0;
   return { restore };
 };
 
@@ -87,7 +116,10 @@ export const restoreRecording = async () => {
   } catch {}
 
   // WebCodecs (4.4.0+) writes here; prefer most recent
-  const opfsFiles = await listOpfsRecordings();
+  const busy = await openInAnEditor();
+  const opfsFiles = (await listOpfsRecordings()).filter(
+    (f) => !busy.fileNames.has(f.name),
+  );
   if (opfsFiles.length > 0) {
     opfsFiles.sort((a, b) => b.lastModified - a.lastModified);
     const latest = opfsFiles[0];
@@ -102,6 +134,15 @@ export const restoreRecording = async () => {
     const editorUrl = "editor.html?mode=recover";
     chrome.tabs.create({ url: editorUrl, active: true }, async (tab) => {
       chrome.storage.local.set({ sandboxTab: tab.id });
+      // A recovered recording is the one most worth protecting, and it had none
+      // before. The next recording wiped it.
+      registerRetainable({
+        recordingId: null,
+        backend: "opfs",
+        fileName: latest.name,
+        slot: null,
+        tabId: tab.id,
+      }).catch(() => {});
       await new Promise((resolve) => {
         let settled = false;
         const safetyId = setTimeout(() => {
@@ -169,26 +210,27 @@ export const restoreRecording = async () => {
     messageType = "viewer-recording";
   }
 
-  const chunks = [];
-  try {
-    await chunksStore.iterate((value) => {
-      chunks.push(value);
-    });
-  } catch (err) {
-    console.warn("[Screenity][BG] restoreRecording chunksStore.iterate failed", err);
-  }
+  const { slot: idbSlot, chunks } = await findIdbChunks(busy.slots);
   if (chunks.length === 0) {
     console.warn("[Screenity][BG] restoreRecording: no OPFS files and no IDB chunks");
     await notifyRestoreEmpty(triggerTabId);
     return;
   }
-  // force IDB reader regardless of stale backendRef
+  // force IDB reader regardless of stale backendRef, naming the slot the chunks
+  // were actually found in
   await chrome.storage.local.set({
-    lastRecordingBackendRef: { backend: "idb" },
+    lastRecordingBackendRef: { backend: "idb", slot: idbSlot },
   });
 
   chrome.tabs.create({ url: editorUrl, active: true }, async (tab) => {
     chrome.storage.local.set({ sandboxTab: tab.id });
+    registerRetainable({
+      recordingId: null,
+      backend: "idb",
+      fileName: null,
+      slot: idbSlot,
+      tabId: tab.id,
+    }).catch(() => {});
     await new Promise((resolve) => {
       let settled = false;
       const safetyId = setTimeout(() => {

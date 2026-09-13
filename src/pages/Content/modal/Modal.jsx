@@ -106,8 +106,8 @@ const Modal = (props) => {
           <AlertDialog.Description className="AlertDialogDescription">
             {description.split("\n").map((line, idx) => (
               <React.Fragment key={idx}>
+                {idx > 0 && <br />}
                 {line}
-                <br />
               </React.Fragment>
             ))}
             {learnmore && (

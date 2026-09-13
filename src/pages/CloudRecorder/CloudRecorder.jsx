@@ -26,6 +26,10 @@ import {
   screenSurfaceSwitching,
 } from "../utils/screenCaptureMode";
 import { acquireDisplayMediaWithFocusRetry } from "../utils/acquireDisplayMedia";
+import {
+  resolveCaptureSurface,
+  setCapturedSurface,
+} from "../utils/captureSurface";
 import { startPrewarm, stopPrewarm } from "../Recorder/streamWarmup";
 import { preloadWebCodecsModules } from "../Recorder/webcodecs/WebCodecsRecorder";
 import {
@@ -73,11 +77,23 @@ localforage.config({
 
 import { shouldSeparateAudio } from "./shouldSeparateAudio";
 import {
-  uploadAndAttachMic,
+  shouldMuxBusAudio,
+  needsContextResume,
+  isBusSilentFault,
+} from "./audioBusPolicy";
+import {
   setPendingMicRecovery,
   clearPendingMicRecovery,
   runMicRecoveryScan,
 } from "./micRecovery";
+// Upload and attach separately, not through uploadAndAttachMic: the upload
+// starts before the scene POST and the attach is only needed when the id did
+// not make it into the payload.
+import {
+  collectMicChunks,
+  uploadMicToStorage,
+  attachSceneAudio,
+} from "./uploadMicToStorage";
 
 const API_BASE = process.env.SCREENITY_API_BASE_URL;
 // Big mic file on a slow uplink, but a wedged POST must not hold the recorder
@@ -86,6 +102,11 @@ const SEPARATED_MIC_UPLOAD_BUDGET_MS = 120000;
 // Tighter: this one sits in front of the countdown, so the user watches it.
 // Over budget only the IDB chunks go, the same loss as not trying.
 const START_MIC_RECOVERY_BUDGET_MS = 15000;
+// Runs beside video finalize and the silence check, so it is usually done
+// by the scene POST: born with the mic beats gaining a voice after the
+// editor already loaded. Short because the editor waits on this POST;
+// over budget falls back to the attach path.
+const PRE_SCENE_MIC_UPLOAD_BUDGET_MS = 2500;
 // Enable the start-flow logs unconditionally for dev builds so the
 // startup timeline is visible in the cloudrecorder tab console without
 // needing to set `window.SCREENITY_DEBUG_RECORDER = true` first. Prod
@@ -134,6 +155,8 @@ const resolveExtVersion = () => {
   }
 };
 const SESSION_STATE_INDEX_KEY = "cloudRecorderSessionStateIndex";
+// stale-cleared and crashed are what a toolbar click or a closed recorder tab
+// rewrite a crashed take to.
 const RECOVERABLE_SESSION_STATUSES = new Set([
   "recording",
   "hidden",
@@ -141,7 +164,10 @@ const RECOVERABLE_SESSION_STATUSES = new Set([
   "stopping",
   "finalize-failed",
   "upload-stalled",
+  "stale-cleared",
+  "crashed",
 ]);
+const HOST_BUSY_BEAT_MS = 15000;
 
 // `let` (not `const`) so ensureChunkStoreReady() can swap each instance
 // from the IDB default to an OPFS-backed adapter at session start. All
@@ -213,6 +239,14 @@ const IS_IFRAME_CONTEXT =
 const CloudRecorder = () => {
   const screenTimer = useRef({ start: null, total: 0, paused: false });
   const cameraTimer = useRef({ start: null, total: 0, paused: false });
+  // The mic records on its own recorder, started after the video ones and able
+  // to die without them, so its length is measured rather than inherited.
+  const audioTimer = useRef({
+    start: null,
+    total: 0,
+    paused: false,
+    everStarted: false,
+  });
   const [started, setStarted] = useState(false);
   const [initProject, setInitProject] = useState(false);
   const [finalizeFailure, setFinalizeFailure] = useState(null);
@@ -388,6 +422,8 @@ const CloudRecorder = () => {
   const fatalErrorRef = useRef(false);
   const idbReadyRef = useRef(false);
   const recoveryAttempted = useRef(false);
+  const purgeMarksRef = useRef({});
+  const purgeMarkChainRef = useRef(Promise.resolve());
   const recoveryExportedRef = useRef(false);
   const screenTrackLostRef = useRef(false);
   const screenTrackMonitor = useRef(null);
@@ -462,6 +498,18 @@ const CloudRecorder = () => {
   // Live AudioContext interruption stats from attachAudioContextWatchdog,
   // folded into the audio diag snapshot at finalize for upload telemetry.
   const audioHealthRef = useRef(null);
+  // What is actually wired into the bus, not what the user asked for.
+  // The mux decision reads this so an empty bus is never encoded.
+  const busSources = useRef({ mic: false, system: false });
+  // Bus health at recording start, folded into the audio diag snapshot.
+  const busWarmupRef = useRef({
+    ran: false,
+    rms: null,
+    silentFault: false,
+    ctxResumedAtStart: false,
+    ctxStateAtStart: null,
+  });
+  const busTap = useRef(null);
   const destination = useRef(null);
 
   const keepAliveInterval = useRef(null);
@@ -1922,13 +1970,23 @@ const CloudRecorder = () => {
 
   // chunk_0 stays: it's the init segment the crash-recovery and Download
   // paths need. Unconfirmed chunks stay too, see selectPrefixChunksToDrop.
-  const dropRetainedPrefix = async (store, keyPrefix, uploader, rangesRef) => {
+  const dropRetainedPrefix = async (
+    store,
+    keyPrefix,
+    uploader,
+    rangesRef,
+    confirmedOffset = null,
+    markIndex = Infinity
+  ) => {
     const prefix = screenRetainedPrefixRef.current;
-    const { drop, keptUnconfirmed } = selectPrefixChunksToDrop({
+    const selected = selectPrefixChunksToDrop({
       prefix,
-      lastServerOffset: Number(uploader?.lastServerOffset) || 0,
+      lastServerOffset:
+        confirmedOffset ?? (Number(uploader?.lastServerOffset) || 0),
       safetyWindowBytes: CHUNK_PURGE_SAFETY_WINDOW_BYTES,
     });
+    const keptUnconfirmed = selected.keptUnconfirmed;
+    const drop = selected.drop.filter((i) => i <= markIndex);
     // Stop offering local playback either way: the opening is about to be
     // partly gone, so an offer built from it would not decode.
     screenRetainedPrefixRef.current = {
@@ -1983,6 +2041,40 @@ const CloudRecorder = () => {
     }
   };
 
+  // Where a track's chunks on disk pick up after the purged gap. Resume can't
+  // place the bytes that follow a gap without it.
+  const persistPurgeMark = (track, entry) => {
+    // Screen and camera share one key, so writes run one at a time or one
+    // track can put back the other's older mark after its chunks are gone.
+    const run = purgeMarkChainRef.current.then(() =>
+      writePurgeMark(track, entry)
+    );
+    purgeMarkChainRef.current = run.catch(() => false);
+    return run;
+  };
+
+  const writePurgeMark = async (track, entry) => {
+    const sessionId = recorderSession.current?.id;
+    if (!sessionId) return false;
+    if ((purgeMarksRef.current[track]?.index ?? -1) >= entry.index) return true;
+    const key = `chunkPurgeMarks:${sessionId}`;
+    const next = {
+      ...purgeMarksRef.current,
+      [track]: { index: entry.index, endByte: entry.endByte },
+    };
+    try {
+      await chrome.storage.local.set({ [key]: next });
+      // The offscreen storage proxy swallows a failed write, so only a read
+      // back proves the mark exists before anything is deleted.
+      const { [key]: stored } = await chrome.storage.local.get([key]);
+      if (stored?.[track]?.index !== entry.index) return false;
+    } catch {
+      return false;
+    }
+    purgeMarksRef.current = next;
+    return true;
+  };
+
   // Purge IDB chunks Bunny has confirmed. chunk_0 (webm init segment) is preserved.
   const purgeConfirmedChunks = async (
     store,
@@ -2019,13 +2111,36 @@ const CloudRecorder = () => {
     mode
   ) => {
     const isScreen = trackLabel === "screen";
+    // One reading per pass. A PATCH landing mid-pass would otherwise widen the
+    // deletes past the mark just saved.
+    const confirmedOffset = Number(uploader.lastServerOffset) || 0;
+    const { untrack: confirmed } = selectChunksToPurge({
+      ranges: rangesRef.current,
+      lastServerOffset: confirmedOffset,
+      safetyWindowBytes: CHUNK_PURGE_SAFETY_WINDOW_BYTES,
+      prefixChunks: 0,
+    });
+    // Written before anything leaves disk, so a crash can't leave a gap
+    // resume has no position for.
+    const lastConfirmed = confirmed[confirmed.length - 1];
+    if (lastConfirmed && !(await persistPurgeMark(trackLabel, lastConfirmed))) {
+      return;
+    }
+    const markIndex = purgeMarksRef.current[trackLabel]?.index ?? -1;
     if (isScreen && mode === "all") {
-      await dropRetainedPrefix(store, keyPrefix, uploader, rangesRef);
+      await dropRetainedPrefix(
+        store,
+        keyPrefix,
+        uploader,
+        rangesRef,
+        confirmedOffset,
+        markIndex
+      );
     }
     const ranges = rangesRef.current;
     const { untrack, purge } = selectChunksToPurge({
       ranges,
-      lastServerOffset: Number(uploader.lastServerOffset) || 0,
+      lastServerOffset: confirmedOffset,
       safetyWindowBytes: CHUNK_PURGE_SAFETY_WINDOW_BYTES,
       prefixChunks: isScreen ? screenRetainedPrefixRef.current.chunks : 0,
     });
@@ -2033,6 +2148,7 @@ const CloudRecorder = () => {
     let purgedCount = 0;
     let purgedBytes = 0;
     for (const entry of purge) {
+      if (entry.index > markIndex) break;
       try {
         // eslint-disable-next-line no-await-in-loop
         await store.removeItem(`${keyPrefix}${entry.index}`);
@@ -2383,6 +2499,8 @@ const CloudRecorder = () => {
       trackContainers: { ...trackContainers },
       trackCodecs: { ...trackCodecs },
       encoderHwSlots,
+      // Resume holds a separated mic's chunks on this. The container can't tell.
+      separatedAudio: separatedAudio.current,
       updatedAt: Date.now(),
       ...overrides,
     };
@@ -2442,6 +2560,7 @@ const CloudRecorder = () => {
       trackContainers: { ...trackContainers },
       trackCodecs: { ...trackCodecs },
       encoderHwSlots,
+      separatedAudio: separatedAudio.current,
       diag: captureSessionDiag(),
       ...meta,
     };
@@ -2489,6 +2608,62 @@ const CloudRecorder = () => {
       );
     }
     return true;
+  };
+
+  // Read the mixed bus for a moment after start. A silent bus with a live
+  // mic is the signature that costs the user their voice for the whole take.
+  const measureBusWarmup = async () => {
+    const analyser = busTap.current;
+    if (!analyser || busWarmupRef.current.ran) return;
+    busWarmupRef.current.ran = true;
+    const buf = new Float32Array(analyser.fftSize);
+    let peak = 0;
+    for (let i = 0; i < 6; i++) {
+      // eslint-disable-next-line no-await-in-loop
+      await new Promise((resolve) => setTimeout(resolve, 250));
+      if (isFinishing.current) return;
+      try {
+        analyser.getFloatTimeDomainData(buf);
+      } catch {
+        return;
+      }
+      let sum = 0;
+      for (let j = 0; j < buf.length; j++) sum += buf[j] * buf[j];
+      peak = Math.max(peak, Math.sqrt(sum / buf.length));
+    }
+    busWarmupRef.current.rms = peak;
+    const micTrack = rawMicStream.current?.getAudioTracks?.()[0] || null;
+    const fault = isBusSilentFault({
+      rms: peak,
+      micIntended: busSources.current.mic,
+      hasLiveMicTrack: Boolean(micTrack && micTrack.readyState === "live"),
+    });
+    busWarmupRef.current.silentFault = fault;
+    if (!fault) return;
+    // Backstop for anything that suspends the graph after start. Safe while
+    // unpaused, and never touches the gain the user muted deliberately.
+    if (
+      aCtx.current &&
+      needsContextResume({
+        state: aCtx.current.state,
+        paused: pausedStateRef.current,
+      })
+    ) {
+      try {
+        await aCtx.current.resume();
+      } catch {}
+    }
+    diagForward("audio-bus-silent-at-start", {
+      rms: peak,
+      ctxState: aCtx.current?.state ?? null,
+      ctxStateAtStart: busWarmupRef.current.ctxStateAtStart,
+      ctxResumedAtStart: busWarmupRef.current.ctxResumedAtStart,
+      busHasMic: busSources.current.mic,
+      busHasSystem: busSources.current.system,
+      micGain: audioInputGain.current?.gain?.value ?? null,
+      trackMuted: micTrack ? Boolean(micTrack.muted) : null,
+      trackEnabled: micTrack ? Boolean(micTrack.enabled) : null,
+    });
   };
 
   // MediaRecorder has no getDiagSnapshot(), so assemble the equivalent from
@@ -2539,6 +2714,19 @@ const CloudRecorder = () => {
           typeof document !== "undefined" ? document.hidden : null,
         visibilityState:
           typeof document !== "undefined" ? document.visibilityState : null,
+        // What the mux actually got. micChosen true with busHasMic false is
+        // the separated take, and both false with a silent bus is the fault.
+        busHasMic: Boolean(busSources.current.mic),
+        busHasSystem: Boolean(busSources.current.system),
+        // Warm-up level on the mixed bus. Zero here with a live mic track is
+        // the full length silent AAC signature, readable without the file.
+        busRmsAtStart:
+          typeof busWarmupRef.current.rms === "number"
+            ? busWarmupRef.current.rms
+            : null,
+        busSilentAtStart: Boolean(busWarmupRef.current.silentFault),
+        ctxStateAtStart: busWarmupRef.current.ctxStateAtStart,
+        ctxResumedAtStart: Boolean(busWarmupRef.current.ctxResumedAtStart),
         // AudioContext interruption cause-signal: an OS "interrupted" state
         // feeds the destination silence, so chunksOut===0 here with
         // sawInterrupted distinguishes a silent gap from a dead mic track.
@@ -2655,6 +2843,12 @@ const CloudRecorder = () => {
         .catch(() => {});
       throw err;
     } finally {
+      if (!RECOVERABLE_SESSION_STATUSES.has(status)) {
+        chrome.storage.local
+          .remove([`chunkPurgeMarks:${sessionId}`, "cloudRecorderHostBusy"])
+          .catch(() => {});
+      }
+      purgeMarksRef.current = {};
       recorderSession.current = null;
       recordingSessionId.current = null;
       sessionStateIndexedRef.current = false;
@@ -3183,85 +3377,8 @@ const CloudRecorder = () => {
     }
   };
 
-  // Removes stale TUS journals, lookup keys, and Bunny video-map entries that
-  // survive a process crash. Without this, the next session can resume the old
-  // partial Bunny upload and append fresh chunks, producing a garbled video.
-  // Also resets sceneId so the next session gets a fresh scene.
-  const clearStaleUploadJournals = async (storedSession) => {
-    const keysToRemove = [];
-    const tracks = storedSession?.tracks || {};
-
-    for (const trackData of Object.values(tracks)) {
-      const upl = trackData?.uploader;
-      if (!upl) continue;
-
-      if (upl.journalKey) keysToRemove.push(upl.journalKey);
-      if (upl.journalLookupKey) keysToRemove.push(upl.journalLookupKey);
-
-      const pid = upl.projectId || storedSession?.projectId || null;
-      const sid = upl.sceneId || null;
-      const t = upl.type || upl.trackType || null;
-      if (pid && t) {
-        keysToRemove.push(
-          `bunnyVideoMap-${pid}-${sid || "none"}-${t || "none"}`
-        );
-      }
-    }
-
-    // Reset sceneId so getOrCreateSceneId doesn't reuse a scene tied to cleared journals.
-    keysToRemove.push("sceneId", "sceneIdStatus");
-
-    const uniqKeys = [...new Set(keysToRemove)];
-
-    const screenUpl = tracks.screen?.uploader || null;
-    const cameraUpl = tracks.camera?.uploader || null;
-
-    console.info(
-      "[CloudRecorder] clearStaleUploadJournals: removing stale journal + sceneId keys",
-      {
-        sessionId: storedSession?.id || null,
-        keyCount: uniqKeys.length,
-        screen: {
-          journalKey: screenUpl?.journalKey || null,
-          mediaId: screenUpl?.mediaId || null,
-          journalOffset: screenUpl?.offset || 0,
-          journalTotalBytes: screenUpl?.totalBytes || 0,
-          journalStatus: screenUpl?.status || null,
-        },
-        camera: {
-          journalKey: cameraUpl?.journalKey || null,
-          mediaId: cameraUpl?.mediaId || null,
-          journalOffset: cameraUpl?.offset || 0,
-        },
-      }
-    );
-
-    void emitUploadTelemetry("upload_recovery_journals_cleared", {
-      reason: "post-crash-recovery",
-      sessionId: storedSession?.id || null,
-      projectId: storedSession?.projectId || null,
-      clearedKeyCount: uniqKeys.length,
-      screenJournalKey: screenUpl?.journalKey || null,
-      screenMediaId: screenUpl?.mediaId || null,
-      screenJournalOffset: screenUpl?.offset || 0,
-      screenJournalTotalBytes: screenUpl?.totalBytes || 0,
-      screenJournalStatus: screenUpl?.status || null,
-      cameraJournalKey: cameraUpl?.journalKey || null,
-      cameraMediaId: cameraUpl?.mediaId || null,
-      cameraJournalOffset: cameraUpl?.offset || 0,
-    });
-
-    if (!uniqKeys.length) return;
-    try {
-      await chrome.storage.local.remove(uniqKeys);
-    } catch (err) {
-      console.warn(
-        "[CloudRecorder] clearStaleUploadJournals: failed to remove keys",
-        { keys: uniqKeys, error: err?.message || String(err) }
-      );
-    }
-  };
-
+  // Background resume owns a crashed take (resumeJournal.js), cleanup included.
+  // This host only has to stop the crashed take's scene id being reused.
   const tryRecoverPreviousSession = useCallback(async () => {
     if (recoveryAttempted.current) return;
     recoveryAttempted.current = true;
@@ -3269,164 +3386,18 @@ const CloudRecorder = () => {
       const { recorderSession: storedSession } = await chrome.storage.local.get(
         ["recorderSession"]
       );
-
-      // Recovery reads from whatever backend the previous session wrote to.
-      // Sessions before the OPFS migration have no storageBackends field; fall
-      // back to IDB across the board, matching pre-migration behaviour.
-      const prevBackends = storedSession?.storageBackends || {
-        screen: "idb",
-        audio: "idb",
-        camera: "idb",
-      };
-      const prevOpfsSessionId =
-        storedSession?.opfsSessionId || storedSession?.id || null;
-      const recoveryScreenStore = openExistingChunksStore({
-        sessionId: prevOpfsSessionId,
-        track: "screen",
-        backend: prevBackends.screen || "idb",
-      }).store;
-      const recoveryCameraStore = openExistingChunksStore({
-        sessionId: prevOpfsSessionId,
-        track: "camera",
-        backend: prevBackends.camera || "idb",
-      }).store;
-      const recoveryAudioStore = openExistingChunksStore({
-        sessionId: prevOpfsSessionId,
-        track: "audio",
-        backend: prevBackends.audio || "idb",
-      }).store;
-
-      const [chunkCount, cameraChunkCount, audioChunkCount] = await Promise.all(
-        [
-          recoveryScreenStore.length().catch(() => 0),
-          recoveryCameraStore.length().catch(() => 0),
-          recoveryAudioStore.length().catch(() => 0),
-        ]
-      );
-      const isRecoverable = RECOVERABLE_SESSION_STATUSES.has(
-        storedSession?.status
-      );
-      const hasDurableChunks =
-        chunkCount > 0 || cameraChunkCount > 0 || audioChunkCount > 0;
-      if (storedSession && isRecoverable && hasDurableChunks) {
-        void emitUploadTelemetry("upload_recovery_available", {
-          reason: "durable-chunks",
-          recoveredChunkCount: chunkCount,
-          recoveredCameraChunkCount: cameraChunkCount,
-          recoveredAudioChunkCount: audioChunkCount,
-          recordingSessionId: storedSession?.id || null,
-          projectId: storedSession?.projectId || null,
-          screenStorageBackend: prevBackends.screen || "idb",
-          cameraStorageBackend: prevBackends.camera || "idb",
-          audioStorageBackend: prevBackends.audio || "idb",
-        });
-        const ts = new Date().toISOString();
-
-        if (chunkCount > 0) {
-          const recovered = [];
-          await recoveryScreenStore.iterate((value) => {
-            recovered.push(value);
-          });
-          recovered.sort((a, b) => a.index - b.index);
-          const blob = createBlobFromChunks(
-            recovered.map((c) => c.chunk),
-            "video/webm"
-          );
-          if (blob) {
-            const objectUrl = URL.createObjectURL(blob);
-            try {
-              await chrome.downloads.download({
-                url: objectUrl,
-                filename: `Screenity-Recovered-${ts}.webm`,
-                saveAs: false,
-              });
-            } finally {
-              // download() resolves before the blob fetch; delay revoke.
-              setTimeout(() => {
-                try {
-                  URL.revokeObjectURL(objectUrl);
-                } catch {}
-              }, 2000);
-            }
-          }
-        }
-
-        if (cameraChunkCount > 0) {
-          const cameraRecovered = [];
-          await recoveryCameraStore.iterate((value) => {
-            cameraRecovered.push(value);
-          });
-          cameraRecovered.sort((a, b) => (a.index || 0) - (b.index || 0));
-          const cameraBlob = createBlobFromChunks(
-            cameraRecovered.map((c) => c.chunk),
-            "video/webm"
-          );
-          if (cameraBlob) {
-            const cameraObjectUrl = URL.createObjectURL(cameraBlob);
-            try {
-              await chrome.downloads.download({
-                url: cameraObjectUrl,
-                filename: `Screenity-Recovered-Camera-${ts}.webm`,
-                saveAs: false,
-              });
-            } finally {
-              setTimeout(() => {
-                try {
-                  URL.revokeObjectURL(cameraObjectUrl);
-                } catch {}
-              }, 2000);
-            }
-          }
-        }
-
-        chrome.runtime.sendMessage({
-          type: "show-toast",
-          message: chrome.i18n.getMessage("toastRecoveredSession"),
-        });
-
-        await recoveryScreenStore.clear().catch(() => {});
-        await recoveryAudioStore.clear().catch(() => {});
-        await recoveryCameraStore.clear().catch(() => {});
-        // If the previous session wrote anything to OPFS, drop the whole
-        // session directory so the parent doesn't accumulate empty subdirs.
-        const prevUsedOpfs = Object.values(prevBackends).some(
-          (b) => b === "opfs"
-        );
-        if (prevUsedOpfs && prevOpfsSessionId) {
-          destroySessionDir(prevOpfsSessionId).catch(() => {});
-        }
-        await clearStaleUploadJournals(storedSession);
-        await chrome.storage.local.set({
-          recorderSession: {
-            ...storedSession,
-            status: "recovered",
-            recoveredAt: Date.now(),
-            recoveredChunkCount: chunkCount,
-            recoveredCameraChunkCount: cameraChunkCount,
-          },
-        });
-      } else if (storedSession && isRecoverable) {
-        void emitUploadTelemetry("upload_recovery_available", {
-          reason: "metadata-only",
-          recoveredChunkCount: 0,
-          recordingSessionId: storedSession?.id || null,
-          projectId: storedSession?.projectId || null,
-        });
-        // Even without durable chunks, video-map/lookup keys alone can cause a garbled resume.
-        await clearStaleUploadJournals(storedSession);
-        await chrome.storage.local.set({
-          recorderSession: {
-            ...storedSession,
-            status: "recovery-metadata-only",
-            recoveredAt: Date.now(),
-            recoveredChunkCount: 0,
-          },
-        });
-      } else {
-        void emitUploadTelemetry("upload_recovery_unavailable", {
-          reason: "no-recoverable-session",
-        });
+      if (
+        !storedSession ||
+        !RECOVERABLE_SESSION_STATUSES.has(storedSession.status)
+      ) {
+        return;
       }
+      await chrome.storage.local.remove(["sceneId", "sceneIdStatus"]);
+      void emitUploadTelemetry("upload_recovery_available", {
+        reason: "handed-to-resume",
+        recordingSessionId: storedSession.id,
+        projectId: storedSession.projectId || null,
+      });
     } catch (err) {
       console.warn("Recovery check failed:", err);
     }
@@ -3710,6 +3681,8 @@ const CloudRecorder = () => {
           micSource
             .connect(audioInputGain.current)
             .connect(destination.current);
+          if (busTap.current) audioInputGain.current.connect(busTap.current);
+          busSources.current.mic = true;
         }
         // Set either way, matching the eager path: later consumers read
         // micStream as the audio bus.
@@ -3863,8 +3836,27 @@ const CloudRecorder = () => {
     sendRecordingErrorBase(why, cancel);
   };
 
+  // Written before the uploaders abort, so a browser dying mid-discard or
+  // mid-cancel can't have the take resumed back into the user's library.
+  const markSessionDiscarded = async () => {
+    try {
+      const discardedId = recorderSession.current?.id;
+      if (!discardedId) return;
+      const { discardedRecordingSessionIds: prev } =
+        await chrome.storage.local.get(["discardedRecordingSessionIds"]);
+      const list = Array.isArray(prev) ? prev : [];
+      await chrome.storage.local.set({
+        discardedRecordingSessionIds: [
+          ...list.filter((id) => id !== discardedId),
+          discardedId,
+        ].slice(-10),
+      });
+    } catch {}
+  };
+
   const dismissRecording = async (restarting = false, reason = "dismiss") => {
     clearPendingStart();
+    await markSessionDiscarded();
     setInitProject(false);
     await cleanupIfEmptyUploads(restarting ? "restart" : "dismiss");
 
@@ -5038,18 +5030,35 @@ const CloudRecorder = () => {
         hasCamera: Boolean(cameraStream.current),
         hasMic: Boolean(micStream.current),
       });
+      // Pause suspends the graph and restart clears pausedStateRef without
+      // resuming, so the next take muxed silence for its whole length.
+      const ctxStateAtStart = aCtx.current?.state ?? null;
+      busWarmupRef.current.ctxStateAtStart = ctxStateAtStart;
+      busWarmupRef.current.ctxResumedAtStart = false;
+      busWarmupRef.current.ran = false;
+      busWarmupRef.current.rms = null;
+      busWarmupRef.current.silentFault = false;
+      if (
+        aCtx.current &&
+        needsContextResume({
+          state: ctxStateAtStart,
+          paused: pausedStateRef.current,
+        })
+      ) {
+        try {
+          await aCtx.current.resume();
+          busWarmupRef.current.ctxResumedAtStart = true;
+        } catch {}
+        diagForward("audio-bus-context-resumed", {
+          stateBefore: ctxStateAtStart,
+          stateAfter: aCtx.current?.state ?? null,
+        });
+      }
       if (screenStream.current) {
         setupTrack = "screen";
-        // Stream-track presence isn't reliable: micStream is always
-        // attached when a mic exists (the mix point for system audio)
-        // and gain-muted when micActive=false. audioIntent reads from
-        // BG before contentState's fresh-state auto-default can race.
-        const { micActive, systemAudio } = audioIntent.current;
-        // On a separated take the mic is not on the bus, so micActive says
-        // nothing about whether the bus carries sound; attaching muxes silence.
-        const screenHasAudio = separatedAudio.current
-          ? systemAudio === true
-          : micActive === true || systemAudio === true;
+        // What is wired into the bus, not what was asked for. Intent said
+        // "system audio on" with nothing connected, muxing full length silence.
+        const screenHasAudio = shouldMuxBusAudio(busSources.current);
         const stream = screenHasAudio
           ? attachMicToStream(screenStream.current, micStream.current)
           : // Strip incidental audio tracks (e.g. residual tab-capture
@@ -5175,11 +5184,8 @@ const CloudRecorder = () => {
                   notePausedDrop("screen", blob);
                   return;
                 }
-                if (screenUploader.current.queuedBytes > 15 * 1024 * 1024) {
-                  await screenUploader.current
-                    .waitForPendingUploads?.()
-                    .catch(() => {});
-                }
+                // No pre-write backpressure gate here: parking before write()
+                // lets the next chunk overtake this one into the byte stream.
                 await screenUploader.current.write(blob);
                 consecutiveScreenFailures.current = 0;
                 const endByte = Number(screenUploader.current?.totalBytes) || 0;
@@ -5254,6 +5260,8 @@ const CloudRecorder = () => {
         });
 
         screenRecorder.current.start(2000);
+        // Fire and forget: the samples take 1.5s and start latency is budgeted.
+        void measureBusWarmup();
 
         // First-chunk watchdog (8s, chrome.alarms-backed).
         chrome.runtime
@@ -5372,6 +5380,13 @@ const CloudRecorder = () => {
                 type: "show-toast",
                 message: chrome.i18n.getMessage("toastAudioCaptureDegraded"),
               });
+              // The mic file stops here, so freeze its clock or it claims the
+              // whole session's length.
+              if (!audioTimer.current.paused && audioTimer.current.start) {
+                audioTimer.current.total +=
+                  Date.now() - audioTimer.current.start;
+                audioTimer.current.paused = true;
+              }
               try {
                 if (audioRecorder.current?.state === "recording") {
                   audioRecorder.current.stop();
@@ -5440,18 +5455,22 @@ const CloudRecorder = () => {
         });
 
         audioRecorder.current.start(2000);
+        // Same tick as start(), so the clock covers exactly what the file does.
+        audioTimer.current.start = Date.now();
+        audioTimer.current.total = 0;
+        audioTimer.current.paused = false;
+        audioTimer.current.everStarted = true;
       }
 
       if (cameraStream.current) {
         setupTrack = "camera";
         let streamToRecord = cameraStream.current;
 
-        // Camera-only carries the mic in-stream; screen+camera routes audio
-        // through the audio uploader so the camera track stays video-only.
-        // audioIntent is the BG snapshot (see screen branch above for why).
+        // Camera-only carries the mic in-stream. Screen+camera routes audio through the
+        // audio uploader so the camera track stays video-only, same bus rule as screen.
         if (
           recordingType.current === "camera" &&
-          audioIntent.current.micActive &&
+          shouldMuxBusAudio(busSources.current) &&
           micStream.current
         ) {
           streamToRecord = attachMicToStream(
@@ -5621,6 +5640,8 @@ const CloudRecorder = () => {
         });
 
         cameraRecorder.current.start(2000);
+        // Camera-only muxes the mic too, and the screen call site never runs.
+        void measureBusWarmup();
         scheduleCameraSilenceCheck();
       }
 
@@ -5663,6 +5684,16 @@ const CloudRecorder = () => {
       cameraTimer.current.paused = false;
       cameraTimer.current.total = 0;
     }
+    // A restart that loses the mic would otherwise report the previous take's
+    // measured length.
+    if (!audioRecorder.current) {
+      audioTimer.current = {
+        start: null,
+        total: 0,
+        paused: false,
+        everStarted: false,
+      };
+    }
 
     lastUploadProgress.current = {
       screen: screenUploader.current?.offset || 0,
@@ -5695,6 +5726,12 @@ const CloudRecorder = () => {
     }
     cameraTimer.current.start = null;
     cameraTimer.current.paused = false;
+    if (!audioTimer.current.paused && audioTimer.current.start) {
+      audioTimer.current.total =
+        (audioTimer.current.total || 0) + (now - audioTimer.current.start);
+    }
+    audioTimer.current.start = null;
+    audioTimer.current.paused = false;
   }
 
   const stopAllRecorders = async ({ stopStreams = true } = {}) => {
@@ -5732,6 +5769,13 @@ const CloudRecorder = () => {
       }
     };
 
+    // Freeze the mic clock here, not at cleanupTimers: the drain below waits on
+    // onstop and pending writes, and none of that time is in the file.
+    if (!audioTimer.current.paused && audioTimer.current.start) {
+      audioTimer.current.total += Date.now() - audioTimer.current.start;
+      audioTimer.current.paused = true;
+    }
+
     await Promise.all([
       stopRecorder(screenRecorder),
       stopRecorder(cameraRecorder),
@@ -5756,6 +5800,10 @@ const CloudRecorder = () => {
       destination.current = null;
       audioInputGain.current = null;
       audioOutputGain.current = null;
+      // The tap belongs to the closed context, and nothing is on the bus
+      // any more. Both are rebuilt with the next graph.
+      busTap.current = null;
+      busSources.current = { mic: false, system: false };
     }
   };
 
@@ -5783,13 +5831,17 @@ const CloudRecorder = () => {
 
     const screen = getDuration(screenTimer.current);
     const camera = getDuration(cameraTimer.current);
+    // Bunny can't measure an audio-only track (reports 1), so this number is
+    // the only duration the mic media ever gets. Muxed shapes have no mic
+    // recorder and keep the video timer.
+    const audio = audioTimer.current.everStarted
+      ? getDuration(audioTimer.current)
+      : Math.max(screen, camera);
 
     return {
       screen,
       camera,
-      // The mic starts, pauses and stops with the session, so the live video
-      // timer is its length. Bunny can't measure an audio-only track, reports 1.
-      audio: Math.max(screen, camera),
+      audio,
       fallbackMs:
         firstChunkTime.current && lastTimecode.current
           ? Math.max(0, lastTimecode.current - firstChunkTime.current)
@@ -6067,6 +6119,30 @@ const CloudRecorder = () => {
     };
   }, []);
 
+  // Tells background resume this host still holds a take, including a post-stop
+  // drain or open retry modal no pipeline step covers.
+  useEffect(() => {
+    const beat = () => {
+      if (
+        !recorderSession.current &&
+        !finalizeFailureRef.current &&
+        !isInit.current
+      ) {
+        return;
+      }
+      chrome.storage.local
+        .set({
+          cloudRecorderHostBusy: {
+            at: Date.now(),
+            sessionId: recorderSession.current?.id || null,
+          },
+        })
+        .catch(() => {});
+    };
+    const id = setInterval(beat, HOST_BUSY_BEAT_MS);
+    return () => clearInterval(id);
+  }, []);
+
   useEffect(() => {
     tryRecoverPreviousSession();
   }, [tryRecoverPreviousSession]);
@@ -6232,12 +6308,13 @@ const CloudRecorder = () => {
   const createSceneOrHandleMultiMode = async (
     uploadMeta,
     durations,
-    isSilent
+    isSilent,
+    separatedMic = null
   ) => {
     const {
       projectId,
       clickEvents = [],
-      surface,
+      capturedSurface = null,
       multiMode,
       multiSceneCount = 0,
       multiLastSceneId = null,
@@ -6248,7 +6325,7 @@ const CloudRecorder = () => {
     } = await chrome.storage.local.get([
       "projectId",
       "clickEvents",
-      "surface",
+      "capturedSurface",
       "multiMode",
       "multiSceneCount",
       "multiLastSceneId",
@@ -6346,16 +6423,18 @@ const CloudRecorder = () => {
         audioMediaId: separatedAudio.current
           ? null
           : uploadMeta.audio?.mediaId || null,
-        // Null on a separated take: the mic uploads after this POST so the
-        // editor isn't held behind it; attach-scene-audio fills it in.
-        audioSourceMediaId: null,
-        // No audioLayout: the server derives it from the mic's media doc, which
-        // does not exist yet. attach-scene-audio marks the scene later.
+        // The mic id, when its upload beat this POST: the scene is born with
+        // its voice instead of gaining one after the editor already read it.
+        // Null means the upload lost the race; attach-scene-audio fills it in
+        // after, as before.
+        audioSourceMediaId: separatedMic?.mediaId || null,
+        // No audioLayout: the server reads it off the mic's media doc, which
+        // /api/bunny/upload stamped 'separated' when the file went up.
         recordingSessionId: recorderSession.current?.id || null,
         durations,
         captionSource: uploadMeta.screen ? "screen" : "camera",
         transcriptionSourceMediaId: !isSilent
-          ? uploadMeta.audio?.mediaId || null
+          ? uploadMeta.audio?.mediaId || separatedMic?.mediaId || null
           : null,
         thumbnail: uploadMeta.screen?.thumbnail || null,
         dimensions: {
@@ -6369,7 +6448,9 @@ const CloudRecorder = () => {
             : null,
         },
         clickEvents: scaledClickEvents,
-        surface,
+        // Omitted when unknown: the app defaults to monitor, and a
+        // guess would be worse than that default.
+        ...(capturedSurface ? { surface: capturedSurface } : {}),
         instantMode: instantMode.current,
         newProject: !recordingToScene && (!multiMode || multiSceneCount === 0),
         insertAfterSceneId,
@@ -6435,6 +6516,8 @@ const CloudRecorder = () => {
           sceneId,
           screenMediaId: uploadMeta.screen?.mediaId || null,
           cameraMediaId: uploadMeta.camera?.mediaId || null,
+          // Not the mic: a recovered scene carries no micIncluded, so the
+          // attach path gives it its voice instead of naming it twice.
           audioMediaId: uploadMeta.audio?.mediaId || null,
           // Pass the duration + capture dims so the server can stamp
           // them onto the media docs (and therefore the scene) right
@@ -6518,7 +6601,13 @@ const CloudRecorder = () => {
         ]).then(() => {
           logDebugEvent("scene-create-complete", { projectId, sceneId });
         });
-        return { created: true };
+        // micIncluded is claimed only here, by the POST that carried the id.
+        // A reused scene's earlier POST sent none; a recovered one never sent
+        // this payload at all. Both still need the attach.
+        return {
+          created: true,
+          micIncluded: Boolean(separatedMic?.mediaId),
+        };
       }
     }
 
@@ -6997,6 +7086,75 @@ const CloudRecorder = () => {
     }
 
     const audioBlob = await buildAudioBlobFromDurableStore();
+
+    // Starts ahead of the scene POST: the POST releases the editor and
+    // nothing refetches the scene after, so a mic attached later only shows
+    // up if the user reloads. Sending the media id in the payload avoids that.
+    //
+    // Not at the drain (chunks are complete by then): the no-upload check
+    // above can still abandon the take, and nothing sweeps an unreferenced
+    // Bunny Storage upload, so starting earlier would strand a file for a
+    // recording that was never saved.
+    //
+    // Ahead of the silence check on purpose: isAudioSilent decodes the whole
+    // track on this thread, so overlapping it with the in-flight POST is
+    // free; the other order adds the decode to the wait.
+    const willUploadMic = Boolean(
+      separatedAudio.current && audioRecorder.current
+    );
+    let micUploadPromise = null;
+    if (willUploadMic) {
+      // Claimed before the scene POST: createSceneOrHandleMultiMode sends
+      // editor-ready, and the BG starts discarding this document on arrival,
+      // so a flag set afterwards is never seen.
+      await chrome.storage.local.set({
+        micUploadInFlight: { at: Date.now(), sceneId: uploadMeta.sceneId },
+      });
+      // Marker first, cleared on success, so a tab dying mid-upload leaves the
+      // launch scan something to find. Gated on the recorder, not the store:
+      // the store exists on every take, so a mic-off one overwrote real markers.
+      await setPendingMicRecovery({
+        projectId,
+        sceneId: uploadMeta.sceneId,
+        duration: usedDurations.audio || null,
+        mimeType: trackContainers.audio || "audio/webm",
+        // Audio goes to OPFS where supported, so the scan needs both to
+        // reopen the same store rather than an empty one.
+        sessionId: storageOpfsSessionId,
+        backend: storageBackends.audio || "idb",
+        // So a recovered mic still queues captions against the right video
+        // track, which the scene POST could not name.
+        targetMediaId:
+          uploadMeta.screen?.mediaId || uploadMeta.camera?.mediaId || null,
+      });
+      micRecoveryPending.current = true;
+      micUploadPromise = (async () => {
+        const { screenityToken } = await chrome.storage.local.get([
+          "screenityToken",
+        ]);
+        // The blob above already holds every chunk and uploadMicToStorage
+        // re-wraps whatever it's handed, so pass it instead of reading the
+        // store again. Empty means the store gave nothing back; fall back to
+        // its own read for a memory-only take.
+        const chunks =
+          audioBlob && audioBlob.size > 0
+            ? [audioBlob]
+            : await collectMicChunks(audioChunksStore);
+        if (!chunks.length) return { ok: false, reason: "no-chunks" };
+        return uploadMicToStorage({
+          chunks,
+          mimeType: trackContainers.audio || "audio/webm",
+          sceneId: uploadMeta.sceneId,
+          projectId,
+          duration: usedDurations.audio || null,
+          token: screenityToken,
+        });
+      })().catch((err) => ({
+        ok: false,
+        reason: err?.message || String(err),
+      }));
+    }
+
     const silent = audioBlob ? await isAudioSilent(audioBlob) : true;
 
     await upsertPendingScene(uploadMeta.sceneId, {
@@ -7049,12 +7207,6 @@ const CloudRecorder = () => {
           );
         }
 
-        // Claimed before the scene POST: createSceneOrHandleMultiMode sends
-        // editor-ready, and the BG starts discarding this document on arrival,
-        // so a flag set afterwards is never seen.
-        const willUploadMic = Boolean(
-          separatedAudio.current && audioRecorder.current
-        );
         diagForward("mic-upload-decision", {
           willUploadMic,
           separated: separatedAudio.current,
@@ -7063,16 +7215,38 @@ const CloudRecorder = () => {
           rawMicTracks: rawMicStream.current?.getAudioTracks?.().length || 0,
           audioStoreReady: audioChunkStoreReadyRef.current,
         });
-        if (willUploadMic) {
-          await chrome.storage.local.set({
-            micUploadInFlight: { at: Date.now(), sceneId: uploadMeta.sceneId },
+        // Gives the upload started before the silence check a short window to
+        // land, so the scene can be created holding its own voice. Short
+        // because the editor waits on this POST; over budget, the scene goes
+        // out without the mic and the attach below fills it in, same as
+        // before this change.
+        let separatedMic = null;
+        if (micUploadPromise) {
+          const raced = await Promise.race([
+            micUploadPromise,
+            new Promise((r) =>
+              setTimeout(
+                () => r({ ok: false, reason: "pre-scene-budget" }),
+                PRE_SCENE_MIC_UPLOAD_BUDGET_MS
+              )
+            ),
+          ]);
+          if (raced?.ok && raced.mediaId) {
+            separatedMic = { mediaId: raced.mediaId, url: raced.url || null };
+          }
+          diagForward("separated-mic-pre-scene", {
+            won: Boolean(separatedMic),
+            reason: raced?.reason || null,
           });
         }
 
-        await createSceneOrHandleMultiMode(uploadMeta, usedDurations, silent);
+        const sceneResult = await createSceneOrHandleMultiMode(
+          uploadMeta,
+          usedDurations,
+          silent,
+          separatedMic
+        );
 
-        // Before the mic upload, not after: that POST is the whole mic file and
-        // awaiting it held the editor shut for its duration.
         if (!willUploadMic) {
           await chrome.storage.local
             .remove(["micUploadInFlight"])
@@ -7081,25 +7255,35 @@ const CloudRecorder = () => {
 
         chrome.runtime.sendMessage({ type: "video-ready", uploadMeta });
 
-        // Marker first, cleared on success, so a tab dying mid-upload leaves the
-        // launch scan something to find. Gated on the recorder, not the store:
-        // the store exists on every take, so a mic-off one overwrote real markers.
-        if (willUploadMic) {
-          await setPendingMicRecovery({
-            projectId,
-            sceneId: uploadMeta.sceneId,
-            duration: usedDurations.audio || null,
-            mimeType: trackContainers.audio || "audio/webm",
-            // Audio goes to OPFS where supported, so the scan needs both to
-            // reopen the same store rather than an empty one.
-            sessionId: storageOpfsSessionId,
-            backend: storageBackends.audio || "idb",
-            // So a recovered mic still queues captions against the right video
-            // track, which the scene POST could not name.
-            targetMediaId:
-              uploadMeta.screen?.mediaId || uploadMeta.camera?.mediaId || null,
+        // The marker and the upload were both claimed before the POST, so there
+        // are only two cases left: the scene already names the mic, or it does
+        // not and still needs the attach.
+        if (willUploadMic && sceneResult?.micIncluded && separatedMic) {
+          micRecoveryPending.current = false;
+          await clearPendingMicRecovery(uploadMeta.sceneId);
+          await chrome.storage.local
+            .remove(["micUploadInFlight"])
+            .catch(() => {});
+          diagForward("separated-mic-in-scene", {
+            mediaId: String(separatedMic.mediaId).slice(0, 40),
           });
-          micRecoveryPending.current = true;
+          // The POST named the mic as its transcription source, but
+          // uploadMeta.audio is still empty on a separated take and
+          // handleTranscription reads it.
+          if (!silent) {
+            uploadMeta.audio = {
+              ...(uploadMeta.audio || {}),
+              mediaId: separatedMic.mediaId,
+              separated: true,
+            };
+            handleTranscription(uploadMeta, projectId).catch((err) =>
+              console.warn(
+                "[CloudRecorder] separated handleTranscription failed:",
+                err
+              )
+            );
+          }
+        } else if (willUploadMic) {
           try {
             const { screenityToken } = await chrome.storage.local.get([
               "screenityToken",
@@ -7107,15 +7291,11 @@ const CloudRecorder = () => {
             // Budgeted: this sits ahead of pipeline-completed, finalize and
             // window.close, so a stalled several-hundred-MB POST would hold the
             // tab and its capture binding open. Timing out leaves the marker.
-            const result = await Promise.race([
-              uploadAndAttachMic({
-                store: audioChunksStore,
-                projectId,
-                sceneId: uploadMeta.sceneId,
-                duration: usedDurations.audio || null,
-                mimeType: trackContainers.audio || "audio/webm",
-                token: screenityToken,
-              }),
+            // Waits on the upload already in flight rather than starting a
+            // second one.
+            const uploaded = await Promise.race([
+              micUploadPromise ||
+                Promise.resolve({ ok: false, reason: "no-upload-started" }),
               new Promise((r) =>
                 setTimeout(
                   () => r({ ok: false, reason: "inline-upload-timeout" }),
@@ -7123,6 +7303,31 @@ const CloudRecorder = () => {
                 )
               ),
             ]);
+            // A reused or recovered scene reaches here too, and that is the
+            // point: the POST behind it carried no mic id, so this attach is
+            // what gives it a voice.
+            const result = !uploaded?.ok
+              ? { ok: false, reason: `upload-${uploaded?.reason || "unknown"}` }
+              : await (async () => {
+                  const attached = await attachSceneAudio({
+                    projectId,
+                    sceneId: uploadMeta.sceneId,
+                    audioMediaId: uploaded.mediaId,
+                    duration: usedDurations.audio || null,
+                    token: screenityToken,
+                  });
+                  return attached.ok
+                    ? {
+                        ok: true,
+                        mediaId: uploaded.mediaId,
+                        attached: attached.attached,
+                      }
+                    : {
+                        ok: false,
+                        reason: `attach-${attached.reason}`,
+                        mediaId: uploaded.mediaId,
+                      };
+                })();
             if (result.ok) {
               micRecoveryPending.current = false;
               await clearPendingMicRecovery(uploadMeta.sceneId);
@@ -7390,6 +7595,9 @@ const CloudRecorder = () => {
     // Only the screen branch supersamples; clear it so a later take can't
     // inherit a previous recording's value.
     captureCapRef.current = null;
+    // Same for the reported surface: unknown until this attempt's
+    // stream is up, and a camera take never sets one.
+    await setCapturedSurface(null);
     const prewarmedStream = streamOpts.prewarmedStream || null;
     const { width = 1920, height = 1080 } = getResolutionForQuality() || {};
 
@@ -7480,6 +7688,16 @@ const CloudRecorder = () => {
             const src = ctx.createMediaStreamSource(screenStream.current);
             src.connect(ctx.destination);
           }
+
+          // Report what was cropped, not the crop. preferCurrentTab
+          // makes this browser unless the user switched panes.
+          await setCapturedSurface(
+            resolveCaptureSurface(
+              screenStream.current.getVideoTracks()[0].getSettings()
+                .displaySurface,
+              { isTab: isTab.current }
+            )
+          );
 
           bindScreenTrack(screenStream.current.getVideoTracks()[0]);
         } catch (err) {
@@ -7847,7 +8065,17 @@ const CloudRecorder = () => {
             });
           }
 
-          traceStep("streamAcquired", { surface: surface || null });
+          // tabCapture streams carry no displaySurface, so fall back to
+          // isTab. Unknown stays unset and the scene payload omits it.
+          const capturedSurface = resolveCaptureSurface(surface, {
+            isTab: isTab.current,
+          });
+          await setCapturedSurface(capturedSurface);
+
+          traceStep("streamAcquired", {
+            surface: surface || null,
+            capturedSurface,
+          });
 
           setTimeout(() => {
             traceStep("preparingSent");
@@ -7894,6 +8122,11 @@ const CloudRecorder = () => {
           let boundSurface = surface;
           track.addEventListener("configurationchange", () => {
             const next = track.getSettings();
+            void setCapturedSurface(
+              resolveCaptureSurface(next.displaySurface, {
+                isTab: isTab.current,
+              })
+            );
             chrome.storage.local.set({
               surface: next.displaySurface,
               recordedStreamDimensions: {
@@ -7986,6 +8219,13 @@ const CloudRecorder = () => {
                 );
               console.log(
                 "[CloudRecorder] getDisplayMedia fallback OK after streamId rejection"
+              );
+              await setCapturedSurface(
+                resolveCaptureSurface(
+                  screenStream.current.getVideoTracks()[0].getSettings()
+                    .displaySurface,
+                  { isTab: isTab.current }
+                )
               );
               bindScreenTrack(screenStream.current.getVideoTracks()[0]);
             } catch (fallbackErr) {
@@ -8157,6 +8397,13 @@ const CloudRecorder = () => {
         const rawTrack = rawMicStream.current?.getAudioTracks?.()[0];
         if (rawTrack) {
           rawTrack.addEventListener("ended", () => {
+            // The take carries on for system audio, but the mic file stops
+            // here, so freeze its clock or it claims the session's length.
+            if (!audioTimer.current.paused && audioTimer.current.start) {
+              audioTimer.current.total +=
+                Date.now() - audioTimer.current.start;
+              audioTimer.current.paused = true;
+            }
             const startMs = screenTimer.current?.start || null;
             const dur = startMs ? Date.now() - startMs : null;
             const SALVAGE_THRESHOLD_MS = 30000;
@@ -8211,6 +8458,15 @@ const CloudRecorder = () => {
         "CloudRecorder"
       );
       destination.current = aCtx.current.createMediaStreamDestination();
+      // Parallel tap so the warm-up check can read the mixed bus. A
+      // MediaStreamDestination is a sink and cannot be analysed directly.
+      busSources.current = { mic: false, system: false };
+      try {
+        busTap.current = aCtx.current.createAnalyser();
+        busTap.current.fftSize = 2048;
+      } catch {
+        busTap.current = null;
+      }
       // A stereo destination duplicates a mono mic, wasting half the AAC bitrate.
       // System audio only joins at start, so the lazy setMic path stays stereo.
       audioBusChannels.current = null;
@@ -8248,6 +8504,8 @@ const CloudRecorder = () => {
           micSource
             .connect(audioInputGain.current)
             .connect(destination.current);
+          if (busTap.current) audioInputGain.current.connect(busTap.current);
+          busSources.current.mic = true;
           micStream.current = destination.current.stream;
 
           const { micActive } = await chrome.storage.local.get(["micActive"]);
@@ -8265,6 +8523,8 @@ const CloudRecorder = () => {
         screenSource
           .connect(audioOutputGain.current)
           .connect(destination.current);
+        if (busTap.current) audioOutputGain.current.connect(busTap.current);
+        busSources.current.system = true;
 
         // Diagnostic only: system/tab audio can die mid-recording (tab closed,
         // OS mute, BT disconnect). Log it, don't stop; video/mic continue.
@@ -8821,6 +9081,8 @@ const CloudRecorder = () => {
       const timeoutMs = Number(request.timeoutMs) || 20000;
       (async () => {
         try {
+          // Only cancel and discard send shouldFinalize:false.
+          if (request.shouldFinalize === false) await markSessionDiscarded();
           if (isInit.current) {
             await stopRecording(
               request.shouldFinalize !== false,
@@ -8899,6 +9161,16 @@ const CloudRecorder = () => {
         cameraTimer.current.total += now - cameraTimer.current.start;
         cameraTimer.current.paused = true;
       }
+      // Gated on the recorder: a pause landing during mic setup is skipped for
+      // the mic alone, and the clock has to track the file, not the session.
+      if (
+        audioRecorder.current?.state === "paused" &&
+        !audioTimer.current.paused &&
+        audioTimer.current.start
+      ) {
+        audioTimer.current.total += now - audioTimer.current.start;
+        audioTimer.current.paused = true;
+      }
       pausedStateRef.current = true;
       void setRecordingTimingState({
         paused: true,
@@ -8934,6 +9206,13 @@ const CloudRecorder = () => {
       if (cameraTimer.current.paused) {
         cameraTimer.current.start = now;
         cameraTimer.current.paused = false;
+      }
+      if (
+        audioTimer.current.paused &&
+        audioRecorder.current?.state === "recording"
+      ) {
+        audioTimer.current.start = now;
+        audioTimer.current.paused = false;
       }
       pausedStateRef.current = false;
       void (async () => {

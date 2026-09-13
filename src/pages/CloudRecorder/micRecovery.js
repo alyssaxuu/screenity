@@ -11,6 +11,10 @@ import {
 
 const API_BASE = process.env.SCREENITY_API_BASE_URL;
 const MARKER_KEY = "pendingMicRecovery";
+export const MIC_AWAIT_SCENE_ALARM = "mic-recovery-await-scene";
+// Longer than the stop path's 120s inline budget plus margin, so a flag left
+// behind by a closed tab can't block the scan forever.
+const INLINE_UPLOAD_FRESH_MS = 5 * 60 * 1000;
 // Past a week the Bunny signature is useless and the marker is likelier a
 // stale profile than a real debt.
 const MAX_MARKER_AGE_MS = 7 * 24 * 60 * 60 * 1000;
@@ -80,6 +84,9 @@ export const listPendingMicRecovery = async () => {
   const map = await readMarkerMap();
   return Object.values(map).sort((a, b) => (a.at || 0) - (b.at || 0));
 };
+
+export const hasAwaitSceneMarkers = async () =>
+  (await listPendingMicRecovery()).some((m) => m.awaitScene);
 
 export const readPendingMicRecovery = async () => {
   try {
@@ -180,6 +187,22 @@ const bumpAttempts = async (marker) => {
   } catch {}
 };
 
+const fetchScene = async ({ projectId, sceneId }, token) => {
+  if (!API_BASE || !token || !projectId || !sceneId) return null;
+  try {
+    // Uncached, or a "not yet" answer sticks for a minute.
+    const res = await fetch(`${API_BASE}/videos/${projectId}/?refresh=true`, {
+      headers: { Authorization: `Bearer ${token}` },
+      credentials: "include",
+    });
+    if (!res.ok) return null;
+    const body = await res.json().catch(() => null);
+    return body?.video?.data?.scenes?.[sceneId] || null;
+  } catch {
+    return null;
+  }
+};
+
 // Keyed on the marker, not a bare "ever": a worker outlives several recordings
 // and a new debt deserves a fresh attempt.
 const _attempted = new Set();
@@ -215,6 +238,23 @@ const recoverOne = async (marker, { logger, token, ignoreLiveRecording }) => {
     }));
   } catch {
     return { ran: false, reason: "store-open-failed" };
+  }
+
+  // Crash recovery writes this marker before the scene exists, and attaching to
+  // a missing scene reads as settled and clears the voice.
+  if (marker.awaitScene) {
+    const scene = await fetchScene(marker, token);
+    if (!scene) return { ran: false, reason: "scene-not-ready" };
+    // The stop path attached it and was only cut off before cleaning up.
+    // Sending it again would orphan a second copy on Storage.
+    if (scene.audioSourceMediaId) {
+      await clearPendingMicRecovery(marker.sceneId);
+      const live = await chrome.storage.local.get(["recording", "pendingRecording"]);
+      if (!live.recording && !live.pendingRecording) {
+        await store.clear().catch(() => {});
+      }
+      return { ran: false, reason: "already-attached" };
+    }
   }
 
   _attempted.add(key);
@@ -283,9 +323,19 @@ export const runMicRecoveryScan = async ({
   // durable backup with it. Only a pass that reaches the chunks burns the
   // one-shot, so the early returns below must not block a later wake.
   const all = await listPendingMicRecovery();
-  const markers = backend
-    ? all.filter((m) => (m.backend || "idb") === backend)
-    : all;
+  // The stop path writes its marker before its own inline upload, so scanning
+  // that marker then would send the same mic twice.
+  const { micUploadInFlight } = await chrome.storage.local.get([
+    "micUploadInFlight",
+  ]);
+  const inFlightScene =
+    micUploadInFlight &&
+    Date.now() - (micUploadInFlight.at || 0) < INLINE_UPLOAD_FRESH_MS
+      ? micUploadInFlight.sceneId
+      : null;
+  const markers = (
+    backend ? all.filter((m) => (m.backend || "idb") === backend) : all
+  ).filter((m) => !inFlightScene || m.sceneId !== inFlightScene);
   if (!markers.length) return { ran: false, reason: "no-marker" };
 
   if (!ignoreLiveRecording) {

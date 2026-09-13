@@ -1782,5 +1782,25 @@
   "emptyRecordingDescription": {
     "message": "Nie zarejestrowano obrazu. Spróbuj nagrać ponownie.",
     "description": "Modal description when the recording file contains no video"
+  },
+  "unsavedRecordingModalTitle": {
+    "message": "Ostatnie nagranie nie zostało zapisane",
+    "description": "Title of the modal shown when starting a recording while the previous one is unsaved."
+  },
+  "unsavedRecordingModalDescription": {
+    "message": "Jest nadal otwarte w innej karcie i przepadnie po jej zamknięciu. Pobierz je najpierw, aby je zachować.",
+    "description": "Body of the unsaved-previous-recording modal."
+  },
+  "unsavedRecordingModalAction": {
+    "message": "Nagrywaj mimo to",
+    "description": "Confirm button: start the new recording anyway."
+  },
+  "unsavedRecordingModalCancel": {
+    "message": "Otwórz nagranie",
+    "description": "Cancel button: bring the unsaved recording's tab forward instead."
+  },
+  "unsavedRecordingModalDismiss": {
+    "message": "Nie pokazuj ponownie",
+    "description": "Side button: start the recording and stop prompting about unsaved recordings."
   }
 }

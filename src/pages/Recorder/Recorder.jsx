@@ -16,6 +16,11 @@ import {
   enforceOversampleRatio,
 } from "../utils/captureResolution";
 import {
+  createDimensionLockedStream,
+  isDimensionLockDisabled,
+} from "./dimensionLock";
+import { activeChunksStore, loadActiveSlot } from "../utils/chunkStores";
+import {
   getBitrates,
   getResolutionForQuality,
   computeTargetVideoBps,
@@ -72,9 +77,9 @@ localforage.config({
   version: 1,
 });
 
-const chunksStore = localforage.createInstance({
-  name: "chunks",
-});
+// The retained recording sits in the other slot, so a hardcoded instance here
+// would have cleared it. Resolves the live slot on every call.
+const chunksStore = activeChunksStore;
 
 document.body.style.willChange = "contents";
 
@@ -302,6 +307,25 @@ const Recorder = () => {
   const pendingMicIntent = useRef(null);
 
   const recorder = useRef(null);
+
+  // Recordings whose editor tab is still open, computed by the background at
+  // record start. Awaiting the slot pointer keeps writes on the free slot.
+  const readRetentionPlan = async () => {
+    try {
+      await loadActiveSlot();
+      const { retentionPlan } = await chrome.storage.local.get([
+        "retentionPlan",
+      ]);
+      const names = retentionPlan?.keepNames;
+      return Array.isArray(names) ? names : [];
+    } catch {
+      return [];
+    }
+  };
+
+  // Fixed-size relay for the MediaRecorder path, see dimensionLock.js.
+
+  const dimensionLock = useRef(null);
   const useWebCodecs = useRef(false);
   // null on MediaRecorder path.
   const chunkWriter = useRef(null);
@@ -1470,6 +1494,7 @@ const Recorder = () => {
         if (!openResult) {
           openResult = await selection.writer.open(recordingId, {
             extension: recordingExtension,
+            keepNames: await readRetentionPlan(),
           });
         }
         endOpen({ backend: selection.backend, prewarmed: prewarmedMatches });
@@ -1489,6 +1514,7 @@ const Recorder = () => {
           selection = await chooseWriter({ preferOpfs: false });
           openResult = await selection.writer.open(recordingId, {
             extension: recordingExtension,
+            keepNames: await readRetentionPlan(),
           });
         } else {
           throw openErr;
@@ -2278,6 +2304,8 @@ const Recorder = () => {
               );
               (async () => {
                 const prev = recorder.current;
+                dimensionLock.current?.stop().catch(() => {});
+                dimensionLock.current = null;
                 recorder.current = null;
                 useWebCodecs.current = false;
                 try {
@@ -2369,6 +2397,8 @@ const Recorder = () => {
             type: "show-toast",
             message: chrome.i18n.getMessage("webcodecsFailedOffToast"),
           });
+          dimensionLock.current?.stop().catch(() => {});
+          dimensionLock.current = null;
           recorder.current = null;
           // Abort the OPFS writer opened for the WebCodecs path. The recursive
           // startRecording() picks IDB because forceMediaRecorder short-circuits
@@ -2432,7 +2462,48 @@ const Recorder = () => {
             // slot rather than leaving it to the unclaimed-prewarm timeout.
             closeActiveEncoderPrewarm().catch(() => {});
             try {
-              recorder.current = createMediaRecorder(liveStream.current, {
+              // A surface resize mid-recording corrupts the rest of the file.
+              // Record a dimension-locked relay, not the raw track.
+              let recordStream = liveStream.current;
+              let lock = null;
+              if (!(await isDimensionLockDisabled())) {
+                lock = createDimensionLockedStream(liveStream.current, {
+                  width,
+                  height,
+                  fps,
+                  onError: (info) => {
+                    chrome.runtime
+                      .sendMessage({
+                        type: "diag-forward",
+                        event: "recorder-dimension-lock-error",
+                        data: {
+                          error: info.error,
+                          framesIn: info.framesIn,
+                          framesOut: info.framesOut,
+                          sourceSizeChanges: info.sourceSizeChanges,
+                        },
+                      })
+                      .catch(() => {});
+                    requestStop("dimension-lock-pump-error");
+                  },
+                });
+                if (lock) {
+                  dimensionLock.current = lock;
+                  recordStream = lock.stream;
+                }
+                chrome.runtime
+                  .sendMessage({
+                    type: "diag-forward",
+                    event: "recorder-dimension-lock",
+                    data: {
+                      engaged: Boolean(lock),
+                      width: lock ? lock.width : null,
+                      height: lock ? lock.height : null,
+                    },
+                  })
+                  .catch(() => {});
+              }
+              recorder.current = createMediaRecorder(recordStream, {
                 audioBitsPerSecond,
                 videoBitsPerSecond: videoBitsPerSecond,
               });
@@ -2536,6 +2607,8 @@ const Recorder = () => {
         } catch (err) {
           debugError("Failed to start MediaRecorder", err);
           sendRecordingError("Failed to start recording: " + String(err));
+          dimensionLock.current?.stop().catch(() => {});
+          dimensionLock.current = null;
           recorder.current = null;
           isStarting.current = false;
           stopTabKeepAlive();
@@ -3034,6 +3107,7 @@ const Recorder = () => {
           } catch {}
           const openResult = await selection.writer.open(recordingId, {
             extension: prewarmExt,
+            keepNames: await readRetentionPlan(),
           });
           return { selection, openResult, recordingId, extension: prewarmExt };
         } catch {
@@ -3210,6 +3284,8 @@ const Recorder = () => {
     if (!useWebCodecs.current) {
       await updateFreeFinalizeStatus("chunks_ready", 100);
     }
+    dimensionLock.current?.stop().catch(() => {});
+    dimensionLock.current = null;
     recorder.current = null;
 
     stopTabKeepAlive();
@@ -3277,6 +3353,9 @@ const Recorder = () => {
         recorder.current.onerror = null;
       } catch {}
     }
+
+    dimensionLock.current?.stop().catch(() => {});
+    dimensionLock.current = null;
 
     if (chunkWriter.current) {
       try {
@@ -3364,6 +3443,10 @@ const Recorder = () => {
       isRestarting.current = false;
       return false;
     }
+
+    dimensionLock.current?.stop().catch(() => {});
+
+    dimensionLock.current = null;
 
     recorder.current = null;
 
@@ -4782,6 +4865,10 @@ const Recorder = () => {
               } catch (err) {
                 debugWarn("offscreen-shutdown discard teardown failed", err);
               }
+              // Stops the relay pump. It never stops the capture tracks, so the
+              // slow-start race noted below does not apply.
+              dimensionLock.current?.stop().catch(() => {});
+              dimensionLock.current = null;
               if (chunkWriter.current) {
                 try {
                   await chunkWriter.current.abort();

@@ -1,17 +1,13 @@
-import localforage from "localforage";
 import { sendMessageTab } from "../tabManagement";
-
-localforage.config({
-  driver: localforage.INDEXEDDB,
-  name: "screenity",
-  version: 1,
-});
+import { activeChunksStore } from "../../utils/chunkStores";
 
 // in-memory promise chain. storage-based sendingChunks flag was racy:
 // check-then-set via async chrome.storage let two concurrent triggers pass.
 let _sendChain = Promise.resolve();
 
-export const chunksStore = localforage.createInstance({ name: "chunks" });
+// Resolves to whichever slot is live, see chunkStores.js. Same export name so
+// every existing caller still means "the current recording".
+export const chunksStore = activeChunksStore;
 const DEBUG_POSTSTOP = false;
 
 export const clearAllRecordings = async () => {

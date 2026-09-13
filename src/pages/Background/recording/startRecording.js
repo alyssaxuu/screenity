@@ -6,6 +6,7 @@ import { makeRecordingAttemptId } from "../../utils/errorCodes";
 import { lifecycle } from "../../utils/lifecycleLog";
 import { sweepRecorderTabs } from "./sweepRecorderTabs";
 import { emitRecordingTelemetry } from "./emitRecordingTelemetry";
+import { retainedTabIdsFor } from "./recordingRetention";
 
 // `recording` flag isn't set until the recorder iframe inits (seconds later),
 // so countdown-finished + 8s fallback can both fire and open two recorder tabs
@@ -199,8 +200,22 @@ const _startRecordingInner = async (caller) => {
     "recordingType",
   ]);
 
-  // Close every prior editor tab by URL (sandboxTab only tracks the last).
-  // OPFS wipes on new recording, so a stale editor would read missing data.
+  // Computed before the sweep below, because it decides which editor tabs are
+  // holding a recording that survives and therefore must stay open.
+  let retainedTabIds = new Set();
+  try {
+    // Read, not recomputed. startRecorderSession published this before the
+    // recorder acted on it, and a second answer here would disagree.
+    const stored = await chrome.storage.local.get(["retentionPlan"]);
+    retainedTabIds = await retainedTabIdsFor(stored?.retentionPlan);
+  } catch (err) {
+    // Retention is best-effort. A failure here must not stop a recording, and
+    // falling through means the old wipe-everything behaviour.
+    console.warn("[Screenity][BG] retention plan failed", err);
+  }
+
+  // sandboxTab only tracks the last tab, so match by URL instead. Skip tabs
+  // holding a kept recording: closing one drops its only copy.
   try {
     // editor.html covers viewer mode too (editor.html?view=1); startsWith match.
     const editorUrls = [chrome.runtime.getURL("editor.html")];
@@ -208,6 +223,7 @@ const _startRecordingInner = async (caller) => {
     const editorTabs = allTabs.filter(
       (t) =>
         t.id != null &&
+        !retainedTabIds.has(t.id) &&
         t.url &&
         editorUrls.some((prefix) => t.url.startsWith(prefix)),
     );
@@ -320,7 +336,7 @@ const _startRecordingInner = async (caller) => {
       }
     });
   } else {
-    chrome.storage.local.remove(["recordingMeta"]);
+    chrome.storage.local.remove(["recordingMeta", "recordedTabDomain"]);
   }
 
   chrome.storage.local.set({ lastRecordingType: recordingType || "screen" });

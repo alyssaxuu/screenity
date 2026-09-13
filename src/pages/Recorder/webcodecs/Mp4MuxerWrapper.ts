@@ -22,6 +22,7 @@ interface Mp4MuxerWrapperOptions {
   videoCodec?: string;
   audioCodec?: string;
   onChunk: (chunk: Uint8Array, timestampUs: number | null) => void | Promise<void>;
+  onMuxError?: (err: any, kind: "video" | "audio") => void;
   debug?: boolean;
 }
 
@@ -48,6 +49,8 @@ export class Mp4MuxerWrapper {
   private lastAudioTimestampUs = 0;
 
   private _lastDecoderConfig: any = null;
+  private _audioClosed = false;
+  private _muxErrorReported = false;
 
   // Coalesces small StreamTarget writes (per-fragment headers, sample data,
   // trailing bytes) into fewer larger IDB puts.
@@ -154,6 +157,33 @@ export class Mp4MuxerWrapper {
     }
   }
 
+  // Packet buffering: the Output waits for audio at every timestamp, so a dead
+  // audio track stops all fragment writes and buffers video in memory.
+  closeAudio() {
+    if (!this.audioSource || this._audioClosed) return;
+    this._audioClosed = true;
+    this.log("[MUXER] closeAudio");
+    try {
+      this.audioSource.close();
+    } catch (err) {
+      this.warn("[MUXER] closeAudio threw", err);
+    }
+  }
+
+  // finalize() still resolves after a rejected add(), so dropped packets ship
+  // as a valid but empty recording. Report the first one.
+  private trackAdd(p: any, kind: "video" | "audio") {
+    if (!(p instanceof Promise)) return p;
+    return p.catch((err) => {
+      if (this._muxErrorReported) return;
+      this._muxErrorReported = true;
+      this.err(`[MUXER] ${kind} add failed`, err);
+      try {
+        this.options.onMuxError?.(err, kind);
+      } catch {}
+    });
+  }
+
   addVideoChunk(chunk: EncodedVideoChunk, meta: any) {
     if (meta?.decoderConfig) {
       this._lastDecoderConfig = meta.decoderConfig;
@@ -166,14 +196,14 @@ export class Mp4MuxerWrapper {
         : meta;
 
     const packet = this.buildPacket(chunk, effectiveMeta, "video");
-    return this.videoSource.add(packet, effectiveMeta);
+    return this.trackAdd(this.videoSource.add(packet, effectiveMeta), "video");
   }
 
   addAudioChunk(chunk: EncodedAudioChunk, meta: any) {
-    if (!this.audioSource) return;
+    if (!this.audioSource || this._audioClosed) return;
 
     const packet = this.buildPacket(chunk, meta, "audio");
-    return this.audioSource.add(packet, meta);
+    return this.trackAdd(this.audioSource.add(packet, meta), "audio");
   }
 
   async start() {

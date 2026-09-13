@@ -70,6 +70,10 @@ import {
   checkCapturePermissions,
 } from "../recording/recordingHelpers";
 import { clearAllRecordings } from "../recording/chunkHandler";
+import {
+  markRetainedSaved,
+  unsavedRetained,
+} from "../recording/recordingRetention";
 import { setMicActiveTab } from "../tabManagement/tabHelpers";
 import { handleSignOutDrive } from "../drive/handleSignOutDrive";
 import { loginWithWebsite } from "../auth/loginWithWebsite";
@@ -1545,6 +1549,73 @@ export const setupHandlers = () => {
   registerMessage("diag-editor-ready", (message) =>
     diagEvent("editor-load-ready", { path: message?.path || null }),
   );
+  // Which recording this editor owns. lastRecordingBackendRef always names the
+  // newest, so with several editors open none of them can use it.
+  registerMessage("resolve-editor-recording", async (_message, sender) => {
+    const tabId = sender?.tab?.id;
+    if (typeof tabId !== "number") return { ref: null };
+    try {
+      const { retainedRecordings } = await chrome.storage.local.get([
+        "retainedRecordings",
+      ]);
+      const list = Array.isArray(retainedRecordings) ? retainedRecordings : [];
+      const mine = list.find((e) => e.tabId === tabId);
+      if (!mine) return { ref: null };
+      // Its slot was reclaimed, so a ref would point this editor at whichever
+      // recording is live now.
+      if (mine.bytesGone) return { ref: null, gone: true };
+      // slot travels inside ref: the IDB reader takes it from there.
+      return {
+        ref: {
+          backend: mine.backend,
+          fileName: mine.fileName,
+          slot: mine.slot || null,
+        },
+        recordingId: mine.recordingId,
+      };
+    } catch {
+      return { ref: null };
+    }
+  });
+
+  // Asked before a recording starts. The popup blocks on the answer so the
+  // user acknowledges an unsaved previous recording before replacing it.
+  registerMessage("unsaved-retained-recording", async () => {
+    const entry = await unsavedRetained();
+    return entry
+      ? { hasUnsaved: true, tabId: entry.tabId, recordingId: entry.recordingId }
+      : { hasUnsaved: false };
+  });
+
+  // Bring the unsaved recording's editor forward so it can be downloaded.
+  registerMessage("focus-retained-recording", async (message) => {
+    const tabId = message?.tabId;
+    if (typeof tabId !== "number") return { ok: false };
+    try {
+      // Only a tab this registry knows, so the message is not a way to focus
+      // any tab in the browser.
+      const { retainedRecordings } = await chrome.storage.local.get([
+        "retainedRecordings",
+      ]);
+      const list = Array.isArray(retainedRecordings) ? retainedRecordings : [];
+      if (!list.some((e) => e.tabId === tabId)) return { ok: false };
+      const tab = await chrome.tabs.get(tabId);
+      await chrome.windows.update(tab.windowId, { focused: true });
+      await chrome.tabs.update(tabId, { active: true });
+      return { ok: true };
+    } catch {
+      return { ok: false };
+    }
+  });
+
+  // The editor reports a download or Drive save so retention can stop
+  // protecting a recording the user already has a copy of.
+  registerMessage("recording-saved", async (message, sender) => {
+    await markRetainedSaved(
+      message?.recordingId || null,
+      sender?.tab?.id ?? null,
+    );
+  });
   // prefix allowlist so a compromised context can't spoof lifecycle events
   registerMessage("diag-forward", (message) => {
     const ev = typeof message?.event === "string" ? message.event : null;
@@ -1560,6 +1631,11 @@ export const setupHandlers = () => {
       "editor-",
       // AudioContext interrupt/resume from attachAudioContextWatchdog (page realm).
       "audiocontext-",
+      // Mix-bus warm-up and the resume that keeps a suspended graph from
+      // muxing silence. Dropped before, so the bus was invisible in zips.
+      "audio-bus-",
+      // Mic separation decisions and fallbacks, dropped for the same reason.
+      "separated-",
     ];
     if (!allowedPrefixes.some((p) => ev.startsWith(p))) return;
     diagEvent(ev, message?.data ?? null);
@@ -1858,6 +1934,35 @@ export const setupHandlers = () => {
       return true;
     },
   );
+  // Gated so DefinePlugin strips it from a release bundle. The DevHUD button
+  // behind the same flag is the only caller, and this revokes permissions.
+  if (process.env.SCREENITY_DEV_MODE === "true") {
+    // remove() needs no user gesture so the worker can do it, request() cannot.
+    registerMessage("reset-capture-permissions", async () => {
+      // One at a time: remove() is atomic, so a single unremovable entry fails
+      // the whole batch. lastError carries the reason and is otherwise swallowed.
+      const targets = [
+        "desktopCapture",
+        "alarms",
+        "offscreen",
+        "clipboardWrite",
+      ];
+      const results = {};
+      for (const permission of targets) {
+        results[permission] = await new Promise((resolve) => {
+          chrome.permissions.remove({ permissions: [permission] }, (ok) => {
+            const err = chrome.runtime.lastError;
+            resolve(err ? `error: ${err.message}` : ok ? "removed" : "refused");
+          });
+        });
+      }
+      const remaining = await new Promise((resolve) => {
+        chrome.permissions.getAll((p) => resolve(p?.permissions || []));
+      });
+      return { results, remaining };
+    });
+  }
+
   registerMessage("is-pinned", async () => await isPinned());
 
   // prevent Chrome from discarding the CloudRecorder tab while recording
@@ -1867,11 +1972,13 @@ export const setupHandlers = () => {
 
   registerMessage(
     "save-to-drive",
-    async (message) => await handleSaveToDrive(message, false),
+    async (message, sender) =>
+      await handleSaveToDrive(message, false, sender?.tab?.id ?? null),
   );
   registerMessage(
     "save-to-drive-fallback",
-    async (message) => await handleSaveToDrive(message, true),
+    async (message, sender) =>
+      await handleSaveToDrive(message, true, sender?.tab?.id ?? null),
   );
   registerMessage("request-download", (message) =>
     requestDownload(message.base64, message.title),

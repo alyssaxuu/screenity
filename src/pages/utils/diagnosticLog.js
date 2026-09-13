@@ -258,6 +258,12 @@ export const getStorageFlags = async () => {
     "lastRestartFlow",
     "restartFlowHistory",
     "lastFirstChunkWatchdog",
+    // Unsaved-recording retention: which recordings are protected, the plan
+    // handed to the writer, and the IDB slot in use.
+    "retainedRecordings",
+    "retentionPlan",
+    "activeChunkSlot",
+    "unsavedRecordingPromptDismissed",
     // Cloud recorder lifecycle (Pro flow). Surfaces the recorder session
     // state machine + the message-flow flags needed to debug double-prompt
     // / silent-close scenarios.

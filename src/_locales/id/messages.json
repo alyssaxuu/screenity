@@ -1782,5 +1782,25 @@
   "emptyRecordingDescription": {
     "message": "Tidak ada video yang terekam. Silakan coba rekam lagi.",
     "description": "Modal description when the recording file contains no video"
+  },
+  "unsavedRecordingModalTitle": {
+    "message": "Rekaman terakhir Anda belum disimpan",
+    "description": "Title of the modal shown when starting a recording while the previous one is unsaved."
+  },
+  "unsavedRecordingModalDescription": {
+    "message": "Rekaman masih terbuka di tab lain dan akan hilang setelah Anda menutup tab itu. Unduh dulu untuk menyimpannya.",
+    "description": "Body of the unsaved-previous-recording modal."
+  },
+  "unsavedRecordingModalAction": {
+    "message": "Tetap rekam",
+    "description": "Confirm button: start the new recording anyway."
+  },
+  "unsavedRecordingModalCancel": {
+    "message": "Buka rekaman",
+    "description": "Cancel button: bring the unsaved recording's tab forward instead."
+  },
+  "unsavedRecordingModalDismiss": {
+    "message": "Jangan tampilkan lagi",
+    "description": "Side button: start the recording and stop prompting about unsaved recordings."
   }
 }

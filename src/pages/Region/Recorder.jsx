@@ -44,6 +44,7 @@ import { perfMark, perfSpan } from "../utils/perfMarks";
 import { markStartProgress } from "../utils/startProgress";
 
 import localforage from "localforage";
+import { activeChunksStore } from "../utils/chunkStores";
 
 localforage.config({
   driver: localforage.INDEXEDDB,
@@ -51,9 +52,9 @@ localforage.config({
   version: 1,
 });
 
-const chunksStore = localforage.createInstance({
-  name: "chunks",
-});
+// Region always writes to IDB. Goes through the slot resolver so it writes to
+// and clears the free slot, leaving a retained recording alone.
+const chunksStore = activeChunksStore;
 
 const DEBUG_RECORDER =
   typeof window !== "undefined" ? !!window.SCREENITY_DEBUG_RECORDER : false;

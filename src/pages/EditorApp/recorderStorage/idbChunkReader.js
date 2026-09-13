@@ -1,5 +1,5 @@
-// IDB ChunkReader. Iterates chunksStore, sorts by (timestamp, index).
 import localforage from "localforage";
+import { instanceForSlot, loadActiveSlot } from "../../utils/chunkStores";
 
 localforage.config({
   driver: localforage.INDEXEDDB,
@@ -7,17 +7,18 @@ localforage.config({
   version: 1,
 });
 
-const chunksStore = localforage.createInstance({
-  name: "chunks",
-});
-
 export class IdbChunkReader {
   constructor() {
     this._opened = false;
+    this._store = null;
   }
 
-  async open(_backendRef) {
-    await chunksStore.ready();
+  // backendRef.slot names this editor's own recording. Without it a second
+  // editor reads whichever slot is live, which is the newer recording.
+  async open(backendRef) {
+    const slot = backendRef?.slot || (await loadActiveSlot());
+    this._store = instanceForSlot(slot);
+    await this._store.ready();
     this._opened = true;
   }
 
@@ -26,7 +27,7 @@ export class IdbChunkReader {
       throw new Error("idb-chunk-reader-not-opened");
     }
     const items = [];
-    await chunksStore.iterate((value) => {
+    await this._store.iterate((value) => {
       items.push(value);
       return undefined;
     });
@@ -58,5 +59,3 @@ export class IdbChunkReader {
     this._opened = false;
   }
 }
-
-export { chunksStore as idbChunksStore };

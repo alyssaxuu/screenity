@@ -1782,5 +1782,25 @@
   "emptyRecordingDescription": {
     "message": "कोई वीडियो कैप्चर नहीं हुआ। कृपया दोबारा रिकॉर्ड करें।",
     "description": "Modal description when the recording file contains no video"
+  },
+  "unsavedRecordingModalTitle": {
+    "message": "आपकी पिछली रिकॉर्डिंग सहेजी नहीं गई है",
+    "description": "Title of the modal shown when starting a recording while the previous one is unsaved."
+  },
+  "unsavedRecordingModalDescription": {
+    "message": "यह अब भी दूसरे टैब में खुली है और उस टैब को बंद करते ही खो जाएगी। इसे रखने के लिए पहले डाउनलोड करें।",
+    "description": "Body of the unsaved-previous-recording modal."
+  },
+  "unsavedRecordingModalAction": {
+    "message": "फिर भी रिकॉर्ड करें",
+    "description": "Confirm button: start the new recording anyway."
+  },
+  "unsavedRecordingModalCancel": {
+    "message": "रिकॉर्डिंग खोलें",
+    "description": "Cancel button: bring the unsaved recording's tab forward instead."
+  },
+  "unsavedRecordingModalDismiss": {
+    "message": "दोबारा न दिखाएं",
+    "description": "Side button: start the recording and stop prompting about unsaved recordings."
   }
 }
