@@ -879,6 +879,34 @@
     "message": "Kaydın başlatılmasında bir hata oluştu gibi görünüyor. Tarayıcınızı yeniden başlatın ve tekrar deneyin. Sorun devam ederse, lütfen support@screenity.io adresinden bize ulaşın.",
     "description": "Akış hatası modal açıklaması"
   },
+  "accountErrorModalTitle": {
+    "message": "Abonelik gerekiyor",
+    "description": "Title of the modal shown when a cloud recording is refused because the account has no active subscription"
+  },
+  "accountErrorModalDescription": {
+    "message": "Screenity bulut kaydı başlatamadı çünkü bu hesabın etkin bir aboneliği yok. Kayıtlarınız ve ayarlarınız güvende.",
+    "description": "Body shown when the account has never had an active subscription (server: upgrade_required)"
+  },
+  "accountErrorModalDescriptionLapsed": {
+    "message": "Screenity bulut kaydı başlatamadı çünkü bu hesabın Pro erişimi sona erdi. Kayıtlarınız ve ayarlarınız güvende.",
+    "description": "Body shown when the account's subscription has ended (server: reactivate_required)"
+  },
+  "accountErrorModalAction": {
+    "message": "Aboneliği görüntüle",
+    "description": "Button that opens the subscription page"
+  },
+  "authErrorModalTitle": {
+    "message": "Tekrar oturum açın",
+    "description": "Title of the modal shown when a cloud recording is refused because the session expired, not the subscription"
+  },
+  "authErrorModalDescription": {
+    "message": "Screenity bulut kaydı başlatamadı çünkü bu oturum sona erdi. Aboneliğiniz, kayıtlarınız ve ayarlarınız güvende.",
+    "description": "Body shown when the session/token failed; the account may well be a paying subscriber"
+  },
+  "authErrorModalAction": {
+    "message": "Oturum aç",
+    "description": "Button that reopens the login flow"
+  },
   "highestQuality": {
     "message": "En Yüksek Kalite",
     "description": "Açılır penceredeki en yüksek kalite etiketi"
@@ -1580,6 +1608,14 @@
   "audioTrackEndedToast": {
     "message": "Ses bağlantısı kesildi. Kaydınız şimdi kaydediliyor. Şimdiye kadar yakalanan video güvende.",
     "description": "Toast shown when the audio track ends mid-recording (e.g. mic unplugged, permission revoked)"
+  },
+  "captureAudioUnavailableToast": {
+    "message": "Bilgisayar sesi kaydedilemedi, bu nedenle bu kayıtta yalnızca video var.",
+    "description": "Toast shown when the system/tab audio source fails to start and recording continues without it"
+  },
+  "captureAudioRepickToast": {
+    "message": "Bilgisayar sesi kaydedilemedi. Yalnızca video kaydetmek için ekranınızı yeniden seçin.",
+    "description": "Toast shown before the screen picker reopens because system audio could not start and capture is retrying without it"
   },
   "editorRecoveryToast": {
     "message": "Kaydınız kaydedildi. Düzenleyici açılmadı. Tekrar denemek için Screenity simgesine tıklayın.",

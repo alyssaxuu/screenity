@@ -879,6 +879,34 @@
     "message": "開始錄製時似乎發生了錯誤。請重新開啟您的瀏覽器後再試一次。如果問題還是存在，請寄信到 support@screenity.io 與我們聯繫。",
     "description": "Stream error modal description"
   },
+  "accountErrorModalTitle": {
+    "message": "需要訂閱",
+    "description": "Title of the modal shown when a cloud recording is refused because the account has no active subscription"
+  },
+  "accountErrorModalDescription": {
+    "message": "Screenity 無法開始雲端錄製，此帳號沒有有效訂閱。你的錄製內容和設定都已保留。",
+    "description": "Body shown when the account has never had an active subscription (server: upgrade_required)"
+  },
+  "accountErrorModalDescriptionLapsed": {
+    "message": "Screenity 無法開始雲端錄製，此帳號的 Pro 使用權限已結束。你的錄製內容和設定都已保留。",
+    "description": "Body shown when the account's subscription has ended (server: reactivate_required)"
+  },
+  "accountErrorModalAction": {
+    "message": "查看訂閱",
+    "description": "Button that opens the subscription page"
+  },
+  "authErrorModalTitle": {
+    "message": "請重新登入",
+    "description": "Title of the modal shown when a cloud recording is refused because the session expired, not the subscription"
+  },
+  "authErrorModalDescription": {
+    "message": "Screenity 無法開始雲端錄製，此登入狀態已過期。你的訂閱、錄製內容和設定都已保留。",
+    "description": "Body shown when the session/token failed; the account may well be a paying subscriber"
+  },
+  "authErrorModalAction": {
+    "message": "登入",
+    "description": "Button that reopens the login flow"
+  },
   "highestQuality": {
     "message": "最高品質",
     "description": "Highest quality toggle label in popup"
@@ -1580,6 +1608,14 @@
   "audioTrackEndedToast": {
     "message": "音訊已中斷，正在儲存錄製內容。已錄製的影片是安全的。",
     "description": "Toast shown when the audio track ends mid-recording (e.g. mic unplugged, permission revoked)"
+  },
+  "captureAudioUnavailableToast": {
+    "message": "無法擷取電腦音訊，因此這次錄製僅包含影像。",
+    "description": "Toast shown when the system/tab audio source fails to start and recording continues without it"
+  },
+  "captureAudioRepickToast": {
+    "message": "無法擷取電腦音訊。請重新選擇畫面以僅錄製影像。",
+    "description": "Toast shown before the screen picker reopens because system audio could not start and capture is retrying without it"
   },
   "editorRecoveryToast": {
     "message": "錄製內容已儲存。編輯器未開啟，請點擊 Screenity 圖示重試。",

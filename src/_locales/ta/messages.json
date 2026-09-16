@@ -879,6 +879,34 @@
     "message": "பதிவில் ஏதோ பிழை ஏற்பட்டது போல் தெரிகிறது. உங்கள் உலாவியை மீண்டும் தொடங்கி, மீண்டும் முயற்சிக்கவும். சிக்கல் தொடர்ந்தால், தயவுசெய்து support@screenity.io முகவரியில் எங்களைத் தொடர்பு கொள்ளவும்.",
     "description": "ஸ்ட்ரீம் பிழை மாடல் விளக்கம்"
   },
+  "accountErrorModalTitle": {
+    "message": "சந்தா தேவை",
+    "description": "Title of the modal shown when a cloud recording is refused because the account has no active subscription"
+  },
+  "accountErrorModalDescription": {
+    "message": "இந்தக் கணக்கில் செயலில் உள்ள சந்தா இல்லாததால் Screenity கிளவுட் பதிவைத் தொடங்க முடியவில்லை. உங்கள் பதிவுகளும் அமைப்புகளும் பாதுகாப்பாக உள்ளன.",
+    "description": "Body shown when the account has never had an active subscription (server: upgrade_required)"
+  },
+  "accountErrorModalDescriptionLapsed": {
+    "message": "இந்தக் கணக்கின் Pro அணுகல் முடிந்துவிட்டதால் Screenity கிளவுட் பதிவைத் தொடங்க முடியவில்லை. உங்கள் பதிவுகளும் அமைப்புகளும் பாதுகாப்பாக உள்ளன.",
+    "description": "Body shown when the account's subscription has ended (server: reactivate_required)"
+  },
+  "accountErrorModalAction": {
+    "message": "சந்தாவைப் பார்க்க",
+    "description": "Button that opens the subscription page"
+  },
+  "authErrorModalTitle": {
+    "message": "மீண்டும் உள்நுழையவும்",
+    "description": "Title of the modal shown when a cloud recording is refused because the session expired, not the subscription"
+  },
+  "authErrorModalDescription": {
+    "message": "அமர்வு காலாவதியானதால் Screenity கிளவுட் பதிவைத் தொடங்க முடியவில்லை. உங்கள் சந்தா, பதிவுகள், அமைப்புகள் அனைத்தும் பாதுகாப்பாக உள்ளன.",
+    "description": "Body shown when the session/token failed; the account may well be a paying subscriber"
+  },
+  "authErrorModalAction": {
+    "message": "உள்நுழை",
+    "description": "Button that reopens the login flow"
+  },
   "highestQuality": {
     "message": "அதிசய உயர தரம்",
     "description": "பாப் பப் வரிசையில் அதிசய உயர தரம் லேபிள்"
@@ -1580,6 +1608,14 @@
   "audioTrackEndedToast": {
     "message": "ஆடியோ துண்டிக்கப்பட்டது. உங்கள் பதிவு சேமிக்கப்படுகிறது. இதுவரை பதிவான வீடியோ பாதுகாப்பாக உள்ளது.",
     "description": "Toast shown when the audio track ends mid-recording (e.g. mic unplugged, permission revoked)"
+  },
+  "captureAudioUnavailableToast": {
+    "message": "கணினி ஒலியைப் பதிவு செய்ய முடியவில்லை, எனவே இந்தப் பதிவில் காணொளி மட்டுமே உள்ளது.",
+    "description": "Toast shown when the system/tab audio source fails to start and recording continues without it"
+  },
+  "captureAudioRepickToast": {
+    "message": "கணினி ஒலியைப் பதிவு செய்ய முடியவில்லை. காணொளியை மட்டும் பதிவு செய்ய திரையை மீண்டும் தேர்ந்தெடுக்கவும்.",
+    "description": "Toast shown before the screen picker reopens because system audio could not start and capture is retrying without it"
   },
   "editorRecoveryToast": {
     "message": "உங்கள் பதிவு சேமிக்கப்பட்டது. எடிட்டர் திறக்கப்படவில்லை. மீண்டும் முயற்சிக்க Screenity சின்னத்தைக் கிளிக் செய்யுங்கள்.",

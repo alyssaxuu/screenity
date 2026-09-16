@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useCallback } from "react";
 import { createDebugLogger } from "../utils/recorderDebug";
 import { selectMimeType, getCodecLabel, buildTrackSnapshot } from "../utils/recorderCodec";
 import { getUserMediaWithFallback } from "../utils/mediaDeviceFallback";
+import { isCaptureAudioSourceError } from "../utils/captureAudioFallback";
 import { startAudioStream as acquireMicStream } from "../utils/startAudioStream";
 import { shouldAcquireMicAtStart } from "../utils/micAcquisitionPolicy";
 import { attachAudioContextWatchdog } from "../utils/audioContextWatchdog";
@@ -2337,12 +2338,42 @@ const Recorder = () => {
       const endGetDisplayMedia = perfSpan("Region.Recorder getDisplayMedia");
       // Region needs a focused doc too: retry once on InvalidStateError. No
       // monitor constraints here (tab-crop via preferCurrentTab).
-      stream = await acquireDisplayMediaWithFocusRetry({
-        getDisplayMedia: (c) => navigator.mediaDevices.getDisplayMedia(c),
-        constraints,
-        onReactivate: () =>
-          chrome.runtime.sendMessage({ type: "activate-recorder-tab" }),
-      });
+      const acquireDisplay = (c) =>
+        acquireDisplayMediaWithFocusRetry({
+          getDisplayMedia: (cc) => navigator.mediaDevices.getDisplayMedia(cc),
+          constraints: c,
+          onReactivate: () =>
+            chrome.runtime.sendMessage({ type: "activate-recorder-tab" }),
+        });
+      try {
+        stream = await acquireDisplay(constraints);
+      } catch (err) {
+        // The audio rejection takes the video with it. getDisplayMedia only
+        // fails after the user has picked, so the retry costs a second pick.
+        if (!constraints.audio || !isCaptureAudioSourceError(err)) throw err;
+        console.warn("[Region] capture audio source failed", err);
+        try {
+          chrome.runtime.sendMessage({
+            type: "diag-forward",
+            event: "recorder-capture-audio-unavailable",
+            data: {
+              path: "region",
+              error: String(err?.name || err).slice(0, 80),
+              message: String(err?.message || "").slice(0, 120),
+            },
+          });
+        } catch {}
+        // Fired before the picker reopens: an unexplained second prompt
+        // reads as a bug.
+        chrome.runtime
+          .sendMessage({
+            type: "show-toast",
+            message: chrome.i18n.getMessage("captureAudioRepickToast"),
+            timeout: 10000,
+          })
+          .catch(() => {});
+        stream = await acquireDisplay({ ...constraints, audio: false });
+      }
       endGetDisplayMedia({
         videoTracks: stream?.getVideoTracks?.()?.length ?? 0,
         audioTracks: stream?.getAudioTracks?.()?.length ?? 0,

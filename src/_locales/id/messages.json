@@ -879,6 +879,34 @@
     "message": "Sepertinya ada kesalahan saat memulai perekaman. Restart browser Anda dan coba lagi. Jika masalah masih berlanjut, silakan hubungi kami di support@screenity.io.",
     "description": "Deskripsi modal kesalahan stream"
   },
+  "accountErrorModalTitle": {
+    "message": "Perlu langganan",
+    "description": "Title of the modal shown when a cloud recording is refused because the account has no active subscription"
+  },
+  "accountErrorModalDescription": {
+    "message": "Screenity tidak dapat memulai rekaman cloud karena akun ini tidak memiliki langganan aktif. Rekaman dan pengaturan Anda aman.",
+    "description": "Body shown when the account has never had an active subscription (server: upgrade_required)"
+  },
+  "accountErrorModalDescriptionLapsed": {
+    "message": "Screenity tidak dapat memulai rekaman cloud karena akses Pro akun ini telah berakhir. Rekaman dan pengaturan Anda aman.",
+    "description": "Body shown when the account's subscription has ended (server: reactivate_required)"
+  },
+  "accountErrorModalAction": {
+    "message": "Lihat langganan",
+    "description": "Button that opens the subscription page"
+  },
+  "authErrorModalTitle": {
+    "message": "Masuk lagi",
+    "description": "Title of the modal shown when a cloud recording is refused because the session expired, not the subscription"
+  },
+  "authErrorModalDescription": {
+    "message": "Screenity tidak dapat memulai rekaman cloud karena sesi ini telah berakhir. Langganan, rekaman, dan pengaturan Anda aman.",
+    "description": "Body shown when the session/token failed; the account may well be a paying subscriber"
+  },
+  "authErrorModalAction": {
+    "message": "Masuk",
+    "description": "Button that reopens the login flow"
+  },
   "highestQuality": {
     "message": "Kualitas Tertinggi",
     "description": "Label untuk mengganti kualitas tertinggi di popup"
@@ -1580,6 +1608,14 @@
   "audioTrackEndedToast": {
     "message": "Audio terputus. Menyimpan rekaman Anda. Video yang direkam sejauh ini aman.",
     "description": "Toast shown when the audio track ends mid-recording (e.g. mic unplugged, permission revoked)"
+  },
+  "captureAudioUnavailableToast": {
+    "message": "Audio komputer tidak dapat direkam, jadi rekaman ini hanya berisi video.",
+    "description": "Toast shown when the system/tab audio source fails to start and recording continues without it"
+  },
+  "captureAudioRepickToast": {
+    "message": "Audio komputer tidak dapat direkam. Pilih layar Anda lagi untuk merekam video saja.",
+    "description": "Toast shown before the screen picker reopens because system audio could not start and capture is retrying without it"
   },
   "editorRecoveryToast": {
     "message": "Rekaman Anda tersimpan. Editor tidak terbuka. Klik ikon Screenity untuk mencoba lagi.",

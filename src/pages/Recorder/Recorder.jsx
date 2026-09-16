@@ -45,6 +45,10 @@ import { beginFinalizeHeartbeat } from "../utils/finalizeHeartbeat";
 import { IS_OFFSCREEN_HOST } from "../utils/recordingHost";
 import { sendSystemAudioGuidanceToast } from "../utils/systemAudioGuidance";
 import {
+  isCaptureAudioSourceError,
+  shouldRequestCaptureAudio,
+} from "../utils/captureAudioFallback";
+import {
   shouldUseDisplayMediaForScreen,
   screenSurfaceSwitching,
 } from "../utils/screenCaptureMode";
@@ -3566,6 +3570,22 @@ const Recorder = () => {
 
   async function startStream(data, id, options, permissions, permissions2, streamOpts = {}) {
     const useDisplayMedia = !!streamOpts.useDisplayMedia;
+    let captureAudioDropped = false;
+    const reportCaptureAudioUnavailable = (err, extra) => {
+      slLog("capture-audio-unavailable", { ...extra });
+      try {
+        chrome.runtime.sendMessage({
+          type: "diag-forward",
+          event: "recorder-capture-audio-unavailable",
+          data: {
+            ...extra,
+            isTab: Boolean(isTab.current),
+            error: String(err?.name || err).slice(0, 80),
+            message: String(err?.message || "").slice(0, 120),
+          },
+        });
+      } catch {}
+    };
     // Only the screen/desktop branches supersample; clear it so a camera-only
     // take can't inherit a previous screen recording's value.
     captureCapRef.current = null;
@@ -3769,8 +3789,8 @@ const Recorder = () => {
       helperVideoStream.current = userStream;
       slLog("helperVideoStream-assigned", { path: "camera", streamId: userStream.id });
     } else if (useDisplayMedia) {
-      // macOS + Chrome 141+ screen path: getDisplayMedia for system audio.
-      // Falls through to the shared mixing/recorder setup below.
+      // Every offscreen-hosted screen recording lands here, on any OS, plus
+      // macOS + Chrome 141+ in a tab host. Shared setup continues below.
       const { disableSurfaceSwitching } = await chrome.storage.local.get([
         "disableSurfaceSwitching",
       ]);
@@ -3801,13 +3821,39 @@ const Recorder = () => {
       slLog("getDisplayMedia-start");
       let stream;
       const endGdm = perfSpan("Recorder getDisplayMedia(screen)");
-      try {
-        stream = await acquireDisplayMediaWithFocusRetry({
+      const acquireDisplay = (constraints) =>
+        acquireDisplayMediaWithFocusRetry({
           getDisplayMedia: (c) => navigator.mediaDevices.getDisplayMedia(c),
-          constraints: displayConstraints,
+          constraints,
           onReactivate: () =>
             chrome.runtime.sendMessage({ type: "activate-recorder-tab" }),
         });
+      try {
+        try {
+          stream = await acquireDisplay(displayConstraints);
+        } catch (err) {
+          // The audio rejection takes the video with it. getDisplayMedia only
+          // fails after the user has picked, so the retry costs a second pick.
+          if (!displayConstraints.audio || !isCaptureAudioSourceError(err)) {
+            throw err;
+          }
+          debugWarn("System audio source failed, re-picking video-only", err);
+          reportCaptureAudioUnavailable(err, { path: "getDisplayMedia" });
+          // Fired before the picker reopens: an unexplained second prompt
+          // reads as a bug.
+          chrome.runtime
+            .sendMessage({
+              type: "show-toast",
+              message: chrome.i18n.getMessage("captureAudioRepickToast"),
+              timeout: 10000,
+            })
+            .catch(() => {});
+          captureAudioDropped = "announced";
+          stream = await acquireDisplay({
+            ...displayConstraints,
+            audio: false,
+          });
+        }
         endGdm({
           videoTracks: stream.getVideoTracks().length,
           audioTracks: stream.getAudioTracks().length,
@@ -3884,20 +3930,32 @@ const Recorder = () => {
         videoMandatory.minHeight = videoMaxH;
       }
 
-      const constraints = {
+      const wantsCaptureAudio = shouldRequestCaptureAudio({
+        isTab: isTab.current,
+        systemAudio: data.systemAudio,
+        canRequestAudioTrack: options?.canRequestAudioTrack,
+      });
+
+      const audioMandatory = {
         audio: {
           mandatory: {
             chromeMediaSource: isTab.current ? "tab" : "desktop",
             chromeMediaSourceId: id,
           },
         },
+      };
+      const constraints = {
+        ...(wantsCaptureAudio ? audioMandatory : { audio: false }),
         video: {
           mandatory: videoMandatory,
         },
       };
 
       debug("desktopCapture getUserMedia constraints", constraints);
-      slLog("getUserMedia-start", { isTab: isTab.current });
+      slLog("getUserMedia-start", {
+        isTab: isTab.current,
+        withAudio: wantsCaptureAudio,
+      });
 
       let stream;
 
@@ -3905,7 +3963,25 @@ const Recorder = () => {
         isTab: Boolean(isTab.current),
       });
       try {
-        stream = await navigator.mediaDevices.getUserMedia(constraints);
+        try {
+          stream = await navigator.mediaDevices.getUserMedia(constraints);
+        } catch (err) {
+          // A dead loopback endpoint fails the video too. No picker on this
+          // path, so the retry is free.
+          if (
+            !wantsCaptureAudio ||
+            !isCaptureAudioSourceError(err, { bareNameCounts: true })
+          ) {
+            throw err;
+          }
+          debugWarn("Capture audio source failed, retrying video-only", err);
+          reportCaptureAudioUnavailable(err, { path: "desktopCapture" });
+          captureAudioDropped = true;
+          stream = await navigator.mediaDevices.getUserMedia({
+            ...constraints,
+            audio: false,
+          });
+        }
         endGum({
           videoTracks: stream.getVideoTracks().length,
           audioTracks: stream.getAudioTracks().length,
@@ -3936,7 +4012,7 @@ const Recorder = () => {
         trackState: stream.getVideoTracks()[0]?.readyState,
       });
 
-      if (isTab.current) {
+      if (isTab.current && stream.getAudioTracks().length > 0) {
         const output = new AudioContext();
         const source = output.createMediaStreamSource(stream);
         source.connect(output.destination);
@@ -4044,6 +4120,17 @@ const Recorder = () => {
       try {
         sysTracks[0].stop();
       } catch {}
+    }
+
+    // Say it now, or they find out in the editor.
+    if (captureAudioDropped === true && data.systemAudio) {
+      chrome.runtime
+        .sendMessage({
+          type: "show-toast",
+          message: chrome.i18n.getMessage("captureAudioUnavailableToast"),
+          timeout: 8000,
+        })
+        .catch(() => {});
     }
 
     const micTracks = helperAudioStream.current?.getAudioTracks() ?? [];

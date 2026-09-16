@@ -1065,7 +1065,14 @@ export const setupHandlers = () => {
       const { screenityToken } = await chrome.storage.local.get([
         "screenityToken",
       ]);
-      const headers = { "Content-Type": "application/json" };
+      // Server reads the scene's source off these; without them it falls
+      // back to a DB lookup.
+      const headers = {
+        "Content-Type": "application/json",
+        "x-screenity-source": "extension",
+      };
+      const extVersion = chrome.runtime.getManifest()?.version;
+      if (extVersion) headers["x-screenity-ext-version"] = String(extVersion);
       if (screenityToken) headers.Authorization = `Bearer ${screenityToken}`;
       // No keepalive:true (MV3 SW fetches with it can hang forever).
       // 3s abort then fall through to editor-tab proxy. Healthy is
@@ -2896,6 +2903,15 @@ export const setupHandlers = () => {
 
     const url = `${process.env.SCREENITY_APP_BASE}/?settings=open`;
     createTab(url, true);
+  });
+  // URL built here, never passed in: a content script must not be able to
+  // open a tab at an address of its choosing.
+  registerMessage("open-subscription", async () => {
+    if (!CLOUD_FEATURES_ENABLED) {
+      console.warn("Cloud features disabled");
+      return;
+    }
+    createTab(`${process.env.SCREENITY_APP_BASE}/upgrade`, true);
   });
   registerMessage("open-support", async () => {
     if (!CLOUD_FEATURES_ENABLED) {

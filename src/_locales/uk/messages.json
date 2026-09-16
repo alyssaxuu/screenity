@@ -879,6 +879,34 @@
     "message": "Схоже, що виникла помилка при запуску запису. Перезапустіть свій браузер і спробуйте ще раз. Якщо проблема не зникає, будь ласка, зв'яжіться з нами за адресою support@screenity.io.",
     "description": "Опис модального вікна помилки потоку"
   },
+  "accountErrorModalTitle": {
+    "message": "Потрібна підписка",
+    "description": "Title of the modal shown when a cloud recording is refused because the account has no active subscription"
+  },
+  "accountErrorModalDescription": {
+    "message": "Screenity не зміг почати хмарний запис: у цього облікового запису немає активної підписки. Ваші записи та налаштування збережено.",
+    "description": "Body shown when the account has never had an active subscription (server: upgrade_required)"
+  },
+  "accountErrorModalDescriptionLapsed": {
+    "message": "Screenity не зміг почати хмарний запис: доступ Pro для цього облікового запису завершився. Ваші записи та налаштування збережено.",
+    "description": "Body shown when the account's subscription has ended (server: reactivate_required)"
+  },
+  "accountErrorModalAction": {
+    "message": "Переглянути підписку",
+    "description": "Button that opens the subscription page"
+  },
+  "authErrorModalTitle": {
+    "message": "Увійдіть знову",
+    "description": "Title of the modal shown when a cloud recording is refused because the session expired, not the subscription"
+  },
+  "authErrorModalDescription": {
+    "message": "Screenity не зміг почати хмарний запис: сесія завершилася. Ваша підписка, записи та налаштування збережено.",
+    "description": "Body shown when the session/token failed; the account may well be a paying subscriber"
+  },
+  "authErrorModalAction": {
+    "message": "Увійти",
+    "description": "Button that reopens the login flow"
+  },
   "highestQuality": {
     "message": "Найвища якість",
     "description": "Позначка перемикача найвищої якості в спливаючому вікні"
@@ -1572,6 +1600,14 @@
   "audioTrackEndedToast": {
     "message": "Аудіо від'єднано. Зберігаємо запис. Записане відео у безпеці.",
     "description": "Toast shown when the audio track ends mid-recording (e.g. mic unplugged, permission revoked)"
+  },
+  "captureAudioUnavailableToast": {
+    "message": "Не вдалося записати звук комп'ютера, тому цей запис містить лише відео.",
+    "description": "Toast shown when the system/tab audio source fails to start and recording continues without it"
+  },
+  "captureAudioRepickToast": {
+    "message": "Не вдалося записати звук комп'ютера. Виберіть екран ще раз, щоб записати лише відео.",
+    "description": "Toast shown before the screen picker reopens because system audio could not start and capture is retrying without it"
   },
   "editorRecoveryToast": {
     "message": "Запис збережено. Редактор не відкрився. Натисніть на значок Screenity, щоб спробувати знову.",

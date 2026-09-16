@@ -879,6 +879,34 @@
     "message": "Si è verificato un errore durante l'avvio della registrazione. Riavvia il tuo browser e riprova. Se il problema persiste, contattaci all'indirizzo support@screenity.io.",
     "description": "Descrizione del modalità di errore di streaming"
   },
+  "accountErrorModalTitle": {
+    "message": "Abbonamento necessario",
+    "description": "Title of the modal shown when a cloud recording is refused because the account has no active subscription"
+  },
+  "accountErrorModalDescription": {
+    "message": "Screenity non ha potuto avviare una registrazione cloud perché questo account non ha un abbonamento attivo. Le tue registrazioni e impostazioni sono al sicuro.",
+    "description": "Body shown when the account has never had an active subscription (server: upgrade_required)"
+  },
+  "accountErrorModalDescriptionLapsed": {
+    "message": "Screenity non ha potuto avviare una registrazione cloud perché l'accesso Pro di questo account è terminato. Le tue registrazioni e impostazioni sono al sicuro.",
+    "description": "Body shown when the account's subscription has ended (server: reactivate_required)"
+  },
+  "accountErrorModalAction": {
+    "message": "Vedi abbonamento",
+    "description": "Button that opens the subscription page"
+  },
+  "authErrorModalTitle": {
+    "message": "Accedi di nuovo",
+    "description": "Title of the modal shown when a cloud recording is refused because the session expired, not the subscription"
+  },
+  "authErrorModalDescription": {
+    "message": "Screenity non ha potuto avviare una registrazione cloud perché la sessione è scaduta. Abbonamento, registrazioni e impostazioni sono al sicuro.",
+    "description": "Body shown when the session/token failed; the account may well be a paying subscriber"
+  },
+  "authErrorModalAction": {
+    "message": "Accedi",
+    "description": "Button that reopens the login flow"
+  },
   "highestQuality": {
     "message": "Qualità più alta",
     "description": "Etichetta per attivare la qualità più alta nella finestra popup"
@@ -1560,6 +1588,14 @@
   "audioTrackEndedToast": {
     "message": "Audio disconnesso. Salvataggio della registrazione in corso. Il video catturato è al sicuro.",
     "description": "Toast shown when the audio track ends mid-recording (e.g. mic unplugged, permission revoked)"
+  },
+  "captureAudioUnavailableToast": {
+    "message": "Non è stato possibile acquisire l'audio del computer, quindi questa registrazione contiene solo il video.",
+    "description": "Toast shown when the system/tab audio source fails to start and recording continues without it"
+  },
+  "captureAudioRepickToast": {
+    "message": "Non è stato possibile acquisire l'audio del computer. Scegli di nuovo lo schermo per registrare solo il video.",
+    "description": "Toast shown before the screen picker reopens because system audio could not start and capture is retrying without it"
   },
   "editorRecoveryToast": {
     "message": "La registrazione è stata salvata. L'editor non si è aperto. Clicca sull'icona di Screenity per riprovare.",

@@ -21,6 +21,11 @@ import { traceStep } from "../utils/startFlowTrace";
 import { markStartProgress } from "../utils/startProgress";
 import { IS_OFFSCREEN_HOST } from "../utils/recordingHost";
 import { sendSystemAudioGuidanceToast } from "../utils/systemAudioGuidance";
+import { isCaptureAudioSourceError } from "../utils/captureAudioFallback";
+import {
+  isSeparatedInFact,
+  shouldDeclareSeparated,
+} from "./separatedInFact";
 import {
   shouldUseDisplayMediaForScreen,
   screenSurfaceSwitching,
@@ -501,6 +506,23 @@ const CloudRecorder = () => {
   // What is actually wired into the bus, not what the user asked for.
   // The mux decision reads this so an empty bus is never encoded.
   const busSources = useRef({ mic: false, system: false });
+  // audioRecorder is null for all of startStream (startRecording waits on
+  // uploader init), so it can't tell "too late to separate" from "not built yet".
+  const recordersBuilt = useRef(false);
+  // audioRecorder is never nulled, so after a restart it still points at the
+  // previous take's recorder.
+  const micRecordedThisTake = useRef(false);
+  // stopAllRecorders() resets the refs above, and every consumer in
+  // stopRecording runs after it. Teardown must not clear this one.
+  const stopAudioVerdict = useRef(null);
+  // Read this, not separatedAudio, anywhere the answer decides what the
+  // server is told about where the voice lives.
+  const separatedNow = () =>
+    isSeparatedInFact({
+      separatedAudio: separatedAudio.current,
+      hasAudioRecorder: micRecordedThisTake.current,
+      busHasMic: Boolean(busSources.current.mic),
+    });
   // Bus health at recording start, folded into the audio diag snapshot.
   const busWarmupRef = useRef({
     ran: false,
@@ -1531,6 +1553,7 @@ const CloudRecorder = () => {
     screenMediaId,
     cameraMediaId,
     audioMediaId,
+    audioLayout = null,
     durations = null,
     dimensions = null,
   }) => {
@@ -1555,6 +1578,7 @@ const CloudRecorder = () => {
         screenMediaId: screenMediaId || null,
         cameraMediaId: cameraMediaId || null,
         audioMediaId: audioMediaId || null,
+        ...(audioLayout ? { audioLayout } : {}),
         // Server stamps these onto media docs so scenes land with the
         // real length instead of waiting for Bunny's encoded webhook.
         durations: durations || undefined,
@@ -3670,10 +3694,19 @@ const CloudRecorder = () => {
         rawMicStream.current = acquired;
         // The separated recorder is built at start, only if a mic existed.
         // A mic turned on later has nothing to record into, so fall back to
-        // muxing for the rest of this take.
-        if (separatedAudio.current && !audioRecorder.current) {
+        // muxing for the rest of this take. Before the build it still gets a
+        // recorder, so flipping there sent the mic to Stream off a mic-less bus.
+        if (
+          separatedAudio.current &&
+          recordersBuilt.current &&
+          !micRecordedThisTake.current
+        ) {
           separatedAudio.current = false;
           diagForward("separated-fallback-late-mic", {});
+        } else if (separatedAudio.current && !recordersBuilt.current) {
+          diagForward("separated-fallback-declined-early", {
+            micRecordedThisTake: micRecordedThisTake.current,
+          });
         }
         if (!separatedAudio.current) {
           audioInputGain.current = aCtx.current.createGain();
@@ -4008,6 +4041,8 @@ const CloudRecorder = () => {
     resetSessionTrackState();
     recoveryExportedRef.current = false;
     audioCaptureDegradedRef.current = false;
+    recordersBuilt.current = false;
+    micRecordedThisTake.current = false;
     index.current = 0;
     lastTimecode.current = 0;
 
@@ -4374,7 +4409,7 @@ const CloudRecorder = () => {
       // file with duration 1 and no plain URL. See uploadMicToStorage.js.
       if (
         micActive === true &&
-        !separatedAudio.current &&
+        !separatedNow() &&
         rawMicStream.current?.getAudioTracks?.().length
       ) {
         // Audio uploader failures are non-fatal; recording proceeds
@@ -5257,6 +5292,18 @@ const CloudRecorder = () => {
           container: screenSelection.container,
           codec: screenSelection.codec,
           hwSlots: screenSelection.hwSlots,
+          // Audio that arrived but never reached the bus encodes video-only,
+          // and the file alone cannot say which step dropped it.
+          enableAudio: screenHasAudio,
+          inputAudioTracks: stream.getAudioTracks().length,
+        });
+        diagForward("screen-encoder-audio", {
+          enableAudio: screenHasAudio,
+          busHasSystem: Boolean(busSources.current.system),
+          busHasMic: Boolean(busSources.current.mic),
+          streamAudioTracks: stream.getAudioTracks().length,
+          screenStreamAudioTracks:
+            screenStream.current?.getAudioTracks?.().length || 0,
         });
 
         screenRecorder.current.start(2000);
@@ -5442,6 +5489,7 @@ const CloudRecorder = () => {
         });
         markStartProgress("audio-encoder-probe-done");
         audioRecorder.current = audioSelection.recorder;
+        micRecordedThisTake.current = true;
         encoderKinds.audio = audioSelection.kind;
         trackContainers.audio = audioSelection.container;
         trackCodecs.audio = audioSelection.codec;
@@ -5461,6 +5509,9 @@ const CloudRecorder = () => {
         audioTimer.current.paused = false;
         audioTimer.current.everStarted = true;
       }
+      // Past here a late mic really has missed the separated recorder, which
+      // is the case the setMic fallback is for.
+      recordersBuilt.current = true;
 
       if (cameraStream.current) {
         setupTrack = "camera";
@@ -5804,6 +5855,8 @@ const CloudRecorder = () => {
       // any more. Both are rebuilt with the next graph.
       busTap.current = null;
       busSources.current = { mic: false, system: false };
+      recordersBuilt.current = false;
+      micRecordedThisTake.current = false;
     }
   };
 
@@ -6413,6 +6466,19 @@ const CloudRecorder = () => {
         screenEncoded
       );
 
+      // Snapshot, not the live bus: by here it is zeroed.
+      const stopAudio = stopAudioVerdict.current || {
+        separated: separatedNow(),
+        micRecorded: micRecordedThisTake.current,
+        systemAudioOnScreen: Boolean(busSources.current.system),
+      };
+      const isSeparated = stopAudio.separated;
+      const declareSeparated = shouldDeclareSeparated({
+        separatedInFact: isSeparated,
+        micRecorded: stopAudio.micRecorded,
+        micLanded: Boolean(separatedMic?.mediaId),
+        systemAudioOnScreen: stopAudio.systemAudioOnScreen,
+      });
       const payload = {
         sceneId,
         screenMediaId: uploadMeta.screen?.mediaId || null,
@@ -6420,21 +6486,22 @@ const CloudRecorder = () => {
         screenVideoId: uploadMeta.screen?.videoId || null,
         cameraVideoId: uploadMeta.camera?.videoId || null,
         // Separated: the mic is its own source, not the scene's audio media.
-        audioMediaId: separatedAudio.current
-          ? null
-          : uploadMeta.audio?.mediaId || null,
+        audioMediaId: isSeparated ? null : uploadMeta.audio?.mediaId || null,
         // The mic id, when its upload beat this POST: the scene is born with
         // its voice instead of gaining one after the editor already read it.
         // Null means the upload lost the race; attach-scene-audio fills it in
         // after, as before.
         audioSourceMediaId: separatedMic?.mediaId || null,
-        // No audioLayout: the server reads it off the mic's media doc, which
-        // /api/bunny/upload stamped 'separated' when the file went up.
+        // Stated, not read off the mic's media doc: no upload means no doc, and
+        // a missing one used to read as muxed (a voice the video never had).
+        ...(declareSeparated ? { audioLayout: "separated" } : {}),
         recordingSessionId: recorderSession.current?.id || null,
         durations,
         captionSource: uploadMeta.screen ? "screen" : "camera",
         transcriptionSourceMediaId: !isSilent
-          ? uploadMeta.audio?.mediaId || separatedMic?.mediaId || null
+          ? (isSeparated
+              ? separatedMic?.mediaId || null
+              : uploadMeta.audio?.mediaId || separatedMic?.mediaId || null)
           : null,
         thumbnail: uploadMeta.screen?.thumbnail || null,
         dimensions: {
@@ -6518,7 +6585,10 @@ const CloudRecorder = () => {
           cameraMediaId: uploadMeta.camera?.mediaId || null,
           // Not the mic: a recovered scene carries no micIncluded, so the
           // attach path gives it its voice instead of naming it twice.
-          audioMediaId: uploadMeta.audio?.mediaId || null,
+          // Separated: that id is a caption copy, and naming it here tells the
+          // server the voice is in the video.
+          audioMediaId: isSeparated ? null : uploadMeta.audio?.mediaId || null,
+          audioLayout: declareSeparated ? "separated" : null,
           // Pass the duration + capture dims so the server can stamp
           // them onto the media docs (and therefore the scene) right
           // away, instead of waiting for the Bunny encoded webhook.
@@ -6748,6 +6818,12 @@ const CloudRecorder = () => {
     pausedStateRef.current = false;
     stopAllIntervals();
 
+    // Before teardown: willUploadMic and the scene payload both run after it.
+    stopAudioVerdict.current = {
+      separated: separatedNow(),
+      micRecorded: micRecordedThisTake.current,
+      systemAudioOnScreen: Boolean(busSources.current.system),
+    };
     // Drain recorders before clearing `recording` so the next start
     // gets a free tab-capture binding.
     await stopAllRecorders();
@@ -7099,9 +7175,12 @@ const CloudRecorder = () => {
     // Ahead of the silence check on purpose: isAudioSilent decodes the whole
     // track on this thread, so overlapping it with the in-flight POST is
     // free; the other order adds the decode to the wait.
-    const willUploadMic = Boolean(
-      separatedAudio.current && audioRecorder.current
-    );
+    const stopAudio = stopAudioVerdict.current || {
+      separated: separatedNow(),
+      micRecorded: micRecordedThisTake.current,
+      systemAudioOnScreen: Boolean(busSources.current.system),
+    };
+    const willUploadMic = Boolean(stopAudio.separated && stopAudio.micRecorded);
     let micUploadPromise = null;
     if (willUploadMic) {
       // Claimed before the scene POST: createSceneOrHandleMultiMode sends
@@ -7209,7 +7288,14 @@ const CloudRecorder = () => {
 
         diagForward("mic-upload-decision", {
           willUploadMic,
+          // Both, on purpose: a take where they disagree is the 4.6.9 bug,
+          // readable without the file.
           separated: separatedAudio.current,
+          separatedInFact: separatedNow(),
+          busHasMic: Boolean(busSources.current.mic),
+          // Snapshot: the live bus is zeroed by now.
+          busHasSystem: Boolean(stopAudio.systemAudioOnScreen),
+          micRecordedThisTake: micRecordedThisTake.current,
           hasAudioRecorder: Boolean(audioRecorder.current),
           audioRecorderState: audioRecorder.current?.state || null,
           rawMicTracks: rawMicStream.current?.getAudioTracks?.().length || 0,
@@ -7589,6 +7675,24 @@ const CloudRecorder = () => {
   ) => {
     const canCaptureSourceAudio = streamOpts.canRequestAudioTrack !== false;
     const useDisplayMedia = !!streamOpts.useDisplayMedia;
+    // "announced" means the re-pick toast already said it, so the post-start
+    // toast stays quiet.
+    let captureAudioDropped = false;
+    const reportCaptureAudioUnavailable = (err, path) => {
+      console.warn("[CloudRecorder] capture audio source failed", path, err);
+      try {
+        chrome.runtime.sendMessage({
+          type: "diag-forward",
+          event: "cloudrecorder-capture-audio-unavailable",
+          data: {
+            path,
+            isTab: Boolean(isTab.current),
+            error: String(err?.name || err).slice(0, 80),
+            message: String(err?.message || "").slice(0, 120),
+          },
+        });
+      } catch {}
+    };
     // How long the picker was up before a failure. Separates an instant reject
     // from one that lands after the user picked.
     const streamStartedAt = Date.now();
@@ -7923,12 +8027,36 @@ const CloudRecorder = () => {
                 payload: displayConstraints,
               })
               .catch(() => {});
-            screenStream.current = await acquireDisplayMediaWithFocusRetry({
-              getDisplayMedia: (c) => navigator.mediaDevices.getDisplayMedia(c),
-              constraints: displayConstraints,
-              onReactivate: () =>
-                chrome.runtime.sendMessage({ type: "activate-recorder-tab" }),
-            });
+            const acquireDisplay = (constraints) =>
+              acquireDisplayMediaWithFocusRetry({
+                getDisplayMedia: (c) => navigator.mediaDevices.getDisplayMedia(c),
+                constraints,
+                onReactivate: () =>
+                  chrome.runtime.sendMessage({ type: "activate-recorder-tab" }),
+              });
+            try {
+              screenStream.current = await acquireDisplay(displayConstraints);
+            } catch (err) {
+              // System audio that won't open rejects the video request with it.
+              // Retrying without audio costs a second pick but saves the take.
+              if (!displayConstraints.audio || !isCaptureAudioSourceError(err)) {
+                throw err;
+              }
+              reportCaptureAudioUnavailable(err, "getDisplayMedia");
+              // Warn before the picker reopens, so a second prompt isn't a mystery.
+              chrome.runtime
+                .sendMessage({
+                  type: "show-toast",
+                  message: chrome.i18n.getMessage("captureAudioRepickToast"),
+                  timeout: 10000,
+                })
+                .catch(() => {});
+              captureAudioDropped = "announced";
+              screenStream.current = await acquireDisplay({
+                ...displayConstraints,
+                audio: false,
+              });
+            }
             console.log("[CloudRecorder] offscreen getDisplayMedia OK");
           } else {
             if (!id) {
@@ -7991,10 +8119,34 @@ const CloudRecorder = () => {
                 },
               })
               .catch(() => {});
-            screenStream.current = await navigator.mediaDevices.getUserMedia(
-              desktopConstraints
-            );
+            try {
+              screenStream.current = await navigator.mediaDevices.getUserMedia(
+                desktopConstraints
+              );
+            } catch (err) {
+              // A dead loopback endpoint fails the video too. Video with no
+              // audio beats no recording, so drop it and try once more.
+              if (
+                !desktopConstraints.audio ||
+                !isCaptureAudioSourceError(err, { bareNameCounts: true })
+              ) {
+                throw err;
+              }
+              reportCaptureAudioUnavailable(err, "desktopCapture");
+              captureAudioDropped = true;
+              screenStream.current = await navigator.mediaDevices.getUserMedia({
+                ...desktopConstraints,
+                audio: false,
+              });
+            }
             console.log("[CloudRecorder] desktop getUserMedia OK");
+            diagForward("capture-tracks-acquired", {
+              path: "desktopCapture",
+              isTab: Boolean(isTab.current),
+              audioRequested: Boolean(desktopConstraints.audio),
+              videoTracks: screenStream.current?.getVideoTracks?.().length || 0,
+              audioTracks: screenStream.current?.getAudioTracks?.().length || 0,
+            });
           }
           if (!screenStream.current?.getVideoTracks?.().length) {
             sendRecordingError(
@@ -8461,6 +8613,8 @@ const CloudRecorder = () => {
       // Parallel tap so the warm-up check can read the mixed bus. A
       // MediaStreamDestination is a sink and cannot be analysed directly.
       busSources.current = { mic: false, system: false };
+      recordersBuilt.current = false;
+      micRecordedThisTake.current = false;
       try {
         busTap.current = aCtx.current.createAnalyser();
         busTap.current.fftSize = 2048;
@@ -8553,6 +8707,17 @@ const CloudRecorder = () => {
         if (systemAudioVolume !== undefined) {
           audioOutputGain.current.gain.value = systemAudioVolume;
         }
+      }
+
+      // Say it, or they find out in the editor.
+      if (captureAudioDropped === true && data.systemAudio) {
+        chrome.runtime
+          .sendMessage({
+            type: "show-toast",
+            message: chrome.i18n.getMessage("captureAudioUnavailableToast"),
+            timeout: 8000,
+          })
+          .catch(() => {});
       }
 
       try {

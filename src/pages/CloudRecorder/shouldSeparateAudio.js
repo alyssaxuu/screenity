@@ -2,6 +2,11 @@
 // Two exceptions, both of which end in a silent take if they are missed, and
 // neither of which any server can undo: by upload time the screen file is
 // already encoded without the mic.
+//
+// app-web reads a Stream-hosted mic as separated on client >= 4.6.9, exact
+// only while these two stay the whole list: a third would read as separated
+// while muxed, playing the voice twice. Growing it means changing the server
+// rule in the same release. Test S5 fails if it grows.
 export const shouldSeparateAudio = ({
   recordingType,
   instantMode = false,

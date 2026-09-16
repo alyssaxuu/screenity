@@ -10,6 +10,11 @@ export const REC_START_TIMEOUT = "REC_START_TIMEOUT";
 export const REC_START_CANCEL = "REC_START_CANCEL";
 export const REC_START_NOT_READY = "REC_START_NOT_READY";
 export const REC_START_NO_STREAM_MSG = "REC_START_NO_STREAM_MSG";
+// Account can't start a cloud recording. Nothing is wrong with the recorder,
+// so this must never reach the "restart your browser" message.
+export const REC_START_ACCOUNT = "REC_START_ACCOUNT";
+// The session, not the subscription: subscribers hit this too.
+export const REC_START_AUTH = "REC_START_AUTH";
 
 export const REC_RUN_STREAM_END = "REC_RUN_STREAM_END";
 export const REC_RUN_MEMORY = "REC_RUN_MEMORY";
@@ -66,6 +71,27 @@ const STREAM_PATTERNS = [
   "notreadableerror",
   "notfounderror",
   "overconstrainederror",
+];
+
+// The server's own words: withValidSubscription answers 402 upgrade_required
+// for a never-pro account, reactivate_required for a lapsed one.
+const ACCOUNT_PATTERNS = [
+  "upgrade_required",
+  "reactivate_required",
+  "subscription inactive",
+  "subscription_canceled",
+  "subscription_cancelled",
+];
+
+// Before ACCOUNT: a dead session read as a missing subscription sends a
+// paying user to checkout.
+const AUTH_PATTERNS = [
+  "user not authenticated",
+  "login required",
+  "unauthenticated",
+  "unauthorized",
+  "invalid token",
+  "token expired",
 ];
 
 const MEMORY_PATTERNS = [
@@ -130,6 +156,17 @@ export const classifyError = (errorStr = "", errorType = "") => {
   if (typeLower === "cancel-modal") {
     return REC_START_CANCEL;
   }
+  if (AUTH_PATTERNS.some((p) => lower.includes(p))) {
+    return REC_START_AUTH;
+  }
+
+  // Must beat CANCEL: a subscription reason carrying "cancel" is the server
+  // refusing the account, and REC_START_CANCEL is silent, so the take would
+  // fail with no modal at all.
+  if (ACCOUNT_PATTERNS.some((p) => lower.includes(p))) {
+    return REC_START_ACCOUNT;
+  }
+
   if (CANCEL_PATTERNS.some((p) => lower.includes(p))) {
     return REC_START_CANCEL;
   }

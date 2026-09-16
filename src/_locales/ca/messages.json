@@ -879,6 +879,34 @@
     "message": "Hi ha hagut un error en iniciar la gravació. Reinicia el teu navegador i torna-ho a provar. Si el problema persisteix, si us plau, posa't en contacte amb nosaltres a support@screenity.io.",
     "description": "Descripció del modal d'error de transmissió"
   },
+  "accountErrorModalTitle": {
+    "message": "Cal una subscripció",
+    "description": "Title of the modal shown when a cloud recording is refused because the account has no active subscription"
+  },
+  "accountErrorModalDescription": {
+    "message": "Screenity no ha pogut iniciar una gravació al núvol perquè aquest compte no té cap subscripció activa. Les teves gravacions i la configuració estan segures.",
+    "description": "Body shown when the account has never had an active subscription (server: upgrade_required)"
+  },
+  "accountErrorModalDescriptionLapsed": {
+    "message": "Screenity no ha pogut iniciar una gravació al núvol perquè l'accés Pro d'aquest compte ha finalitzat. Les teves gravacions i la configuració estan segures.",
+    "description": "Body shown when the account's subscription has ended (server: reactivate_required)"
+  },
+  "accountErrorModalAction": {
+    "message": "Veure la subscripció",
+    "description": "Button that opens the subscription page"
+  },
+  "authErrorModalTitle": {
+    "message": "Torna a iniciar la sessió",
+    "description": "Title of the modal shown when a cloud recording is refused because the session expired, not the subscription"
+  },
+  "authErrorModalDescription": {
+    "message": "Screenity no ha pogut iniciar una gravació al núvol perquè la sessió ha caducat. La teva subscripció, les gravacions i la configuració estan segures.",
+    "description": "Body shown when the session/token failed; the account may well be a paying subscriber"
+  },
+  "authErrorModalAction": {
+    "message": "Inicia la sessió",
+    "description": "Button that reopens the login flow"
+  },
   "highestQuality": {
     "message": "Qualitat més alta",
     "description": "Etiqueta de commutació de la qualitat més alta al quadre emergent"
@@ -1580,6 +1608,14 @@
   "audioTrackEndedToast": {
     "message": "L'àudio s'ha desconnectat. S'està desant l'enregistrament. El vídeo capturat és segur.",
     "description": "Toast shown when the audio track ends mid-recording (e.g. mic unplugged, permission revoked)"
+  },
+  "captureAudioUnavailableToast": {
+    "message": "No s'ha pogut capturar l'àudio de l'ordinador, així que aquesta gravació només té vídeo.",
+    "description": "Toast shown when the system/tab audio source fails to start and recording continues without it"
+  },
+  "captureAudioRepickToast": {
+    "message": "No s'ha pogut capturar l'àudio de l'ordinador. Torna a triar la pantalla per gravar només el vídeo.",
+    "description": "Toast shown before the screen picker reopens because system audio could not start and capture is retrying without it"
   },
   "editorRecoveryToast": {
     "message": "L'enregistrament s'ha desat. L'editor no s'ha obert. Fes clic a la icona de Screenity per tornar-ho a provar.",

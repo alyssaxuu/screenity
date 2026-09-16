@@ -959,6 +959,52 @@ export const setupHandlers = () => {
     const errorCode = message?.errorCode || null;
     const errorWhy = message?.why || message?.error || null;
 
+    // Account, not the recorder. The generic copy says "restart your browser",
+    // which sends these users round the loop until they write in.
+    // Never the account copy: this fires for subscribers too.
+    if (errorCode === "REC_START_AUTH") {
+      state.openModal(
+        chrome.i18n.getMessage("authErrorModalTitle"),
+        chrome.i18n.getMessage("authErrorModalDescription"),
+        chrome.i18n.getMessage("authErrorModalAction"),
+        chrome.i18n.getMessage("permissionsModalDismiss"),
+        () => {
+          chrome.runtime.sendMessage({ type: "handle-login" }).catch(() => {});
+          state.dismissRecording("auth-error");
+        },
+        () => {
+          state.dismissRecording("auth-error");
+        },
+      );
+      return;
+    }
+
+    if (errorCode === "REC_START_ACCOUNT") {
+      // Copy only. /upgrade is the one customer-facing billing page and
+      // already prices returning customers; /resubscribe is support-only.
+      const lapsed = /reactivate_required|subscription_cancell?ed/i.test(
+        String(errorWhy || ""),
+      );
+      state.openModal(
+        chrome.i18n.getMessage("accountErrorModalTitle"),
+        chrome.i18n.getMessage(
+          lapsed
+            ? "accountErrorModalDescriptionLapsed"
+            : "accountErrorModalDescription",
+        ),
+        chrome.i18n.getMessage("accountErrorModalAction"),
+        chrome.i18n.getMessage("permissionsModalDismiss"),
+        () => {
+          chrome.runtime.sendMessage({ type: "open-subscription" }).catch(() => {});
+          state.dismissRecording("account-error");
+        },
+        () => {
+          state.dismissRecording("account-error");
+        },
+      );
+      return;
+    }
+
     state.openModal(
       chrome.i18n.getMessage("streamErrorModalTitle"),
       chrome.i18n.getMessage("streamErrorModalDescription"),

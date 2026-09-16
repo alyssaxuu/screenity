@@ -292,7 +292,13 @@ export const handleRecordingError = async (request) => {
       focusTab(activeTab);
     }
     if (request.error === "stream-error") {
-      sendMessageTab(activeTab, { type: "stream-error", errorCode });
+      // `why` carries the server's reason word, which is what picks the
+      // lapsed-subscription copy from the never-subscribed one.
+      sendMessageTab(activeTab, {
+        type: "stream-error",
+        errorCode,
+        why: request?.why || null,
+      });
     }
   });
 

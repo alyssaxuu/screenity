@@ -875,6 +875,34 @@
     "message": "看起来启动录制时出现了错误。请重新启动您的浏览器并重试。如果问题仍然存在，请通过 support@screenity.io 与我们联系。",
     "description": "流错误模态框描述"
   },
+  "accountErrorModalTitle": {
+    "message": "需要订阅",
+    "description": "Title of the modal shown when a cloud recording is refused because the account has no active subscription"
+  },
+  "accountErrorModalDescription": {
+    "message": "Screenity 无法开始云端录制，此账号没有有效订阅。你的录制内容和设置均已保留。",
+    "description": "Body shown when the account has never had an active subscription (server: upgrade_required)"
+  },
+  "accountErrorModalDescriptionLapsed": {
+    "message": "Screenity 无法开始云端录制，此账号的 Pro 使用权限已结束。你的录制内容和设置均已保留。",
+    "description": "Body shown when the account's subscription has ended (server: reactivate_required)"
+  },
+  "accountErrorModalAction": {
+    "message": "查看订阅",
+    "description": "Button that opens the subscription page"
+  },
+  "authErrorModalTitle": {
+    "message": "请重新登录",
+    "description": "Title of the modal shown when a cloud recording is refused because the session expired, not the subscription"
+  },
+  "authErrorModalDescription": {
+    "message": "Screenity 无法开始云端录制，此登录状态已过期。你的订阅、录制内容和设置均已保留。",
+    "description": "Body shown when the session/token failed; the account may well be a paying subscriber"
+  },
+  "authErrorModalAction": {
+    "message": "登录",
+    "description": "Button that reopens the login flow"
+  },
   "highestQuality": {
     "message": "最高质量",
     "description": "弹出窗口中的最高质量标签"
@@ -1576,6 +1604,14 @@
   "audioTrackEndedToast": {
     "message": "音频已断开，正在保存录制内容。已录制的视频是安全的。",
     "description": "Toast shown when the audio track ends mid-recording (e.g. mic unplugged, permission revoked)"
+  },
+  "captureAudioUnavailableToast": {
+    "message": "无法捕获电脑声音，因此本次录制仅包含视频。",
+    "description": "Toast shown when the system/tab audio source fails to start and recording continues without it"
+  },
+  "captureAudioRepickToast": {
+    "message": "无法捕获电脑声音。请重新选择屏幕以仅录制视频。",
+    "description": "Toast shown before the screen picker reopens because system audio could not start and capture is retrying without it"
   },
   "editorRecoveryToast": {
     "message": "录制内容已保存。编辑器未打开，请点击 Screenity 图标重试。",

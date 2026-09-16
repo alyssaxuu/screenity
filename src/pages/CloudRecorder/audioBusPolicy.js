@@ -3,10 +3,13 @@
 
 // Attach only when something is actually connected. A separated take keeps
 // the mic off the bus, and system audio can be requested but never granted.
-export const shouldMuxBusAudio = ({
-  busHasMic = false,
-  busHasSystem = false,
-} = {}) => Boolean(busHasMic || busHasSystem);
+//
+// Takes busSources ({ mic, system }) itself. 4.6.9 destructured
+// { busHasMic, busHasSystem } while both callers passed busSources.current, so
+// it read two absent keys, always returned false, and every Pro recording lost
+// its system audio.
+export const shouldMuxBusAudio = ({ mic = false, system = false } = {}) =>
+  Boolean(mic || system);
 
 // A suspended AudioContext feeds its MediaStreamDestination digital silence.
 // Pause suspends it on purpose, so only resume when we are not paused.
