@@ -1205,13 +1205,53 @@
     "message": "Échec de la copie du lien",
     "description": "Toast message shown when failed to copy link to clipboard"
   },
-  "newestSortLabel": {
-    "message": "Les plus récents",
-    "description": "Label for the newest sort option"
+  "sortByHeading": {
+    "message": "Trier par",
+    "description": "Section heading in the videos sort dropdown for the field being sorted on"
   },
-  "oldestSortLabel": {
-    "message": "Les plus anciens",
-    "description": "Label for the oldest sort option"
+  "orderHeading": {
+    "message": "Ordre",
+    "description": "Section heading in the videos sort dropdown for the sort direction"
+  },
+  "sortFieldLastEdited": {
+    "message": "Dernière modification",
+    "description": "Sort field option: when the video was last edited"
+  },
+  "sortFieldDateCreated": {
+    "message": "Date de création",
+    "description": "Sort field option: when the video was created"
+  },
+  "sortFieldName": {
+    "message": "Nom",
+    "description": "Sort field option: the video's title"
+  },
+  "sortFieldLength": {
+    "message": "Durée",
+    "description": "Sort field option: the video's duration"
+  },
+  "orderNewestFirst": {
+    "message": "Plus récentes en premier",
+    "description": "Sort order option for date fields"
+  },
+  "orderOldestFirst": {
+    "message": "Plus anciennes en premier",
+    "description": "Sort order option for date fields"
+  },
+  "orderAToZ": {
+    "message": "De A à Z",
+    "description": "Sort order option for the name field"
+  },
+  "orderZToA": {
+    "message": "De Z à A",
+    "description": "Sort order option for the name field"
+  },
+  "orderLongestFirst": {
+    "message": "Plus longues en premier",
+    "description": "Sort order option for the length field"
+  },
+  "orderShortestFirst": {
+    "message": "Plus courtes en premier",
+    "description": "Sort order option for the length field"
   },
   "allVideosHeading": {
     "message": "Toutes les vidéos",
@@ -1224,6 +1264,32 @@
   "loadingVideosLabel": {
     "message": "Chargement des vidéos...",
     "description": "Label shown when videos are loading in the popup"
+  },
+  "loadingMoreVideosLabel": {
+    "message": "Chargement de plus de vidéos...",
+    "description": "Label shown at the bottom of the videos list while loading additional pages"
+  },
+  "searchVideosPlaceholder": {
+    "message": "Rechercher des vidéos",
+    "description": "Placeholder text for the videos search input in the popup"
+  },
+  "noVideosMatchSearchTitle": {
+    "message": "Aucun résultat pour « $SEARCHTERM$ »",
+    "description": "Heading shown when no videos match the current search query in the popup",
+    "placeholders": {
+      "searchterm": {
+        "content": "$1",
+        "example": "design review"
+      }
+    }
+  },
+  "noVideosMatchSearchHint": {
+    "message": "Essayez d'ajuster votre recherche.",
+    "description": "Subtext shown under the no search results heading in the popup"
+  },
+  "privateVideoTooltip": {
+    "message": "Privée",
+    "description": "Tooltip shown on the lock badge over a private video's thumbnail"
   },
   "goToDashboardButtonLabel": {
     "message": "Aller au tableau de bord",

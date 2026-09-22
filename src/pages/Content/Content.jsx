@@ -12,6 +12,7 @@ const Content = () => {
       </ContentState>
       <style type="text/css">{`
 			#screenity-ui, #screenity-ui div {
+				opacity: unset;
 				background-color: unset;
 				padding: unset;
 				width: unset;

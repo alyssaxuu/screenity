@@ -1205,13 +1205,53 @@
     "message": "இணைப்பை நகலெடுக்க முடியவில்லை",
     "description": "Toast message shown when failed to copy link to clipboard"
   },
-  "newestSortLabel": {
-    "message": "சமீபத்தியவை",
-    "description": "Label for the newest sort option"
+  "sortByHeading": {
+    "message": "வரிசைப்படுத்து",
+    "description": "Section heading in the videos sort dropdown for the field being sorted on"
   },
-  "oldestSortLabel": {
-    "message": "பழையவை",
-    "description": "Label for the oldest sort option"
+  "orderHeading": {
+    "message": "வரிசை",
+    "description": "Section heading in the videos sort dropdown for the sort direction"
+  },
+  "sortFieldLastEdited": {
+    "message": "கடைசியாக திருத்தப்பட்டது",
+    "description": "Sort field option: when the video was last edited"
+  },
+  "sortFieldDateCreated": {
+    "message": "உருவாக்கப்பட்ட தேதி",
+    "description": "Sort field option: when the video was created"
+  },
+  "sortFieldName": {
+    "message": "பெயர்",
+    "description": "Sort field option: the video's title"
+  },
+  "sortFieldLength": {
+    "message": "நீளம்",
+    "description": "Sort field option: the video's duration"
+  },
+  "orderNewestFirst": {
+    "message": "சமீபத்தியவை முதலில்",
+    "description": "Sort order option for date fields"
+  },
+  "orderOldestFirst": {
+    "message": "பழையவை முதலில்",
+    "description": "Sort order option for date fields"
+  },
+  "orderAToZ": {
+    "message": "A முதல் Z வரை",
+    "description": "Sort order option for the name field"
+  },
+  "orderZToA": {
+    "message": "Z முதல் A வரை",
+    "description": "Sort order option for the name field"
+  },
+  "orderLongestFirst": {
+    "message": "நீளமானவை முதலில்",
+    "description": "Sort order option for the length field"
+  },
+  "orderShortestFirst": {
+    "message": "குறுகியவை முதலில்",
+    "description": "Sort order option for the length field"
   },
   "allVideosHeading": {
     "message": "அனைத்து வீடியோக்கள்",
@@ -1224,6 +1264,32 @@
   "loadingVideosLabel": {
     "message": "வீடியோக்களை ஏற்றுகிறது...",
     "description": "Label shown when videos are loading in the popup"
+  },
+  "loadingMoreVideosLabel": {
+    "message": "மேலும் ஏற்றுகிறது...",
+    "description": "Label shown at the bottom of the videos list while loading additional pages"
+  },
+  "searchVideosPlaceholder": {
+    "message": "வீடியோக்களைத் தேடு",
+    "description": "Placeholder text for the videos search input in the popup"
+  },
+  "noVideosMatchSearchTitle": {
+    "message": "\"$SEARCHTERM$\" க்கு எதுவும் கிடைக்கவில்லை",
+    "description": "Heading shown when no videos match the current search query in the popup",
+    "placeholders": {
+      "searchterm": {
+        "content": "$1",
+        "example": "design review"
+      }
+    }
+  },
+  "noVideosMatchSearchHint": {
+    "message": "வேறு தேடல் சொல்லை முயற்சிக்கவும்.",
+    "description": "Subtext shown under the no search results heading in the popup"
+  },
+  "privateVideoTooltip": {
+    "message": "தனியுரிமை",
+    "description": "Tooltip shown on the lock badge over a private video's thumbnail"
   },
   "goToDashboardButtonLabel": {
     "message": "டாஷ்போர்டுக்குச் செல்லவும்",

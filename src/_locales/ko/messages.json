@@ -1205,13 +1205,53 @@
     "message": "링크 복사에 실패했습니다",
     "description": "Toast message shown when failed to copy link to clipboard"
   },
-  "newestSortLabel": {
-    "message": "최신순",
-    "description": "Label for the newest sort option"
+  "sortByHeading": {
+    "message": "정렬 기준",
+    "description": "Section heading in the videos sort dropdown for the field being sorted on"
   },
-  "oldestSortLabel": {
+  "orderHeading": {
+    "message": "정렬 순서",
+    "description": "Section heading in the videos sort dropdown for the sort direction"
+  },
+  "sortFieldLastEdited": {
+    "message": "최근 수정일",
+    "description": "Sort field option: when the video was last edited"
+  },
+  "sortFieldDateCreated": {
+    "message": "생성일",
+    "description": "Sort field option: when the video was created"
+  },
+  "sortFieldName": {
+    "message": "이름",
+    "description": "Sort field option: the video's title"
+  },
+  "sortFieldLength": {
+    "message": "길이",
+    "description": "Sort field option: the video's duration"
+  },
+  "orderNewestFirst": {
+    "message": "최신순",
+    "description": "Sort order option for date fields"
+  },
+  "orderOldestFirst": {
     "message": "오래된순",
-    "description": "Label for the oldest sort option"
+    "description": "Sort order option for date fields"
+  },
+  "orderAToZ": {
+    "message": "오름차순",
+    "description": "Sort order option for the name field"
+  },
+  "orderZToA": {
+    "message": "내림차순",
+    "description": "Sort order option for the name field"
+  },
+  "orderLongestFirst": {
+    "message": "긴 순서대로",
+    "description": "Sort order option for the length field"
+  },
+  "orderShortestFirst": {
+    "message": "짧은 순서대로",
+    "description": "Sort order option for the length field"
   },
   "allVideosHeading": {
     "message": "모든 영상",
@@ -1224,6 +1264,32 @@
   "loadingVideosLabel": {
     "message": "영상을 불러오는 중...",
     "description": "Label shown when videos are loading in the popup"
+  },
+  "loadingMoreVideosLabel": {
+    "message": "더 불러오는 중...",
+    "description": "Label shown at the bottom of the videos list while loading additional pages"
+  },
+  "searchVideosPlaceholder": {
+    "message": "영상 검색",
+    "description": "Placeholder text for the videos search input in the popup"
+  },
+  "noVideosMatchSearchTitle": {
+    "message": "\"$SEARCHTERM$\"에 대한 검색 결과가 없습니다",
+    "description": "Heading shown when no videos match the current search query in the popup",
+    "placeholders": {
+      "searchterm": {
+        "content": "$1",
+        "example": "design review"
+      }
+    }
+  },
+  "noVideosMatchSearchHint": {
+    "message": "다른 검색어로 시도해 보세요.",
+    "description": "Subtext shown under the no search results heading in the popup"
+  },
+  "privateVideoTooltip": {
+    "message": "비공개",
+    "description": "Tooltip shown on the lock badge over a private video's thumbnail"
   },
   "goToDashboardButtonLabel": {
     "message": "대시보드로 이동",

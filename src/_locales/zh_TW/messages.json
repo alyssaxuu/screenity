@@ -1205,13 +1205,53 @@
     "message": "無法複製連結",
     "description": "Toast message shown when failed to copy link to clipboard"
   },
-  "newestSortLabel": {
-    "message": "最新",
-    "description": "Label for the newest sort option"
+  "sortByHeading": {
+    "message": "排序方式",
+    "description": "Section heading in the videos sort dropdown for the field being sorted on"
   },
-  "oldestSortLabel": {
-    "message": "最舊",
-    "description": "Label for the oldest sort option"
+  "orderHeading": {
+    "message": "順序",
+    "description": "Section heading in the videos sort dropdown for the sort direction"
+  },
+  "sortFieldLastEdited": {
+    "message": "最近編輯",
+    "description": "Sort field option: when the video was last edited"
+  },
+  "sortFieldDateCreated": {
+    "message": "建立日期",
+    "description": "Sort field option: when the video was created"
+  },
+  "sortFieldName": {
+    "message": "名稱",
+    "description": "Sort field option: the video's title"
+  },
+  "sortFieldLength": {
+    "message": "長度",
+    "description": "Sort field option: the video's duration"
+  },
+  "orderNewestFirst": {
+    "message": "最新在前",
+    "description": "Sort order option for date fields"
+  },
+  "orderOldestFirst": {
+    "message": "最舊在前",
+    "description": "Sort order option for date fields"
+  },
+  "orderAToZ": {
+    "message": "A 到 Z",
+    "description": "Sort order option for the name field"
+  },
+  "orderZToA": {
+    "message": "Z 到 A",
+    "description": "Sort order option for the name field"
+  },
+  "orderLongestFirst": {
+    "message": "最長在前",
+    "description": "Sort order option for the length field"
+  },
+  "orderShortestFirst": {
+    "message": "最短在前",
+    "description": "Sort order option for the length field"
   },
   "allVideosHeading": {
     "message": "所有影片",
@@ -1224,6 +1264,32 @@
   "loadingVideosLabel": {
     "message": "正在載入影片...",
     "description": "Label shown when videos are loading in the popup"
+  },
+  "loadingMoreVideosLabel": {
+    "message": "正在載入更多...",
+    "description": "Label shown at the bottom of the videos list while loading additional pages"
+  },
+  "searchVideosPlaceholder": {
+    "message": "搜尋影片",
+    "description": "Placeholder text for the videos search input in the popup"
+  },
+  "noVideosMatchSearchTitle": {
+    "message": "找不到與「$SEARCHTERM$」相關的內容",
+    "description": "Heading shown when no videos match the current search query in the popup",
+    "placeholders": {
+      "searchterm": {
+        "content": "$1",
+        "example": "design review"
+      }
+    }
+  },
+  "noVideosMatchSearchHint": {
+    "message": "請嘗試調整搜尋字詞。",
+    "description": "Subtext shown under the no search results heading in the popup"
+  },
+  "privateVideoTooltip": {
+    "message": "私密",
+    "description": "Tooltip shown on the lock badge over a private video's thumbnail"
   },
   "goToDashboardButtonLabel": {
     "message": "前往儀表板",

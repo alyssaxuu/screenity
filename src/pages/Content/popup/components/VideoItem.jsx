@@ -1,8 +1,12 @@
 import React from "react";
 
-import { CopyLinkIcon, MoreActionsIcon } from "../../images/popup/images";
+import {
+  CopyLinkIcon,
+  MoreActionsIcon,
+  LockIcon,
+} from "../../images/popup/images";
 
-const VideoItem = ({ title, date, thumbnail, onOpen, onCopyLink }) => {
+const VideoItem = ({ title, date, thumbnail, isPublic, onOpen, onCopyLink }) => {
   const formatRelativeTime = (timestamp) => {
     const now = new Date();
     const then = new Date(timestamp);
@@ -45,20 +49,22 @@ const VideoItem = ({ title, date, thumbnail, onOpen, onCopyLink }) => {
     >
       <div className="video-item">
         <div className="video-item-left">
-          {/*
-					Need a better way to handle thumbnails - proxy from server?
-
-					<div
-            className="video-item-thumbnail"
-            style={{
-              backgroundImage: `url(${thumbnail})`,
-              backgroundSize: "cover",
-              backgroundPosition: "center",
-            }}
-          ></div> */}
+          {thumbnail && (
+            <div className="video-item-thumbnail">
+              <img src={thumbnail} alt="" loading="lazy" decoding="async" />
+            </div>
+          )}
           <div className="video-item-info">
             <div className="video-item-info-title">{title}</div>
             <div className="video-item-info-date">
+              {isPublic === false && (
+                <img
+                  className="video-item-lock"
+                  src={LockIcon}
+                  alt={chrome.i18n.getMessage("privateVideoTooltip")}
+                  title={chrome.i18n.getMessage("privateVideoTooltip")}
+                />
+              )}
               {formatRelativeTime(date)}
             </div>
           </div>

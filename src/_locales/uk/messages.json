@@ -1205,13 +1205,53 @@
     "message": "Не вдалося скопіювати посилання",
     "description": "Toast message shown when failed to copy link to clipboard"
   },
-  "newestSortLabel": {
-    "message": "Останні",
-    "description": "Label for the newest sort option"
+  "sortByHeading": {
+    "message": "Сортувати за",
+    "description": "Section heading in the videos sort dropdown for the field being sorted on"
   },
-  "oldestSortLabel": {
-    "message": "Найстаріші",
-    "description": "Label for the oldest sort option"
+  "orderHeading": {
+    "message": "Порядок",
+    "description": "Section heading in the videos sort dropdown for the sort direction"
+  },
+  "sortFieldLastEdited": {
+    "message": "Останнє редагування",
+    "description": "Sort field option: when the video was last edited"
+  },
+  "sortFieldDateCreated": {
+    "message": "Дата створення",
+    "description": "Sort field option: when the video was created"
+  },
+  "sortFieldName": {
+    "message": "Назва",
+    "description": "Sort field option: the video's title"
+  },
+  "sortFieldLength": {
+    "message": "Тривалість",
+    "description": "Sort field option: the video's duration"
+  },
+  "orderNewestFirst": {
+    "message": "Спочатку нові",
+    "description": "Sort order option for date fields"
+  },
+  "orderOldestFirst": {
+    "message": "Спочатку старі",
+    "description": "Sort order option for date fields"
+  },
+  "orderAToZ": {
+    "message": "Від А до Я",
+    "description": "Sort order option for the name field"
+  },
+  "orderZToA": {
+    "message": "Від Я до А",
+    "description": "Sort order option for the name field"
+  },
+  "orderLongestFirst": {
+    "message": "Спочатку довгі",
+    "description": "Sort order option for the length field"
+  },
+  "orderShortestFirst": {
+    "message": "Спочатку короткі",
+    "description": "Sort order option for the length field"
   },
   "allVideosHeading": {
     "message": "Усі відео",
@@ -1224,6 +1264,32 @@
   "loadingVideosLabel": {
     "message": "Завантаження відео...",
     "description": "Label shown when videos are loading in the popup"
+  },
+  "loadingMoreVideosLabel": {
+    "message": "Завантаження ще...",
+    "description": "Label shown at the bottom of the videos list while loading additional pages"
+  },
+  "searchVideosPlaceholder": {
+    "message": "Пошук відео",
+    "description": "Placeholder text for the videos search input in the popup"
+  },
+  "noVideosMatchSearchTitle": {
+    "message": "Нічого не знайдено за запитом «$SEARCHTERM$»",
+    "description": "Heading shown when no videos match the current search query in the popup",
+    "placeholders": {
+      "searchterm": {
+        "content": "$1",
+        "example": "design review"
+      }
+    }
+  },
+  "noVideosMatchSearchHint": {
+    "message": "Спробуйте змінити пошуковий запит.",
+    "description": "Subtext shown under the no search results heading in the popup"
+  },
+  "privateVideoTooltip": {
+    "message": "Приватне",
+    "description": "Tooltip shown on the lock badge over a private video's thumbnail"
   },
   "goToDashboardButtonLabel": {
     "message": "Перейти до панелі",

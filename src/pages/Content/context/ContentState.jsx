@@ -641,15 +641,28 @@ const ContentState = (props) => {
     }
 
     const attemptId = `ra-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+    const isPro = Boolean(
+      contentStateRef.current.isLoggedIn &&
+      contentStateRef.current.isSubscribed &&
+      CLOUD_FEATURES_ENABLED,
+    );
     await initStartFlowTrace(attemptId, {
       recordingType: contentStateRef.current.recordingType,
-      isPro: Boolean(
-        contentStateRef.current.isLoggedIn &&
-        contentStateRef.current.isSubscribed &&
-        CLOUD_FEATURES_ENABLED,
-      ),
+      isPro,
       countdown: Boolean(contentStateRef.current.countdown),
     });
+    // Fired before the gates below (quota, permissions, memory) can bail,
+    // and those gates leave no other trace either side. Only signal that a
+    // pro user clicked Start on an attempt that never reached dispatch.
+    if (isPro) {
+      chrome.runtime
+        .sendMessage({
+          type: "recording-click-beacon",
+          clickId: attemptId,
+          recordingType: contentStateRef.current.recordingType,
+        })
+        .catch(() => {});
+    }
     traceStep("startStreaming");
     perfReset();
     perfMark("Content startStreaming.click", {
@@ -1168,22 +1181,26 @@ const ContentState = (props) => {
   });
 
   useEffect(() => {
-    const handleMessage = (event) => {
-      if (event.data.type === "screenity-permissions") {
-        handleDevicePermissions(event.data);
-      } else if (event.data.type === "screenity-permissions-loaded") {
+    const handleMessage = (message, sender) => {
+      // sender.tab is only unset when the background relayed this (see
+      // relayToSenderTab); a direct broadcast carries the sending tab and
+      // may be another tab's permissions iframe, not ours.
+      if (sender?.tab) return;
+      if (message.type === "screenity-permissions") {
+        handleDevicePermissions(message);
+      } else if (message.type === "screenity-permissions-loaded") {
         setContentState((prevContentState) => ({
           ...prevContentState,
           permissionsLoaded: true,
         }));
-      } else if (event.data.type === "screenity-site-policy") {
+      } else if (message.type === "screenity-site-policy") {
         // Accurate host-page Permissions-Policy read from the cross-origin
         // permissions.html iframe: feature=(self) (e.g. facebook.com) blocks
         // our iframe even though the top-page probe above sees it as allowed.
         const camMicBlocked =
-          event.data.cameraAllowed === false ||
-          event.data.microphoneAllowed === false;
-        const displayBlocked = event.data.displayCaptureAllowed === false;
+          message.cameraAllowed === false ||
+          message.microphoneAllowed === false;
+        const displayBlocked = message.displayCaptureAllowed === false;
         setContentState((prevContentState) => ({
           ...prevContentState,
           sitePermissionsBlocked:
@@ -1194,10 +1211,10 @@ const ContentState = (props) => {
       }
     };
 
-    window.addEventListener("message", handleMessage);
+    chrome.runtime.onMessage.addListener(handleMessage);
 
     return () => {
-      window.removeEventListener("message", handleMessage);
+      chrome.runtime.onMessage.removeListener(handleMessage);
     };
   }, []);
 

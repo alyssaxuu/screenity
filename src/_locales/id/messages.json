@@ -1205,13 +1205,53 @@
     "message": "Gagal menyalin tautan",
     "description": "Toast message shown when failed to copy link to clipboard"
   },
-  "newestSortLabel": {
-    "message": "Terbaru",
-    "description": "Label for the newest sort option"
+  "sortByHeading": {
+    "message": "Urutkan berdasarkan",
+    "description": "Section heading in the videos sort dropdown for the field being sorted on"
   },
-  "oldestSortLabel": {
-    "message": "Terlama",
-    "description": "Label for the oldest sort option"
+  "orderHeading": {
+    "message": "Urutan",
+    "description": "Section heading in the videos sort dropdown for the sort direction"
+  },
+  "sortFieldLastEdited": {
+    "message": "Terakhir diedit",
+    "description": "Sort field option: when the video was last edited"
+  },
+  "sortFieldDateCreated": {
+    "message": "Tanggal dibuat",
+    "description": "Sort field option: when the video was created"
+  },
+  "sortFieldName": {
+    "message": "Nama",
+    "description": "Sort field option: the video's title"
+  },
+  "sortFieldLength": {
+    "message": "Durasi",
+    "description": "Sort field option: the video's duration"
+  },
+  "orderNewestFirst": {
+    "message": "Terbaru lebih dulu",
+    "description": "Sort order option for date fields"
+  },
+  "orderOldestFirst": {
+    "message": "Terlama lebih dulu",
+    "description": "Sort order option for date fields"
+  },
+  "orderAToZ": {
+    "message": "A ke Z",
+    "description": "Sort order option for the name field"
+  },
+  "orderZToA": {
+    "message": "Z ke A",
+    "description": "Sort order option for the name field"
+  },
+  "orderLongestFirst": {
+    "message": "Terpanjang lebih dulu",
+    "description": "Sort order option for the length field"
+  },
+  "orderShortestFirst": {
+    "message": "Terpendek lebih dulu",
+    "description": "Sort order option for the length field"
   },
   "allVideosHeading": {
     "message": "Semua video",
@@ -1224,6 +1264,32 @@
   "loadingVideosLabel": {
     "message": "Memuat video...",
     "description": "Label shown when videos are loading in the popup"
+  },
+  "loadingMoreVideosLabel": {
+    "message": "Memuat lainnya...",
+    "description": "Label shown at the bottom of the videos list while loading additional pages"
+  },
+  "searchVideosPlaceholder": {
+    "message": "Cari video",
+    "description": "Placeholder text for the videos search input in the popup"
+  },
+  "noVideosMatchSearchTitle": {
+    "message": "Tidak ada hasil untuk \"$SEARCHTERM$\"",
+    "description": "Heading shown when no videos match the current search query in the popup",
+    "placeholders": {
+      "searchterm": {
+        "content": "$1",
+        "example": "design review"
+      }
+    }
+  },
+  "noVideosMatchSearchHint": {
+    "message": "Coba sesuaikan kata pencarian Anda.",
+    "description": "Subtext shown under the no search results heading in the popup"
+  },
+  "privateVideoTooltip": {
+    "message": "Pribadi",
+    "description": "Tooltip shown on the lock badge over a private video's thumbnail"
   },
   "goToDashboardButtonLabel": {
     "message": "Ke dashboard",

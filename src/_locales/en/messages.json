@@ -1253,13 +1253,53 @@
     "message": "Failed to copy link",
     "description": "Toast message shown when failed to copy link to clipboard"
   },
-  "newestSortLabel": {
-    "message": "Latest",
-    "description": "Label for the newest sort option"
+  "sortByHeading": {
+    "message": "Sort by",
+    "description": "Section heading in the videos sort dropdown for the field being sorted on"
   },
-  "oldestSortLabel": {
-    "message": "Oldest",
-    "description": "Label for the oldest sort option"
+  "orderHeading": {
+    "message": "Order",
+    "description": "Section heading in the videos sort dropdown for the sort direction"
+  },
+  "sortFieldLastEdited": {
+    "message": "Last edited",
+    "description": "Sort field option: when the video was last edited"
+  },
+  "sortFieldDateCreated": {
+    "message": "Date created",
+    "description": "Sort field option: when the video was created"
+  },
+  "sortFieldName": {
+    "message": "Name",
+    "description": "Sort field option: the video's title"
+  },
+  "sortFieldLength": {
+    "message": "Length",
+    "description": "Sort field option: the video's duration"
+  },
+  "orderNewestFirst": {
+    "message": "Newest first",
+    "description": "Sort order option for date fields"
+  },
+  "orderOldestFirst": {
+    "message": "Oldest first",
+    "description": "Sort order option for date fields"
+  },
+  "orderAToZ": {
+    "message": "A to Z",
+    "description": "Sort order option for the name field"
+  },
+  "orderZToA": {
+    "message": "Z to A",
+    "description": "Sort order option for the name field"
+  },
+  "orderLongestFirst": {
+    "message": "Longest first",
+    "description": "Sort order option for the length field"
+  },
+  "orderShortestFirst": {
+    "message": "Shortest first",
+    "description": "Sort order option for the length field"
   },
   "allVideosHeading": {
     "message": "All videos",
@@ -1272,6 +1312,32 @@
   "loadingVideosLabel": {
     "message": "Loading videos...",
     "description": "Label shown when videos are loading in the popup"
+  },
+  "loadingMoreVideosLabel": {
+    "message": "Loading more...",
+    "description": "Label shown at the bottom of the videos list while loading additional pages"
+  },
+  "searchVideosPlaceholder": {
+    "message": "Search videos",
+    "description": "Placeholder text for the videos search input in the popup"
+  },
+  "noVideosMatchSearchTitle": {
+    "message": "Nothing found for \"$SEARCHTERM$\"",
+    "description": "Heading shown when no videos match the current search query in the popup",
+    "placeholders": {
+      "searchterm": {
+        "content": "$1",
+        "example": "design review"
+      }
+    }
+  },
+  "noVideosMatchSearchHint": {
+    "message": "Try adjusting your search term.",
+    "description": "Subtext shown under the no search results heading in the popup"
+  },
+  "privateVideoTooltip": {
+    "message": "Private",
+    "description": "Tooltip shown on the lock badge over a private video's thumbnail"
   },
   "goToDashboardButtonLabel": {
     "message": "Go to dashboard",

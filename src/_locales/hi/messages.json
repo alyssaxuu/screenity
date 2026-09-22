@@ -1205,13 +1205,53 @@
     "message": "लिंक कॉपी करने में विफल",
     "description": "Toast message shown when failed to copy link to clipboard"
   },
-  "newestSortLabel": {
-    "message": "नवीनतम",
-    "description": "Label for the newest sort option"
+  "sortByHeading": {
+    "message": "इसके अनुसार क्रमबद्ध करें",
+    "description": "Section heading in the videos sort dropdown for the field being sorted on"
   },
-  "oldestSortLabel": {
-    "message": "सबसे पुराने",
-    "description": "Label for the oldest sort option"
+  "orderHeading": {
+    "message": "क्रम",
+    "description": "Section heading in the videos sort dropdown for the sort direction"
+  },
+  "sortFieldLastEdited": {
+    "message": "अंतिम बार संपादित",
+    "description": "Sort field option: when the video was last edited"
+  },
+  "sortFieldDateCreated": {
+    "message": "बनाने की तारीख़",
+    "description": "Sort field option: when the video was created"
+  },
+  "sortFieldName": {
+    "message": "नाम",
+    "description": "Sort field option: the video's title"
+  },
+  "sortFieldLength": {
+    "message": "अवधि",
+    "description": "Sort field option: the video's duration"
+  },
+  "orderNewestFirst": {
+    "message": "पहले नवीनतम",
+    "description": "Sort order option for date fields"
+  },
+  "orderOldestFirst": {
+    "message": "पहले सबसे पुराने",
+    "description": "Sort order option for date fields"
+  },
+  "orderAToZ": {
+    "message": "A से Z",
+    "description": "Sort order option for the name field"
+  },
+  "orderZToA": {
+    "message": "Z से A",
+    "description": "Sort order option for the name field"
+  },
+  "orderLongestFirst": {
+    "message": "पहले सबसे लंबे",
+    "description": "Sort order option for the length field"
+  },
+  "orderShortestFirst": {
+    "message": "पहले सबसे छोटे",
+    "description": "Sort order option for the length field"
   },
   "allVideosHeading": {
     "message": "सभी वीडियो",
@@ -1224,6 +1264,32 @@
   "loadingVideosLabel": {
     "message": "वीडियो लोड हो रहे हैं...",
     "description": "Label shown when videos are loading in the popup"
+  },
+  "loadingMoreVideosLabel": {
+    "message": "और लोड हो रहे हैं...",
+    "description": "Label shown at the bottom of the videos list while loading additional pages"
+  },
+  "searchVideosPlaceholder": {
+    "message": "वीडियो खोजें",
+    "description": "Placeholder text for the videos search input in the popup"
+  },
+  "noVideosMatchSearchTitle": {
+    "message": "\"$SEARCHTERM$\" के लिए कुछ नहीं मिला",
+    "description": "Heading shown when no videos match the current search query in the popup",
+    "placeholders": {
+      "searchterm": {
+        "content": "$1",
+        "example": "design review"
+      }
+    }
+  },
+  "noVideosMatchSearchHint": {
+    "message": "अपना खोज शब्द बदलकर देखें।",
+    "description": "Subtext shown under the no search results heading in the popup"
+  },
+  "privateVideoTooltip": {
+    "message": "निजी",
+    "description": "Tooltip shown on the lock badge over a private video's thumbnail"
   },
   "goToDashboardButtonLabel": {
     "message": "डैशबोर्ड पर जाएं",

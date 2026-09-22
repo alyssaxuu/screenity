@@ -399,13 +399,23 @@ const _startRecordingInner = async (caller) => {
           "cameraActive",
           "micActive",
           "recordedTabDomain",
+          "pendingClickBeacon",
         ]),
         chrome.tabs.query({}).catch(() => []),
         chrome.windows.getAll({}).catch(() => []),
       ]);
       const userObj = extras?.screenityUser || null;
+      // Single-use: consume it here so a stale click never gets attributed
+      // to a later, unrelated start (keyboard shortcut, restart, etc).
+      chrome.storage.local.remove(["pendingClickBeacon"]);
+      const pendingClick = extras?.pendingClickBeacon;
+      const clickId =
+        pendingClick && Date.now() - pendingClick.at < 30000
+          ? pendingClick.clickId
+          : null;
       await emitRecordingTelemetry("recording_initiated_beacon", {
         recordingSessionId: recordingAttemptId,
+        clickId,
         userIdHint: userObj?._id || userObj?.id || null,
         userAgentFull:
           typeof navigator !== "undefined" && navigator.userAgent

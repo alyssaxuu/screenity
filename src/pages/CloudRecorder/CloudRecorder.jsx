@@ -984,6 +984,15 @@ const CloudRecorder = () => {
           typeof eventPayload.siblingProgressing === "boolean"
             ? eventPayload.siblingProgressing
             : null,
+        // isPaused true + patchAttempts 0 means processQueue never ran, not a hung PATCH.
+        isPaused:
+          typeof eventPayload.isPaused === "boolean"
+            ? eventPayload.isPaused
+            : null,
+        isFinalizing:
+          typeof eventPayload.isFinalizing === "boolean"
+            ? eventPayload.isFinalizing
+            : null,
         resUrlMatches:
           typeof eventPayload.resUrlMatches === "boolean"
             ? eventPayload.resUrlMatches
@@ -3151,6 +3160,7 @@ const CloudRecorder = () => {
         uploaderStatus: uploader.status || null,
         errorCode: uploader.lastErrorCode || null,
         isPaused: Boolean(uploader.isPaused),
+        isFinalizing: Boolean(uploader.isFinalizing),
       });
       // Same action the online handler takes. resume() restarts processQueue
       // and, on a recoverable error, the heartbeat that HEAD-resyncs.

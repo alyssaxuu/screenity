@@ -316,14 +316,29 @@ input {
     display: block;
   }
 
+  // Fixed height so swapping the sort control for the search field cannot
+  // resize the header row.
+  .TabsListActions {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 0px;
+    min-width: 0;
+    height: 32px;
+    margin-bottom: 5px;
+  }
+  .TabsListActions.searching {
+    flex: 1 1 auto;
+    margin-left: $spacing-04;
+  }
   .TabsSort {
-    margin-right: $spacing-04;
+    display: flex;
+    align-items: center;
+    height: 100%;
+    box-sizing: border-box;
     border-radius: $container-border-radius;
     padding-left: $spacing-03;
-    padding-right: $spacing-03;
-    padding-top: $spacing-03;
-    padding-bottom: $spacing-03;
-    margin-bottom: 5px;
+    padding-right: $spacing-02;
   }
   .TabsSort:hover {
     cursor: pointer;
@@ -343,6 +358,73 @@ input {
   .TabsSort:focus-visible {
     box-shadow: $focus-border;
     outline: none !important;
+  }
+  .TabsIconButton {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .TabsIconButton:hover {
+    cursor: pointer;
+    background: $color-light-grey;
+  }
+  .TabsIconButton:focus-visible {
+    box-shadow: $focus-border;
+    outline: none !important;
+  }
+  .TabsSearchInline {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: row;
+    align-items: center;
+    gap: $spacing-03;
+    height: 100%;
+    min-width: 0;
+    padding-left: $spacing-04;
+    padding-right: $spacing-02;
+    border-radius: $container-border-radius;
+    background: $color-light-grey;
+    box-sizing: border-box;
+
+    > img {
+      flex-shrink: 0;
+      width: 14px;
+      height: 14px;
+    }
+    .TabsIconButton {
+      margin-bottom: 0;
+      width: 24px;
+      height: 24px;
+    }
+    .TabsIconButton:hover {
+      background: rgba(41, 41, 47, 0.08);
+    }
+    .TabsIconButton img {
+      width: 12px;
+      height: 12px;
+    }
+  }
+  .TabsSearchInput {
+    flex: 1 1 auto;
+    min-width: 0;
+    border: none;
+    background: transparent;
+    color: $color-text-primary;
+    font-size: $font-size-normal;
+
+    &::placeholder {
+      color: $color-text-secondary;
+    }
+  }
+
+  // The global TabsContent white veil washes out the dashboard button; the
+  // videos list uses its own fade over the grey panel instead.
+  .TabsContent::after {
+    display: none;
   }
 }
 

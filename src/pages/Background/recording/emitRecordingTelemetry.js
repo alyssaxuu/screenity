@@ -51,10 +51,12 @@ export const emitRecordingTelemetry = async (eventType, extra = {}) => {
 
     const screenUploader = session?.tracks?.screen?.uploader || null;
     const cameraUploader = session?.tracks?.camera?.uploader || null;
-    // The early beacon fires before this attempt has a session doc, so a
+    // The early beacons fire before this attempt has a session doc, so a
     // recorderSession in storage is the prior recording's. Skip the fallback
     // so we don't tag the beacon with a stale mediaId.
-    const isEarlyBeacon = eventType === "recording_initiated_beacon";
+    const isEarlyBeacon =
+      eventType === "recording_initiated_beacon" ||
+      eventType === "recording_click_beacon";
     const mediaId =
       extra.mediaId ||
       (isEarlyBeacon

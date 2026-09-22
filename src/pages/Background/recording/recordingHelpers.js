@@ -14,6 +14,7 @@ import { perfMark, perfSpan } from "../../utils/perfMarks";
 import { classifyError } from "../../utils/errorCodes";
 import { resetWatchdogState } from "./resetWatchdogState";
 import { sweepRecorderTabs } from "./sweepRecorderTabs";
+import { emitRecordingTelemetry } from "./emitRecordingTelemetry";
 
 // Mirrors CloudRecorder.appendUploadTelemetryEvent so BG-side projectId mutations
 // land in the same `cloudUploadTelemetryEvents` storage key surfaced by
@@ -176,12 +177,14 @@ export const handleRecordingError = async (request) => {
     projectId: projectIdBeforeClear,
     sceneId: sceneIdBeforeClear,
     recordingAttemptId: attemptIdAtClear,
+    uploadMeta: uploadMetaAtClear,
   } = await chrome.storage.local.get([
     "multiMode",
     "multiSceneCount",
     "projectId",
     "sceneId",
     "recordingAttemptId",
+    "uploadMeta",
   ]);
   const preserveMultiProject =
     Boolean(multiMode) && Number(multiSceneCount) > 0;
@@ -236,6 +239,23 @@ export const handleRecordingError = async (request) => {
       why: request?.why || null,
       errorCode,
       recordingAttemptId: attemptIdAtClear || null,
+    });
+    // Local write above never leaves the machine except in a manual zip
+    // export. Send it over the network too (server allowlist has no from/to;
+    // reason/errCode/errMsg carry that) into this take's own upload_sessions doc.
+    const mediaIdAtClear =
+      uploadMetaAtClear?.screen?.mediaId ||
+      uploadMetaAtClear?.camera?.mediaId ||
+      null;
+    void emitRecordingTelemetry("project_state_change", {
+      recordingId: mediaIdAtClear || undefined,
+      mediaId: mediaIdAtClear,
+      projectId: projectIdBeforeClear,
+      sceneId: sceneIdBeforeClear || null,
+      reason: "bg-recording-error",
+      outcome: "project_cleared",
+      errCode: errorCode || undefined,
+      errMsg: request?.why || request?.error || undefined,
     });
   }
 

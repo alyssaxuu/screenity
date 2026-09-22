@@ -30,12 +30,35 @@
   }
 }
 .videos-list {
-  padding-bottom: 10px !important;
+  position: relative;
   max-height: calc(96vh - 260px);
-  overflow-y: overlay;
+  overflow-y: auto;
   padding: $spacing-05;
+  padding-bottom: 28px !important;
+
+  &::-webkit-scrollbar {
+    width: 6px;
+    background: transparent;
+  }
+  &::-webkit-scrollbar-track {
+    background: transparent;
+    border: none;
+    box-shadow: none;
+  }
+  &::-webkit-scrollbar-thumb {
+    background: rgba(41, 41, 47, 0.18);
+    border: none;
+    border-radius: 10px;
+  }
+  &::-webkit-scrollbar-thumb:hover {
+    background: rgba(41, 41, 47, 0.3);
+  }
+  &::-webkit-scrollbar-corner {
+    background: transparent;
+  }
 }
 .bottom-section {
+  position: relative;
   width: 100%;
   bottom: 0px;
   left: 0px;
@@ -44,6 +67,22 @@
   padding-bottom: $spacing-04 !important;
   z-index: 999999;
   padding: $spacing-05;
+
+  // Fades the last rows into the panel instead of cutting them at the button.
+  &::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 100%;
+    height: 36px;
+    background: linear-gradient(
+      to bottom,
+      rgba(246, 247, 251, 0),
+      $color-light-grey
+    );
+    pointer-events: none;
+  }
 }
 .ModalSoon {
   display: flex;
@@ -105,6 +144,29 @@
   color: #6e7684;
   font-size: 14px;
 }
+.empty-state {
+  text-align: center;
+  padding-left: $spacing-05;
+  padding-right: $spacing-05;
+}
+.empty-state-icon {
+  width: 32px;
+  height: 32px;
+  margin-bottom: $spacing-04;
+}
+.empty-state-title {
+  max-width: 100%;
+  font-family: $font-medium;
+  color: $color-text-primary;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.empty-state-description {
+  margin-top: $spacing-02;
+  color: $color-text-secondary;
+  font-size: $font-size-small;
+}
 
 .spinner {
   width: 32px;
@@ -114,6 +176,23 @@
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
   margin-bottom: 10px;
+}
+
+.load-more-indicator {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: $spacing-03;
+  padding: $spacing-04 0;
+  color: #6e7684;
+  font-size: $font-size-small;
+}
+.spinner-small {
+  width: 16px;
+  height: 16px;
+  margin-bottom: 0;
+  border-width: 2px;
 }
 
 @keyframes spin {

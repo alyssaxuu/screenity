@@ -1205,13 +1205,53 @@
     "message": "Не удалось скопировать ссылку",
     "description": "Toast message shown when failed to copy link to clipboard"
   },
-  "newestSortLabel": {
-    "message": "Новые",
-    "description": "Label for the newest sort option"
+  "sortByHeading": {
+    "message": "Сортировать по",
+    "description": "Section heading in the videos sort dropdown for the field being sorted on"
   },
-  "oldestSortLabel": {
-    "message": "Старые",
-    "description": "Label for the oldest sort option"
+  "orderHeading": {
+    "message": "Порядок",
+    "description": "Section heading in the videos sort dropdown for the sort direction"
+  },
+  "sortFieldLastEdited": {
+    "message": "Последнее изменение",
+    "description": "Sort field option: when the video was last edited"
+  },
+  "sortFieldDateCreated": {
+    "message": "Дата создания",
+    "description": "Sort field option: when the video was created"
+  },
+  "sortFieldName": {
+    "message": "Название",
+    "description": "Sort field option: the video's title"
+  },
+  "sortFieldLength": {
+    "message": "Длительность",
+    "description": "Sort field option: the video's duration"
+  },
+  "orderNewestFirst": {
+    "message": "Сначала новые",
+    "description": "Sort order option for date fields"
+  },
+  "orderOldestFirst": {
+    "message": "Сначала старые",
+    "description": "Sort order option for date fields"
+  },
+  "orderAToZ": {
+    "message": "От А до Я",
+    "description": "Sort order option for the name field"
+  },
+  "orderZToA": {
+    "message": "От Я до А",
+    "description": "Sort order option for the name field"
+  },
+  "orderLongestFirst": {
+    "message": "Сначала длинные",
+    "description": "Sort order option for the length field"
+  },
+  "orderShortestFirst": {
+    "message": "Сначала короткие",
+    "description": "Sort order option for the length field"
   },
   "allVideosHeading": {
     "message": "Все видео",
@@ -1224,6 +1264,32 @@
   "loadingVideosLabel": {
     "message": "Загрузка видео...",
     "description": "Label shown when videos are loading in the popup"
+  },
+  "loadingMoreVideosLabel": {
+    "message": "Загрузка ещё...",
+    "description": "Label shown at the bottom of the videos list while loading additional pages"
+  },
+  "searchVideosPlaceholder": {
+    "message": "Поиск видео",
+    "description": "Placeholder text for the videos search input in the popup"
+  },
+  "noVideosMatchSearchTitle": {
+    "message": "Ничего не найдено по запросу «$SEARCHTERM$»",
+    "description": "Heading shown when no videos match the current search query in the popup",
+    "placeholders": {
+      "searchterm": {
+        "content": "$1",
+        "example": "design review"
+      }
+    }
+  },
+  "noVideosMatchSearchHint": {
+    "message": "Попробуйте изменить запрос.",
+    "description": "Subtext shown under the no search results heading in the popup"
+  },
+  "privateVideoTooltip": {
+    "message": "Приватное",
+    "description": "Tooltip shown on the lock badge over a private video's thumbnail"
   },
   "goToDashboardButtonLabel": {
     "message": "Перейти в панель",

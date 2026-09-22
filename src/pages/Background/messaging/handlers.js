@@ -529,21 +529,22 @@ const handleFetchVideos = async (message) => {
     const pageSize = message.pageSize || 12;
     const sort = message.sort || "newest";
     const filter = message.filter || "all";
+    const query = message.query || "";
 
     const token = await chrome.storage.local
       .get("screenityToken")
       .then((r) => r.screenityToken);
 
-    const res = await fetch(
-      `${API_BASE}/videos?page=${page}&pageSize=${pageSize}&sort=${sort}&filter=${filter}`,
-      {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-        credentials: "include",
+    const params = new URLSearchParams({ page, pageSize, sort, filter });
+    if (query) params.set("query", query);
+
+    const res = await fetch(`${API_BASE}/videos?${params.toString()}`, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${token}`,
       },
-    );
+      credentials: "include",
+    });
 
     const result = await res.json();
 
@@ -1546,6 +1547,32 @@ export const setupHandlers = () => {
   });
   registerMessage("set-mic-active-tab", (message) => setMicActiveTab(message));
 
+  // Fires before background dispatch begins: the only trace of an attempt a
+  // pre-dispatch gate (quota, permissions, memory) bails on. Skipped for
+  // anonymous users too, like the dispatch-time beacon, to avoid 401 spam.
+  registerMessage("recording-click-beacon", (message) => {
+    // recordingAttemptId is generated fresh in startRecording.js, unrelated
+    // to this clickId, so stash it here for that beacon to pick up and
+    // join the two server-side. See its read of pendingClickBeacon.
+    if (message?.clickId) {
+      chrome.storage.local.set({
+        pendingClickBeacon: { clickId: message.clickId, at: Date.now() },
+      });
+    }
+    void (async () => {
+      try {
+        const { screenityToken } = await chrome.storage.local.get([
+          "screenityToken",
+        ]);
+        if (!screenityToken) return;
+        await emitRecordingTelemetry("recording_click_beacon", {
+          recordingSessionId: message?.clickId,
+          recordingType: message?.recordingType || null,
+        });
+      } catch {}
+    })();
+  });
+
   registerMessage("diag-countdown-started", () => {
     diagEvent("countdown-started");
     // countdown started means stream setup is done; extend the fallback window
@@ -1686,6 +1713,18 @@ export const setupHandlers = () => {
   registerMessage("on-get-permissions", (message) =>
     handleOnGetPermissions(message),
   );
+  // Relays the permissions.html <-> content script handshake within a single
+  // tab. Only chrome.runtime (content scripts + extension pages) can reach
+  // this, unlike window.postMessage which any embedding page could forge.
+  const relayToSenderTab = (message, sender) => {
+    if (sender?.tab?.id != null) {
+      sendMessageTab(sender.tab.id, message).catch(() => {});
+    }
+  };
+  registerMessage("screenity-get-permissions", relayToSenderTab);
+  registerMessage("screenity-permissions-loaded", relayToSenderTab);
+  registerMessage("screenity-site-policy", relayToSenderTab);
+  registerMessage("screenity-permissions", relayToSenderTab);
   registerMessage(
     "recording-complete",
     async (message, sender) => {

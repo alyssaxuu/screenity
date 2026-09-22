@@ -421,7 +421,31 @@ export class WebCodecsRecorder {
     const processor = new MediaStreamTrackProcessor({ track: this.videoTrack });
     const reader = processor.readable.getReader();
 
-    const { value: frame } = await reader.read();
+    // getSettings() already missed above, so a frozen/backgrounded source
+    // (minimized window capture, backgrounded tab compositor) never delivers
+    // a frame here; uncapped, this is telemetry's largest single
+    // start-progress stall bucket. Time out so start()'s catch falls back
+    // to MediaRecorder.
+    const FRAME_PROBE_TIMEOUT_MS = 5000;
+    let timeoutTimer;
+    let frame;
+    try {
+      const result = await Promise.race([
+        reader.read(),
+        new Promise((_, reject) => {
+          timeoutTimer = setTimeout(
+            () => reject(new Error("probe-frame-timeout")),
+            FRAME_PROBE_TIMEOUT_MS,
+          );
+        }),
+      ]);
+      frame = result.value;
+    } catch (err) {
+      reader.cancel().catch(() => {});
+      throw err;
+    } finally {
+      clearTimeout(timeoutTimer);
+    }
     if (!frame) throw new Error("Cannot probe frame resolution");
 
     const width = frame.codedWidth;

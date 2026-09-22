@@ -276,12 +276,9 @@ const Wrapper = () => {
     let timer = null;
 
     const request = () => {
-      permissionsRef.current?.contentWindow?.postMessage(
-        {
-          type: "screenity-get-permissions",
-        },
-        "*"
-      );
+      chrome.runtime.sendMessage({
+        type: "screenity-get-permissions",
+      });
       attempts += 1;
       timer = setTimeout(retry, 1200 * attempts);
     };

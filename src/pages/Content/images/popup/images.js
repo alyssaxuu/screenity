@@ -30,6 +30,11 @@ const TempMarketing = `${URL}/temp/marketing.webp`;
 const TempSubstack = `${URL}/temp/substack.webp`;
 const CopyLinkIcon = `${URL}/copy-link.svg`;
 const MoreActionsIcon = `${URL}/more-actions.svg`;
+const LockIcon = `${URL}/lock.svg`;
+const SearchIcon = `${URL}/search.svg`;
+const SearchCloseIcon = `${URL}/close.svg`;
+const EmptySearchIcon = `${URL}/empty-search.svg`;
+const EmptyVideosIcon = `${URL}/empty-videos.svg`;
 const ProfilePic = `${URL}/pfp.png`;
 const HandleControl = `${URL}/canvas/handle.png`;
 const RotateControl = `${URL}/canvas/rotate.png`;
@@ -72,6 +77,11 @@ export {
   TempSubstack,
   CopyLinkIcon,
   MoreActionsIcon,
+  LockIcon,
+  SearchIcon,
+  SearchCloseIcon,
+  EmptySearchIcon,
+  EmptyVideosIcon,
   ProfilePic,
   HandleControl,
   RotateControl,

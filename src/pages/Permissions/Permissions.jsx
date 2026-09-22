@@ -2,12 +2,9 @@ import React, { useEffect, useState, useRef, useCallback } from "react";
 
 const Recorder = () => {
   useEffect(() => {
-    window.parent.postMessage(
-      {
-        type: "screenity-permissions-loaded",
-      },
-      "*"
-    );
+    chrome.runtime.sendMessage({
+      type: "screenity-permissions-loaded",
+    });
 
     // Cross-origin iframe, so allowsFeature reflects what the page actually
     // delegated to us. Pages with feature=(self) (e.g. facebook.com) don't
@@ -15,15 +12,12 @@ const Recorder = () => {
     try {
       const pp = document.permissionsPolicy || document.featurePolicy;
       if (pp && typeof pp.allowsFeature === "function") {
-        window.parent.postMessage(
-          {
-            type: "screenity-site-policy",
-            cameraAllowed: pp.allowsFeature("camera"),
-            microphoneAllowed: pp.allowsFeature("microphone"),
-            displayCaptureAllowed: pp.allowsFeature("display-capture"),
-          },
-          "*"
-        );
+        chrome.runtime.sendMessage({
+          type: "screenity-site-policy",
+          cameraAllowed: pp.allowsFeature("camera"),
+          microphoneAllowed: pp.allowsFeature("microphone"),
+          displayCaptureAllowed: pp.allowsFeature("display-capture"),
+        });
       }
     } catch (e) {}
   }, []);
@@ -179,14 +173,11 @@ const Recorder = () => {
     streams.forEach((stream) => stream.getTracks().forEach((t) => t.stop()));
 
     if (!camOk && !micOk) {
-      window.parent.postMessage(
-        {
-          type: "screenity-permissions",
-          success: false,
-          error: lastError?.name || "unknown",
-        },
-        "*"
-      );
+      chrome.runtime.sendMessage({
+        type: "screenity-permissions",
+        success: false,
+        error: lastError?.name || "unknown",
+      });
       return;
     }
 
@@ -202,31 +193,30 @@ const Recorder = () => {
       microphonePermission: micOk,
     });
 
-    window.parent.postMessage(
-      {
-        type: "screenity-permissions",
-        success: true,
-        audioinput: audioinput,
-        audiooutput: audiooutput,
-        videoinput: videoinput,
-        cameraPermission: camOk,
-        microphonePermission: micOk,
-      },
-      "*"
-    );
+    chrome.runtime.sendMessage({
+      type: "screenity-permissions",
+      success: true,
+      audioinput: audioinput,
+      audiooutput: audiooutput,
+      videoinput: videoinput,
+      cameraPermission: camOk,
+      microphonePermission: micOk,
+    });
   };
 
-  const onMessage = (message) => {
+  const onMessage = (message, sender) => {
+    // sender.tab is only unset when the background relayed this (see
+    // relayToSenderTab); a direct broadcast may be another tab's request.
+    if (sender?.tab) return;
     if (message.type === "screenity-get-permissions") {
       checkPermissions();
     }
   };
 
-  // Post message listener
+  // chrome.runtime, not window.postMessage: only extension contexts (content
+  // scripts, extension pages) can reach this, not any embedding page.
   useEffect(() => {
-    window.addEventListener("message", (event) => {
-      onMessage(event.data);
-    });
+    chrome.runtime.onMessage.addListener(onMessage);
   }, []);
 
   return <div></div>;

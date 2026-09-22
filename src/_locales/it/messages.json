@@ -1185,13 +1185,53 @@
     "message": "Impossibile copiare il link",
     "description": "Toast message shown when failed to copy link to clipboard"
   },
-  "newestSortLabel": {
-    "message": "Più recenti",
-    "description": "Label for the newest sort option"
+  "sortByHeading": {
+    "message": "Ordina per",
+    "description": "Section heading in the videos sort dropdown for the field being sorted on"
   },
-  "oldestSortLabel": {
-    "message": "Più vecchi",
-    "description": "Label for the oldest sort option"
+  "orderHeading": {
+    "message": "Ordine",
+    "description": "Section heading in the videos sort dropdown for the sort direction"
+  },
+  "sortFieldLastEdited": {
+    "message": "Ultima modifica",
+    "description": "Sort field option: when the video was last edited"
+  },
+  "sortFieldDateCreated": {
+    "message": "Data di creazione",
+    "description": "Sort field option: when the video was created"
+  },
+  "sortFieldName": {
+    "message": "Nome",
+    "description": "Sort field option: the video's title"
+  },
+  "sortFieldLength": {
+    "message": "Durata",
+    "description": "Sort field option: the video's duration"
+  },
+  "orderNewestFirst": {
+    "message": "Prima i più recenti",
+    "description": "Sort order option for date fields"
+  },
+  "orderOldestFirst": {
+    "message": "Prima i più vecchi",
+    "description": "Sort order option for date fields"
+  },
+  "orderAToZ": {
+    "message": "Dalla A alla Z",
+    "description": "Sort order option for the name field"
+  },
+  "orderZToA": {
+    "message": "Dalla Z alla A",
+    "description": "Sort order option for the name field"
+  },
+  "orderLongestFirst": {
+    "message": "Prima i più lunghi",
+    "description": "Sort order option for the length field"
+  },
+  "orderShortestFirst": {
+    "message": "Prima i più brevi",
+    "description": "Sort order option for the length field"
   },
   "allVideosHeading": {
     "message": "Tutti i video",
@@ -1204,6 +1244,32 @@
   "loadingVideosLabel": {
     "message": "Caricamento video...",
     "description": "Label shown when videos are loading in the popup"
+  },
+  "loadingMoreVideosLabel": {
+    "message": "Caricamento altri...",
+    "description": "Label shown at the bottom of the videos list while loading additional pages"
+  },
+  "searchVideosPlaceholder": {
+    "message": "Cerca video",
+    "description": "Placeholder text for the videos search input in the popup"
+  },
+  "noVideosMatchSearchTitle": {
+    "message": "Nessun risultato per \"$SEARCHTERM$\"",
+    "description": "Heading shown when no videos match the current search query in the popup",
+    "placeholders": {
+      "searchterm": {
+        "content": "$1",
+        "example": "design review"
+      }
+    }
+  },
+  "noVideosMatchSearchHint": {
+    "message": "Prova a modificare il termine di ricerca.",
+    "description": "Subtext shown under the no search results heading in the popup"
+  },
+  "privateVideoTooltip": {
+    "message": "Privato",
+    "description": "Tooltip shown on the lock badge over a private video's thumbnail"
   },
   "goToDashboardButtonLabel": {
     "message": "Vai al pannello",
