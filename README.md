@@ -84,7 +84,7 @@ You can create it accessing [Google Cloud Console](https://console.cloud.google.
 
 ## Custom upload
 
-The editor can upload a recording to your own HTTP endpoint and share the URL it returns. It supports POST or PUT, Bearer, Basic or custom-header auth, and additional headers. See [docs/custom-upload.md](docs/custom-upload.md) for the request payload, the response contract, and example endpoints.
+The editor can upload a recording to your own HTTP endpoint and share the URL it returns. It supports a single multipart POST or PUT, or resumable chunked uploads over [tus](https://tus.io) for large files, with Bearer, Basic or custom-header auth and additional headers. See [docs/custom-upload.md](docs/custom-upload.md) for the request payload, the response contract, and example endpoints.
 
 ## Acknowledgements
 
