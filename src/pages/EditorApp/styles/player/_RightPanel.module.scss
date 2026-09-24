@@ -186,7 +186,9 @@
     font-family: $font-bold;
   }
 
-  input {
+  input,
+  select,
+  textarea {
     box-sizing: border-box;
     width: 100%;
     min-height: 44px;
@@ -202,6 +204,18 @@
       box-shadow: $focus-border;
     }
   }
+
+  textarea {
+    padding: 10px 14px;
+    resize: vertical;
+    line-height: 1.4;
+  }
+}
+.customUploadHint {
+  margin-top: -4px;
+  color: $color-text-secondary;
+  font-size: 12px;
+  line-height: 1.4;
 }
 .customUploadFormActions {
   display: flex;

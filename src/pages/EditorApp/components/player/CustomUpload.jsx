@@ -7,24 +7,32 @@ import { showEditorToast } from "../../utils/editorToast";
 import {
   buildCustomUploadFilename,
   CustomUploadError,
+  EMPTY_CUSTOM_UPLOAD_DRAFT,
   requestCustomUploadPermission,
   resolveCustomUploadSource,
   selectCustomUploadSource,
+  toCustomUploadDraft,
   uploadCustomVideo,
-  validateCustomUploadConfig,
+  validateCustomUploadDraft,
+  validateCustomUploadEndpoint,
 } from "../../utils/customUpload";
 
 const URL =
   "chrome-extension://" + chrome.i18n.getMessage("@@extension_id") + "/assets/";
 const STORAGE_KEY = "customUploadConfig";
-const EMPTY_CONFIG = { endpoint: "", apiToken: "" };
+const AUTH_OPTIONS = [
+  { value: "bearer", key: "customUploadAuthBearer", fallback: "Bearer token" },
+  { value: "basic", key: "customUploadAuthBasic", fallback: "Basic auth" },
+  { value: "header", key: "customUploadAuthHeader", fallback: "Custom header" },
+  { value: "none", key: "customUploadAuthNone", fallback: "None" },
+];
 
 const t = (key, fallback) => chrome.i18n.getMessage(key) || fallback;
 
 const CustomUpload = () => {
   const [contentState, setContentState] = useContext(ContentStateContext);
-  const [config, setConfig] = useState(EMPTY_CONFIG);
-  const [draft, setDraft] = useState(EMPTY_CONFIG);
+  const [config, setConfig] = useState(EMPTY_CUSTOM_UPLOAD_DRAFT);
+  const [draft, setDraft] = useState(EMPTY_CUSTOM_UPLOAD_DRAFT);
   const [showSettings, setShowSettings] = useState(false);
   const [settingsError, setSettingsError] = useState("");
   const [uploadError, setUploadError] = useState("");
@@ -44,11 +52,7 @@ const CustomUpload = () => {
       .get([STORAGE_KEY])
       .then((stored) => {
         if (!mountedRef.current) return;
-        const next = stored?.[STORAGE_KEY] || EMPTY_CONFIG;
-        const loaded = {
-          endpoint: typeof next.endpoint === "string" ? next.endpoint : "",
-          apiToken: typeof next.apiToken === "string" ? next.apiToken : "",
-        };
+        const loaded = toCustomUploadDraft(stored?.[STORAGE_KEY]);
         setConfig(loaded);
         setDraft(loaded);
       })
@@ -74,20 +78,17 @@ const CustomUpload = () => {
     setShowSettings(true);
   };
 
+  const updateDraft = (field) => (event) => {
+    const { value } = event.target;
+    setDraft((previous) => ({ ...previous, [field]: value }));
+  };
+
   const validateEndpointOnBlur = () => {
     try {
-      validateCustomUploadConfig({
-        endpoint: draft.endpoint,
-        apiToken: draft.apiToken || "validation-placeholder",
-      });
+      validateCustomUploadEndpoint(draft.endpoint);
       setSettingsError("");
     } catch (error) {
-      if (
-        error?.code === "endpoint-not-configured" ||
-        error?.code === "invalid-endpoint"
-      ) {
-        setSettingsError(error.message);
-      }
+      setSettingsError(error.message);
     }
   };
 
@@ -95,7 +96,7 @@ const CustomUpload = () => {
     event.preventDefault();
     let normalized;
     try {
-      normalized = validateCustomUploadConfig(draft);
+      normalized = validateCustomUploadDraft(draft);
     } catch (error) {
       setSettingsError(error.message);
       return;
@@ -110,8 +111,9 @@ const CustomUpload = () => {
       return;
     }
     if (!mountedRef.current) return;
-    setConfig(normalized);
-    setDraft(normalized);
+    const saved = toCustomUploadDraft(normalized);
+    setConfig(saved);
+    setDraft(saved);
     setSettingsError("");
     setShowSettings(false);
     showEditorToast(
@@ -147,26 +149,15 @@ const CustomUpload = () => {
 
     let normalized;
     try {
-      normalized = validateCustomUploadConfig(config);
-      if (!source) {
-        throw new CustomUploadError(
-          "source-unavailable",
-          "The exported video is not ready to upload."
-        );
-      }
+      normalized = validateCustomUploadDraft(config);
     } catch (error) {
-      if (
-        error?.code === "endpoint-not-configured" ||
-        error?.code === "missing-api-token" ||
-        error?.code === "invalid-api-token" ||
-        error?.code === "invalid-endpoint"
-      ) {
-        setShowSettings(true);
-        setDraft(config);
-        setSettingsError(error.message);
-      } else {
-        setUploadError(error.message);
-      }
+      setShowSettings(true);
+      setDraft(config);
+      setSettingsError(error.message);
+      return;
+    }
+    if (!source) {
+      setUploadError("The exported video is not ready to upload.");
       return;
     }
 
@@ -229,8 +220,8 @@ const CustomUpload = () => {
   const cancelUpload = () => abortRef.current?.abort();
   const progressLabel =
     progress === null
-      ? t("customUploadUploadingLabel", "Uploading…")
-      : `${t("customUploadUploadingLabel", "Uploading…")} ${progress}%`;
+      ? t("customUploadUploadingLabel", "Uploading...")
+      : `${t("customUploadUploadingLabel", "Uploading...")} ${progress}%`;
 
   return (
     <div className={styles.customUpload}>
@@ -312,36 +303,136 @@ const CustomUpload = () => {
             autoCapitalize="none"
             autoCorrect="off"
             spellCheck="false"
-            onChange={(event) =>
-              setDraft((previous) => ({
-                ...previous,
-                endpoint: event.target.value,
-              }))
-            }
+            onChange={updateDraft("endpoint")}
             onBlur={validateEndpointOnBlur}
             required
           />
-          <label htmlFor="custom-upload-token">
-            {t("customUploadTokenLabel", "API token")}
+          <label htmlFor="custom-upload-method">
+            {t("customUploadMethodLabel", "Method")}
           </label>
-          <input
-            id="custom-upload-token"
-            type="password"
-            value={draft.apiToken}
-            autoComplete="off"
-            onChange={(event) =>
-              setDraft((previous) => ({
-                ...previous,
-                apiToken: event.target.value,
-              }))
-            }
-            onBlur={() => {
-              if (!draft.apiToken.trim()) {
-                setSettingsError("Enter an API token before uploading.");
-              }
-            }}
-            required
+          <select
+            id="custom-upload-method"
+            value={draft.method}
+            onChange={updateDraft("method")}
+          >
+            <option value="POST">POST</option>
+            <option value="PUT">PUT</option>
+          </select>
+          <label htmlFor="custom-upload-auth">
+            {t("customUploadAuthLabel", "Authentication")}
+          </label>
+          <select
+            id="custom-upload-auth"
+            value={draft.authType}
+            onChange={updateDraft("authType")}
+          >
+            {AUTH_OPTIONS.map(({ value, key, fallback }) => (
+              <option key={value} value={value}>
+                {t(key, fallback)}
+              </option>
+            ))}
+          </select>
+          {draft.authType === "bearer" && (
+            <>
+              <label htmlFor="custom-upload-token">
+                {t("customUploadTokenLabel", "API token")}
+              </label>
+              <input
+                id="custom-upload-token"
+                type="password"
+                value={draft.apiToken}
+                autoComplete="off"
+                onChange={updateDraft("apiToken")}
+                onBlur={() => {
+                  if (!draft.apiToken.trim()) {
+                    setSettingsError("Enter an API token before uploading.");
+                  }
+                }}
+                required
+              />
+            </>
+          )}
+          {draft.authType === "basic" && (
+            <>
+              <label htmlFor="custom-upload-username">
+                {t("customUploadUsernameLabel", "Username")}
+              </label>
+              <input
+                id="custom-upload-username"
+                type="text"
+                value={draft.username}
+                autoComplete="off"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck="false"
+                onChange={updateDraft("username")}
+                required
+              />
+              <label htmlFor="custom-upload-password">
+                {t("customUploadPasswordLabel", "Password")}
+              </label>
+              <input
+                id="custom-upload-password"
+                type="password"
+                value={draft.password}
+                autoComplete="off"
+                onChange={updateDraft("password")}
+              />
+            </>
+          )}
+          {draft.authType === "header" && (
+            <>
+              <label htmlFor="custom-upload-header-name">
+                {t("customUploadHeaderNameLabel", "Header name")}
+              </label>
+              <input
+                id="custom-upload-header-name"
+                type="text"
+                value={draft.headerName}
+                placeholder="X-API-Key"
+                autoComplete="off"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck="false"
+                onChange={updateDraft("headerName")}
+                required
+              />
+              <label htmlFor="custom-upload-header-value">
+                {t("customUploadHeaderValueLabel", "Header value")}
+              </label>
+              <input
+                id="custom-upload-header-value"
+                type="password"
+                value={draft.headerValue}
+                autoComplete="off"
+                onChange={updateDraft("headerValue")}
+                required
+              />
+            </>
+          )}
+          <label htmlFor="custom-upload-headers">
+            {t("customUploadExtraHeadersLabel", "Additional headers")}
+          </label>
+          <textarea
+            id="custom-upload-headers"
+            value={draft.headersText}
+            rows={3}
+            placeholder="X-Folder-Id: 42"
+            aria-describedby="custom-upload-headers-hint"
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck="false"
+            onChange={updateDraft("headersText")}
           />
+          <div
+            id="custom-upload-headers-hint"
+            className={styles.customUploadHint}
+          >
+            {t(
+              "customUploadExtraHeadersHint",
+              "Optional. One per line, as Name: value. Values are shown in plain text."
+            )}
+          </div>
           <div className={styles.customUploadFormActions}>
             <button
               type="button"

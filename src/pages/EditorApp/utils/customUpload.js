@@ -52,9 +52,73 @@ const parseEndpoint = (endpoint) => {
   return url;
 };
 
-export const validateCustomUploadConfig = ({ endpoint, apiToken } = {}) => {
-  const url = parseEndpoint(endpoint);
+export const validateCustomUploadEndpoint = (endpoint) =>
+  parseEndpoint(endpoint).href;
 
+const METHODS = ["POST", "PUT"];
+const HEADER_NAME = /^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/;
+// Control characters allow header injection; setRequestHeader throws on
+// values outside Latin-1.
+const UNSAFE_HEADER_VALUE = /[\x00-\x1f\x7f]|[^\x00-\xff]/;
+// Fetch forbidden request headers: XHR drops them silently.
+const FORBIDDEN_HEADER_NAMES = new Set([
+  "accept-charset",
+  "accept-encoding",
+  "access-control-request-headers",
+  "access-control-request-method",
+  "connection",
+  "content-length",
+  "cookie",
+  "cookie2",
+  "date",
+  "dnt",
+  "expect",
+  "host",
+  "keep-alive",
+  "origin",
+  "referer",
+  "set-cookie",
+  "te",
+  "trailer",
+  "transfer-encoding",
+  "upgrade",
+  "via",
+]);
+
+const assertHeader = (name, value) => {
+  if (!HEADER_NAME.test(name)) {
+    throw new CustomUploadError(
+      "invalid-header",
+      `"${name}" is not a valid header name.`
+    );
+  }
+  const lowerName = name.toLowerCase();
+  if (lowerName === "content-type") {
+    // Overriding it drops the multipart boundary the browser generates.
+    throw new CustomUploadError(
+      "forbidden-header",
+      "Content-Type is set automatically for multipart uploads."
+    );
+  }
+  if (
+    FORBIDDEN_HEADER_NAMES.has(lowerName) ||
+    lowerName.startsWith("proxy-") ||
+    lowerName.startsWith("sec-")
+  ) {
+    throw new CustomUploadError(
+      "forbidden-header",
+      `The browser does not allow setting the "${name}" header.`
+    );
+  }
+  if (UNSAFE_HEADER_VALUE.test(value)) {
+    throw new CustomUploadError(
+      "invalid-header",
+      `The "${name}" header value contains unsupported characters.`
+    );
+  }
+};
+
+const normalizeApiToken = (apiToken) => {
   const normalizedToken = String(apiToken || "").trim();
   if (!normalizedToken) {
     throw new CustomUploadError(
@@ -62,18 +126,212 @@ export const validateCustomUploadConfig = ({ endpoint, apiToken } = {}) => {
       "Enter an API token before uploading."
     );
   }
-  if (/[\x00-\x1f\x7f]/.test(normalizedToken)) {
+  if (UNSAFE_HEADER_VALUE.test(normalizedToken)) {
     throw new CustomUploadError(
       "invalid-api-token",
       "The API token contains unsupported characters."
     );
   }
-
-  return {
-    endpoint: url.href,
-    apiToken: normalizedToken,
-  };
+  return { apiToken: normalizedToken };
 };
+
+const normalizeBasicCredentials = (username, password) => {
+  const normalizedUsername = String(username || "").trim();
+  const normalizedPassword = String(password ?? "");
+  if (!normalizedUsername) {
+    throw new CustomUploadError(
+      "missing-username",
+      "Enter a username for Basic auth."
+    );
+  }
+  // RFC 7617: the first colon separates the user-id from the password.
+  if (normalizedUsername.includes(":")) {
+    throw new CustomUploadError(
+      "invalid-username",
+      "The Basic auth username cannot contain a colon."
+    );
+  }
+  if (/[\x00-\x1f\x7f]/.test(normalizedUsername)) {
+    throw new CustomUploadError(
+      "invalid-username",
+      "The Basic auth username contains unsupported characters."
+    );
+  }
+  if (/[\x00-\x1f\x7f]/.test(normalizedPassword)) {
+    throw new CustomUploadError(
+      "invalid-password",
+      "The Basic auth password contains unsupported characters."
+    );
+  }
+  return { username: normalizedUsername, password: normalizedPassword };
+};
+
+const normalizeAuthHeader = (headerName, headerValue) => {
+  const name = String(headerName || "").trim();
+  const value = String(headerValue || "").trim();
+  if (!name) {
+    throw new CustomUploadError(
+      "missing-header-name",
+      "Enter the authentication header name."
+    );
+  }
+  if (!value) {
+    throw new CustomUploadError(
+      "missing-header-value",
+      "Enter the authentication header value."
+    );
+  }
+  assertHeader(name, value);
+  return { headerName: name, headerValue: value };
+};
+
+const AUTH_NORMALIZERS = {
+  bearer: ({ apiToken }) => normalizeApiToken(apiToken),
+  basic: ({ username, password }) =>
+    normalizeBasicCredentials(username, password),
+  header: ({ headerName, headerValue }) =>
+    normalizeAuthHeader(headerName, headerValue),
+  none: () => ({}),
+};
+
+const encodeBasicCredentials = (username, password) => {
+  const bytes = new TextEncoder().encode(`${username}:${password}`);
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary);
+};
+
+// Expects a config returned by validateCustomUploadConfig.
+const buildRequestHeaders = (config) => {
+  const headers = [];
+  if (config.authType === "bearer") {
+    headers.push(["Authorization", `Bearer ${config.apiToken}`]);
+  } else if (config.authType === "basic") {
+    headers.push([
+      "Authorization",
+      `Basic ${encodeBasicCredentials(config.username, config.password)}`,
+    ]);
+  } else if (config.authType === "header") {
+    headers.push([config.headerName, config.headerValue]);
+  }
+  for (const { name, value } of config.headers) headers.push([name, value]);
+  return headers;
+};
+
+export const parseCustomUploadHeaders = (text) =>
+  String(text || "")
+    .split(/\r?\n/)
+    .map((line, index) => ({ line: line.trim(), number: index + 1 }))
+    .filter(({ line }) => line)
+    .map(({ line, number }) => {
+      const separator = line.indexOf(":");
+      if (separator <= 0) {
+        throw new CustomUploadError(
+          "invalid-header",
+          `Header line ${number} must use the "Name: value" format.`
+        );
+      }
+      return {
+        name: line.slice(0, separator).trim(),
+        value: line.slice(separator + 1).trim(),
+      };
+    });
+
+export const formatCustomUploadHeaders = (headers) =>
+  (Array.isArray(headers) ? headers : [])
+    .filter(
+      (header) =>
+        typeof header?.name === "string" && typeof header?.value === "string"
+    )
+    .map(({ name, value }) => `${name}: ${value}`)
+    .join("\n");
+
+// Returns only the fields of the selected auth type, so switching type and
+// saving drops the previous type's secrets from storage.
+export const validateCustomUploadConfig = ({
+  endpoint,
+  method = "POST",
+  // Configs saved before authType existed always used a bearer token.
+  authType = "bearer",
+  headers = [],
+  ...credentials
+} = {}) => {
+  const url = parseEndpoint(endpoint);
+
+  const normalizedMethod = String(method || "")
+    .trim()
+    .toUpperCase();
+  if (!METHODS.includes(normalizedMethod)) {
+    throw new CustomUploadError(
+      "invalid-method",
+      "Choose POST or PUT as the upload method."
+    );
+  }
+
+  if (!Object.hasOwn(AUTH_NORMALIZERS, authType)) {
+    throw new CustomUploadError(
+      "invalid-auth-type",
+      "Choose a supported authentication type."
+    );
+  }
+
+  const config = {
+    endpoint: url.href,
+    method: normalizedMethod,
+    authType,
+    ...AUTH_NORMALIZERS[authType](credentials),
+    headers: headers.map((header) => {
+      const name = String(header?.name ?? "").trim();
+      const value = String(header?.value ?? "").trim();
+      assertHeader(name, value);
+      return { name, value };
+    }),
+  };
+
+  const seen = new Set();
+  for (const [name] of buildRequestHeaders(config)) {
+    const key = name.toLowerCase();
+    if (seen.has(key)) {
+      throw new CustomUploadError(
+        "duplicate-header",
+        `The "${name}" header is set more than once.`
+      );
+    }
+    seen.add(key);
+  }
+
+  return config;
+};
+
+export const EMPTY_CUSTOM_UPLOAD_DRAFT = Object.freeze({
+  endpoint: "",
+  method: "POST",
+  authType: "bearer",
+  apiToken: "",
+  username: "",
+  password: "",
+  headerName: "",
+  headerValue: "",
+  headersText: "",
+});
+
+// Accepts anything read from storage, including configs saved before auth
+// options existed.
+export const toCustomUploadDraft = (stored) => {
+  const draft = { ...EMPTY_CUSTOM_UPLOAD_DRAFT };
+  if (!stored || typeof stored !== "object") return draft;
+  for (const key of Object.keys(draft)) {
+    if (typeof stored[key] === "string") draft[key] = stored[key];
+  }
+  draft.headersText = formatCustomUploadHeaders(stored.headers);
+  return draft;
+};
+
+export const validateCustomUploadDraft = ({ headersText, ...draft } = {}) =>
+  validateCustomUploadConfig({
+    ...draft,
+    headers: parseCustomUploadHeaders(headersText),
+  });
 
 export const getEndpointPermissionOrigin = (endpoint) => {
   const url = parseEndpoint(endpoint);
@@ -204,16 +462,15 @@ export const resolveCustomUploadSource = async (contentState = {}, signal) => {
 };
 
 export const uploadCustomVideo = ({
-  endpoint,
-  apiToken,
   blob,
   filename,
   duration,
   onProgress,
   signal,
   xhrFactory = () => new XMLHttpRequest(),
+  ...settings
 }) => {
-  const config = validateCustomUploadConfig({ endpoint, apiToken });
+  const config = validateCustomUploadConfig(settings);
   if (!(blob instanceof Blob) || blob.size === 0) {
     throw new CustomUploadError(
       "source-unavailable",
@@ -255,8 +512,10 @@ export const uploadCustomVideo = ({
     }
     signal?.addEventListener("abort", abortUpload, { once: true });
 
-    xhr.open("POST", config.endpoint);
-    xhr.setRequestHeader("Authorization", `Bearer ${config.apiToken}`);
+    xhr.open(config.method, config.endpoint);
+    for (const [name, value] of buildRequestHeaders(config)) {
+      xhr.setRequestHeader(name, value);
+    }
     xhr.upload.onprogress = (event) => {
       const total = event.lengthComputable ? event.total : null;
       const percent = total
