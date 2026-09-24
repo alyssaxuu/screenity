@@ -1899,5 +1899,41 @@
   "unsavedRecordingModalDismiss": {
     "message": "Non mostrare più",
     "description": "Side button: start the recording and stop prompting about unsaved recordings."
+  },
+  "customUploadButtonTitle": {
+    "message": "Custom Upload",
+    "description": "Title of the generic custom endpoint upload option"
+  },
+  "customUploadButtonDescription": {
+    "message": "Upload the current version to your endpoint",
+    "description": "Description of the generic custom endpoint upload option"
+  },
+  "customUploadConfigureLabel": {
+    "message": "Configure",
+    "description": "Button that opens the custom upload endpoint settings"
+  },
+  "customUploadEndpointLabel": {
+    "message": "Endpoint URL",
+    "description": "Label for the custom upload endpoint URL field"
+  },
+  "customUploadTokenLabel": {
+    "message": "API token",
+    "description": "Label for the custom upload bearer token field"
+  },
+  "customUploadSaveSettingsLabel": {
+    "message": "Save settings",
+    "description": "Button that saves custom upload endpoint settings"
+  },
+  "customUploadUploadingLabel": {
+    "message": "Uploading…",
+    "description": "Progress label while a custom endpoint upload is active"
+  },
+  "customUploadSuccessTitle": {
+    "message": "Upload complete",
+    "description": "Heading shown after a successful custom endpoint upload"
+  },
+  "customUploadCopyLinkLabel": {
+    "message": "Copy link",
+    "description": "Button that copies the URL returned by a custom upload endpoint"
   }
 }

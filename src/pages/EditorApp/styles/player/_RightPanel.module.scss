@@ -130,6 +130,150 @@
     margin-top: 4px;
   }
 }
+.customUpload {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.customUploadActions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: -4px;
+
+  button {
+    min-height: 40px;
+    padding: 0 8px;
+    color: $color-primary;
+    font-family: $font-bold;
+    cursor: pointer;
+
+    &:focus-visible {
+      border-radius: 8px;
+      box-shadow: $focus-border;
+    }
+  }
+}
+.customUploadProgressTrack {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 4px;
+  overflow: hidden;
+  background: $color-border;
+}
+.customUploadProgressBar {
+  height: 100%;
+  border-radius: 0 4px 4px 0;
+  background: $color-primary;
+  transition: width 160ms ease-out;
+
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+  }
+}
+.customUploadSettings {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px;
+  border: 1px solid $color-border;
+  border-radius: 16px;
+  background: $color-light-grey;
+
+  label {
+    color: $color-text-primary;
+    font-family: $font-bold;
+  }
+
+  input {
+    box-sizing: border-box;
+    width: 100%;
+    min-height: 44px;
+    padding: 0 14px;
+    border: 1px solid $color-border;
+    border-radius: 12px;
+    background: $color-background;
+    color: $color-text-primary;
+    font-family: $font-medium;
+
+    &:focus-visible {
+      outline: none;
+      box-shadow: $focus-border;
+    }
+  }
+}
+.customUploadFormActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 4px;
+
+  button {
+    min-height: 40px;
+    padding: 0 14px;
+    border-radius: 20px;
+    color: $color-text-secondary;
+    font-family: $font-bold;
+    cursor: pointer;
+
+    &:focus-visible {
+      box-shadow: $focus-border;
+    }
+  }
+
+  .customUploadSaveButton {
+    background: $color-primary-transparent;
+    color: $color-primary;
+  }
+}
+.customUploadError {
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: $color-red-light;
+  color: $color-red;
+  line-height: 1.4;
+
+  &:focus {
+    outline: none;
+  }
+}
+.customUploadResult {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px 12px;
+  align-items: center;
+  padding: 14px;
+  border: 1px solid $color-border;
+  border-radius: 16px;
+  background: $color-primary-transparent;
+
+  a {
+    overflow: hidden;
+    color: $color-primary;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  button {
+    min-height: 40px;
+    padding: 0 12px;
+    border-radius: 20px;
+    background: $color-background;
+    color: $color-primary;
+    font-family: $font-bold;
+    cursor: pointer;
+
+    &:focus-visible {
+      box-shadow: $focus-border;
+    }
+  }
+}
+.customUploadResultTitle {
+  grid-column: 1 / -1;
+  color: $color-text-primary;
+  font-family: $font-bold;
+}
 .inputSection {
   padding-top: 4px;
   padding-bottom: 4px;
