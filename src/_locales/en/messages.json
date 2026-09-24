@@ -2006,5 +2006,25 @@
   "customUploadExtraHeadersHint": {
     "message": "Optional. One per line, as Name: value. Values are shown in plain text.",
     "description": "Help text under the custom upload additional headers field"
+  },
+  "customUploadModeLabel": {
+    "message": "Upload mode",
+    "description": "Label for choosing between a single-request upload and a resumable tus upload"
+  },
+  "customUploadModeSimple": {
+    "message": "Single request",
+    "description": "Custom upload mode: send the whole video in one multipart request"
+  },
+  "customUploadModeTus": {
+    "message": "Resumable (tus)",
+    "description": "Custom upload mode: send the video in chunks with the tus resumable upload protocol"
+  },
+  "customUploadChunkSizeLabel": {
+    "message": "Chunk size (MB)",
+    "description": "Label for the size of each chunk in a resumable tus upload"
+  },
+  "customUploadChunkSizeHint": {
+    "message": "Keep it under your server's or proxy's request size limit.",
+    "description": "Help text under the tus chunk size field"
   }
 }

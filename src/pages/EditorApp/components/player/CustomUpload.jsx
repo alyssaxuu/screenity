@@ -292,6 +292,21 @@ const CustomUpload = () => {
               {settingsError}
             </div>
           )}
+          <label htmlFor="custom-upload-mode">
+            {t("customUploadModeLabel", "Upload mode")}
+          </label>
+          <select
+            id="custom-upload-mode"
+            value={draft.mode}
+            onChange={updateDraft("mode")}
+          >
+            <option value="simple">
+              {t("customUploadModeSimple", "Single request")}
+            </option>
+            <option value="tus">
+              {t("customUploadModeTus", "Resumable (tus)")}
+            </option>
+          </select>
           <label htmlFor="custom-upload-endpoint">
             {t("customUploadEndpointLabel", "Endpoint URL")}
           </label>
@@ -299,7 +314,11 @@ const CustomUpload = () => {
             id="custom-upload-endpoint"
             type="url"
             value={draft.endpoint}
-            placeholder="https://video.example.com/api/upload"
+            placeholder={
+              draft.mode === "tus"
+                ? "https://video.example.com/files"
+                : "https://video.example.com/api/upload"
+            }
             autoCapitalize="none"
             autoCorrect="off"
             spellCheck="false"
@@ -307,17 +326,48 @@ const CustomUpload = () => {
             onBlur={validateEndpointOnBlur}
             required
           />
-          <label htmlFor="custom-upload-method">
-            {t("customUploadMethodLabel", "Method")}
-          </label>
-          <select
-            id="custom-upload-method"
-            value={draft.method}
-            onChange={updateDraft("method")}
-          >
-            <option value="POST">POST</option>
-            <option value="PUT">PUT</option>
-          </select>
+          {draft.mode === "tus" ? (
+            <>
+              <label htmlFor="custom-upload-chunk-size">
+                {t("customUploadChunkSizeLabel", "Chunk size (MB)")}
+              </label>
+              <input
+                id="custom-upload-chunk-size"
+                type="number"
+                min="1"
+                max="2048"
+                step="1"
+                inputMode="numeric"
+                value={draft.chunkSizeMb}
+                aria-describedby="custom-upload-chunk-size-hint"
+                onChange={updateDraft("chunkSizeMb")}
+                required
+              />
+              <div
+                id="custom-upload-chunk-size-hint"
+                className={styles.customUploadHint}
+              >
+                {t(
+                  "customUploadChunkSizeHint",
+                  "Keep it under your server's or proxy's request size limit."
+                )}
+              </div>
+            </>
+          ) : (
+            <>
+              <label htmlFor="custom-upload-method">
+                {t("customUploadMethodLabel", "Method")}
+              </label>
+              <select
+                id="custom-upload-method"
+                value={draft.method}
+                onChange={updateDraft("method")}
+              >
+                <option value="POST">POST</option>
+                <option value="PUT">PUT</option>
+              </select>
+            </>
+          )}
           <label htmlFor="custom-upload-auth">
             {t("customUploadAuthLabel", "Authentication")}
           </label>
