@@ -88,6 +88,7 @@ import {
 } from "./audioBusPolicy";
 import {
   setPendingMicRecovery,
+  setPendingMicRecoveryScene,
   clearPendingMicRecovery,
   runMicRecoveryScan,
 } from "./micRecovery";
@@ -3372,7 +3373,7 @@ const CloudRecorder = () => {
           createBlobFromChunks(cameraChunks.current, "video/webm");
         fromMemoryWindow = Boolean(blob);
       }
-      if (!blob) return;
+      if (!blob) return false;
       // Purge drops Bunny-confirmed chunks mid-recording and the memory window
       // holds only the last 8, so either source can be missing the middle.
       const partial =
@@ -3403,11 +3404,13 @@ const CloudRecorder = () => {
           purgedScreenChunks: screenChunksPurgedCountRef.current,
           purgedBytes: chunksPurgedBytesRef.current,
         });
+        return true;
       } finally {
         URL.revokeObjectURL(objectUrl);
       }
     } catch (err) {
       console.warn("Failed to export local recovery:", err);
+      return false;
     }
   };
 
@@ -3875,6 +3878,9 @@ const CloudRecorder = () => {
         typeof why === "string" ? why : JSON.stringify(why)
       } cancel=${cancel}`
     );
+    // A failed take never hits markSceneComplete, so getOrCreateSceneId would
+    // hand its "recording" id to the next take (the BG clear skips the editor).
+    chrome.storage.local.set({ sceneIdStatus: "failed" }).catch(() => {});
     void cleanupIfEmptyUploads("error");
     sendRecordingErrorBase(why, cancel);
   };
@@ -5912,14 +5918,18 @@ const CloudRecorder = () => {
     };
   };
 
-  const handleTranscription = async (uploadMeta, projectId) => {
+  const handleTranscription = async (
+    uploadMeta,
+    projectId,
+    sceneId = uploadMeta.sceneId
+  ) => {
     if (!uploadMeta.audio || !uploadMeta.audio.mediaId) return;
     try {
       const transcriptionTarget =
         uploadMeta.screen?.mediaId || uploadMeta.camera?.mediaId;
 
       if (transcriptionTarget) {
-        const dedupeKey = `transcriptionQueued:${uploadMeta.sceneId}:${uploadMeta.audio.mediaId}`;
+        const dedupeKey = `transcriptionQueued:${sceneId}:${uploadMeta.audio.mediaId}`;
         const dedupe = await chrome.storage.local.get([dedupeKey]);
         if (dedupe?.[dedupeKey]) return;
 
@@ -5938,7 +5948,7 @@ const CloudRecorder = () => {
           body: JSON.stringify({
             output: `transcriptions/${uploadMeta.audio.mediaId}.json`,
             videoId: projectId,
-            sceneId: uploadMeta.sceneId,
+            sceneId,
             inputMediaId: uploadMeta.audio.mediaId,
             targetMediaId: transcriptionTarget,
             lang: "en",
@@ -5948,7 +5958,7 @@ const CloudRecorder = () => {
         await chrome.storage.local.set({ [dedupeKey]: true });
         logDebugEvent("transcription-queued", {
           projectId,
-          sceneId: uploadMeta.sceneId,
+          sceneId,
           inputMediaId: uploadMeta.audio.mediaId,
           targetMediaId: transcriptionTarget,
         });
@@ -5957,7 +5967,7 @@ const CloudRecorder = () => {
       console.warn("❌ Transcription failed:", err);
       logDebugEvent("transcription-failed", {
         projectId,
-        sceneId: uploadMeta.sceneId,
+        sceneId,
         error: err?.message || String(err),
       });
     }
@@ -6421,6 +6431,9 @@ const CloudRecorder = () => {
     const existingStatus = await getSceneCreateStatus(sceneId);
     let sceneOutcome = null;
     let shouldIncrementMultiSceneCount = false;
+    // The server files a take into an empty target scene under that scene's
+    // id and returns it. Everything after the POST must use this id.
+    let effectiveSceneId = sceneId;
 
     if (existingStatus?.status === "created") {
       logDebugEvent("scene-create-skip", {
@@ -6648,6 +6661,24 @@ const CloudRecorder = () => {
         // parallel below since nothing in the handoff reads it.
         sceneOutcome = "created";
         shouldIncrementMultiSceneCount = true;
+        const replySceneId = swRes?.body?.sceneId;
+        if (typeof replySceneId === "string" && replySceneId) {
+          effectiveSceneId = replySceneId;
+        }
+        // The BG matches the offer on the scene the editor opens, so it has to
+        // follow the remap.
+        const offerToRekey = localScreenPlaybackOfferRef.current;
+        if (offerToRekey && offerToRekey.sceneId !== effectiveSceneId) {
+          try {
+            const rekeyed = await chrome.runtime.sendMessage({
+              type: "cloud-local-playback-register",
+              offer: { ...offerToRekey, sceneId: effectiveSceneId },
+            });
+            if (rekeyed?.ok && rekeyed.offer) {
+              localScreenPlaybackOfferRef.current = rekeyed.offer;
+            }
+          } catch {}
+        }
 
         if (multiMode && shouldIncrementMultiSceneCount) {
           // Multi needs count + lastSceneId persisted before
@@ -6655,7 +6686,7 @@ const CloudRecorder = () => {
           // reads them. Keep this awaited path for multi.
           await chrome.storage.local.set({
             multiSceneCount: multiSceneCount + 1,
-            multiLastSceneId: sceneId,
+            multiLastSceneId: effectiveSceneId,
           });
           chrome.runtime.sendMessage({
             type: "reopen-popup-multi",
@@ -6664,7 +6695,7 @@ const CloudRecorder = () => {
 
         sendEditorReady({
           projectId,
-          sceneId,
+          sceneId: effectiveSceneId,
           recordingToScene,
           multiMode,
         });
@@ -6687,6 +6718,7 @@ const CloudRecorder = () => {
         return {
           created: true,
           micIncluded: Boolean(separatedMic?.mediaId),
+          sceneId: effectiveSceneId,
         };
       }
     }
@@ -6694,7 +6726,7 @@ const CloudRecorder = () => {
     if (multiMode && shouldIncrementMultiSceneCount) {
       await chrome.storage.local.set({
         multiSceneCount: multiSceneCount + 1,
-        multiLastSceneId: sceneId,
+        multiLastSceneId: effectiveSceneId,
       });
       chrome.runtime.sendMessage({
         type: "reopen-popup-multi",
@@ -6703,13 +6735,13 @@ const CloudRecorder = () => {
 
     sendEditorReady({
       projectId,
-      sceneId,
+      sceneId: effectiveSceneId,
       recordingToScene,
       multiMode,
     });
 
     await chrome.storage.local.remove("clickEvents");
-    return { [sceneOutcome || "created"]: true };
+    return { [sceneOutcome || "created"]: true, sceneId: effectiveSceneId };
   };
 
   const isAudioSilent = async (audioBlob, silenceThreshold = 0.01) => {
@@ -6759,6 +6791,11 @@ const CloudRecorder = () => {
     };
     stopFlowRef.current.tick = stopTick;
     stopTick("stop-pressed", { reason, shouldFinalize });
+    if (!screenStream.current && !cameraStream.current) {
+      void traceStep("stopRequested", {
+        stopReason: String(reason).slice(0, 40),
+      });
+    }
 
     if (DEBUG_START_FLOW) {
       console.debug("[Screenity] stopRecording invoked", {
@@ -7070,7 +7107,12 @@ const CloudRecorder = () => {
       emitRecordingOutcome("unrecoverable", {
         reason: "uploader-finalize-incomplete",
       });
-      await exportLocalRecovery("finalize-error");
+      // Nothing uploaded: drop the empty project and stub media, as for any
+      // other take that never uploaded.
+      if ((screenMeta?.offset || 0) === 0 && (cameraMeta?.offset || 0) === 0) {
+        await cleanupIfEmptyUploads("finalize-empty");
+      }
+      const recoverySaved = await exportLocalRecovery("finalize-error");
       await chunksStore
         .clear()
         .catch((e) =>
@@ -7084,7 +7126,9 @@ const CloudRecorder = () => {
       await clearCameraChunkStore("finalize-error");
       await clearLocalScreenPlaybackOffer("finalize-error");
       sendRecordingError(
-        "Upload failed to finalize. A recovery copy was downloaded."
+        recoverySaved
+          ? "Upload failed to finalize. A recovery copy was downloaded."
+          : "Upload failed to finalize."
       );
       return;
     }
@@ -7159,11 +7203,26 @@ const CloudRecorder = () => {
               e
             )
           );
-        emitRecordingOutcome("abandoned", { reason: "no-upload" });
+        // No session and no stream: capture never began (picker dismissed or
+        // unanswered), so this is a cancel, not a failed upload.
+        const captureNeverStarted =
+          !recorderSession.current &&
+          !screenStream.current &&
+          !cameraStream.current;
+        emitRecordingOutcome("abandoned", {
+          reason: captureNeverStarted ? "no-stream" : "no-upload",
+        });
         await finalizeRecorderSession("failed");
         await clearAudioChunkStore("no-upload");
         await clearCameraChunkStore("no-upload");
         await clearLocalScreenPlaybackOffer("no-upload");
+        if (captureNeverStarted) {
+          sendRecordingError(
+            "Recording cancelled: no capture stream was acquired.",
+            true
+          );
+          return;
+        }
         sendRecordingError(
           `No media was successfully uploaded. Screen: ${screenStatus} (${screenOffset} bytes, error: ${screenError}), Camera: ${cameraStatus} (${cameraOffset} bytes, error: ${cameraError})`
         );
@@ -7286,16 +7345,6 @@ const CloudRecorder = () => {
     if (!sentLast.current) {
       sentLast.current = true;
       try {
-        // Fire-and-forget transcription queue: not awaited so it doesn't
-        // extend the cloudrecorder's post-stop tail. The fetch dispatches
-        // synchronously into Chrome's network stack, so the request leaves
-        // the page even if window.close fires shortly after.
-        if (!silent && uploadMeta.audio?.mediaId) {
-          handleTranscription(uploadMeta, projectId).catch((err) =>
-            console.warn("[CloudRecorder] handleTranscription failed:", err)
-          );
-        }
-
         diagForward("mic-upload-decision", {
           willUploadMic,
           // Both, on purpose: a take where they disagree is the 4.6.9 bug,
@@ -7342,6 +7391,24 @@ const CloudRecorder = () => {
           silent,
           separatedMic
         );
+        // The mic upload and marker use the minted id; the attach must name
+        // the scene the server actually filed the take under.
+        const micSceneId = sceneResult?.sceneId || uploadMeta.sceneId;
+        // Not awaited so it doesn't extend the post-stop tail. The fetch
+        // dispatches synchronously, so it leaves the page even if window.close
+        // fires shortly after. Runs after the POST to use the effective scene id.
+        if (!silent && uploadMeta.audio?.mediaId) {
+          handleTranscription(uploadMeta, projectId, micSceneId).catch((err) =>
+            console.warn("[CloudRecorder] handleTranscription failed:", err)
+          );
+        }
+        if (willUploadMic && micSceneId !== uploadMeta.sceneId) {
+          await setPendingMicRecoveryScene(uploadMeta.sceneId, micSceneId);
+          diagForward("separated-mic-scene-remapped", {
+            from: String(uploadMeta.sceneId).slice(0, 40),
+            to: String(micSceneId).slice(0, 40),
+          });
+        }
 
         if (!willUploadMic) {
           await chrome.storage.local
@@ -7372,7 +7439,7 @@ const CloudRecorder = () => {
               mediaId: separatedMic.mediaId,
               separated: true,
             };
-            handleTranscription(uploadMeta, projectId).catch((err) =>
+            handleTranscription(uploadMeta, projectId, micSceneId).catch((err) =>
               console.warn(
                 "[CloudRecorder] separated handleTranscription failed:",
                 err
@@ -7407,7 +7474,7 @@ const CloudRecorder = () => {
               : await (async () => {
                   const attached = await attachSceneAudio({
                     projectId,
-                    sceneId: uploadMeta.sceneId,
+                    sceneId: micSceneId,
                     audioMediaId: uploaded.mediaId,
                     duration: usedDurations.audio || null,
                     token: screenityToken,
@@ -7417,6 +7484,7 @@ const CloudRecorder = () => {
                         ok: true,
                         mediaId: uploaded.mediaId,
                         attached: attached.attached,
+                        reason: attached.reason,
                       }
                     : {
                         ok: false,
@@ -7430,6 +7498,7 @@ const CloudRecorder = () => {
               diagForward("separated-mic-attached", {
                 mediaId: String(result.mediaId).slice(0, 40),
                 attached: result.attached,
+                reason: result.reason || null,
               });
               // The scene POST had no transcription source: the mic media did
               // not exist yet, and this path builds no TUS uploader to fill
@@ -7440,11 +7509,12 @@ const CloudRecorder = () => {
                   mediaId: result.mediaId,
                   separated: true,
                 };
-                handleTranscription(uploadMeta, projectId).catch((err) =>
-                  console.warn(
-                    "[CloudRecorder] separated handleTranscription failed:",
-                    err
-                  )
+                handleTranscription(uploadMeta, projectId, micSceneId).catch(
+                  (err) =>
+                    console.warn(
+                      "[CloudRecorder] separated handleTranscription failed:",
+                      err
+                    )
                 );
               }
             } else {
@@ -7782,6 +7852,7 @@ const CloudRecorder = () => {
             },
             audio: data.systemAudio,
           };
+          void traceStep("pickerRequested");
           const stream = await acquireDisplayMediaWithFocusRetry({
             getDisplayMedia: (c) => navigator.mediaDevices.getDisplayMedia(c),
             constraints,
@@ -8044,6 +8115,7 @@ const CloudRecorder = () => {
                 onReactivate: () =>
                   chrome.runtime.sendMessage({ type: "activate-recorder-tab" }),
               });
+            void traceStep("pickerRequested");
             try {
               screenStream.current = await acquireDisplay(displayConstraints);
             } catch (err) {
@@ -8820,7 +8892,12 @@ const CloudRecorder = () => {
         // (canBeginRecording).
         const endUploaderInit = perfSpan("CloudRecorder initializeUploaders");
         const uploaderInitStartedAt = Date.now();
-        uploadersInitialized.current = await initializeUploaders();
+        // A take that died before a session registered leaves this set, and the
+        // next take on this instance would reuse its id.
+        if (!recorderSession.current) recordingSessionId.current = null;
+        uploadersInitialized.current = await initializeUploaders({
+          forceNewSceneId: true,
+        });
         const uploaderInitMs = Date.now() - uploaderInitStartedAt;
         endUploaderInit({ ok: Boolean(uploadersInitialized.current) });
         if (!uploadersInitialized.current) {
@@ -8987,6 +9064,7 @@ const CloudRecorder = () => {
           chrome.storage.local.set({ lastScreenCaptureApi: "desktopCapture" });
           // Desktop picker path: non-tab mode without region, or tabPreferred forced
           // isTab=false (playground) so there's no pre-obtained streamId.
+          void traceStep("pickerRequested");
           chrome.desktopCapture.chooseDesktopMedia(
             ["screen", "window", "tab", "audio"],
             null,

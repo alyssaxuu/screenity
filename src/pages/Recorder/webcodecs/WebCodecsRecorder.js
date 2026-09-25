@@ -356,6 +356,10 @@ export class WebCodecsRecorder {
     this._chunksOut = 0;
     this._framesFromMSTP = 0;
     this._staticFrameSyntheticCount = 0;
+    // Ahead-of-clock drops are real source frames; gap skips are timeline
+    // slots, not frames. Tells a quiet source from a loop discarding frames.
+    this._framesDroppedAheadOfClock = 0;
+    this._framesSkippedForGap = 0;
     // Black placeholder frames synthesized before the first real frame to
     // bridge macOS static-screen first-frame starvation (see readVideoLoop).
     this._syntheticFirstFrameCount = 0;
@@ -489,6 +493,8 @@ export class WebCodecsRecorder {
     // iteration and records nothing.
     this._pendingVideoRead = null;
     this._pendingAudioRead = null;
+    this._framesDroppedAheadOfClock = 0;
+    this._framesSkippedForGap = 0;
     this._droppedForBackpressureCount = 0;
     this._droppedAudioForBackpressureCount = 0;
     this._peakVideoEncodeQueueSize = 0;
@@ -1319,6 +1325,23 @@ export class WebCodecsRecorder {
     };
   }
 
+  // Chrome's frame counts for this track. Missing in some builds, so absent
+  // reads as null, not zero.
+  _readTrackStats() {
+    try {
+      const st = this.videoTrack?.stats;
+      if (!st) return null;
+      const num = (v) => (Number.isFinite(v) ? v : null);
+      return {
+        totalFrames: num(st.totalFrames),
+        deliveredFrames: num(st.deliveredFrames),
+        discardedFrames: num(st.discardedFrames),
+      };
+    } catch {
+      return null;
+    }
+  }
+
   getDiagSnapshot() {
     let firstChunkLatencyMs = null;
     if (this._firstChunkAt != null && this._videoStartUs != null) {
@@ -1344,6 +1367,9 @@ export class WebCodecsRecorder {
       chunksOut: this._chunksOut,
       framesFromMSTP: this._framesFromMSTP,
       staticFrameSyntheticCount: this._staticFrameSyntheticCount,
+      framesDroppedAheadOfClock: this._framesDroppedAheadOfClock,
+      framesSkippedForGap: this._framesSkippedForGap,
+      trackStats: this._readTrackStats(),
       firstChunkLatencyMs,
       videoEncoderStateAtStop: this._videoEncoderStateAtStop,
       encoderConstructCount: this._encoderConstructCount,
@@ -3044,6 +3070,7 @@ export class WebCodecsRecorder {
 
         // Drop frames ahead of wall-clock.
         if (targetIndex < this._videoFrameIndex) {
+          if (frame) this._framesDroppedAheadOfClock += 1;
           frame?.close();
           continue;
         }
@@ -3056,6 +3083,7 @@ export class WebCodecsRecorder {
         const gap = targetIndex - this._videoFrameIndex;
         if (gap > MAX_GAP_FRAMES) {
           this.warn(`[WCR] skipping ${gap - MAX_GAP_FRAMES} frames (tab gap)`);
+          this._framesSkippedForGap += gap - MAX_GAP_FRAMES;
           this._videoFrameIndex = targetIndex - MAX_GAP_FRAMES;
         }
 

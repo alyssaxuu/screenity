@@ -10,6 +10,7 @@ import { tryResumePendingUploads } from "../recording/resumePendingUploads";
 import { runMicRecoveryScan } from "../../CloudRecorder/micRecovery";
 import { clearInMemoryEditorLock } from "../recording/stopRecording";
 import { sendMessageEnsuringContentScript } from "../utils/executeScripts";
+import { traceStep } from "../../utils/startFlowTrace";
 
 const CLOUD_FEATURES_ENABLED =
   process.env.SCREENITY_ENABLE_CLOUD_FEATURES === "true";
@@ -24,7 +25,7 @@ const handleTabMessaging = async (tab) => {
 
   if (offscreen) {
     try {
-      await sendMessageRecord({ type: "stop-recording-tab" });
+      await sendMessageRecord({ type: "stop-recording-tab", reason: "action-click" });
       return;
     } catch (err) {
       console.error(
@@ -43,15 +44,15 @@ const handleTabMessaging = async (tab) => {
       : null;
 
     if (targetTab) {
-      await sendMessageTab(preferredTabId, { type: "stop-recording-tab" });
+      await sendMessageTab(preferredTabId, { type: "stop-recording-tab", reason: "action-click" });
     } else {
-      await sendMessageTab(tab.id, { type: "stop-recording-tab" });
+      await sendMessageTab(tab.id, { type: "stop-recording-tab", reason: "action-click" });
       chrome.storage.local.set({ activeTab: tab.id });
     }
   } catch (error) {
     console.error("[Screenity][ActionClick] handleTabMessaging failed, trying direct recorder stop:", error);
     try {
-      await sendMessageRecord({ type: "stop-recording-tab" });
+      await sendMessageRecord({ type: "stop-recording-tab", reason: "action-click" });
     } catch (recorderErr) {
       console.error("[Screenity][ActionClick] direct recorder stop also failed:", recorderErr);
     }
@@ -205,6 +206,9 @@ export const onActionButtonClickedListener = () => {
 
       if (isRecordingActive) {
         const { recordingTab, offscreen } = snap;
+        if (pendingRecording && !recording) {
+          void traceStep("actionClick");
+        }
         let hasActiveRecorder = false;
 
         if (sessionRecording) {

@@ -1,4 +1,4 @@
-import { getCurrentTab } from "../tabManagement";
+import { getCurrentTab, sendMessageTab } from "../tabManagement";
 import { removeTab } from "../tabManagement/removeTab";
 import { sendMessageRecord } from "./sendMessageRecord.js";
 import { closeOffscreenDocumentWithFlush } from "../offscreen/closeOffscreenDocumentWithFlush";
@@ -9,6 +9,10 @@ import { handleGetStreamingData } from "./recordingHelpers.js";
 import { perfMark, perfSpan } from "../../utils/perfMarks";
 import { sweepRecorderTabs } from "./sweepRecorderTabs";
 import { applyRetentionPlan } from "./recordingRetention";
+import {
+  holdForPreviousRecorder,
+  readPreviousRecorderState,
+} from "./previousRecorderGate";
 
 const openRecorderTab = async (
   activeTab,
@@ -357,6 +361,47 @@ export const startRecorderSession = async (request, tabId = null) => {
     chrome.storage.local.set({ tabPreferred: true });
   } else {
     chrome.storage.local.set({ tabPreferred: false });
+  }
+
+  // Closing the offscreen doc below cuts off a take that is still finalizing,
+  // so hold for it and refuse this start rather than close it.
+  if (!request.customRegion) {
+    try {
+      const { useOffscreenCloud } = await chrome.storage.local.get([
+        "useOffscreenCloud",
+      ]);
+      if (useOffscreenCloud !== false) {
+        const toast = (message, timeout) =>
+          sendMessageTab(activeTab.id, {
+            type: "show-toast",
+            message,
+            timeout,
+          }).catch(() => {});
+        const gate = await holdForPreviousRecorder({
+          read: readPreviousRecorderState,
+          onHold: () =>
+            toast("Finishing your previous recording before starting.", 8000),
+        });
+        if (gate.refused) {
+          toast(
+            "Your previous recording is still uploading. Wait for it to finish, then start again.",
+            10000,
+          );
+          await chrome.storage.local.set({
+            lastStartAborted: {
+              ts: Date.now(),
+              waitedMs: gate.waitedMs,
+              reason: "previous-recording-finalizing",
+            },
+            recordingStartingAt: null,
+            pendingRecording: false,
+          });
+          return;
+        }
+      }
+    } catch (err) {
+      console.warn("[Screenity][BG] previous recorder gate failed", err);
+    }
   }
 
   const endCloseOffscreen = perfSpan("BG.startRecorderSession closeOffscreenDocument");

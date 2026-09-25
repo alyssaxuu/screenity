@@ -64,6 +64,18 @@ export const setPendingMicRecovery = async (info) => {
   } catch {}
 };
 
+// The marker stays keyed on the minted id (the in-flight guard and the stop
+// path's clear use it); the scene's real id rides along as effectiveSceneId.
+export const setPendingMicRecoveryScene = async (sceneId, effectiveSceneId) => {
+  if (!sceneId || !effectiveSceneId) return;
+  try {
+    const map = await readMarkerMap();
+    if (!map[sceneId]) return;
+    map[sceneId] = { ...map[sceneId], effectiveSceneId };
+    await chrome.storage.local.set({ [MARKER_KEY]: map });
+  } catch {}
+};
+
 export const clearPendingMicRecovery = async (sceneId = null) => {
   try {
     if (!sceneId) {
@@ -209,6 +221,7 @@ const _attempted = new Set();
 
 const recoverOne = async (marker, { logger, token, ignoreLiveRecording }) => {
   const key = `${marker.sceneId}:${marker.at}`;
+  const targetSceneId = marker.effectiveSceneId || marker.sceneId;
   if (_attempted.has(key)) return { ran: false, reason: "already-ran" };
 
   if (Date.now() - (marker.at || 0) > MAX_MARKER_AGE_MS) {
@@ -243,7 +256,10 @@ const recoverOne = async (marker, { logger, token, ignoreLiveRecording }) => {
   // Crash recovery writes this marker before the scene exists, and attaching to
   // a missing scene reads as settled and clears the voice.
   if (marker.awaitScene) {
-    const scene = await fetchScene(marker, token);
+    const scene = await fetchScene(
+      { projectId: marker.projectId, sceneId: targetSceneId },
+      token
+    );
     if (!scene) return { ran: false, reason: "scene-not-ready" };
     // The stop path attached it and was only cut off before cleaning up.
     // Sending it again would orphan a second copy on Storage.
@@ -264,7 +280,7 @@ const recoverOne = async (marker, { logger, token, ignoreLiveRecording }) => {
   const result = await uploadAndAttachMic({
     store,
     projectId: marker.projectId,
-    sceneId: marker.sceneId,
+    sceneId: targetSceneId,
     duration: marker.duration,
     mimeType: marker.mimeType || "audio/webm",
     token,
@@ -274,7 +290,7 @@ const recoverOne = async (marker, { logger, token, ignoreLiveRecording }) => {
     await clearPendingMicRecovery(marker.sceneId);
     await queueTranscription({
       projectId: marker.projectId,
-      sceneId: marker.sceneId,
+      sceneId: targetSceneId,
       audioMediaId: result.mediaId,
       targetMediaId: marker.targetMediaId,
       token,

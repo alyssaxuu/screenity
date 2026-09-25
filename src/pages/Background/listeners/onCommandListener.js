@@ -77,7 +77,7 @@ export const onCommandListener = () => {
           ? { type: "cancel-recording" }
           : command === "pause-recording"
             ? { type: "pause-recording" }
-            : { type: "stop-recording-tab" };
+            : { type: "stop-recording-tab", reason: "shortcut-stop" };
       try {
         await sendMessageTab(targetTabId, msg);
       } catch (err) {
@@ -86,7 +86,10 @@ export const onCommandListener = () => {
         // recording; pause/cancel need the content-script pill UI, so they
         // have no direct fallback here (the user can stop via the toolbar).
         if (command === "stop-recording") {
-          await sendMessageRecord({ type: "stop-recording-tab" }).catch(
+          await sendMessageRecord({
+            type: "stop-recording-tab",
+            reason: "shortcut-stop",
+          }).catch(
             () => {},
           );
         }
