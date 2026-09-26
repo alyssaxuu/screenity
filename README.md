@@ -29,6 +29,7 @@ Made by [Alyssa X](https://alyssax.com)
 	- [Self-hosting Screenity](#self-hosting-screenity)
 	- [Creating a development version](#creating-a-development-version)
 		- [Enabling Save to Google Drive](#enabling-save-to-google-drive)
+	- [Custom upload](#custom-upload)
 	- [Acknowledgements](#acknowledgements)
 
 ## Features
@@ -80,6 +81,10 @@ If you’re thinking of building a commercial product from this, feel free to [r
 To enable the Google Drive Upload (authorization consent screen) you must change the client_id in the manifest.json file with your linked extension key.
 
 You can create it accessing [Google Cloud Console](https://console.cloud.google.com/apis/credentials) and selecting Create Credential > OAuth Client ID > Chrome App. To create a persistent extension key, you can follow the steps detailed [here](https://developer.chrome.com/docs/extensions/reference/manifest/key).
+
+## Custom upload
+
+The editor can upload a recording to your own HTTP endpoint and share the URL it returns. It supports a single multipart POST or PUT, or resumable chunked uploads over [tus](https://tus.io) for large files, with Bearer, Basic or custom-header auth and additional headers. See [docs/custom-upload.md](docs/custom-upload.md) for the request payload, the response contract, and example endpoints.
 
 ## Acknowledgements
 

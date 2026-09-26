@@ -1904,5 +1904,109 @@
   "unsavedRecordingModalDismiss": {
     "message": "दोबारा न दिखाएं",
     "description": "Side button: start the recording and stop prompting about unsaved recordings."
+  },
+  "customUploadButtonTitle": {
+    "message": "Custom Upload",
+    "description": "Title of the generic custom endpoint upload option"
+  },
+  "customUploadButtonDescription": {
+    "message": "Upload the current version to your endpoint",
+    "description": "Description of the generic custom endpoint upload option"
+  },
+  "customUploadConfigureLabel": {
+    "message": "Configure",
+    "description": "Button that opens the custom upload endpoint settings"
+  },
+  "customUploadEndpointLabel": {
+    "message": "Endpoint URL",
+    "description": "Label for the custom upload endpoint URL field"
+  },
+  "customUploadTokenLabel": {
+    "message": "API token",
+    "description": "Label for the custom upload bearer token field"
+  },
+  "customUploadSaveSettingsLabel": {
+    "message": "Save settings",
+    "description": "Button that saves custom upload endpoint settings"
+  },
+  "customUploadUploadingLabel": {
+    "message": "Uploading…",
+    "description": "Progress label while a custom endpoint upload is active"
+  },
+  "customUploadSuccessTitle": {
+    "message": "Upload complete",
+    "description": "Heading shown after a successful custom endpoint upload"
+  },
+  "customUploadCopyLinkLabel": {
+    "message": "Copy link",
+    "description": "Button that copies the URL returned by a custom upload endpoint"
+  },
+  "customUploadMethodLabel": {
+    "message": "Method",
+    "description": "Label for the HTTP method (POST or PUT) used by custom uploads"
+  },
+  "customUploadAuthLabel": {
+    "message": "Authentication",
+    "description": "Label for the custom upload authentication type selector"
+  },
+  "customUploadAuthBearer": {
+    "message": "Bearer token",
+    "description": "Custom upload auth option: Authorization: Bearer <token>"
+  },
+  "customUploadAuthBasic": {
+    "message": "Basic auth",
+    "description": "Custom upload auth option: HTTP Basic username and password"
+  },
+  "customUploadAuthHeader": {
+    "message": "Custom header",
+    "description": "Custom upload auth option: a secret sent in a header the user names"
+  },
+  "customUploadAuthNone": {
+    "message": "None",
+    "description": "Custom upload auth option: send no credentials"
+  },
+  "customUploadUsernameLabel": {
+    "message": "Username",
+    "description": "Label for the custom upload Basic auth username"
+  },
+  "customUploadPasswordLabel": {
+    "message": "Password",
+    "description": "Label for the custom upload Basic auth password"
+  },
+  "customUploadHeaderNameLabel": {
+    "message": "Header name",
+    "description": "Label for the name of the custom upload authentication header"
+  },
+  "customUploadHeaderValueLabel": {
+    "message": "Header value",
+    "description": "Label for the secret value of the custom upload authentication header"
+  },
+  "customUploadExtraHeadersLabel": {
+    "message": "Additional headers",
+    "description": "Label for extra HTTP headers sent with custom uploads"
+  },
+  "customUploadExtraHeadersHint": {
+    "message": "Optional. One per line, as Name: value. Values are shown in plain text.",
+    "description": "Help text under the custom upload additional headers field"
+  },
+  "customUploadModeLabel": {
+    "message": "Upload mode",
+    "description": "Label for choosing between a single-request upload and a resumable tus upload"
+  },
+  "customUploadModeSimple": {
+    "message": "Single request",
+    "description": "Custom upload mode: send the whole video in one multipart request"
+  },
+  "customUploadModeTus": {
+    "message": "Resumable (tus)",
+    "description": "Custom upload mode: send the video in chunks with the tus resumable upload protocol"
+  },
+  "customUploadChunkSizeLabel": {
+    "message": "Chunk size (MB)",
+    "description": "Label for the size of each chunk in a resumable tus upload"
+  },
+  "customUploadChunkSizeHint": {
+    "message": "Keep it under your server's or proxy's request size limit.",
+    "description": "Help text under the tus chunk size field"
   }
 }

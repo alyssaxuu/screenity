@@ -3440,6 +3440,27 @@ const ContentState = (props) => {
     return promise;
   };
 
+  // Reuse the same finalization as local MP4 download so upload destinations
+  // receive a standard MP4 when possible, with the playable source as fallback.
+  const getFinalUploadBlob = async () => {
+    const latest = contentStateRef.current || contentState;
+    if (!latest.mp4ready || !(latest.blob instanceof Blob)) {
+      return latest.webm || latest.rawBlob || null;
+    }
+
+    try {
+      const finalized = await ensureStandardMp4();
+      if (
+        finalized?.blob instanceof Blob &&
+        finalized.blob.size > 0 &&
+        finalized.audioCarried !== false
+      ) {
+        return finalized.blob;
+      }
+    } catch {}
+    return latest.blob;
+  };
+
   // Pre-warm the standard MP4 in the background once the editor is ready so the
   // download is an instant file-save. Failures are cached; download() falls
   // back to the fragmented file. Skipped when the flag is off.
@@ -3851,6 +3872,7 @@ const ContentState = (props) => {
   contentState.handleTrim = handleTrim;
   contentState.handleMute = handleMute;
   contentState.download = download;
+  contentState.getFinalUploadBlob = getFinalUploadBlob;
   contentState.cancelDownload = cancelDownload;
   contentState.handleCrop = handleCrop;
   contentState.handleReencode = handleReencode;

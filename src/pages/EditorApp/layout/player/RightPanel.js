@@ -14,6 +14,7 @@ const URL =
 
 import CropUI from "../editor/CropUI";
 import AudioUI from "../editor/AudioUI";
+import CustomUpload from "../../components/player/CustomUpload";
 
 import { ContentStateContext } from "../../context/ContentState";
 
@@ -903,6 +904,7 @@ const RightPanel = () => {
                   <ReactSVG src={URL + "editor/icons/right-arrow.svg"} />
                 </div>
               </div>
+              <CustomUpload />
             </div>
           </div>
           <div className={styles.section}>
