@@ -94,7 +94,10 @@ Screenity sends the current version of the recording, edits included:
 
 1. When the MP4 export is ready, it's converted to a standard (non-fragmented)
    MP4, the same file a local MP4 download gives you. If that conversion fails,
-   the fragmented MP4 is sent instead.
+   the fragmented MP4 is sent instead. The button shows "Preparing video..."
+   with the conversion's progress until the transfer starts; on a long
+   recording, or a WebM source that needs a full re-encode, this can take
+   minutes.
 2. Otherwise the WebM export.
 3. Otherwise the raw recording (WebM).
 

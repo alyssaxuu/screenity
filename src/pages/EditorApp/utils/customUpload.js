@@ -489,16 +489,29 @@ const awaitWithAbort = (promise, signal) => {
   });
 };
 
-export const resolveCustomUploadSource = async (contentState = {}, signal) => {
+// onProgress reports the MP4 finalize as { percent }. Cancelling stops the
+// reports but not the finalize, which the editor caches for the next attempt.
+export const resolveCustomUploadSource = async (
+  contentState = {},
+  signal,
+  onProgress
+) => {
   const readySource = selectCustomUploadSource(contentState);
   if (!readySource) return null;
   if (typeof contentState.getFinalUploadBlob !== "function") {
     return readySource;
   }
 
+  const reportProgress = (fraction) => {
+    if (signal?.aborted || !Number.isFinite(fraction)) return;
+    onProgress?.({
+      percent: Math.min(100, Math.max(0, Math.round(fraction * 100))),
+    });
+  };
+
   try {
     const finalized = await awaitWithAbort(
-      contentState.getFinalUploadBlob(),
+      contentState.getFinalUploadBlob(reportProgress),
       signal
     );
     if (finalized instanceof Blob && finalized.size > 0) return finalized;

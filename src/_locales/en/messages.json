@@ -1951,6 +1951,10 @@
     "message": "Uploading…",
     "description": "Progress label while a custom endpoint upload is active"
   },
+  "customUploadPreparingLabel": {
+    "message": "Preparing video...",
+    "description": "Progress label while the video is finalized before a custom endpoint upload"
+  },
   "customUploadSuccessTitle": {
     "message": "Upload complete",
     "description": "Heading shown after a successful custom endpoint upload"

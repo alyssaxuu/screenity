@@ -37,6 +37,7 @@ const CustomUpload = () => {
   const [settingsError, setSettingsError] = useState("");
   const [uploadError, setUploadError] = useState("");
   const [uploading, setUploading] = useState(false);
+  const [preparing, setPreparing] = useState(false);
   const [progress, setProgress] = useState(null);
   const [resultUrl, setResultUrl] = useState("");
   const abortRef = useRef(null);
@@ -168,6 +169,7 @@ const CustomUpload = () => {
     const controller = new AbortController();
     abortRef.current = controller;
     setUploading(true);
+    setPreparing(true);
     setProgress(null);
     setUploadError("");
     setResultUrl("");
@@ -177,8 +179,15 @@ const CustomUpload = () => {
         await permissionPromise;
         const uploadSource = await resolveCustomUploadSource(
           contentState,
-          controller.signal
+          controller.signal,
+          ({ percent }) => {
+            if (mountedRef.current) setProgress(percent);
+          }
         );
+        if (mountedRef.current) {
+          setPreparing(false);
+          setProgress(null);
+        }
         if (!uploadSource) {
           throw new CustomUploadError(
             "source-unavailable",
@@ -212,16 +221,20 @@ const CustomUpload = () => {
         }
       } finally {
         abortRef.current = null;
-        if (mountedRef.current) setUploading(false);
+        if (mountedRef.current) {
+          setUploading(false);
+          setPreparing(false);
+        }
       }
     })();
   };
 
   const cancelUpload = () => abortRef.current?.abort();
+  const stageLabel = preparing
+    ? t("customUploadPreparingLabel", "Preparing video...")
+    : t("customUploadUploadingLabel", "Uploading...");
   const progressLabel =
-    progress === null
-      ? t("customUploadUploadingLabel", "Uploading...")
-      : `${t("customUploadUploadingLabel", "Uploading...")} ${progress}%`;
+    progress === null ? stageLabel : `${stageLabel} ${progress}%`;
 
   return (
     <div className={styles.customUpload}>

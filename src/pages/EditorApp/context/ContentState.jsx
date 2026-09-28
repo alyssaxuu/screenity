@@ -3276,6 +3276,9 @@ const ContentState = (props) => {
 
   const standardMp4Ref = useRef(null);
   const downloadCancelledRef = useRef(false);
+  // The finalize job captures its progress callback when it starts (often the
+  // pre-warm), so a later caller can only observe it through this set.
+  const finalizeProgressListenersRef = useRef(new Set());
 
   // Cancel an in-progress download/conversion so the user isn't stuck waiting on
   // a slow WebM re-encode. Resets the UI immediately and best-effort aborts the
@@ -3292,9 +3295,15 @@ const ContentState = (props) => {
     }));
   };
 
-  // Only surface finalize progress while a download is actually in flight, so
-  // the background pre-warm doesn't flash a progress bar during editing.
+  // Upload listeners always get finalize progress; the download UI only while a
+  // download is in flight, so the background pre-warm doesn't flash a progress
+  // bar during editing.
   const sharedFinalizeProgress = (p) => {
+    for (const listener of finalizeProgressListenersRef.current) {
+      try {
+        listener(p);
+      } catch {}
+    }
     if (!contentStateRef.current?.downloading) return;
     setContentState((prev) => ({
       ...prev,
@@ -3442,12 +3451,16 @@ const ContentState = (props) => {
 
   // Reuse the same finalization as local MP4 download so upload destinations
   // receive a standard MP4 when possible, with the playable source as fallback.
-  const getFinalUploadBlob = async () => {
+  // onProgress gets the finalize fraction (0-1), which can restart from 0 when
+  // a tier falls back.
+  const getFinalUploadBlob = async (onProgress) => {
     const latest = contentStateRef.current || contentState;
     if (!latest.mp4ready || !(latest.blob instanceof Blob)) {
       return latest.webm || latest.rawBlob || null;
     }
 
+    const listeners = finalizeProgressListenersRef.current;
+    if (typeof onProgress === "function") listeners.add(onProgress);
     try {
       const finalized = await ensureStandardMp4();
       if (
@@ -3457,7 +3470,10 @@ const ContentState = (props) => {
       ) {
         return finalized.blob;
       }
-    } catch {}
+    } catch {
+    } finally {
+      listeners.delete(onProgress);
+    }
     return latest.blob;
   };
 
