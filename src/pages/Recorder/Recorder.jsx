@@ -73,7 +73,12 @@ import {
   validateFastRecorderOutputBlob,
   isTransientFastRecorderError,
   isFastRecorderFailureTransient,
+  RESOLUTION_UNSUPPORTED_CODE,
 } from "../../media/fastRecorderGate";
+import {
+  avcCodecForSize,
+  largeFrameKnownUnsupported,
+} from "../../media/avcLevel";
 
 localforage.config({
   driver: localforage.INDEXEDDB,
@@ -1631,6 +1636,42 @@ const Recorder = () => {
     const width = Math.max(2, Math.round((trackWidth * fitScale) / 2) * 2);
     const height = Math.max(2, Math.round((trackHeight * fitScale) / 2) * 2);
 
+    // The gate's 720p/1080p probe says nothing about 1440p/4K. When it has
+    // positively recorded that this size cannot be encoded, swap now, before
+    // the capture is consumed, instead of after the encoder yields zero chunks.
+    // Not sticky: 1080p WebCodecs is unaffected.
+    if (
+      canUseWebCodecs &&
+      largeFrameKnownUnsupported(width, height, probeResult?.details)
+    ) {
+      debugWarn("Encode size unsupported by WebCodecs, using MediaRecorder", {
+        width,
+        height,
+      });
+      chrome.runtime
+        .sendMessage({
+          type: "diag-forward",
+          event: "recorder-webcodecs-resolution-swap",
+          data: {
+            stage: "preflight",
+            width,
+            height,
+            supports1440p: probeResult?.details?.supports1440p ?? null,
+            supports4k: probeResult?.details?.supports4k ?? null,
+          },
+        })
+        .catch(() => {});
+      if (chunkWriter.current) {
+        try {
+          await chunkWriter.current.abort();
+        } catch {}
+        chunkWriter.current = null;
+        chunkBackendRef.current = null;
+      }
+      isStarting.current = false;
+      return await startRecording({ forceMediaRecorder: true });
+    }
+
     // MediaRecorder encodes the track as-is, so lower it back to the tier or a
     // 1080p recording ships as 3840x2160. Runs after the probe, so a decision
     // that disagreed with the pre-capture guess still lands right.
@@ -2303,6 +2344,20 @@ const Recorder = () => {
               trackLive
             ) {
               webcodecsFallbackTriggered = true;
+              if (failureCode === RESOLUTION_UNSUPPORTED_CODE) {
+                chrome.runtime
+                  .sendMessage({
+                    type: "diag-forward",
+                    event: "recorder-webcodecs-resolution-swap",
+                    data: {
+                      stage: "encoder-choice",
+                      width,
+                      height,
+                      tried: err?.detail?.tried ?? null,
+                    },
+                  })
+                  .catch(() => {});
+              }
               debugWarn(
                 "WebCodecs onError: attempting in-session MediaRecorder swap",
               );
@@ -4322,7 +4377,13 @@ const Recorder = () => {
           probeData?.fastRecorderProbe?.details?.selectedVideoConfig || null;
         // Prefer the probe's codec; fall back to High L4.2 (Main is excluded
         // from the ladder for Windows MFT silent-no-output, see WCR).
-        const codec = probeConfig?.codec || "avc1.64002A";
+        // The probe codec was chosen at 1080p, so lift its level when the
+        // warm frame is bigger than L4.2 allows.
+        const codec = avcCodecForSize(
+          probeConfig?.codec || "avc1.64002A",
+          w,
+          h,
+        );
         const bitrate =
           Number(probeConfig?.bitrate) || 4_000_000;
         const framerate =

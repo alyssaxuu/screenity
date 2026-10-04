@@ -38,6 +38,7 @@ import {
   isFastRecorderFailureTransient,
 } from "../../media/fastRecorderGate";
 import { getResolutionForQuality } from "../Recorder/recorderConfig";
+import { avcCodecForSize } from "../../media/avcLevel";
 import { chooseWriter } from "../Recorder/recorderStorage/chooseWriter";
 import { chooseReader } from "../Recorder/recorderStorage/chooseReader";
 import { lifecycle } from "../utils/lifecycleLog";
@@ -2519,7 +2520,11 @@ const Recorder = () => {
               void startEncoderPrewarm({
                 width: warmW,
                 height: warmH,
-                codec: probeConfig?.codec || "avc1.64002A",
+                codec: avcCodecForSize(
+                  probeConfig?.codec || "avc1.64002A",
+                  warmW,
+                  warmH,
+                ),
                 bitrate: Number(probeConfig?.bitrate) || 4_000_000,
                 framerate: Number(probeConfig?.framerate) || fps || 30,
               });

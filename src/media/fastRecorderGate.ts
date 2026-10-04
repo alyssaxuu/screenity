@@ -1,3 +1,5 @@
+import { avcCodecForSize } from "./avcLevel";
+
 declare const chrome: any;
 
 // mediabunny is ~3MB; defer until validateFastRecorderOutputBlob runs.
@@ -140,6 +142,8 @@ export const isTransientFastRecorderError = (errorString: string) => {
 };
 const isTransientError = isTransientFastRecorderError;
 
+export const RESOLUTION_UNSUPPORTED_CODE = "webcodecs-resolution-unsupported";
+
 // firstChunkSeen=false means no output ever landed: cancel or contention,
 // not an encoder defect (real breakage emits at least one chunk first).
 export const isFastRecorderFailureTransient = (
@@ -148,6 +152,8 @@ export const isFastRecorderFailureTransient = (
   detail: any
 ): boolean => {
   if (isTransientFastRecorderError(errorString)) return true;
+  // This frame size cannot be encoded; 1080p still can, so don't sticky-disable.
+  if (reasonCode === RESOLUTION_UNSUPPORTED_CODE) return true;
   if (
     reasonCode === "webcodecs-zero-frames-at-stop" &&
     detail &&
@@ -449,6 +455,53 @@ export const prewarmFastRecorderProbe = (): void => {
   void probeFastRecorderSupport().catch(() => {});
 };
 
+// The 720p/1080p ladder says nothing about frames above L4.2's coded-area
+// limit, which is where 1440p and 4K live. Probe those sizes with the codec the
+// recorder will actually ask for. Informational: a miss here must never take
+// WebCodecs away from 1080p, so it feeds details, not reasons.
+const LARGE_FRAME_PROBES = [
+  { key: "supports1440p", width: 2560, height: 1440, bitrate: 10_000_000 },
+  { key: "supports4k", width: 3840, height: 2160, bitrate: 24_000_000 },
+] as const;
+
+const probeLargeFrameSupport = async (
+  base: VideoEncoderConfig
+): Promise<Record<string, any>> => {
+  const out: Record<string, any> = {};
+  for (const probe of LARGE_FRAME_PROBES) {
+    const attempts: Array<{ codec: string; hw: string; supported: boolean }> = [];
+    let selected: VideoEncoderConfig | null = null;
+    for (const baseCodec of ["avc1.64002A", "avc1.42E028"]) {
+      const codec = avcCodecForSize(baseCodec, probe.width, probe.height);
+      for (const hw of ["prefer-hardware", "prefer-software", "no-preference"]) {
+        const config: any = {
+          ...base,
+          codec,
+          width: probe.width,
+          height: probe.height,
+          bitrate: probe.bitrate,
+          hardwareAcceleration: hw,
+        };
+        let supported = false;
+        try {
+          const support = await VideoEncoder.isConfigSupported(config);
+          supported = Boolean(support?.supported);
+          if (supported) selected = support?.config || config;
+        } catch {
+          supported = false;
+        }
+        attempts.push({ codec, hw, supported });
+        if (selected) break;
+      }
+      if (selected) break;
+    }
+    out[probe.key] = Boolean(selected);
+    out[`${probe.key}Config`] = selected;
+    out[`${probe.key}Attempts`] = attempts;
+  }
+  return out;
+};
+
 const _probeFastRecorderSupportUncached = async (): Promise<FastRecorderProbeResult> => {
   try {
     debugLog("probe start", GATE_VERSION, Date.now());
@@ -584,6 +637,10 @@ const _probeFastRecorderSupportUncached = async (): Promise<FastRecorderProbeRes
       details.attemptedConfigCount = attemptSummaries.length;
       details.attemptSummary = attemptSummaries;
       reasons.push("video-config-unsupported");
+    }
+
+    if (selectedVideoConfig && hasVideoEncoder) {
+      Object.assign(details, await probeLargeFrameSupport(baseVideoConfig));
     }
 
   if (hasAudioEncoder && typeof AudioEncoder.isConfigSupported === "function") {

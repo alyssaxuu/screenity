@@ -35,6 +35,8 @@ import {
 } from "./recorderLogic";
 import { getStartupFlags } from "./startupFlags";
 import { orientBoxToSource } from "../recorderConfig";
+import { avcCodecForSize, exceedsAvcL42 } from "../../../media/avcLevel";
+import { RESOLUTION_UNSUPPORTED_CODE } from "../../../media/fastRecorderGate";
 import { claimPrewarmedEncoder } from "../encoderPrewarm";
 // Lazy-load Mp4MuxerWrapper so its ~3MB mediabunny static import doesn't
 // drag into recorder.bundle.js cold start (dominates click-record latency).
@@ -659,6 +661,15 @@ export class WebCodecsRecorder {
             bitrate: safeBitrate,
             framerate: fps,
           });
+          // The probe's codec was picked at 1080p; its level may be too low
+          // for this frame.
+          if (config.codec) {
+            config.codec = avcCodecForSize(
+              config.codec,
+              this.targetWidth,
+              this.targetHeight,
+            );
+          }
           this.log("[WCR] Using override encoder config", config);
           try {
             const support = await VideoEncoder.isConfigSupported(config);
@@ -2797,7 +2808,14 @@ export class WebCodecsRecorder {
               { codec: "avc1.42E028", containerCodec: "avc", hw: "prefer-software" },
             ];
 
-    for (const c of candidates) {
+    // Past L4.2's coded-area limit the declared level has to rise or Chrome
+    // rejects the frame size at encode time, after configure() has passed.
+    const oversize = exceedsAvcL42(width, height);
+
+    for (const candidate of candidates) {
+      const c = oversize
+        ? { ...candidate, codec: avcCodecForSize(candidate.codec, width, height) }
+        : candidate;
       const config = { ...base, codec: c.codec, hardwareAcceleration: c.hw };
       // Use the normalized config from isConfigSupported so a clamp
       // Chrome would have applied doesn't trigger a SW fallback later.
@@ -2805,6 +2823,18 @@ export class WebCodecsRecorder {
       try {
         supported = await VideoEncoder.isConfigSupported(config);
       } catch {}
+      // configure() reports an unsupported size asynchronously, so a rung that
+      // isConfigSupported already refused would be "selected" and then die
+      // with zero chunks. Only large frames skip on it: smaller sizes keep the
+      // existing ladder behaviour untouched.
+      if (oversize && supported && supported.supported === false) {
+        this._videoCodecConfigsTried.push({
+          codec: c.codec,
+          hw: c.hw,
+          succeeded: false,
+        });
+        continue;
+      }
       const resolvedConfig =
         supported?.supported && supported.config ? supported.config : config;
       const test = new VideoEncoder({ output() {}, error() {} });
@@ -2845,7 +2875,16 @@ export class WebCodecsRecorder {
         try { test.close(); } catch {}
       }
     }
-    throw new Error("WebCodecsRecorder: No supported H.264 encoder");
+    const failure = new Error("WebCodecsRecorder: No supported H.264 encoder");
+    if (oversize) {
+      failure.code = RESOLUTION_UNSUPPORTED_CODE;
+      failure.detail = {
+        width,
+        height,
+        tried: this._videoCodecConfigsTried.slice(),
+      };
+    }
+    throw failure;
   }
 
   // Geometry lives in letterbox.js; this just paints it.
