@@ -10,6 +10,7 @@ import TooltipWrap from "../components/TooltipWrap";
 import { CheckWhiteIcon, DropdownGroup } from "../../images/popup/images";
 
 import { buildDiagnosticZip } from "../../../utils/buildDiagnosticZip";
+import { physicalScreenSize } from "../../../utils/physicalScreenSize";
 
 // Context
 import { contentStateContext } from "../../context/ContentState";
@@ -103,11 +104,14 @@ const SettingsMenu = (props) => {
   };
 
   useEffect(() => {
-    // More accurate screen detection
-    const w = window.screen.availWidth * window.devicePixelRatio;
-    const h = window.screen.availHeight * window.devicePixelRatio;
-    setWidth(Math.round(w));
-    setHeight(Math.round(h));
+    // Full display, not the work area: avail* drops the menu bar/taskbar and
+    // would hide 4K on a native 4K monitor.
+    const { width: w, height: h } = physicalScreenSize(
+      window.screen,
+      window.devicePixelRatio,
+    );
+    setWidth(w);
+    setHeight(h);
 
     // Fix RAM detection on macOS
     const isMac = navigator.userAgent.includes("Macintosh");
