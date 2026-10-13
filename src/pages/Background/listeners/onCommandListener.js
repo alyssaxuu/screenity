@@ -60,6 +60,7 @@ export const onCommandListener = () => {
     } else if (
       command === "cancel-recording" ||
       command === "pause-recording" ||
+      command === "toggle-microphone" ||
       command === "stop-recording"
     ) {
       // Recording controls must reach the recording UI tab (the pill + its
@@ -77,13 +78,15 @@ export const onCommandListener = () => {
           ? { type: "cancel-recording" }
           : command === "pause-recording"
             ? { type: "pause-recording" }
-            : { type: "stop-recording-tab", reason: "shortcut-stop" };
+            : command === "toggle-microphone"
+              ? { type: "toggle-microphone" }
+              : { type: "stop-recording-tab", reason: "shortcut-stop" };
       try {
         await sendMessageTab(targetTabId, msg);
       } catch (err) {
         // Recording UI tab gone (closed/navigated). The offscreen recorder
         // accepts stop-recording-tab directly, so stop can still end the
-        // recording; pause/cancel need the content-script pill UI, so they
+        // recording; pause/cancel/mic need the content-script pill UI, so they
         // have no direct fallback here (the user can stop via the toolbar).
         if (command === "stop-recording") {
           await sendMessageRecord({

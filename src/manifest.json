@@ -85,6 +85,12 @@
       },
       "description": "Pause/Resume recording"
     },
+    "toggle-microphone": {
+      "suggested_key": {
+        "default": "Alt+Shift+A"
+      },
+      "description": "Mute/Unmute microphone"
+    },
     "stop-recording": {
       "description": "Stop recording"
     },

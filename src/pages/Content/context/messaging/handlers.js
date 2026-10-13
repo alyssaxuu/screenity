@@ -902,6 +902,30 @@ export const setupHandlers = () => {
     state.dismissRecording("cancel-recording-cmd");
   });
 
+  registerMessage("toggle-microphone", () => {
+    const state = getState();
+    if (
+      !state.recording ||
+      !state.microphonePermission ||
+      state.defaultAudioInput === "none"
+    ) {
+      return;
+    }
+
+    const active = !state.micActive;
+    setContentState((prev) => ({ ...prev, micActive: active }));
+    chrome.storage.local.set({ micActive: active });
+    chrome.runtime.sendMessage({
+      type: "set-mic-active-tab",
+      active,
+      defaultAudioInput: state.defaultAudioInput,
+    });
+    state.openToast(
+      chrome.i18n.getMessage(active ? "micOnToast" : "micOffToast"),
+      () => {},
+    );
+  });
+
   registerMessage("pause-recording", () => {
     const state = getState();
     if (state.paused) {
