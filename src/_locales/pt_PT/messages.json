@@ -1085,13 +1085,29 @@
     "message": "Certifique-se de ativar a opção 'Partilhar áudio do sistema' se desejar gravar áudio do computador. Se não visualizar esta opção, tente atualizar o Chrome ou alternar para a gravação de guias.",
     "description": "Descrição do Aviso de Áudio para Outros Sistemas"
   },
-  "maxResolutionLabel": {
-    "message": "Resolução máxima",
-    "description": "Etiqueta de resolução máxima no menu de configurações"
+  "qualityLabel": {
+    "message": "Qualidade",
+    "description": "Etiqueta de qualidade no menu de definições"
   },
-  "maxFPSLabel": {
-    "message": "Máximo de FPS",
-    "description": "Etiqueta de máximo de FPS no menu de configurações"
+  "qualityAutoLabel": {
+    "message": "Automático",
+    "description": "Opção de qualidade automática no menu de definições"
+  },
+  "qualityCustomLabel": {
+    "message": "Personalizado",
+    "description": "Apresentado quando a resolução ou a taxa de fotogramas foi escolhida manualmente"
+  },
+  "smootherMotionLabel": {
+    "message": "Priorizar movimento mais fluido",
+    "description": "Interruptor nas definições de qualidade que favorece um vídeo mais fluido em vez de nitidez"
+  },
+  "resolutionGroupLabel": {
+    "message": "Resolução",
+    "description": "Título acima das opções de resolução"
+  },
+  "frameRateGroupLabel": {
+    "message": "Taxa de fotogramas",
+    "description": "Título acima das opções de taxa de fotogramas"
   },
   "notEnoughRAM": {
     "message": "Memória RAM insuficiente",
@@ -1904,5 +1920,141 @@
   "unsavedRecordingModalDismiss": {
     "message": "Não mostrar novamente",
     "description": "Side button: start the recording and stop prompting about unsaved recordings."
+  },
+  "teleprompterLabel": {
+    "message": "Teleprompter",
+    "description": "Switch label: opens the floating teleprompter window"
+  },
+  "teleprompterUnavailableLabel": {
+    "message": "Teleprompter (indisponível nesta página)",
+    "description": "Switch label shown when the page cannot open the teleprompter window"
+  },
+  "teleprompterIntroTitle": {
+    "message": "Como funciona o teleprompter",
+    "description": "Modal title shown the first time the teleprompter is switched on"
+  },
+  "teleprompterIntroDescription": {
+    "message": "O teu guião abre numa janela flutuante que fica fora da gravação quando partilhas uma janela ou separador, gravas uma área ou gravas só a câmara. Se partilhares o ecrã inteiro, a janela apareceria no vídeo, por isso fecha quando começas. O teu guião é sempre guardado.",
+    "description": "Modal body: where the script window shows and when it closes"
+  },
+  "teleprompterClosedToast": {
+    "message": "Teleprompter fechado para ficar fora da tua gravação",
+    "description": "Toast: the teleprompter window was closed because the whole screen is being recorded"
+  },
+  "teleprompterPlaceholder": {
+    "message": "Escreve ou cola o teu guião",
+    "description": "Placeholder in the empty teleprompter script box"
+  },
+  "teleprompterPlay": {
+    "message": "Iniciar deslocamento",
+    "description": "Teleprompter button: start scrolling the script"
+  },
+  "teleprompterPause": {
+    "message": "Pausar deslocamento",
+    "description": "Teleprompter button: pause scrolling the script"
+  },
+  "teleprompterMore": {
+    "message": "Mais opções do guião",
+    "description": "Teleprompter button: open the script options menu"
+  },
+  "teleprompterTextSize": {
+    "message": "Tamanho do texto",
+    "description": "Teleprompter menu row: text size"
+  },
+  "teleprompterSpeed": {
+    "message": "Velocidade",
+    "description": "Teleprompter menu row: scroll speed"
+  },
+  "teleprompterSmaller": {
+    "message": "Texto mais pequeno",
+    "description": "Teleprompter button: decrease text size"
+  },
+  "teleprompterLarger": {
+    "message": "Texto maior",
+    "description": "Teleprompter button: increase text size"
+  },
+  "teleprompterSlower": {
+    "message": "Mais devagar",
+    "description": "Teleprompter button: scroll slower"
+  },
+  "teleprompterFaster": {
+    "message": "Mais rápido",
+    "description": "Teleprompter button: scroll faster"
+  },
+  "teleprompterWpmUnit": {
+    "message": "ppm",
+    "description": "Unit shown after the scroll speed, words per minute"
+  },
+  "teleprompterScrollOnStart": {
+    "message": "Deslocar quando a gravação começar",
+    "description": "Teleprompter menu option: start scrolling when the recording starts"
+  },
+  "teleprompterRewind": {
+    "message": "Voltar ao início",
+    "description": "Teleprompter menu option: scroll the script back to the top"
+  },
+  "teleprompterHide": {
+    "message": "Ocultar guião",
+    "description": "Teleprompter menu option: close the teleprompter window"
+  },
+  "teleprompterPlayDisabled": {
+    "message": "Desloca-se automaticamente quando começares a gravar",
+    "description": "Tooltip on the disabled teleprompter play button before recording starts"
+  },
+  "teleprompterFullScreenTitle": {
+    "message": "O teleprompter vai ser fechado",
+    "description": "Modal title: the teleprompter window is about to be closed because the whole screen is recorded"
+  },
+  "teleprompterFullScreenDescription": {
+    "message": "Estás a gravar o ecrã inteiro, por isso a janela do teleprompter apareceria no vídeo. Vamos fechá-la para que não seja gravada. Podes mantê-la aberta, mas será gravada.",
+    "description": "Modal body: why the teleprompter window closes when recording the entire screen"
+  },
+  "teleprompterFullScreenClose": {
+    "message": "OK, fechar",
+    "description": "Modal button: close the teleprompter window and start recording"
+  },
+  "teleprompterFullScreenKeep": {
+    "message": "Manter visível",
+    "description": "Modal button: keep the teleprompter window open even though it will be recorded"
+  },
+  "teleprompterFullScreenNever": {
+    "message": "Não mostrar novamente",
+    "description": "Modal side button: close the teleprompter window and do not show this modal again"
+  },
+  "cameraFullScreenTitle": {
+    "message": "A janela da câmara será fechada",
+    "description": "Modal title: the camera window is about to be closed because the whole screen is recorded"
+  },
+  "cameraFullScreenDescription": {
+    "message": "Estás a gravar o ecrã inteiro, por isso a janela da câmara apareceria no vídeo. Vamos fechá-la para ficar fora da gravação. A tua câmara continua a ser gravada.",
+    "description": "Modal body: why the camera window closes when recording the entire screen"
+  },
+  "teleprompterClear": {
+    "message": "Limpar guião",
+    "description": "Script menu item: empty the script"
+  },
+  "teleprompterClearConfirm": {
+    "message": "Clica novamente para limpar",
+    "description": "Script menu item after the first click: asks for a second click to empty the script"
+  },
+  "teleprompterHideCamera": {
+    "message": "Mover a câmara para a página",
+    "description": "Teleprompter menu option: move the camera picture out of this window and back onto the page"
+  },
+  "teleprompterShowCamera": {
+    "message": "Mover a câmara para aqui",
+    "description": "Teleprompter menu option: move the camera picture from the page into this window"
+  },
+  "teleprompterShow": {
+    "message": "Mostrar guião",
+    "description": "Teleprompter menu option: show the script in the floating window"
+  },
+  "pressRecordOnPageToast": {
+    "message": "Clica uma vez em \"Iniciar gravação\" na página para o Chrome poder pedir acesso ao ecrã.",
+    "description": "Toast shown when Record was pressed in the floating window and Chrome still needs a click on the page to ask for screen capture access"
+  },
+  "teleprompterRegionStartOnPage": {
+    "message": "A gravação de uma região tem de ser iniciada a partir da página",
+    "description": "Tooltip on the disabled Start button in the floating teleprompter window when recording a region, which can only be started from the page"
   }
 }

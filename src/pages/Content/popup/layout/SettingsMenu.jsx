@@ -10,6 +10,7 @@ import TooltipWrap from "../components/TooltipWrap";
 import { CheckWhiteIcon, DropdownGroup } from "../../images/popup/images";
 
 import { buildDiagnosticZip } from "../../../utils/buildDiagnosticZip";
+import { physicalScreenSize, screenFits } from "../../../utils/physicalScreenSize";
 
 // Context
 import { contentStateContext } from "../../context/ContentState";
@@ -26,13 +27,29 @@ const CLOUD_FEATURES_ENABLED =
   process.env.SCREENITY_ENABLE_CLOUD_FEATURES === "true";
 const DEV_MODE = process.env.SCREENITY_DEV_MODE === "true";
 
+// Inline: the portal's inherited stylesheet varies.
+const QUALITY_LABEL_STYLE = {
+  padding: "10px 22px 4px",
+  fontSize: 12,
+  lineHeight: 1,
+  letterSpacing: "0.02em",
+  color: "#6e7684",
+  userSelect: "none",
+};
+const QUALITY_SEPARATOR_STYLE = {
+  height: 1,
+  backgroundColor: "#ececf1",
+  margin: "6px 22px",
+};
+
+const FPS_OPTIONS = ["60", "30", "24", "15", "10", "5"];
+
 const SettingsMenu = (props) => {
   const [contentState, setContentState] = useContext(contentStateContext);
   const [restore, setRestore] = useState(false);
   const [cloudRestore, setCloudRestore] = useState(false);
   const [openQuality, setOpenQuality] = useState(false);
   const [openResize, setOpenResize] = useState(false);
-  const [openFPS, setOpenFPS] = useState(false);
   const [RAM, setRAM] = useState(0);
   const [width, setWidth] = useState(0);
   const [height, setHeight] = useState(0);
@@ -103,11 +120,13 @@ const SettingsMenu = (props) => {
   };
 
   useEffect(() => {
-    // More accurate screen detection
-    const w = window.screen.availWidth * window.devicePixelRatio;
-    const h = window.screen.availHeight * window.devicePixelRatio;
-    setWidth(Math.round(w));
-    setHeight(Math.round(h));
+    // Full display, not avail*: the menu bar/taskbar cut would hide 4K on a native 4K monitor.
+    const { width: w, height: h } = physicalScreenSize(
+      window.screen,
+      window.devicePixelRatio
+    );
+    setWidth(w);
+    setHeight(h);
 
     // Fix RAM detection on macOS
     const isMac = navigator.userAgent.includes("Macintosh");
@@ -124,12 +143,14 @@ const SettingsMenu = (props) => {
     }
   };
 
+  // A probe from before the ladder-v2 gate has no supports4k; count it stale.
   const hasLadderFields = (probe) => {
     if (!probe || !probe.details) return false;
     return (
       Array.isArray(probe.details.attemptSummary) &&
       probe.details.attemptSummary.length > 0 &&
-      Boolean(probe.details.selectedVideoConfig)
+      Boolean(probe.details.selectedVideoConfig) &&
+      typeof probe.details.supports4k === "boolean"
     );
   };
 
@@ -260,6 +281,44 @@ const SettingsMenu = (props) => {
     };
   }, [contentState?.useWebCodecsRecorder]);
 
+  // Unset reads as auto, matching resolveQualityValue/resolveFps.
+  const qualityChoice = contentState.qualityValue ?? "auto";
+  const fpsChoice = contentState.fpsValue ?? "auto";
+  const qualityIsAuto = qualityChoice === "auto" && fpsChoice === "auto";
+
+  const updateQuality = (patch) => {
+    setContentState((prevContentState) => ({
+      ...prevContentState,
+      ...patch,
+    }));
+    chrome.storage.local.set(patch);
+  };
+
+  // Offered on smaller screens too: 4k is a fit-inside box, never upscaled, and
+  // the screen is only picked later in Chrome's share picker.
+  const supports4k =
+    fastRecorderInfo?.probe?.details?.supports4k === true && RAM >= 8;
+
+  // A saved 4k stays visible and checked while the probe is unknown, and when
+  // RAM now rules it out. Only a definite probe miss hides it: the recorder
+  // drops that pick to 1080p, so 1080p shows as checked.
+  const probeMissed4k = fastRecorderInfo?.probe?.details?.supports4k === false;
+  const show4k = supports4k || (qualityChoice === "4k" && !probeMissed4k);
+  const shownQuality =
+    qualityChoice === "4k" && probeMissed4k ? "1080p" : qualityChoice;
+
+  // When 4k is offered, lower rungs ignore the screen gate for the same reason.
+  const fitsScreen = (w, h) => supports4k || screenFits({ width, height }, w, h);
+
+  const qualityOptions = [
+    ...(show4k ? [{ value: "4k", disabled: !supports4k }] : []),
+    { value: "1080p", disabled: RAM < 4 || !fitsScreen(1920, 1080) },
+    { value: "720p", disabled: RAM < 2 || !fitsScreen(1280, 720) },
+    { value: "480p", disabled: false },
+    { value: "360p", disabled: false },
+    { value: "240p", disabled: false },
+  ];
+
   return (
     <DropdownMenu.Root
       open={props.open}
@@ -313,7 +372,6 @@ const SettingsMenu = (props) => {
               open={openResize}
               onOpenChange={(open) => {
                 if (open) {
-                  setOpenFPS(false);
                   setOpenQuality(false);
                 }
                 setOpenResize(open);
@@ -354,7 +412,7 @@ const SettingsMenu = (props) => {
                   </TooltipWrap>
                   <TooltipWrap
                     content={
-                      width < 1920 || height < 1080
+                      !screenFits({ width, height }, 1920, 1080)
                         ? chrome.i18n.getMessage("screenTooSmallTooltip")
                         : ""
                     }
@@ -368,14 +426,14 @@ const SettingsMenu = (props) => {
                           height: 1080,
                         });
                       }}
-                      disabled={width < 1920 || height < 1080}
+                      disabled={!screenFits({ width, height }, 1920, 1080)}
                     >
                       1920 x 1080 (1080p)
                     </DropdownMenu.Item>
                   </TooltipWrap>
                   <TooltipWrap
                     content={
-                      width < 1280 || height < 720
+                      !screenFits({ width, height }, 1280, 720)
                         ? chrome.i18n.getMessage("screenTooSmallTooltip")
                         : ""
                     }
@@ -389,14 +447,14 @@ const SettingsMenu = (props) => {
                           height: 720,
                         });
                       }}
-                      disabled={width < 1280 || height < 720}
+                      disabled={!screenFits({ width, height }, 1280, 720)}
                     >
                       1280 x 720 (720p)
                     </DropdownMenu.Item>
                   </TooltipWrap>
                   <TooltipWrap
                     content={
-                      width < 640 || height < 480
+                      !screenFits({ width, height }, 640, 480)
                         ? chrome.i18n.getMessage("screenTooSmallTooltip")
                         : ""
                     }
@@ -410,14 +468,14 @@ const SettingsMenu = (props) => {
                           height: 480,
                         });
                       }}
-                      disabled={width < 640 || height < 480}
+                      disabled={!screenFits({ width, height }, 640, 480)}
                     >
                       640 x 480 (480p)
                     </DropdownMenu.Item>
                   </TooltipWrap>
                   <TooltipWrap
                     content={
-                      width < 480 || height < 360
+                      !screenFits({ width, height }, 480, 360)
                         ? chrome.i18n.getMessage("screenTooSmallTooltip")
                         : ""
                     }
@@ -431,14 +489,14 @@ const SettingsMenu = (props) => {
                           height: 360,
                         });
                       }}
-                      disabled={width < 480 || height < 360}
+                      disabled={!screenFits({ width, height }, 480, 360)}
                     >
                       480 x 360 (360p)
                     </DropdownMenu.Item>
                   </TooltipWrap>
                   <TooltipWrap
                     content={
-                      width < 320 || height < 240
+                      !screenFits({ width, height }, 320, 240)
                         ? chrome.i18n.getMessage("screenTooSmallTooltip")
                         : ""
                     }
@@ -452,7 +510,7 @@ const SettingsMenu = (props) => {
                           height: 240,
                         });
                       }}
-                      disabled={width < 320 || height < 240}
+                      disabled={!screenFits({ width, height }, 320, 240)}
                     >
                       320 x 240 (240p)
                     </DropdownMenu.Item>
@@ -461,22 +519,22 @@ const SettingsMenu = (props) => {
               </DropdownMenu.Portal>
             </DropdownMenu.Sub>
           )}
-          {!contentState.isSubscribed && !contentState.isLoggedIn && (
+          {!contentState.isSubscribed && (
             <DropdownMenu.Sub
               open={openQuality}
               onOpenChange={(open) => {
                 if (open) {
-                  setOpenFPS(false);
                   setOpenResize(false);
                 }
                 setOpenQuality(open);
               }}
             >
               <DropdownMenu.SubTrigger className="DropdownMenuItem">
-                {chrome.i18n.getMessage("maxResolutionLabel") +
-                  " (" +
-                  contentState.qualityValue +
-                  ")"}
+                {chrome.i18n.getMessage("qualityLabel") +
+                  ": " +
+                  chrome.i18n.getMessage(
+                    qualityIsAuto ? "qualityAutoLabel" : "qualityCustomLabel"
+                  )}
                 <div className="ItemIndicatorArrow">
                   <img src={DropdownGroup} />
                 </div>
@@ -488,195 +546,112 @@ const SettingsMenu = (props) => {
                   alignOffset={-3}
                 >
                   <DropdownMenu.RadioGroup
-                    value={contentState.qualityValue}
-                    onValueChange={(value) => {
-                      setContentState((prevContentState) => ({
-                        ...prevContentState,
-                        qualityValue: value,
-                      }));
-                      chrome.storage.local.set({
-                        qualityValue: value,
-                      });
-                    }}
+                    value={qualityIsAuto ? "auto" : ""}
+                    onValueChange={() =>
+                      updateQuality({
+                        qualityValue: "auto",
+                        fpsValue: "auto",
+                      })
+                    }
                   >
-                    <TooltipWrap
-                      content={
-                        RAM < 8 || width < 3840 || height < 2160
-                          ? chrome.i18n.getMessage("maxResolutionTooltip")
-                          : ""
-                      }
-                    >
-                      <DropdownMenu.RadioItem
-                        className="ScreenityDropdownMenuItem"
-                        value="4k"
-                        disabled={RAM < 8 || width < 3840 || height < 2160}
-                      >
-                        4k
-                        <DropdownMenu.ItemIndicator className="ScreenityItemIndicator">
-                          <img src={CheckWhiteIcon} />
-                        </DropdownMenu.ItemIndicator>
-                      </DropdownMenu.RadioItem>
-                    </TooltipWrap>
-                    <TooltipWrap
-                      content={
-                        RAM < 4 || width < 1920 || height < 1080
-                          ? chrome.i18n.getMessage("maxResolutionTooltip")
-                          : ""
-                      }
-                    >
-                      <DropdownMenu.RadioItem
-                        className="ScreenityDropdownMenuItem"
-                        value="1080p"
-                        disabled={RAM < 4 || width < 1920 || height < 1080}
-                      >
-                        1080p
-                        <DropdownMenu.ItemIndicator className="ScreenityItemIndicator">
-                          <img src={CheckWhiteIcon} />
-                        </DropdownMenu.ItemIndicator>
-                      </DropdownMenu.RadioItem>
-                    </TooltipWrap>
-                    <TooltipWrap
-                      content={
-                        RAM < 2 || width < 1280 || height < 720
-                          ? chrome.i18n.getMessage("maxResolutionTooltip")
-                          : ""
-                      }
-                    >
-                      <DropdownMenu.RadioItem
-                        className="ScreenityDropdownMenuItem"
-                        value="720p"
-                        disabled={RAM < 2 || width < 1280 || height < 720}
-                      >
-                        720p
-                        <DropdownMenu.ItemIndicator className="ScreenityItemIndicator">
-                          <img src={CheckWhiteIcon} />
-                        </DropdownMenu.ItemIndicator>
-                      </DropdownMenu.RadioItem>
-                    </TooltipWrap>
                     <DropdownMenu.RadioItem
                       className="ScreenityDropdownMenuItem"
-                      value="480p"
+                      value="auto"
                     >
-                      480p
-                      <DropdownMenu.ItemIndicator className="ScreenityItemIndicator">
-                        <img src={CheckWhiteIcon} />
-                      </DropdownMenu.ItemIndicator>
-                    </DropdownMenu.RadioItem>
-                    <DropdownMenu.RadioItem
-                      className="ScreenityDropdownMenuItem"
-                      value="360p"
-                    >
-                      360p
-                      <DropdownMenu.ItemIndicator className="ScreenityItemIndicator">
-                        <img src={CheckWhiteIcon} />
-                      </DropdownMenu.ItemIndicator>
-                    </DropdownMenu.RadioItem>
-                    <DropdownMenu.RadioItem
-                      className="ScreenityDropdownMenuItem"
-                      value="240p"
-                    >
-                      240p
+                      {chrome.i18n.getMessage("qualityAutoLabel")}
                       <DropdownMenu.ItemIndicator className="ScreenityItemIndicator">
                         <img src={CheckWhiteIcon} />
                       </DropdownMenu.ItemIndicator>
                     </DropdownMenu.RadioItem>
                   </DropdownMenu.RadioGroup>
-                </DropdownMenu.SubContent>
-              </DropdownMenu.Portal>
-            </DropdownMenu.Sub>
-          )}
-          {!contentState.isSubscribed && !contentState.isLoggedIn && (
-            <DropdownMenu.Sub
-              open={openFPS}
-              onOpenChange={(open) => {
-                if (open) {
-                  setOpenQuality(false);
-                  setOpenResize(false);
-                }
-                setOpenFPS(open);
-              }}
-            >
-              <DropdownMenu.SubTrigger className="DropdownMenuItem">
-                {chrome.i18n.getMessage("maxFPSLabel") +
-                  " (" +
-                  contentState.fpsValue +
-                  " fps)"}
-                <div className="ItemIndicatorArrow">
-                  <img src={DropdownGroup} />
-                </div>
-              </DropdownMenu.SubTrigger>
-              <DropdownMenu.Portal>
-                <DropdownMenu.SubContent
-                  className="ScreenityDropdownMenuContent"
-                  sideOffset={0}
-                  alignOffset={-3}
-                >
-                  <DropdownMenu.RadioGroup
-                    value={contentState.fpsValue}
-                    onValueChange={(value) => {
-                      setContentState((prevContentState) => ({
-                        ...prevContentState,
-                        fpsValue: value,
-                      }));
-                      chrome.storage.local.set({
-                        fpsValue: value,
-                      });
+                  <DropdownMenu.CheckboxItem
+                    className="ScreenityDropdownMenuItem"
+                    disabled={fpsChoice !== "auto"}
+                    onSelect={(e) => {
+                      e.preventDefault();
                     }}
+                    onCheckedChange={(checked) =>
+                      updateQuality({ smootherMotion: checked })
+                    }
+                    checked={contentState.smootherMotion === true}
+                  >
+                    {chrome.i18n.getMessage("smootherMotionLabel")}
+                    <DropdownMenu.ItemIndicator className="ScreenityItemIndicator">
+                      <img src={CheckWhiteIcon} />
+                    </DropdownMenu.ItemIndicator>
+                  </DropdownMenu.CheckboxItem>
+                  <DropdownMenu.Separator style={QUALITY_SEPARATOR_STYLE} />
+                  <DropdownMenu.Label style={QUALITY_LABEL_STYLE}>
+                    {chrome.i18n.getMessage("resolutionGroupLabel")}
+                  </DropdownMenu.Label>
+                  <DropdownMenu.RadioGroup
+                    value={shownQuality}
+                    onValueChange={(value) =>
+                      updateQuality({ qualityValue: value })
+                    }
                   >
                     <DropdownMenu.RadioItem
                       className="ScreenityDropdownMenuItem"
-                      value="60"
+                      value="auto"
                     >
-                      60 fps
+                      {chrome.i18n.getMessage("qualityAutoLabel")}
                       <DropdownMenu.ItemIndicator className="ScreenityItemIndicator">
                         <img src={CheckWhiteIcon} />
                       </DropdownMenu.ItemIndicator>
                     </DropdownMenu.RadioItem>
+                    {qualityOptions.map(({ value, disabled }) => (
+                      <TooltipWrap
+                        key={value}
+                        content={
+                          disabled
+                            ? chrome.i18n.getMessage("maxResolutionTooltip")
+                            : ""
+                        }
+                      >
+                        <DropdownMenu.RadioItem
+                          className="ScreenityDropdownMenuItem"
+                          value={value}
+                          disabled={disabled}
+                        >
+                          {value}
+                          <DropdownMenu.ItemIndicator className="ScreenityItemIndicator">
+                            <img src={CheckWhiteIcon} />
+                          </DropdownMenu.ItemIndicator>
+                        </DropdownMenu.RadioItem>
+                      </TooltipWrap>
+                    ))}
+                  </DropdownMenu.RadioGroup>
+                  <DropdownMenu.Separator style={QUALITY_SEPARATOR_STYLE} />
+                  <DropdownMenu.Label style={QUALITY_LABEL_STYLE}>
+                    {chrome.i18n.getMessage("frameRateGroupLabel")}
+                  </DropdownMenu.Label>
+                  <DropdownMenu.RadioGroup
+                    value={fpsChoice}
+                    onValueChange={(value) =>
+                      updateQuality({ fpsValue: value })
+                    }
+                  >
                     <DropdownMenu.RadioItem
                       className="ScreenityDropdownMenuItem"
-                      value="30"
+                      value="auto"
                     >
-                      30 fps
+                      {chrome.i18n.getMessage("qualityAutoLabel")}
                       <DropdownMenu.ItemIndicator className="ScreenityItemIndicator">
                         <img src={CheckWhiteIcon} />
                       </DropdownMenu.ItemIndicator>
                     </DropdownMenu.RadioItem>
-                    <DropdownMenu.RadioItem
-                      className="ScreenityDropdownMenuItem"
-                      value="24"
-                    >
-                      24 fps
-                      <DropdownMenu.ItemIndicator className="ScreenityItemIndicator">
-                        <img src={CheckWhiteIcon} />
-                      </DropdownMenu.ItemIndicator>
-                    </DropdownMenu.RadioItem>
-                    <DropdownMenu.RadioItem
-                      className="ScreenityDropdownMenuItem"
-                      value="15"
-                    >
-                      15 fps
-                      <DropdownMenu.ItemIndicator className="ScreenityItemIndicator">
-                        <img src={CheckWhiteIcon} />
-                      </DropdownMenu.ItemIndicator>
-                    </DropdownMenu.RadioItem>
-                    <DropdownMenu.RadioItem
-                      className="ScreenityDropdownMenuItem"
-                      value="10"
-                    >
-                      10 fps
-                      <DropdownMenu.ItemIndicator className="ScreenityItemIndicator">
-                        <img src={CheckWhiteIcon} />
-                      </DropdownMenu.ItemIndicator>
-                    </DropdownMenu.RadioItem>
-                    <DropdownMenu.RadioItem
-                      className="ScreenityDropdownMenuItem"
-                      value="5"
-                    >
-                      5 fps
-                      <DropdownMenu.ItemIndicator className="ScreenityItemIndicator">
-                        <img src={CheckWhiteIcon} />
-                      </DropdownMenu.ItemIndicator>
-                    </DropdownMenu.RadioItem>
+                    {FPS_OPTIONS.map((value) => (
+                      <DropdownMenu.RadioItem
+                        key={value}
+                        className="ScreenityDropdownMenuItem"
+                        value={value}
+                      >
+                        {value} fps
+                        <DropdownMenu.ItemIndicator className="ScreenityItemIndicator">
+                          <img src={CheckWhiteIcon} />
+                        </DropdownMenu.ItemIndicator>
+                      </DropdownMenu.RadioItem>
+                    ))}
                   </DropdownMenu.RadioGroup>
                 </DropdownMenu.SubContent>
               </DropdownMenu.Portal>

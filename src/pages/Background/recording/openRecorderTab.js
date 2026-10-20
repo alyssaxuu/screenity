@@ -404,6 +404,18 @@ export const startRecorderSession = async (request, tabId = null) => {
     }
   }
 
+  // The region recorder is already acquiring its stream and fires
+  // reset-active-tab on its own clock; the close below can stall for seconds,
+  // and startRecording needs recordingTab by then.
+  if (request.region && request.customRegion) {
+    await chrome.storage.local.set({
+      recordingTab: activeTab.id,
+      offscreen: false,
+      region: true,
+      recordingUiTabId: activeTab.id,
+    });
+  }
+
   const endCloseOffscreen = perfSpan("BG.startRecorderSession closeOffscreenDocument");
   // finalize any in-flight offscreen upload before teardown; a back-to-back
   // start otherwise bare-closes the prior TUS finalize and loses it
@@ -414,12 +426,6 @@ export const startRecorderSession = async (request, tabId = null) => {
     if (tabId !== null) chrome.tabs.update(tabId, { active: true });
 
     if (request.customRegion) {
-      chrome.storage.local.set({
-        recordingTab: activeTab.id,
-        offscreen: false,
-        region: true,
-        recordingUiTabId: activeTab.id,
-      });
       const endSendLoaded = perfSpan("BG.startRecorderSession customRegion.sendLoaded");
       sendMessageRecord({
         type: "loaded",

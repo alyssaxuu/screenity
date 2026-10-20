@@ -850,6 +850,7 @@ export default class BunnyTusUploader {
       height = null,
       linkedMediaId = null,
       reuse = null,
+      fresh = false,
       sceneId = null,
       sessionId = null,
     },
@@ -889,13 +890,17 @@ export default class BunnyTusUploader {
       });
       this.fingerprint = fingerprint;
 
-      const resumeJournal = await this.getResumeJournal({
-        projectId,
-        sceneId,
-        type,
-        fingerprint,
-        reuse,
-      });
+      // fresh: the old video is known gone, so neither the journal nor the video
+      // map may hand its ids back.
+      const resumeJournal = fresh
+        ? null
+        : await this.getResumeJournal({
+            projectId,
+            sceneId,
+            type,
+            fingerprint,
+            reuse,
+          });
 
       if (reuse) {
         if (!reuse.videoId || !reuse.mediaId) {
@@ -937,7 +942,7 @@ export default class BunnyTusUploader {
           mediaId: this.mediaId,
           sessionId: this.sessionId,
         });
-      } else {
+      } else if (!fresh) {
         const existingMap = await this.getVideoMap(projectId, sceneId, type);
         if (existingMap?.videoId && existingMap?.mediaId) {
           this.videoId = existingMap.videoId;

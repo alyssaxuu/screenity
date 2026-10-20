@@ -15,6 +15,7 @@ import {
 } from "../CloudRecorder/recorderStorage/opfsKvStore";
 import { handleGetStreamingData } from "./recording/recordingHelpers";
 import { initUninstallSurvey } from "./utils/uninstallSurvey";
+import { initRecorderHostWatch } from "./offscreen/hostWatch";
 
 // Don't tear down an in-flight start on SW restart: a fresh start is
 // mid-setup (recorder tab not loaded yet), not dead. Mirrors the alarm
@@ -34,7 +35,6 @@ const clearStaleLocks = async () => {
       restarting,
       recordingTab,
       offscreen,
-      multiMode,
       region,
       recordingStartingAt,
     } = await chrome.storage.local.get([
@@ -46,7 +46,6 @@ const clearStaleLocks = async () => {
       "restarting",
       "recordingTab",
       "offscreen",
-      "multiMode",
       "region",
       "recordingStartingAt",
     ]);
@@ -137,13 +136,6 @@ const clearStaleLocks = async () => {
       }
     }
 
-    if (multiMode && !recording) {
-      stale.multiMode = false;
-      stale.multiSceneCount = 0;
-      stale.multiProjectId = null;
-      stale.multiLastSceneId = null;
-      console.warn("[Screenity][BG] Stale multi-mode state found on startup, clearing");
-    }
 
     if (region && !recording) {
       stale.region = false;
@@ -339,6 +331,7 @@ setupHandlers();
 initCountdownFallback();
 initKeepAwake();
 initLifecycleObserver();
+initRecorderHostWatch();
 initUninstallSurvey();
 
 // Recovery must run AFTER clearStaleLocks: if the recorder tab died

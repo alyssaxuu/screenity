@@ -2,9 +2,6 @@ import { getContextRefs } from "../context/CameraContext";
 import { setPipMode } from "./uiState";
 import { getUserMediaWithFallback } from "../../utils/mediaDeviceFallback";
 
-const CLOUD_FEATURES_ENABLED =
-  process.env.SCREENITY_ENABLE_CLOUD_FEATURES === "true";
-
 export const getCameraStream = async (
   constraints,
   streamRef,
@@ -327,78 +324,17 @@ export const stopCameraStream = (streamRef, videoRef) => {
   }
 };
 
-export const togglePip = (videoRef) => {
-  if (document.pictureInPictureElement) {
-    document.exitPictureInPicture();
-  } else {
-    try {
-      videoRef.current.requestPictureInPicture().catch(() => {
-        setPipMode(false);
-        chrome.runtime.sendMessage({ type: "pip-ended" });
-      });
-    } catch (error) {
-      setPipMode(false);
-      chrome.runtime.sendMessage({ type: "pip-ended" });
-    }
-  }
-};
-export const surfaceHandler = async (request, videoRef) => {
-  console.log("Picture in Picture request ready");
+// The copy inside the floating window never opens a video PiP of its own.
+export const IS_WINDOW_COPY =
+  typeof window !== "undefined" &&
+  new URLSearchParams(window.location.search).get("pip") === "1";
 
-  if (
-    !videoRef?.requestPictureInPicture &&
-    !videoRef?.current?.requestPictureInPicture
-  ) {
-    setPipMode(false);
-    chrome.runtime.sendMessage({ type: "pip-ended" });
-    return;
-  }
-
-  // recordingType leads, surface only qualifies it: displaySurface reports
-  // "monitor" for a region/tab crop too, since the crop happens after the pick.
-  const CROPPED_TYPES = ["region", "tab", "camera"];
-  const croppedCapture = CROPPED_TYPES.includes(request.recordingType);
-  const fullMonitor = request.surface === "monitor" && !croppedCapture;
-
-  if (!CLOUD_FEATURES_ENABLED) {
-    const shouldEnterPip = fullMonitor;
-    if (shouldEnterPip && videoRef.current) {
-      try {
-        await videoRef.current.requestPictureInPicture();
-      } catch (err) {
-        console.error("❌ Failed to enter PiP:", err);
-        setPipMode(false);
-        chrome.runtime.sendMessage({ type: "pip-ended" });
-      }
-    }
-    return;
-  }
-
-  // Auth data is passed along with the set-surface message from the background
-  // script (setSurface.js) to avoid an async round-trip that would lose the
-  // user gesture context required by requestPictureInPicture().
-  try {
-    const isSubscribed = request.subscribed || false;
-    const instantMode = request.instantMode || false;
-
-    // PiP rule: enter PiP when the bubble needs to be visible to the
-    // capture (free+monitor, pro+instant+monitor) or as a draggable
-    // preview when the camera is already a separate cloud track
-    // (pro+non-instant+non-monitor). Skip PiP when the on-page bubble
-    // is captured naturally (pro+instant+non-monitor) or would imply
-    // the camera's part of the screen recording when it isn't
-    // (pro+non-instant+monitor).
-    const shouldEnterPip =
-      (fullMonitor && (!isSubscribed || instantMode)) ||
-      (request.surface !== "monitor" && isSubscribed && !instantMode);
-
-    if (shouldEnterPip && videoRef.current) {
-      await videoRef.current.requestPictureInPicture();
-    }
-  } catch (error) {
-    console.error("❌ Failed to enter Picture in Picture:", error);
-    setPipMode(false);
-    chrome.runtime.sendMessage({ type: "pip-ended" });
+// The floating window is opened inside the click that starts the recording.
+// Entering the browser's video PiP on its own replaces the bubble with a black
+// "Picture in picture mode" card, so only the bubble's own button may.
+export const surfaceHandler = async (request) => {
+  if (process.env.NODE_ENV !== "production") {
+    console.debug("[Screenity][pip] bubble surface", request?.surface);
   }
 };
 

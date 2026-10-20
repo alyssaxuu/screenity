@@ -111,6 +111,62 @@ const markProjectPublic = async (projectId) => {
 };
 const CLOUD_FEATURES_ENABLED =
   process.env.SCREENITY_ENABLE_CLOUD_FEATURES === "true";
+
+const postDiagnosticReport = async ({ trace, ...rest }) => {
+  const appBase = process.env.SCREENITY_APP_BASE;
+  if (!appBase) return;
+  const { screenityToken } = await chrome.storage.local.get("screenityToken");
+  if (!screenityToken) return;
+  const ua = navigator.userAgent || "";
+  const payload = {
+    ...rest,
+    extVersion: chrome.runtime.getManifest().version,
+    env: {
+      os: (await chrome.runtime.getPlatformInfo()).os || null,
+      browser: (ua.match(/Chrome\/\d+/) || [""])[0] || null,
+    },
+    trace,
+  };
+  fetch(`${appBase}/api/log/diagnostic-report`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${screenityToken}`,
+    },
+    body: JSON.stringify(payload),
+    keepalive: true,
+  }).catch(() => {});
+};
+
+// For clicks that never started an attempt, so there is no startFlowTrace.
+export const submitStageDiagnosticReport = async (event = {}) => {
+  if (!CLOUD_FEATURES_ENABLED) return;
+  try {
+    const { projectId } = await chrome.storage.local.get("projectId");
+    await postDiagnosticReport({
+      attemptId: event.attemptId,
+      projectId: projectId || null,
+      trigger: event.trigger || "error",
+      trace: {
+        recordingType: event.recordingType || null,
+        surface: null,
+        isPro: true,
+        countdown: false,
+        outcome: event.outcome || "error",
+        t: { startStreaming: null },
+        routing: null,
+        error: null,
+        errorCode: null,
+        stuck: null,
+        stage: event.stage || null,
+        reason: event.reason || null,
+        pendingAgeMs: Number.isFinite(event.pendingAgeMs)
+          ? event.pendingAgeMs
+          : null,
+      },
+    });
+  } catch {}
+};
 const DEBUG_POSTSTOP = false;
 // Gate for the start-flow / stop-flow / offscreen-diag console mirrors.
 // Off in prod by default; set globalThis.SCREENITY_DEBUG_RECORDER for support.
@@ -716,10 +772,13 @@ export const handleFinishMultiRecording = async () => {
       });
     } else {
       // existing-project multi recording: only reuse editorTab if it still matches
-      const { projectId, instantMode } = await chrome.storage.local.get([
+      const stored = await chrome.storage.local.get([
         "projectId",
+        "multiProjectId",
         "instantMode",
       ]);
+      const projectId = stored.projectId || stored.multiProjectId || null;
+      const instantMode = stored.instantMode;
       const targetUrl = getEditorTargetUrl({
         projectId,
         instantMode: Boolean(instantMode),
@@ -1681,6 +1740,16 @@ export const setupHandlers = () => {
     chrome.tabs.create({ url: editorRecoveryUrl, active: true });
   });
   registerMessage("recording-error", async (message) => {
+    // The recorder's 15s no-chunk watchdog sends this for a screen that is
+    // merely idle. It is a warning: tearing down here closed the recorder tab
+    // and cleared the project while the capture was still running.
+    if (message?.error === "stream-warning") {
+      diagEvent("warning", {
+        error: message.error,
+        why: message.why || null,
+      });
+      return;
+    }
     await handleRecordingError(message);
     await clearRecordingSessionSafe("recording-error", {
       error: message?.error || null,
@@ -1896,6 +1965,7 @@ export const setupHandlers = () => {
     },
   );
   registerMessage("submit-diagnostic-report", async (message) => {
+    if (message?.event) return submitStageDiagnosticReport(message.event);
     try {
       const appBase = process.env.SCREENITY_APP_BASE;
       if (!appBase) return;
@@ -1910,17 +1980,11 @@ export const setupHandlers = () => {
       const trigger = message?.trigger || "manual";
       const isSuccess = trigger === "success-summary";
       const trace = startFlowTrace;
-      const ua = navigator.userAgent || "";
-      const payload = {
+      await postDiagnosticReport({
         attemptId: trace.attemptId,
         projectId: projectId || null,
         recordingSessionId: recorderSession?.id || null,
-        extVersion: chrome.runtime.getManifest().version,
         trigger,
-        env: {
-          os: (await chrome.runtime.getPlatformInfo()).os || null,
-          browser: (ua.match(/Chrome\/\d+/) || [""])[0] || null,
-        },
         trace: isSuccess
           ? {
               recordingType: trace.recordingType,
@@ -1938,16 +2002,7 @@ export const setupHandlers = () => {
               stuck: null,
             }
           : trace,
-      };
-      fetch(`${appBase}/api/log/diagnostic-report`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${screenityToken}`,
-        },
-        body: JSON.stringify(payload),
-        keepalive: true,
-      }).catch(() => {});
+      });
     } catch {
     }
   });

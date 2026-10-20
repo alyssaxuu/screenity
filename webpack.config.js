@@ -302,6 +302,9 @@ const config = {
       "process.env.RECORDING_WARNING_THRESHOLD": JSON.stringify(
         process.env.RECORDING_WARNING_THRESHOLD || 60 // Default to 1 minute
       ),
+      "process.env.ENABLE_LIVE_TRANSCRIPTION": JSON.stringify(
+        process.env.ENABLE_LIVE_TRANSCRIPTION || ""
+      ),
       "process.env.SCREENITY_DEV_MODE": JSON.stringify(
         process.env.SCREENITY_DEV_MODE || ""
       ),
@@ -358,6 +361,13 @@ const config = {
         {
           from: "src/_locales/",
           to: path.join(__dirname, "build/_locales"),
+          force: true,
+        },
+        // AudioWorklet modules load by URL and run without the webpack
+        // runtime, so this one is copied rather than bundled.
+        {
+          from: "src/pages/Recorder/audioGapWorklet.js",
+          to: path.join(__dirname, "build/audioGapWorklet.js"),
           force: true,
         },
         {

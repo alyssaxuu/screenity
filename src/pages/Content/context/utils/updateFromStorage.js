@@ -67,6 +67,7 @@ export const updateFromStorage = (check = true, id = null) => {
       "systemAudio",
       "qualityValue",
       "fpsValue",
+      "smootherMotion",
       "fastRecorderBeta",
       "fastRecorderStatus",
       "useWebCodecsRecorder",
@@ -75,7 +76,6 @@ export const updateFromStorage = (check = true, id = null) => {
       "sortBy",
       "wasLoggedIn",
       "instantMode",
-      "hasSeenInstantModeModal",
       "hasSubscribedBefore",
     ],
     (result) => {
@@ -299,6 +299,10 @@ export const updateFromStorage = (check = true, id = null) => {
           result.fpsValue !== undefined && result.fpsValue !== null
             ? result.fpsValue
             : prevContentState.fpsValue,
+        smootherMotion:
+          result.smootherMotion !== undefined && result.smootherMotion !== null
+            ? result.smootherMotion === true
+            : prevContentState.smootherMotion,
         fastRecorderBeta:
           result.fastRecorderBeta !== undefined &&
           result.fastRecorderBeta !== null
@@ -319,7 +323,6 @@ export const updateFromStorage = (check = true, id = null) => {
         wasLoggedIn: result.wasLoggedIn || false,
         sortBy: result.sortBy || "newest",
         instantMode: result.instantMode || false,
-        hasSeenInstantModeModal: result.hasSeenInstantModeModal || false,
         onboarding: result.onboarding || false,
         hasSubscribedBefore: result.hasSubscribedBefore || false,
         showProSplash: result.showProSplash || false,

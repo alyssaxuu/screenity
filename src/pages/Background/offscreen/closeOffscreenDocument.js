@@ -1,3 +1,4 @@
+import { noteOffscreenClose } from "./hostWatch";
 export const closeOffscreenDocument = async () => {
   try {
     const existingContexts = await chrome.runtime.getContexts({});
@@ -6,6 +7,7 @@ export const closeOffscreenDocument = async () => {
     );
 
     if (offscreenDocument) {
+      noteOffscreenClose("close-offscreen");
       await chrome.offscreen.closeDocument();
     }
   } catch (error) {

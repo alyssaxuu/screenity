@@ -1065,13 +1065,29 @@
     "message": "Assicurati di attivare l'opzione 'Condividi l'audio del sistema' se desideri registrare l'audio del computer. Se non vedi questa opzione, prova a aggiornare Chrome o passa alla registrazione della scheda.",
     "description": "Descrizione dell'avviso audio per altri sistemi"
   },
-  "maxResolutionLabel": {
-    "message": "Risoluzione massima",
-    "description": "Etichetta risoluzione massima nel menu delle impostazioni"
+  "qualityLabel": {
+    "message": "Qualità",
+    "description": "Etichetta della qualità nel menu delle impostazioni"
   },
-  "maxFPSLabel": {
-    "message": "FPS massimi",
-    "description": "Etichetta FPS massimi nel menu delle impostazioni"
+  "qualityAutoLabel": {
+    "message": "Automatico",
+    "description": "Opzione di qualità automatica nel menu delle impostazioni"
+  },
+  "qualityCustomLabel": {
+    "message": "Personalizzato",
+    "description": "Mostrato quando risoluzione o frequenza fotogrammi sono state scelte a mano"
+  },
+  "smootherMotionLabel": {
+    "message": "Privilegia la fluidità",
+    "description": "Interruttore nelle impostazioni di qualità che favorisce un video più fluido rispetto alla nitidezza"
+  },
+  "resolutionGroupLabel": {
+    "message": "Risoluzione",
+    "description": "Titolo sopra le opzioni di risoluzione"
+  },
+  "frameRateGroupLabel": {
+    "message": "Frequenza fotogrammi",
+    "description": "Titolo sopra le opzioni di frequenza fotogrammi"
   },
   "notEnoughRAM": {
     "message": "RAM insufficiente",
@@ -1899,5 +1915,141 @@
   "unsavedRecordingModalDismiss": {
     "message": "Non mostrare più",
     "description": "Side button: start the recording and stop prompting about unsaved recordings."
+  },
+  "teleprompterLabel": {
+    "message": "Teleprompter",
+    "description": "Switch label: opens the floating teleprompter window"
+  },
+  "teleprompterUnavailableLabel": {
+    "message": "Teleprompter (non disponibile in questa pagina)",
+    "description": "Switch label shown when the page cannot open the teleprompter window"
+  },
+  "teleprompterIntroTitle": {
+    "message": "Come funziona il teleprompter",
+    "description": "Modal title shown the first time the teleprompter is switched on"
+  },
+  "teleprompterIntroDescription": {
+    "message": "Il tuo copione si apre in una finestra mobile che resta fuori dalla registrazione quando condividi una finestra o una scheda, registri un'area o registri solo la fotocamera. Se condividi l'intero schermo, la finestra comparirebbe nel video, quindi si chiude all'avvio. Il copione viene sempre salvato.",
+    "description": "Modal body: where the script window shows and when it closes"
+  },
+  "teleprompterClosedToast": {
+    "message": "Teleprompter chiuso per tenerlo fuori dalla registrazione",
+    "description": "Toast: the teleprompter window was closed because the whole screen is being recorded"
+  },
+  "teleprompterPlaceholder": {
+    "message": "Scrivi o incolla il tuo copione",
+    "description": "Placeholder in the empty teleprompter script box"
+  },
+  "teleprompterPlay": {
+    "message": "Avvia lo scorrimento",
+    "description": "Teleprompter button: start scrolling the script"
+  },
+  "teleprompterPause": {
+    "message": "Metti in pausa lo scorrimento",
+    "description": "Teleprompter button: pause scrolling the script"
+  },
+  "teleprompterMore": {
+    "message": "Altre opzioni del copione",
+    "description": "Teleprompter button: open the script options menu"
+  },
+  "teleprompterTextSize": {
+    "message": "Dimensione testo",
+    "description": "Teleprompter menu row: text size"
+  },
+  "teleprompterSpeed": {
+    "message": "Velocità",
+    "description": "Teleprompter menu row: scroll speed"
+  },
+  "teleprompterSmaller": {
+    "message": "Testo più piccolo",
+    "description": "Teleprompter button: decrease text size"
+  },
+  "teleprompterLarger": {
+    "message": "Testo più grande",
+    "description": "Teleprompter button: increase text size"
+  },
+  "teleprompterSlower": {
+    "message": "Più lento",
+    "description": "Teleprompter button: scroll slower"
+  },
+  "teleprompterFaster": {
+    "message": "Più veloce",
+    "description": "Teleprompter button: scroll faster"
+  },
+  "teleprompterWpmUnit": {
+    "message": "ppm",
+    "description": "Unit shown after the scroll speed, words per minute"
+  },
+  "teleprompterScrollOnStart": {
+    "message": "Scorri all'avvio della registrazione",
+    "description": "Teleprompter menu option: start scrolling when the recording starts"
+  },
+  "teleprompterRewind": {
+    "message": "Torna all'inizio",
+    "description": "Teleprompter menu option: scroll the script back to the top"
+  },
+  "teleprompterHide": {
+    "message": "Nascondi copione",
+    "description": "Teleprompter menu option: close the teleprompter window"
+  },
+  "teleprompterPlayDisabled": {
+    "message": "Scorre automaticamente quando avvii la registrazione",
+    "description": "Tooltip on the disabled teleprompter play button before recording starts"
+  },
+  "teleprompterFullScreenTitle": {
+    "message": "Il teleprompter verrà chiuso",
+    "description": "Modal title: the teleprompter window is about to be closed because the whole screen is recorded"
+  },
+  "teleprompterFullScreenDescription": {
+    "message": "Stai registrando l'intero schermo, quindi la finestra del teleprompter comparirebbe nel video. La chiudiamo per tenerla fuori dalla registrazione. Puoi lasciarla aperta, ma verrà registrata.",
+    "description": "Modal body: why the teleprompter window closes when recording the entire screen"
+  },
+  "teleprompterFullScreenClose": {
+    "message": "OK, chiudilo",
+    "description": "Modal button: close the teleprompter window and start recording"
+  },
+  "teleprompterFullScreenKeep": {
+    "message": "Lascialo visibile",
+    "description": "Modal button: keep the teleprompter window open even though it will be recorded"
+  },
+  "teleprompterFullScreenNever": {
+    "message": "Non mostrare più",
+    "description": "Modal side button: close the teleprompter window and do not show this modal again"
+  },
+  "cameraFullScreenTitle": {
+    "message": "La finestra della fotocamera si chiuderà",
+    "description": "Modal title: the camera window is about to be closed because the whole screen is recorded"
+  },
+  "cameraFullScreenDescription": {
+    "message": "Stai registrando l'intero schermo, quindi la finestra della fotocamera comparirebbe nel video. La chiuderemo per tenerla fuori dalla registrazione. La fotocamera viene comunque registrata.",
+    "description": "Modal body: why the camera window closes when recording the entire screen"
+  },
+  "teleprompterClear": {
+    "message": "Cancella copione",
+    "description": "Script menu item: empty the script"
+  },
+  "teleprompterClearConfirm": {
+    "message": "Fai di nuovo clic per cancellare",
+    "description": "Script menu item after the first click: asks for a second click to empty the script"
+  },
+  "teleprompterHideCamera": {
+    "message": "Sposta la fotocamera sulla pagina",
+    "description": "Teleprompter menu option: move the camera picture out of this window and back onto the page"
+  },
+  "teleprompterShowCamera": {
+    "message": "Sposta la fotocamera qui",
+    "description": "Teleprompter menu option: move the camera picture from the page into this window"
+  },
+  "teleprompterShow": {
+    "message": "Mostra copione",
+    "description": "Teleprompter menu option: show the script in the floating window"
+  },
+  "pressRecordOnPageToast": {
+    "message": "Fai clic una volta su \"Avvia la registrazione\" nella pagina, così Chrome può chiedere l'accesso allo schermo.",
+    "description": "Toast shown when Record was pressed in the floating window and Chrome still needs a click on the page to ask for screen capture access"
+  },
+  "teleprompterRegionStartOnPage": {
+    "message": "La registrazione di un'area deve essere avviata dalla pagina",
+    "description": "Tooltip on the disabled Start button in the floating teleprompter window when recording a region, which can only be started from the page"
   }
 }

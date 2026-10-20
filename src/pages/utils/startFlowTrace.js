@@ -198,6 +198,44 @@ export const submitDiagnosticReport = async (trigger) => {
   }
 };
 
+let lastIgnoredReportAt = 0;
+const IGNORED_REPORT_COOLDOWN_MS = 10000;
+
+/**
+ * Report a Start click the double-click guard swallowed. Own event, not the
+ * stored trace (that belongs to the attempt still in flight). Throttled so a
+ * mashed button is one report.
+ */
+export const reportIgnoredStartClick = async ({
+  reason,
+  pendingAgeMs,
+  recordingType,
+}) => {
+  try {
+    const now = Date.now();
+    if (now - lastIgnoredReportAt < IGNORED_REPORT_COOLDOWN_MS) return;
+    lastIgnoredReportAt = now;
+
+    const res = await chrome.storage.local.get(["isSubscribed", "isLoggedIn"]);
+    if (!res.isSubscribed || !res.isLoggedIn) return;
+
+    chrome.runtime
+      .sendMessage({
+        type: "submit-diagnostic-report",
+        event: {
+          attemptId: `ig-${now.toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
+          trigger: "ignored",
+          outcome: "ignored",
+          stage: "start-click-ignored",
+          reason,
+          pendingAgeMs,
+          recordingType: recordingType || null,
+        },
+      })
+      .catch(() => {});
+  } catch {}
+};
+
 /** Format the trace as a compact human-readable timeline. */
 export const formatStartFlowTimeline = (trace) => {
   if (!trace?.t) return null;

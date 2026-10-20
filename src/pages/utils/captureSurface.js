@@ -27,3 +27,15 @@ export const setCapturedSurface = async (surface) => {
     }
   } catch {}
 };
+
+// Region crops report surface "browser", so only this flag tells them from a
+// tab. Anything but true clears the key, so it can't leak into a later take.
+export const setCapturedRegion = async (isRegion) => {
+  try {
+    if (isRegion === true) {
+      await chrome.storage.local.set({ capturedRegion: true });
+    } else {
+      await chrome.storage.local.remove(["capturedRegion"]);
+    }
+  } catch {}
+};

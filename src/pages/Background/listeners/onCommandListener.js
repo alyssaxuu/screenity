@@ -60,7 +60,8 @@ export const onCommandListener = () => {
     } else if (
       command === "cancel-recording" ||
       command === "pause-recording" ||
-      command === "stop-recording"
+      command === "stop-recording" ||
+      command === "toggle-mic"
     ) {
       // Recording controls must reach the recording UI tab (the pill + its
       // content-script handlers), not the focused tab. With offscreen
@@ -77,7 +78,9 @@ export const onCommandListener = () => {
           ? { type: "cancel-recording" }
           : command === "pause-recording"
             ? { type: "pause-recording" }
-            : { type: "stop-recording-tab", reason: "shortcut-stop" };
+            : command === "toggle-mic"
+              ? { type: "toggle-mic" }
+              : { type: "stop-recording-tab", reason: "shortcut-stop" };
       try {
         await sendMessageTab(targetTabId, msg);
       } catch (err) {

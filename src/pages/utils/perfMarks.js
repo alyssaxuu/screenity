@@ -1,7 +1,7 @@
 // Perf instrumentation; enabled in prod too (300-event-per-context
-// cap, 250ms debounced flush) so user diag zips have the full
-// stop→editor timing. Labels are hardcoded; payloads are caller ints/
-// strings. Console "[perf]" lines stay dev-only.
+// cap, 250ms debounced flush, 15s for progress-only batches) so user
+// diag zips have the full stop→editor timing. Labels are hardcoded;
+// payloads are caller ints/strings. Console "[perf]" lines stay dev-only.
 const DEV = process.env.SCREENITY_DEV_MODE === "true";
 const ENABLED = true;
 
@@ -15,6 +15,10 @@ const buildDevImpl = () => {
   const STORAGE_KEY_BASE = "perfTimeline";
   const MAX_EVENTS = 300;
   const FLUSH_DEBOUNCE_MS = 250;
+  // Each flush rewrites the whole list and reaches every tab's onChanged
+  // listeners. Progress marks fire every second while recording, so a batch
+  // holding only those waits longer; any other mark pulls the flush forward.
+  const PROGRESS_FLUSH_MS = 15000;
 
   const detectContext = () => {
     try {
@@ -56,6 +60,7 @@ const buildDevImpl = () => {
   const localBuf = [];
   let lastMarkPerfNow = null;
   let pendingFlush = null;
+  let pendingFlushAt = 0;
   let writeChain = Promise.resolve();
   let cachedSessionId = null;
 
@@ -86,12 +91,18 @@ const buildDevImpl = () => {
       .catch(() => {});
   };
 
-  const scheduleFlush = () => {
-    if (pendingFlush) return;
+  const scheduleFlush = (label) => {
+    const delay = isLowValueLabel(label) ? PROGRESS_FLUSH_MS : FLUSH_DEBOUNCE_MS;
+    const at = Date.now() + delay;
+    if (pendingFlush) {
+      if (pendingFlushAt <= at) return;
+      clearTimeout(pendingFlush);
+    }
+    pendingFlushAt = at;
     pendingFlush = setTimeout(() => {
       pendingFlush = null;
       flushNow();
-    }, FLUSH_DEBOUNCE_MS);
+    }, delay);
   };
 
   const emit = (label, meta) => {
@@ -130,7 +141,7 @@ const buildDevImpl = () => {
         }
       } catch {}
     }
-    scheduleFlush();
+    scheduleFlush(label);
   };
 
   const perfMarkImpl = (label, meta = null) => {

@@ -1085,13 +1085,29 @@
     "message": "如果您要錄製電腦音訊請確保您啟用「分享系統音訊」選項。如果您沒有看到這個選項，請嘗試更新 Chrome 或是改為使用分頁錄製。",
     "description": "Other audio warning description"
   },
-  "maxResolutionLabel": {
-    "message": "最大解析度",
-    "description": "Max resolution label in settings menu"
+  "qualityLabel": {
+    "message": "畫質",
+    "description": "設定選單中的畫質標籤"
   },
-  "maxFPSLabel": {
-    "message": "最大幀率",
-    "description": "Max FPS label in settings menu"
+  "qualityAutoLabel": {
+    "message": "自動",
+    "description": "設定選單中的自動畫質選項"
+  },
+  "qualityCustomLabel": {
+    "message": "自訂",
+    "description": "手動選擇解析度或幀率時顯示"
+  },
+  "smootherMotionLabel": {
+    "message": "優先確保動作更流暢",
+    "description": "畫質設定中的開關，優先考慮更流暢的影片而非清晰度"
+  },
+  "resolutionGroupLabel": {
+    "message": "解析度",
+    "description": "解析度選項上方的標題"
+  },
+  "frameRateGroupLabel": {
+    "message": "影格率",
+    "description": "幀率選項上方的標題"
   },
   "notEnoughRAM": {
     "message": "記憶體不足",
@@ -1904,5 +1920,141 @@
   "unsavedRecordingModalDismiss": {
     "message": "不再顯示",
     "description": "Side button: start the recording and stop prompting about unsaved recordings."
+  },
+  "teleprompterLabel": {
+    "message": "提詞機",
+    "description": "Switch label: opens the floating teleprompter window"
+  },
+  "teleprompterUnavailableLabel": {
+    "message": "提詞機（此頁面無法使用）",
+    "description": "Switch label shown when the page cannot open the teleprompter window"
+  },
+  "teleprompterIntroTitle": {
+    "message": "提詞機的運作方式",
+    "description": "Modal title shown the first time the teleprompter is switched on"
+  },
+  "teleprompterIntroDescription": {
+    "message": "你的講稿會在一個浮動視窗中開啟。分享視窗或分頁、錄製某個區域或只錄製攝影機時，該視窗不會出現在錄影中。如果分享整個螢幕，視窗會出現在影片裡，所以開始時會將它關閉。你的講稿一律會被儲存。",
+    "description": "Modal body: where the script window shows and when it closes"
+  },
+  "teleprompterClosedToast": {
+    "message": "已關閉提詞機，避免被錄進影片",
+    "description": "Toast: the teleprompter window was closed because the whole screen is being recorded"
+  },
+  "teleprompterPlaceholder": {
+    "message": "輸入或貼上你的講稿",
+    "description": "Placeholder in the empty teleprompter script box"
+  },
+  "teleprompterPlay": {
+    "message": "開始捲動",
+    "description": "Teleprompter button: start scrolling the script"
+  },
+  "teleprompterPause": {
+    "message": "暫停捲動",
+    "description": "Teleprompter button: pause scrolling the script"
+  },
+  "teleprompterMore": {
+    "message": "更多講稿選項",
+    "description": "Teleprompter button: open the script options menu"
+  },
+  "teleprompterTextSize": {
+    "message": "文字大小",
+    "description": "Teleprompter menu row: text size"
+  },
+  "teleprompterSpeed": {
+    "message": "速度",
+    "description": "Teleprompter menu row: scroll speed"
+  },
+  "teleprompterSmaller": {
+    "message": "縮小文字",
+    "description": "Teleprompter button: decrease text size"
+  },
+  "teleprompterLarger": {
+    "message": "放大文字",
+    "description": "Teleprompter button: increase text size"
+  },
+  "teleprompterSlower": {
+    "message": "更慢",
+    "description": "Teleprompter button: scroll slower"
+  },
+  "teleprompterFaster": {
+    "message": "更快",
+    "description": "Teleprompter button: scroll faster"
+  },
+  "teleprompterWpmUnit": {
+    "message": "字/分鐘",
+    "description": "Unit shown after the scroll speed, words per minute"
+  },
+  "teleprompterScrollOnStart": {
+    "message": "開始錄製時自動捲動",
+    "description": "Teleprompter menu option: start scrolling when the recording starts"
+  },
+  "teleprompterRewind": {
+    "message": "捲動回頂端",
+    "description": "Teleprompter menu option: scroll the script back to the top"
+  },
+  "teleprompterHide": {
+    "message": "隱藏講稿",
+    "description": "Teleprompter menu option: close the teleprompter window"
+  },
+  "teleprompterPlayDisabled": {
+    "message": "開始錄製後會自動捲動",
+    "description": "Tooltip on the disabled teleprompter play button before recording starts"
+  },
+  "teleprompterFullScreenTitle": {
+    "message": "提詞機將會關閉",
+    "description": "Modal title: the teleprompter window is about to be closed because the whole screen is recorded"
+  },
+  "teleprompterFullScreenDescription": {
+    "message": "你正在錄製整個螢幕，提詞機視窗會出現在影片中。我們會將它關閉，以免被錄進去。你也可以保持開啟，但它會被錄製下來。",
+    "description": "Modal body: why the teleprompter window closes when recording the entire screen"
+  },
+  "teleprompterFullScreenClose": {
+    "message": "好，關閉",
+    "description": "Modal button: close the teleprompter window and start recording"
+  },
+  "teleprompterFullScreenKeep": {
+    "message": "保持顯示",
+    "description": "Modal button: keep the teleprompter window open even though it will be recorded"
+  },
+  "teleprompterFullScreenNever": {
+    "message": "不要再顯示",
+    "description": "Modal side button: close the teleprompter window and do not show this modal again"
+  },
+  "cameraFullScreenTitle": {
+    "message": "攝影機視窗將關閉",
+    "description": "Modal title: the camera window is about to be closed because the whole screen is recorded"
+  },
+  "cameraFullScreenDescription": {
+    "message": "你正在錄製整個螢幕，攝影機視窗會出現在影片中。我們會將其關閉，避免被錄進去。你的攝影機仍會被錄製。",
+    "description": "Modal body: why the camera window closes when recording the entire screen"
+  },
+  "teleprompterClear": {
+    "message": "清除講稿",
+    "description": "Script menu item: empty the script"
+  },
+  "teleprompterClearConfirm": {
+    "message": "再點一次以清除",
+    "description": "Script menu item after the first click: asks for a second click to empty the script"
+  },
+  "teleprompterHideCamera": {
+    "message": "將攝影機移到頁面",
+    "description": "Teleprompter menu option: move the camera picture out of this window and back onto the page"
+  },
+  "teleprompterShowCamera": {
+    "message": "將攝影機移到此處",
+    "description": "Teleprompter menu option: move the camera picture from the page into this window"
+  },
+  "teleprompterShow": {
+    "message": "顯示講稿",
+    "description": "Teleprompter menu option: show the script in the floating window"
+  },
+  "pressRecordOnPageToast": {
+    "message": "請先在頁面上點擊「開始錄製」一次，以便 Chrome 請求螢幕擷取權限。",
+    "description": "Toast shown when Record was pressed in the floating window and Chrome still needs a click on the page to ask for screen capture access"
+  },
+  "teleprompterRegionStartOnPage": {
+    "message": "區域錄製必須從頁面開始",
+    "description": "Tooltip on the disabled Start button in the floating teleprompter window when recording a region, which can only be started from the page"
   }
 }

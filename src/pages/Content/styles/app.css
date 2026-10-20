@@ -824,7 +824,7 @@ body.driver-active .OnboardingArrow {
 .TooltipContent {
   border-radius: 30px;
   background-color: #29292f;
-  padding: 10px 15px;
+  padding: 8px 13px;
   font-size: 12px;
   margin-bottom: 10px;
   bottom: 100px;
@@ -3685,7 +3685,7 @@ button {
 .TooltipContent {
   border-radius: 30px;
   background-color: #29292f;
-  padding: 10px 15px;
+  padding: 8px 13px;
   font-size: 12px;
   line-height: 1;
   font-family: "Satoshi-Medium", sans-serif;

@@ -1085,13 +1085,29 @@
     "message": "컴퓨터 오디오를 녹음하려면 '시스템 오디오 공유' 옵션을 활성화하세요. 이 옵션을 보지 못하는 경우 Chrome을 업데이트하거나 탭 녹음 옵션으로 전환해 보세요.",
     "description": "기타 시스템용 오디오 경고 설명"
   },
-  "maxResolutionLabel": {
-    "message": "최대 해상도",
-    "description": "설정 메뉴에서 최대 해상도 레이블"
+  "qualityLabel": {
+    "message": "품질",
+    "description": "설정 메뉴의 품질 레이블"
   },
-  "maxFPSLabel": {
-    "message": "최대 FPS",
-    "description": "설정 메뉴에서 최대 FPS 레이블"
+  "qualityAutoLabel": {
+    "message": "자동",
+    "description": "설정 메뉴의 자동 품질 옵션"
+  },
+  "qualityCustomLabel": {
+    "message": "사용자 지정",
+    "description": "해상도나 프레임 속도를 직접 선택했을 때 표시됩니다"
+  },
+  "smootherMotionLabel": {
+    "message": "더 부드러운 움직임 우선",
+    "description": "선명도보다 더 부드러운 영상을 우선하는 품질 설정 스위치"
+  },
+  "resolutionGroupLabel": {
+    "message": "해상도",
+    "description": "해상도 옵션 위의 제목"
+  },
+  "frameRateGroupLabel": {
+    "message": "프레임 속도",
+    "description": "프레임 속도 옵션 위의 제목"
   },
   "notEnoughRAM": {
     "message": "RAM 부족",
@@ -1904,5 +1920,141 @@
   "unsavedRecordingModalDismiss": {
     "message": "다시 표시하지 않기",
     "description": "Side button: start the recording and stop prompting about unsaved recordings."
+  },
+  "teleprompterLabel": {
+    "message": "텔레프롬프터",
+    "description": "Switch label: opens the floating teleprompter window"
+  },
+  "teleprompterUnavailableLabel": {
+    "message": "텔레프롬프터(이 페이지에서는 사용할 수 없음)",
+    "description": "Switch label shown when the page cannot open the teleprompter window"
+  },
+  "teleprompterIntroTitle": {
+    "message": "텔레프롬프터 작동 방식",
+    "description": "Modal title shown the first time the teleprompter is switched on"
+  },
+  "teleprompterIntroDescription": {
+    "message": "스크립트는 플로팅 창에서 열리며, 창이나 탭을 공유하거나 영역 또는 카메라만 녹화할 때는 녹화에 나타나지 않습니다. 전체 화면을 공유하면 창이 영상에 보이게 되므로 시작할 때 닫힙니다. 스크립트는 항상 저장됩니다.",
+    "description": "Modal body: where the script window shows and when it closes"
+  },
+  "teleprompterClosedToast": {
+    "message": "녹화에 나오지 않도록 텔레프롬프터를 닫았습니다",
+    "description": "Toast: the teleprompter window was closed because the whole screen is being recorded"
+  },
+  "teleprompterPlaceholder": {
+    "message": "스크립트를 작성하거나 붙여넣으세요",
+    "description": "Placeholder in the empty teleprompter script box"
+  },
+  "teleprompterPlay": {
+    "message": "스크롤 시작",
+    "description": "Teleprompter button: start scrolling the script"
+  },
+  "teleprompterPause": {
+    "message": "스크롤 일시 중지",
+    "description": "Teleprompter button: pause scrolling the script"
+  },
+  "teleprompterMore": {
+    "message": "스크립트 옵션 더보기",
+    "description": "Teleprompter button: open the script options menu"
+  },
+  "teleprompterTextSize": {
+    "message": "글자 크기",
+    "description": "Teleprompter menu row: text size"
+  },
+  "teleprompterSpeed": {
+    "message": "속도",
+    "description": "Teleprompter menu row: scroll speed"
+  },
+  "teleprompterSmaller": {
+    "message": "글자 작게",
+    "description": "Teleprompter button: decrease text size"
+  },
+  "teleprompterLarger": {
+    "message": "글자 크게",
+    "description": "Teleprompter button: increase text size"
+  },
+  "teleprompterSlower": {
+    "message": "느리게",
+    "description": "Teleprompter button: scroll slower"
+  },
+  "teleprompterFaster": {
+    "message": "빠르게",
+    "description": "Teleprompter button: scroll faster"
+  },
+  "teleprompterWpmUnit": {
+    "message": "wpm",
+    "description": "Unit shown after the scroll speed, words per minute"
+  },
+  "teleprompterScrollOnStart": {
+    "message": "녹화 시작 시 자동 스크롤",
+    "description": "Teleprompter menu option: start scrolling when the recording starts"
+  },
+  "teleprompterRewind": {
+    "message": "맨 위로 스크롤",
+    "description": "Teleprompter menu option: scroll the script back to the top"
+  },
+  "teleprompterHide": {
+    "message": "스크립트 숨기기",
+    "description": "Teleprompter menu option: close the teleprompter window"
+  },
+  "teleprompterPlayDisabled": {
+    "message": "녹화를 시작하면 자동으로 스크롤됩니다",
+    "description": "Tooltip on the disabled teleprompter play button before recording starts"
+  },
+  "teleprompterFullScreenTitle": {
+    "message": "텔레프롬프터가 닫힙니다",
+    "description": "Modal title: the teleprompter window is about to be closed because the whole screen is recorded"
+  },
+  "teleprompterFullScreenDescription": {
+    "message": "전체 화면을 녹화 중이라 텔레프롬프터 창이 영상에 나타납니다. 녹화에 포함되지 않도록 창을 닫겠습니다. 열어 둘 수도 있지만, 그러면 녹화됩니다.",
+    "description": "Modal body: why the teleprompter window closes when recording the entire screen"
+  },
+  "teleprompterFullScreenClose": {
+    "message": "닫기",
+    "description": "Modal button: close the teleprompter window and start recording"
+  },
+  "teleprompterFullScreenKeep": {
+    "message": "계속 표시",
+    "description": "Modal button: keep the teleprompter window open even though it will be recorded"
+  },
+  "teleprompterFullScreenNever": {
+    "message": "다시 표시하지 않기",
+    "description": "Modal side button: close the teleprompter window and do not show this modal again"
+  },
+  "cameraFullScreenTitle": {
+    "message": "카메라 창이 닫힙니다",
+    "description": "Modal title: the camera window is about to be closed because the whole screen is recorded"
+  },
+  "cameraFullScreenDescription": {
+    "message": "전체 화면을 녹화 중이라 카메라 창이 영상에 나타나게 됩니다. 녹화에 보이지 않도록 창을 닫겠습니다. 카메라는 계속 녹화됩니다.",
+    "description": "Modal body: why the camera window closes when recording the entire screen"
+  },
+  "teleprompterClear": {
+    "message": "스크립트 지우기",
+    "description": "Script menu item: empty the script"
+  },
+  "teleprompterClearConfirm": {
+    "message": "다시 클릭하면 지워집니다",
+    "description": "Script menu item after the first click: asks for a second click to empty the script"
+  },
+  "teleprompterHideCamera": {
+    "message": "카메라를 페이지로 이동",
+    "description": "Teleprompter menu option: move the camera picture out of this window and back onto the page"
+  },
+  "teleprompterShowCamera": {
+    "message": "카메라를 여기로 이동",
+    "description": "Teleprompter menu option: move the camera picture from the page into this window"
+  },
+  "teleprompterShow": {
+    "message": "스크립트 표시",
+    "description": "Teleprompter menu option: show the script in the floating window"
+  },
+  "pressRecordOnPageToast": {
+    "message": "처음 한 번은 페이지에서 ‘녹화 시작’을 눌러 Chrome이 화면 캡처 권한을 요청할 수 있게 해 주세요.",
+    "description": "Toast shown when Record was pressed in the floating window and Chrome still needs a click on the page to ask for screen capture access"
+  },
+  "teleprompterRegionStartOnPage": {
+    "message": "영역 녹화는 페이지에서 시작해야 합니다",
+    "description": "Tooltip on the disabled Start button in the floating teleprompter window when recording a region, which can only be started from the page"
   }
 }

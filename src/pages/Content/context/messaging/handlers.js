@@ -6,6 +6,11 @@ import { setContentState, contentStateRef, setTimer } from "../ContentState";
 import { updateFromStorage } from "../utils/updateFromStorage";
 
 import { checkAuthStatus } from "../utils/checkAuthStatus";
+import {
+  ABORTED,
+  abortStartGate,
+  runPrompterStartGate,
+} from "../../teleprompter/prompterGate";
 import { traceStep, setStartFlowOutcome } from "../../../utils/startFlowTrace";
 import { perfMark } from "../../../utils/perfMarks";
 import { triggerSupportDownload } from "../../../utils/triggerSupportDownload";
@@ -627,6 +632,13 @@ export const setupHandlers = () => {
       pendingRecording: true,
     }));
 
+    // Waits on the user's choice when the capture would record the teleprompter
+    // window. No-op if it isn't open.
+    try {
+      // Ended under the prompt (stop-pending, recording-error): no countdown.
+      if ((await runPrompterStartGate(getState())) === ABORTED) return;
+    } catch {}
+
     // BG is source of truth; reading React default would race the user
     // setting and produce double beeps.
     const { countdown: storedCountdown } = await chrome.storage.local.get([
@@ -709,6 +721,44 @@ export const setupHandlers = () => {
       hideUI: nextHideUI,
       ...(nextHideUI ? { hideToolbar: true, hideUIAlerts: true } : {}),
     });
+  });
+
+  registerMessage("toggle-mic", () => {
+    const state = contentStateRef.current;
+    if (state.pushToTalk || !state.microphonePermission) return;
+    const nextActive = !state.micActive;
+    let patch = { micActive: nextActive };
+    if (state.recording) {
+      if (state.defaultAudioInput === "none") return;
+    } else if (nextActive) {
+      // Same pick as the popup's mic dropdown when it turns the mic back on.
+      const devices = state.audioInput || [];
+      const selected =
+        devices.find((d) => d.deviceId === state.defaultAudioInput) ||
+        devices[0];
+      if (!selected) return;
+      patch = {
+        micActive: true,
+        defaultAudioInput: selected.deviceId,
+        defaultAudioInputLabel: selected.label || "",
+      };
+    }
+    setContentState((prev) => ({ ...prev, ...patch }));
+    chrome.storage.local.set(patch);
+    if (!state.recording) return;
+    chrome.runtime.sendMessage({
+      type: "set-mic-active-tab",
+      active: nextActive,
+      defaultAudioInput: state.defaultAudioInput,
+    });
+    if (typeof getState()?.openToast === "function") {
+      getState().openToast(
+        nextActive
+          ? chrome.i18n.getMessage("micOnToast")
+          : chrome.i18n.getMessage("micOffToast"),
+        () => {}
+      );
+    }
   });
 
   registerMessage("toggle-cursor-mode", () => {
@@ -794,6 +844,7 @@ export const setupHandlers = () => {
     }
   });
   registerMessage("recording-error", (message) => {
+    abortStartGate(getState());
     // Sender carries why/errorCode. Dropping them landed every
     // error-triggered report with a null cause.
     setStartFlowOutcome("error", {
@@ -804,6 +855,7 @@ export const setupHandlers = () => {
       ...prev,
       pendingRecording: false,
       preparingRecording: false,
+      startGateOpen: false,
       recording: false,
       paused: false,
       time: 0,
@@ -811,6 +863,15 @@ export const setupHandlers = () => {
       pipEnded: false,
       pipActive: false,
     }));
+    // Cancelling the picker is a choice, not a failure.
+    if (
+      message?.error === "cancel-modal" &&
+      /permission denied|notallowederror|user cancelled/i.test(
+        String(message?.why || ""),
+      )
+    ) {
+      return;
+    }
     const state = getState();
     if (state && typeof state.openModal === "function") {
       state.openModal(
@@ -886,6 +947,9 @@ export const setupHandlers = () => {
     const toggleCursorModeCommand = message.commands.find(
       (command) => command.name === "toggle-cursor-mode",
     );
+    const toggleMicCommand = message.commands.find(
+      (command) => command.name === "toggle-mic"
+    );
 
     setContentState((prev) => ({
       ...prev,
@@ -894,6 +958,7 @@ export const setupHandlers = () => {
       toggleDrawingModeShortcut: toggleDrawingModeCommand?.shortcut || "",
       toggleBlurModeShortcut: toggleBlurModeCommand?.shortcut || "",
       toggleCursorModeShortcut: toggleCursorModeCommand?.shortcut || "",
+      toggleMicShortcut: toggleMicCommand?.shortcut || "",
     }));
   });
 
@@ -1213,9 +1278,11 @@ export const setupHandlers = () => {
   });
 
   registerMessage("stop-pending", () => {
+    abortStartGate(getState());
     setStartFlowOutcome("error");
     setContentState((prev) => ({
       ...prev,
+      startGateOpen: false,
       pendingRecording: false,
       preparingRecording: false,
       pipEnded: false,

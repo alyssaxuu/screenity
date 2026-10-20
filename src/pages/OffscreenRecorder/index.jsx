@@ -35,6 +35,23 @@ const swKeepaliveTimer = setInterval(() => {
 }, SW_KEEPALIVE_MS);
 window.addEventListener("pagehide", () => clearInterval(swKeepaliveTimer));
 
+// Lets the SW tell a close it issued from this document vanishing on its own.
+let hostPortStopped = false;
+window.addEventListener("pagehide", () => {
+  hostPortStopped = true;
+});
+const connectHostPort = () => {
+  if (hostPortStopped) return;
+  try {
+    const port = chrome.runtime.connect({ name: "recorder-host" });
+    port.onDisconnect.addListener(() => {
+      void chrome.runtime.lastError;
+      setTimeout(connectHostPort, 2000);
+    });
+  } catch {}
+};
+connectHostPort();
+
 const IS_RESUME_DOC =
   new URLSearchParams(window.location.search).get("resume") === "1";
 

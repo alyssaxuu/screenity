@@ -300,7 +300,11 @@ export const handleRecordingError = async (request) => {
     });
   } catch {}
 
-  sendMessageRecord({ type: "recording-error" }).then(() => {
+  sendMessageRecord({
+    type: "recording-error",
+    error: request?.error || null,
+    why: request?.why || null,
+  }).then(() => {
     const candidateTabs = [activeTab, recordingUiTabId, tabRecordedID].filter(
       (id, idx, arr) => Number.isInteger(id) && arr.indexOf(id) === idx,
     );

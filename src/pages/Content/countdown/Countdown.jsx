@@ -138,6 +138,17 @@ const Countdown = () => {
     return cleanupTimers;
   }, [contentState.countdownActive]);
 
+  // Mirrored into state for the floating window's countdown.
+  useEffect(() => {
+    const value =
+      contentState.countdownActive && contentState.isCountdownVisible
+        ? count
+        : null;
+    setContentState((prev) =>
+      prev.countdownValue === value ? prev : { ...prev, countdownValue: value }
+    );
+  }, [count, contentState.countdownActive, contentState.isCountdownVisible]);
+
   useEffect(() => {
     if (!activeRef.current || cancelledRef.current) {
       return;

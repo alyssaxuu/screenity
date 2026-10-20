@@ -6,9 +6,9 @@ import { getContextRefs } from "../context/CameraContext";
 import {
   getCameraStream,
   stopCameraStream,
-  togglePip,
   surfaceHandler,
   cameraToggledToolbar,
+  IS_WINDOW_COPY,
 } from "../utils/cameraUtils";
 import { loadEffect } from "../utils/backgroundUtils";
 import {
@@ -17,6 +17,11 @@ import {
   setPipMode,
   setBackgroundEffects,
 } from "../utils/uiState";
+
+// The window copy isn't a PiP, so it must not report that one ended.
+const notifyPipEnded = () => {
+  if (!IS_WINDOW_COPY) chrome.runtime.sendMessage({ type: "pip-ended" });
+};
 
 function waitForVideoRef(callback, attempts = 10) {
   const { videoRef } = getContextRefs();
@@ -75,7 +80,6 @@ export const setupHandlers = ({ setLoading }) => {
   );
   registerMessage("camera-only-update", handleCameraOnlyUpdate);
   registerMessage("screen-update", handleScreenUpdate);
-  registerMessage("toggle-pip", () => togglePip(getContextRefs().videoRef));
   registerMessage("set-surface", (message) => {
     console.log("Preparing Picture in Picture request");
 
@@ -99,7 +103,7 @@ export const setupHandlers = ({ setLoading }) => {
       });
     }
     setPipMode(false);
-    chrome.runtime.sendMessage({ type: "pip-ended" });
+    notifyPipEnded();
   });
 
   messageRouter();
@@ -109,7 +113,7 @@ export const setupHandlers = ({ setLoading }) => {
     if (res.pipForceClose && document.pictureInPictureElement) {
       document.exitPictureInPicture().catch(() => {});
       setPipMode(false);
-      chrome.runtime.sendMessage({ type: "pip-ended" });
+      notifyPipEnded();
     }
   });
   chrome.storage.onChanged.addListener((changes, area) => {
@@ -118,7 +122,7 @@ export const setupHandlers = ({ setLoading }) => {
     if (document.pictureInPictureElement) {
       document.exitPictureInPicture().catch(() => {});
       setPipMode(false);
-      chrome.runtime.sendMessage({ type: "pip-ended" });
+      notifyPipEnded();
     }
   });
 };
@@ -127,7 +131,7 @@ const handleStopRecording = async (request) => {
   if (document.pictureInPictureElement) {
     document.exitPictureInPicture();
     setPipMode(false);
-    chrome.runtime.sendMessage({ type: "pip-ended" });
+    notifyPipEnded();
   }
   // Stop tracks so the webcam light goes off; otherwise the iframe holds
   // the stream until the page is torn down (may be much later or never if

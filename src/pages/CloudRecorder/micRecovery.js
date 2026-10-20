@@ -178,7 +178,6 @@ const queueTranscription = async ({
         sceneId,
         inputMediaId: audioMediaId,
         targetMediaId,
-        lang: "en",
         model: "tiny",
       }),
     });

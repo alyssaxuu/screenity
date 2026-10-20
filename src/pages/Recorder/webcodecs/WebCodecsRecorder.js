@@ -12,6 +12,7 @@
 import { perfMark, perfSpan } from "../../utils/perfMarks";
 import { diagForward } from "../../utils/diagForward";
 import { computeLetterboxRect } from "./letterbox";
+import { createFpsWindows } from "../perfTelemetry";
 import {
   AAC_SUPPORTED_RATES,
   AVC_MAX_PIXELS,
@@ -35,6 +36,14 @@ import {
 } from "./recorderLogic";
 import { getStartupFlags } from "./startupFlags";
 import { orientBoxToSource } from "../recorderConfig";
+import {
+  advanceAudioLeadInHold,
+  computeStartLeadInUs,
+  createAudioLeadInHoldState,
+  isValidStartEpochMs,
+} from "./startLeadIn";
+import { avcCodecForSize, exceedsAvcL42 } from "../../../media/avcLevel";
+import { RESOLUTION_UNSUPPORTED_CODE } from "../../../media/fastRecorderGate";
 import { claimPrewarmedEncoder } from "../encoderPrewarm";
 // Lazy-load Mp4MuxerWrapper so its ~3MB mediabunny static import doesn't
 // drag into recorder.bundle.js cold start (dominates click-record latency).
@@ -109,6 +118,17 @@ export class WebCodecsRecorder {
     this._frameDurationUs = null;
     this._lastKeyFrameIndex = 0;
     this._keyFrameIntervalFrames = 60;
+    // Shared start epoch (startLeadIn.js): first video frame and first audio
+    // packet are padded to their offset from it.
+    this._startEpochUs = null;
+    this._videoLeadInPending = false;
+    this._audioLeadInPending = false;
+    this._videoArrivalUs = null;
+    // Telemetry: first-frame lag past the epoch, and lead-in written (0 if the
+    // clamp fell back). Null without an epoch.
+    this._startLagMs = null;
+    this._startLeadInMs = null;
+    this._audioStartLeadInMs = null;
 
     this.audioSamplesWritten = 0;
     this.audioSampleRate = null;
@@ -261,6 +281,7 @@ export class WebCodecsRecorder {
     // almost did.
     this._peakVideoEncodeQueueSize = 0;
     this._peakAudioEncodeQueueSize = 0;
+    this._fpsWindows = createFpsWindows();
 
     // Encoder reclaim recovery. Chrome reclaims idle HW slots; we
     // rebuild with the same config. Cap 5 plus throttle is ~10s of retries.
@@ -531,6 +552,15 @@ export class WebCodecsRecorder {
     this._videoStartUs = null;
     this._frameDurationUs = null;
     this._lastKeyFrameIndex = 0;
+    this._startEpochUs = isValidStartEpochMs(this.options.startEpochMs)
+      ? this.options.startEpochMs * 1000
+      : null;
+    this._videoLeadInPending = false;
+    this._audioLeadInPending = this._startEpochUs != null;
+    this._videoArrivalUs = null;
+    this._startLagMs = null;
+    this._startLeadInMs = null;
+    this._audioStartLeadInMs = null;
     this.audioSamplesWritten = 0;
     this._audioTimeBaseUs = 0;
     this._audioStampRate = null;
@@ -659,6 +689,15 @@ export class WebCodecsRecorder {
             bitrate: safeBitrate,
             framerate: fps,
           });
+          // Probe codec was picked at 1080p; its level may be too low here.
+          if (config.codec) {
+            config.codec = avcCodecForSize(
+              config.codec,
+              this.targetWidth,
+              this.targetHeight,
+              fps,
+            );
+          }
           this.log("[WCR] Using override encoder config", config);
           try {
             const support = await VideoEncoder.isConfigSupported(config);
@@ -1145,6 +1184,9 @@ export class WebCodecsRecorder {
         videoEncoderStateAtStop: this._videoEncoderStateAtStop,
         failureReported: this._failureReported,
         lastFailureCode: this._lastFailureCode || null,
+        startLagMs: this._startLagMs,
+        startLeadInMs: this._startLeadInMs,
+        audioStartLeadInMs: this._audioStartLeadInMs,
       });
     } catch {}
 
@@ -1239,12 +1281,13 @@ export class WebCodecsRecorder {
   // cleanup() nulls _videoStartUs, so this reads null once it has run. The
   // finalize-time capture in WebCodecsTrackRecorder lands before that.
   _effectiveOutputFps() {
-    if (this._videoStartUs == null || !(this.frameCount > 0)) return null;
+    const startUs = this._videoArrivalUs ?? this._videoStartUs;
+    if (startUs == null || !(this.frameCount > 0)) return null;
     let pausedUs = this.totalPausedDurationUs || 0;
     if (this.paused && this.pauseStartUs != null) {
       pausedUs += performance.now() * 1000 - this.pauseStartUs;
     }
-    const elapsedUs = performance.now() * 1000 - this._videoStartUs - pausedUs;
+    const elapsedUs = performance.now() * 1000 - startUs - pausedUs;
     if (!(elapsedUs > 0)) return null;
     return Math.round((this.frameCount / (elapsedUs / 1e6)) * 100) / 100;
   }
@@ -1283,6 +1326,20 @@ export class WebCodecsRecorder {
       startupBufferEngaged: this._startupBufferEngaged ?? null,
       framesBufferedAtStart: this._framesBufferedAtStart ?? null,
       adoptedWarmEncoder: this._adoptedPrewarmEncoder === true,
+      startLagMs: this._startLagMs,
+      startLeadInMs: this._startLeadInMs,
+      audioStartLeadInMs: this._audioStartLeadInMs,
+    };
+  }
+
+  // fps per 30 s window and whether the live encoder config asks for hardware.
+  // The config is the request: Chrome doesn't say what it really ran on.
+  getPerfSnapshot() {
+    const accel = this._activeVideoConfig?.hardwareAcceleration;
+    return {
+      fps: this._fpsWindows.snapshot(),
+      encodeHardware:
+        accel === "prefer-hardware" ? true : accel === "prefer-software" ? false : null,
     };
   }
 
@@ -1344,10 +1401,9 @@ export class WebCodecsRecorder {
 
   getDiagSnapshot() {
     let firstChunkLatencyMs = null;
-    if (this._firstChunkAt != null && this._videoStartUs != null) {
-      firstChunkLatencyMs = Math.round(
-        this._firstChunkAt - this._videoStartUs / 1000,
-      );
+    const arrivalUs = this._videoArrivalUs ?? this._videoStartUs;
+    if (this._firstChunkAt != null && arrivalUs != null) {
+      firstChunkLatencyMs = Math.round(this._firstChunkAt - arrivalUs / 1000);
     }
     return {
       videoCodecString: this.actualVideoCodec || null,
@@ -2797,7 +2853,14 @@ export class WebCodecsRecorder {
               { codec: "avc1.42E028", containerCodec: "avc", hw: "prefer-software" },
             ];
 
-    for (const c of candidates) {
+    // Past L4.2's coded-area limit (or above 30fps) the level must rise, or
+    // Chrome rejects the frame at encode time (configure() still passes).
+    const oversize = exceedsAvcL42(width, height) || fps > 30;
+
+    for (const candidate of candidates) {
+      const c = oversize
+        ? { ...candidate, codec: avcCodecForSize(candidate.codec, width, height, fps) }
+        : candidate;
       const config = { ...base, codec: c.codec, hardwareAcceleration: c.hw };
       // Use the normalized config from isConfigSupported so a clamp
       // Chrome would have applied doesn't trigger a SW fallback later.
@@ -2805,6 +2868,17 @@ export class WebCodecsRecorder {
       try {
         supported = await VideoEncoder.isConfigSupported(config);
       } catch {}
+      // configure() reports an unsupported size asynchronously, so a rung
+      // isConfigSupported refused would be selected and die with zero chunks.
+      // Only large frames skip on it.
+      if (oversize && supported && supported.supported === false) {
+        this._videoCodecConfigsTried.push({
+          codec: c.codec,
+          hw: c.hw,
+          succeeded: false,
+        });
+        continue;
+      }
       const resolvedConfig =
         supported?.supported && supported.config ? supported.config : config;
       const test = new VideoEncoder({ output() {}, error() {} });
@@ -2845,7 +2919,16 @@ export class WebCodecsRecorder {
         try { test.close(); } catch {}
       }
     }
-    throw new Error("WebCodecsRecorder: No supported H.264 encoder");
+    const failure = new Error("WebCodecsRecorder: No supported H.264 encoder");
+    if (exceedsAvcL42(width, height)) {
+      failure.code = RESOLUTION_UNSUPPORTED_CODE;
+      failure.detail = {
+        width,
+        height,
+        tried: this._videoCodecConfigsTried.slice(),
+      };
+    }
+    throw failure;
   }
 
   // Geometry lives in letterbox.js; this just paints it.
@@ -2876,6 +2959,45 @@ export class WebCodecsRecorder {
     this.resizeCtx.fillStyle = "#000";
     this.resizeCtx.fillRect(0, 0, tw, th);
     this.resizeCtx.drawImage(frame, rect.x, rect.y, rect.w, rect.h);
+  }
+
+  // For a track that started before the epoch existed (screen, when a mic file
+  // follows). Before its first frame it behaves as if passed at start; after,
+  // the file can't be padded, so only the signed lag is recorded (negative =
+  // frame beat the epoch).
+  setStartEpoch(epochMs) {
+    if (!isValidStartEpochMs(epochMs) || this._startEpochUs != null) return;
+    this.options.startEpochMs = epochMs;
+    this._startEpochUs = epochMs * 1000;
+    if (this._videoStartUs != null) {
+      this._startLagMs = Math.round(
+        ((this._videoArrivalUs ?? this._videoStartUs) - this._startEpochUs) /
+          1000,
+      );
+      this._startLeadInMs = 0;
+      return;
+    }
+    if (this.audioSamplesWritten === 0 && !this._audioDataEncoded) {
+      this._audioLeadInPending = true;
+    }
+  }
+
+  // Timeline zero is the epoch when usable (frame held from 0 to its arrival),
+  // else the first frame, real or stand-in.
+  _anchorVideoStart(nowUs) {
+    this._videoArrivalUs = nowUs;
+    if (this._startEpochUs != null) {
+      this._startLagMs = Math.round((nowUs - this._startEpochUs) / 1000);
+    }
+    const leadInUs = computeStartLeadInUs(this._startEpochUs, nowUs);
+    if (leadInUs == null) {
+      this._videoStartUs = nowUs;
+      if (this._startEpochUs != null) this._startLeadInMs = 0;
+      return;
+    }
+    this._videoStartUs = this._startEpochUs;
+    this._startLeadInMs = Math.round(leadInUs / 1000);
+    this._videoLeadInPending = true;
   }
 
   async readVideoLoop() {
@@ -3011,7 +3133,7 @@ export class WebCodecsRecorder {
             }
             ensureResizeCanvas();
             if (this._videoStartUs == null) {
-              this._videoStartUs = performance.now() * 1000;
+              this._anchorVideoStart(performance.now() * 1000);
             }
             isSynthetic = true;
             this._syntheticFirstFrameCount += 1;
@@ -3052,7 +3174,7 @@ export class WebCodecsRecorder {
           this.drawFrameToResizeCanvas(frame);
 
           if (!this._videoStartUs) {
-            this._videoStartUs = performance.now() * 1000;
+            this._anchorVideoStart(performance.now() * 1000);
             perfMark("WCR.firstSourceFrame", {
               w: frame.codedWidth,
               h: frame.codedHeight,
@@ -3079,16 +3201,24 @@ export class WebCodecsRecorder {
         // Filling the gap synchronously would overflow the encoder queue, so
         // skip ahead to at most MAX_GAP_FRAMES behind. Skipped indices
         // advance _videoFrameIndex to prevent repeated catch-up attempts.
+        // First frame after a lead-in: encode at 0 and hold to its arrival slot,
+        // not a tab-gap clamp. Muxer wrappers rebase the first PTS to 0, so only
+        // a long first sample keeps the offset. A dropped attempt retries from 0.
+        const holdUntilIndex =
+          this._videoLeadInPending && targetIndex > this._videoFrameIndex
+            ? targetIndex
+            : null;
+
         const MAX_GAP_FRAMES = 8;
         const gap = targetIndex - this._videoFrameIndex;
-        if (gap > MAX_GAP_FRAMES) {
+        if (holdUntilIndex == null && gap > MAX_GAP_FRAMES) {
           this.warn(`[WCR] skipping ${gap - MAX_GAP_FRAMES} frames (tab gap)`);
           this._framesSkippedForGap += gap - MAX_GAP_FRAMES;
           this._videoFrameIndex = targetIndex - MAX_GAP_FRAMES;
         }
 
         const startIndex = this._videoFrameIndex;
-        const endIndex = targetIndex;
+        const endIndex = holdUntilIndex != null ? startIndex : targetIndex;
         for (let i = startIndex; i <= endIndex; i += 1) {
           const tsUs = i * frameDurationUs;
 
@@ -3150,13 +3280,17 @@ export class WebCodecsRecorder {
           if (vQueueSize > effectiveQueueCap) {
             this._droppedForBackpressureCount += 1;
             this._forceNextKeyframe = true;
-            this._videoFrameIndex = i + 1;
+            // A dropped lead-in hold leaves index 0 for the retry.
+            if (holdUntilIndex == null) this._videoFrameIndex = i + 1;
             continue;
           }
 
           const resized = new VideoFrame(this.resizeCanvas, {
             timestamp: tsUs,
-            duration: frameDurationUs,
+            duration:
+              holdUntilIndex != null
+                ? (holdUntilIndex + 1 - i) * frameDurationUs
+                : frameDurationUs,
           });
 
           const keyFrame =
@@ -3180,7 +3314,7 @@ export class WebCodecsRecorder {
             this.videoEncoder.state === "closed"
           ) {
             resized.close();
-            this._videoFrameIndex = i + 1;
+            if (holdUntilIndex == null) this._videoFrameIndex = i + 1;
             this._forceNextKeyframe = true;
             continue;
           }
@@ -3201,7 +3335,7 @@ export class WebCodecsRecorder {
                 this.videoEncoder?.state === "closed"
               ) {
                 this.warn("[WCR] encode() race during pause; dropping frame");
-                this._videoFrameIndex = i + 1;
+                if (holdUntilIndex == null) this._videoFrameIndex = i + 1;
                 this._forceNextKeyframe = true;
                 continue;
               }
@@ -3214,7 +3348,7 @@ export class WebCodecsRecorder {
                 // at 16 a real reclaim looks like backpressure and silently
                 // skips the rebuild. Chrome names reclaims in the message.
                 if (isReclaimErrorMessage(encErr) || q <= 5) {
-                  this._videoFrameIndex = i + 1;
+                  if (holdUntilIndex == null) this._videoFrameIndex = i + 1;
                   this._forceNextKeyframe = true;
                   this.warn(
                     "[WCR] encode() QuotaExceededError with near-empty queue; treating as encoder reclaim, rebuilding",
@@ -3225,7 +3359,7 @@ export class WebCodecsRecorder {
                 }
                 this._droppedForBackpressureCount += 1;
                 this._forceNextKeyframe = true;
-                this._videoFrameIndex = i + 1;
+                if (holdUntilIndex == null) this._videoFrameIndex = i + 1;
                 this.warn(
                   "[WCR] encode() QuotaExceededError; dropping frame as backpressure",
                 );
@@ -3254,7 +3388,13 @@ export class WebCodecsRecorder {
               });
             }
             this.frameCount++;
-            this._videoFrameIndex = i + 1;
+            this._fpsWindows.tick(
+              this.frameCount,
+              performance.now() - (this.totalPausedDurationUs || 0) / 1000,
+            );
+            this._videoLeadInPending = false;
+            this._videoFrameIndex =
+              holdUntilIndex != null ? holdUntilIndex + 1 : i + 1;
           } finally {
             resized.close();
           }
@@ -3506,6 +3646,76 @@ export class WebCodecsRecorder {
       });
     };
 
+    // Audio gets the same lead-in as its video, or padding video alone puts
+    // them out of sync. Silence runs from the epoch to firstStartUs (start of
+    // the first packet written). Skips the reconciler (isCatchUpSilence).
+    const padAudioLeadIn = (firstStartUs) => {
+      const leadInUs = computeStartLeadInUs(this._startEpochUs, firstStartUs);
+      if (this._startEpochUs != null) {
+        this._audioStartLeadInMs =
+          leadInUs == null ? 0 : Math.round(leadInUs / 1000);
+      }
+      if (leadInUs == null) return;
+      let remainingUs = leadInUs;
+      while (remainingUs >= 1000) {
+        const silent = makeSilentAudioData(
+          Math.min(SILENCE_CHUNK_MS, remainingUs / 1000),
+        );
+        // Read before close(): a closed AudioData reports 0 frames.
+        const silentUs = Math.round(
+          (silent.numberOfFrames * 1_000_000) / silent.sampleRate,
+        );
+        try {
+          encodeAudioData(silent, true);
+        } finally {
+          silent.close?.();
+        }
+        remainingUs -= silentUs;
+      }
+    };
+
+    // _prebufferedAudio packets are older than anything held, so they go first
+    // and count toward the length the start estimate subtracts.
+    const leadInHeld = [];
+    const leadInState = createAudioLeadInHoldState();
+    const packetLengthUs = (audioData) => {
+      const rate = audioData.sampleRate || this.audioSampleRate || 48000;
+      return Math.round(((audioData.numberOfFrames || 0) * 1_000_000) / rate);
+    };
+    const adoptPrebufferedIntoHold = () => {
+      if (!this._prebufferedAudio.length) return;
+      const older = this._prebufferedAudio.splice(0);
+      for (const packet of older) leadInState.heldUs += packetLengthUs(packet);
+      leadInHeld.unshift(...older);
+    };
+
+    const flushLeadInHold = (firstStartUs) => {
+      this._audioLeadInPending = false;
+      adoptPrebufferedIntoHold();
+      padAudioLeadIn(firstStartUs);
+      while (leadInHeld.length) {
+        const held = leadInHeld.shift();
+        try {
+          encodeAudioData(held);
+        } finally {
+          held.close?.();
+        }
+      }
+    };
+
+    const holdForLeadIn = (audioData) => {
+      const nowUs = performance.now() * 1000;
+      adoptPrebufferedIntoHold();
+      leadInHeld.push(audioData);
+      const flushNow = advanceAudioLeadInHold(
+        leadInState,
+        nowUs,
+        packetLengthUs(audioData),
+        leadInHeld.length,
+      );
+      if (flushNow) flushLeadInHold(leadInState.startUs);
+    };
+
     // Lost AudioData (MSTP overflow under load) shortens the track with
     // contiguous PTS, so everything after the loss plays early.
     const AUDIO_DRIFT_WINDOW_US = 2_000_000;
@@ -3662,6 +3872,15 @@ export class WebCodecsRecorder {
             continue;
           }
           try {
+            // Silence before delivery went live: first audio, or follows held.
+            if (this._audioLeadInPending) {
+              flushLeadInHold(
+                leadInState.startUs ??
+                  performance.now() * 1000 -
+                    SILENCE_CHUNK_MS * 1000 -
+                    leadInState.heldUs,
+              );
+            }
             const silent = makeSilentAudioData(SILENCE_CHUNK_MS);
             try {
               encodeAudioData(silent);
@@ -3763,6 +3982,10 @@ export class WebCodecsRecorder {
         }
 
         try {
+          if (this._audioLeadInPending) {
+            holdForLeadIn(audioData);
+            continue;
+          }
           if (this._prebufferedAudio.length) {
             while (this._prebufferedAudio.length) {
               const buffered = this._prebufferedAudio.shift();
@@ -3784,6 +4007,17 @@ export class WebCodecsRecorder {
       }
     } catch (err) {
       this.err("[WCR] audio loop error:", err);
+    }
+
+    if (leadInHeld.length) {
+      try {
+        if (this.audioEncoder && this.audioEncoder.state !== "closed") {
+          flushLeadInHold(leadInState.startUs);
+        }
+      } catch (err) {
+        this.warn("[WCR] lead-in flush failed", err);
+      }
+      for (const held of leadInHeld.splice(0)) held.close?.();
     }
 
     if (

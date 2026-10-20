@@ -1085,13 +1085,29 @@
     "message": "कंप्यूटर ऑडियो को रिकॉर्ड करना चाहते हैं तो 'सिस्टम ऑडियो साझा करें' विकल्प को टॉगल करने की सुनिश्चित करें। इस विकल्प को दिखाई नहीं देता है, तो कृपया Chrome को अपडेट करने का प्रयास करें, या टैब रिकॉर्डिंग पर स्विच करें।",
     "description": "अन्य ऑडियो चेतावना विवरण"
   },
-  "maxResolutionLabel": {
-    "message": "अधिकतम रिज़ॉल्यूशन",
-    "description": "सेटिंग्स मेनू में अधिकतम रिज़ॉल्यूशन का लेबल"
+  "qualityLabel": {
+    "message": "गुणवत्ता",
+    "description": "सेटिंग मेनू में गुणवत्ता का लेबल"
   },
-  "maxFPSLabel": {
-    "message": "अधिकतम FPS",
-    "description": "सेटिंग्स मेनू में अधिकतम FPS का लेबल"
+  "qualityAutoLabel": {
+    "message": "ऑटो",
+    "description": "सेटिंग मेनू में ऑटो गुणवत्ता विकल्प"
+  },
+  "qualityCustomLabel": {
+    "message": "कस्टम",
+    "description": "तब दिखता है जब रिज़ॉल्यूशन या फ़्रेम दर हाथ से चुनी गई हो"
+  },
+  "smootherMotionLabel": {
+    "message": "स्मूद मोशन को प्राथमिकता दें",
+    "description": "गुणवत्ता सेटिंग में स्विच, जो स्पष्टता के बजाय अधिक सहज वीडियो को प्राथमिकता देता है"
+  },
+  "resolutionGroupLabel": {
+    "message": "रिज़ॉल्यूशन",
+    "description": "रिज़ॉल्यूशन विकल्पों के ऊपर का शीर्षक"
+  },
+  "frameRateGroupLabel": {
+    "message": "फ़्रेम दर",
+    "description": "फ़्रेम दर विकल्पों के ऊपर का शीर्षक"
   },
   "notEnoughRAM": {
     "message": "पर्याप्त रैम नहीं",
@@ -1904,5 +1920,141 @@
   "unsavedRecordingModalDismiss": {
     "message": "दोबारा न दिखाएं",
     "description": "Side button: start the recording and stop prompting about unsaved recordings."
+  },
+  "teleprompterLabel": {
+    "message": "टेलीप्रॉम्प्टर",
+    "description": "Switch label: opens the floating teleprompter window"
+  },
+  "teleprompterUnavailableLabel": {
+    "message": "टेलीप्रॉम्प्टर (इस पेज पर उपलब्ध नहीं)",
+    "description": "Switch label shown when the page cannot open the teleprompter window"
+  },
+  "teleprompterIntroTitle": {
+    "message": "टेलीप्रॉम्प्टर कैसे काम करता है",
+    "description": "Modal title shown the first time the teleprompter is switched on"
+  },
+  "teleprompterIntroDescription": {
+    "message": "आपकी स्क्रिप्ट एक फ़्लोटिंग विंडो में खुलती है, जो विंडो या टैब शेयर करने, किसी हिस्से को रिकॉर्ड करने या सिर्फ़ कैमरा रिकॉर्ड करने पर रिकॉर्डिंग में नहीं आती। अगर आप पूरी स्क्रीन शेयर करते हैं, तो विंडो वीडियो में दिखाई देगी, इसलिए शुरू करते ही वह बंद हो जाती है। आपकी स्क्रिप्ट हमेशा सेव रहती है।",
+    "description": "Modal body: where the script window shows and when it closes"
+  },
+  "teleprompterClosedToast": {
+    "message": "टेलीप्रॉम्प्टर बंद किया गया ताकि वह आपकी रिकॉर्डिंग में न दिखे",
+    "description": "Toast: the teleprompter window was closed because the whole screen is being recorded"
+  },
+  "teleprompterPlaceholder": {
+    "message": "अपनी स्क्रिप्ट लिखें या पेस्ट करें",
+    "description": "Placeholder in the empty teleprompter script box"
+  },
+  "teleprompterPlay": {
+    "message": "स्क्रोल शुरू करें",
+    "description": "Teleprompter button: start scrolling the script"
+  },
+  "teleprompterPause": {
+    "message": "स्क्रोल रोकें",
+    "description": "Teleprompter button: pause scrolling the script"
+  },
+  "teleprompterMore": {
+    "message": "स्क्रिप्ट के और विकल्प",
+    "description": "Teleprompter button: open the script options menu"
+  },
+  "teleprompterTextSize": {
+    "message": "टेक्स्ट का आकार",
+    "description": "Teleprompter menu row: text size"
+  },
+  "teleprompterSpeed": {
+    "message": "गति",
+    "description": "Teleprompter menu row: scroll speed"
+  },
+  "teleprompterSmaller": {
+    "message": "छोटा टेक्स्ट",
+    "description": "Teleprompter button: decrease text size"
+  },
+  "teleprompterLarger": {
+    "message": "बड़ा टेक्स्ट",
+    "description": "Teleprompter button: increase text size"
+  },
+  "teleprompterSlower": {
+    "message": "धीमा",
+    "description": "Teleprompter button: scroll slower"
+  },
+  "teleprompterFaster": {
+    "message": "तेज़",
+    "description": "Teleprompter button: scroll faster"
+  },
+  "teleprompterWpmUnit": {
+    "message": "शब्द/मिनट",
+    "description": "Unit shown after the scroll speed, words per minute"
+  },
+  "teleprompterScrollOnStart": {
+    "message": "रिकॉर्डिंग शुरू होने पर स्क्रोल करें",
+    "description": "Teleprompter menu option: start scrolling when the recording starts"
+  },
+  "teleprompterRewind": {
+    "message": "सबसे ऊपर वापस जाएं",
+    "description": "Teleprompter menu option: scroll the script back to the top"
+  },
+  "teleprompterHide": {
+    "message": "स्क्रिप्ट छिपाएं",
+    "description": "Teleprompter menu option: close the teleprompter window"
+  },
+  "teleprompterPlayDisabled": {
+    "message": "रिकॉर्डिंग शुरू होते ही अपने आप स्क्रोल होगा",
+    "description": "Tooltip on the disabled teleprompter play button before recording starts"
+  },
+  "teleprompterFullScreenTitle": {
+    "message": "टेलीप्रॉम्प्टर बंद किया जाएगा",
+    "description": "Modal title: the teleprompter window is about to be closed because the whole screen is recorded"
+  },
+  "teleprompterFullScreenDescription": {
+    "message": "आप पूरी स्क्रीन रिकॉर्ड कर रहे हैं, इसलिए टेलीप्रॉम्प्टर विंडो वीडियो में दिखाई देगी। इसे रिकॉर्डिंग से बाहर रखने के लिए हम इसे बंद कर देंगे। आप इसे खुला रख सकते हैं, लेकिन यह रिकॉर्ड हो जाएगी।",
+    "description": "Modal body: why the teleprompter window closes when recording the entire screen"
+  },
+  "teleprompterFullScreenClose": {
+    "message": "ठीक है, बंद करें",
+    "description": "Modal button: close the teleprompter window and start recording"
+  },
+  "teleprompterFullScreenKeep": {
+    "message": "खुला रखें",
+    "description": "Modal button: keep the teleprompter window open even though it will be recorded"
+  },
+  "teleprompterFullScreenNever": {
+    "message": "फिर से न दिखाएं",
+    "description": "Modal side button: close the teleprompter window and do not show this modal again"
+  },
+  "cameraFullScreenTitle": {
+    "message": "कैमरा विंडो बंद हो जाएगी",
+    "description": "Modal title: the camera window is about to be closed because the whole screen is recorded"
+  },
+  "cameraFullScreenDescription": {
+    "message": "आप पूरी स्क्रीन रिकॉर्ड कर रहे हैं, इसलिए कैमरा विंडो वीडियो में दिखाई देगी। उसे रिकॉर्डिंग से बाहर रखने के लिए हम उसे बंद कर देंगे। आपका कैमरा फिर भी रिकॉर्ड होता रहेगा।",
+    "description": "Modal body: why the camera window closes when recording the entire screen"
+  },
+  "teleprompterClear": {
+    "message": "स्क्रिप्ट साफ़ करें",
+    "description": "Script menu item: empty the script"
+  },
+  "teleprompterClearConfirm": {
+    "message": "साफ़ करने के लिए फिर क्लिक करें",
+    "description": "Script menu item after the first click: asks for a second click to empty the script"
+  },
+  "teleprompterHideCamera": {
+    "message": "कैमरा पेज पर ले जाएं",
+    "description": "Teleprompter menu option: move the camera picture out of this window and back onto the page"
+  },
+  "teleprompterShowCamera": {
+    "message": "कैमरा यहां ले जाएं",
+    "description": "Teleprompter menu option: move the camera picture from the page into this window"
+  },
+  "teleprompterShow": {
+    "message": "स्क्रिप्ट दिखाएं",
+    "description": "Teleprompter menu option: show the script in the floating window"
+  },
+  "pressRecordOnPageToast": {
+    "message": "पहली बार पेज पर “रिकॉर्डिंग शुरू करें” पर क्लिक करें, ताकि Chrome स्क्रीन कैप्चर की अनुमति माँग सके।",
+    "description": "Toast shown when Record was pressed in the floating window and Chrome still needs a click on the page to ask for screen capture access"
+  },
+  "teleprompterRegionStartOnPage": {
+    "message": "क्षेत्र की रिकॉर्डिंग पेज से ही शुरू करनी होगी",
+    "description": "Tooltip on the disabled Start button in the floating teleprompter window when recording a region, which can only be started from the page"
   }
 }

@@ -1,4 +1,5 @@
 import { getCurrentTab, sendMessageTab } from "../tabManagement";
+import { flagUpdatesFromUser } from "./serverFlags";
 
 const API_BASE = process.env.SCREENITY_API_BASE_URL;
 const CLOUD_FEATURES_ENABLED =
@@ -149,7 +150,6 @@ export const loginWithWebsite = async (arg = {}) => {
           ? {
               backgroundEffectsActive: false,
               backgroundEffect: "",
-              fpsValue: "30",
             }
           : {}),
       });
@@ -186,6 +186,7 @@ export const loginWithWebsite = async (arg = {}) => {
       responseData;
 
     await chrome.storage.local.set({
+      ...flagUpdatesFromUser(user, { subscribed: subscribed === true }),
       screenityUser: user,
       lastAuthCheck: now,
       isLoggedIn: true,
@@ -201,7 +202,6 @@ export const loginWithWebsite = async (arg = {}) => {
         ? {
             backgroundEffectsActive: false,
             backgroundEffect: "",
-            fpsValue: "30",
           }
         : {}),
     });
@@ -292,7 +292,6 @@ export const loginWithWebsite = async (arg = {}) => {
           ? {
               backgroundEffectsActive: false,
               backgroundEffect: "",
-              fpsValue: "30",
             }
           : {}),
       });

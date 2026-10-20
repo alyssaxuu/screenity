@@ -427,7 +427,7 @@ export const resumeOneJournal = async (journal, { latestSessionId = null } = {})
     // bytes reached, so the whole file goes up as new media in the same scene.
     uploader = makeUploader(trackType);
     try {
-      await uploader.initialize(projectId, initOpts);
+      await uploader.initialize(projectId, { ...initOpts, fresh: true });
     } catch (freshErr) {
       return fail("initialize-fresh", freshErr);
     }
@@ -499,6 +499,9 @@ export const resumeOneJournal = async (journal, { latestSessionId = null } = {})
     return fail("finalize", err);
   }
 
+  // The fresh media carries its own journal. Leaving the replaced one behind
+  // lets the next pass resume it again and upload the same take as more media.
+  if (freshMedia) await removeJournal(mediaId);
   await clearAttempts(mediaId);
   emit("upload_resume_completed", {
     ...ctx,

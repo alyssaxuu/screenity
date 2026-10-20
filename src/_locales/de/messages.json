@@ -1085,13 +1085,29 @@
     "message": "Stellen Sie sicher, dass Sie die Option 'System-Audio teilen' aktivieren, wenn Sie Computer-Audio aufzeichnen möchten. Wenn Sie diese Option nicht sehen, versuchen Sie, Chrome zu aktualisieren oder zur Tab-Aufzeichnung zu wechseln.",
     "description": "Beschreibung der Audio-Warnung für andere Systeme"
   },
-  "maxResolutionLabel": {
-    "message": "Maximale Auflösung",
-    "description": "Beschriftung für maximale Auflösung im Einstellungsmenü"
+  "qualityLabel": {
+    "message": "Qualität",
+    "description": "Beschriftung für Qualität im Einstellungsmenü"
   },
-  "maxFPSLabel": {
-    "message": "Maximale FPS",
-    "description": "Beschriftung für maximale FPS im Einstellungsmenü"
+  "qualityAutoLabel": {
+    "message": "Automatisch",
+    "description": "Option für automatische Qualität im Einstellungsmenü"
+  },
+  "qualityCustomLabel": {
+    "message": "Benutzerdefiniert",
+    "description": "Wird angezeigt, wenn Auflösung oder Bildrate manuell gewählt wurden"
+  },
+  "smootherMotionLabel": {
+    "message": "Flüssigere Bewegung bevorzugen",
+    "description": "Schalter in den Qualitätseinstellungen, der flüssigeres Video gegenüber Schärfe bevorzugt"
+  },
+  "resolutionGroupLabel": {
+    "message": "Auflösung",
+    "description": "Überschrift über den Auflösungsoptionen"
+  },
+  "frameRateGroupLabel": {
+    "message": "Bildrate",
+    "description": "Überschrift über den Bildratenoptionen"
   },
   "notEnoughRAM": {
     "message": "Nicht genügend RAM",
@@ -1904,5 +1920,141 @@
   "unsavedRecordingModalDismiss": {
     "message": "Nicht mehr anzeigen",
     "description": "Side button: start the recording and stop prompting about unsaved recordings."
+  },
+  "teleprompterLabel": {
+    "message": "Teleprompter",
+    "description": "Switch label: opens the floating teleprompter window"
+  },
+  "teleprompterUnavailableLabel": {
+    "message": "Teleprompter (auf dieser Seite nicht verfügbar)",
+    "description": "Switch label shown when the page cannot open the teleprompter window"
+  },
+  "teleprompterIntroTitle": {
+    "message": "So funktioniert der Teleprompter",
+    "description": "Modal title shown the first time the teleprompter is switched on"
+  },
+  "teleprompterIntroDescription": {
+    "message": "Ihr Skript öffnet sich in einem schwebenden Fenster, das nicht in der Aufnahme erscheint, wenn Sie ein Fenster oder einen Tab teilen, einen Bereich aufnehmen oder nur Ihre Kamera. Teilen Sie Ihren gesamten Bildschirm, würde das Fenster im Video zu sehen sein, deshalb wird es beim Start geschlossen. Ihr Skript wird immer gespeichert.",
+    "description": "Modal body: where the script window shows and when it closes"
+  },
+  "teleprompterClosedToast": {
+    "message": "Teleprompter geschlossen, damit er nicht in der Aufnahme erscheint",
+    "description": "Toast: the teleprompter window was closed because the whole screen is being recorded"
+  },
+  "teleprompterPlaceholder": {
+    "message": "Skript schreiben oder einfügen",
+    "description": "Placeholder in the empty teleprompter script box"
+  },
+  "teleprompterPlay": {
+    "message": "Scrollen starten",
+    "description": "Teleprompter button: start scrolling the script"
+  },
+  "teleprompterPause": {
+    "message": "Scrollen pausieren",
+    "description": "Teleprompter button: pause scrolling the script"
+  },
+  "teleprompterMore": {
+    "message": "Weitere Skriptoptionen",
+    "description": "Teleprompter button: open the script options menu"
+  },
+  "teleprompterTextSize": {
+    "message": "Textgröße",
+    "description": "Teleprompter menu row: text size"
+  },
+  "teleprompterSpeed": {
+    "message": "Tempo",
+    "description": "Teleprompter menu row: scroll speed"
+  },
+  "teleprompterSmaller": {
+    "message": "Kleinerer Text",
+    "description": "Teleprompter button: decrease text size"
+  },
+  "teleprompterLarger": {
+    "message": "Größerer Text",
+    "description": "Teleprompter button: increase text size"
+  },
+  "teleprompterSlower": {
+    "message": "Langsamer",
+    "description": "Teleprompter button: scroll slower"
+  },
+  "teleprompterFaster": {
+    "message": "Schneller",
+    "description": "Teleprompter button: scroll faster"
+  },
+  "teleprompterWpmUnit": {
+    "message": "WPM",
+    "description": "Unit shown after the scroll speed, words per minute"
+  },
+  "teleprompterScrollOnStart": {
+    "message": "Beim Aufnahmestart scrollen",
+    "description": "Teleprompter menu option: start scrolling when the recording starts"
+  },
+  "teleprompterRewind": {
+    "message": "Zurück zum Anfang scrollen",
+    "description": "Teleprompter menu option: scroll the script back to the top"
+  },
+  "teleprompterHide": {
+    "message": "Skript ausblenden",
+    "description": "Teleprompter menu option: close the teleprompter window"
+  },
+  "teleprompterPlayDisabled": {
+    "message": "Scrollt automatisch, sobald die Aufnahme startet",
+    "description": "Tooltip on the disabled teleprompter play button before recording starts"
+  },
+  "teleprompterFullScreenTitle": {
+    "message": "Der Teleprompter wird geschlossen",
+    "description": "Modal title: the teleprompter window is about to be closed because the whole screen is recorded"
+  },
+  "teleprompterFullScreenDescription": {
+    "message": "Sie nehmen Ihren gesamten Bildschirm auf, daher wäre das Teleprompter-Fenster im Video zu sehen. Wir schließen es, damit es nicht aufgenommen wird. Sie können es geöffnet lassen, dann wird es aber mit aufgenommen.",
+    "description": "Modal body: why the teleprompter window closes when recording the entire screen"
+  },
+  "teleprompterFullScreenClose": {
+    "message": "OK, schließen",
+    "description": "Modal button: close the teleprompter window and start recording"
+  },
+  "teleprompterFullScreenKeep": {
+    "message": "Sichtbar lassen",
+    "description": "Modal button: keep the teleprompter window open even though it will be recorded"
+  },
+  "teleprompterFullScreenNever": {
+    "message": "Nicht mehr anzeigen",
+    "description": "Modal side button: close the teleprompter window and do not show this modal again"
+  },
+  "cameraFullScreenTitle": {
+    "message": "Das Kamerafenster wird geschlossen",
+    "description": "Modal title: the camera window is about to be closed because the whole screen is recorded"
+  },
+  "cameraFullScreenDescription": {
+    "message": "Sie nehmen Ihren gesamten Bildschirm auf, daher würde das Kamerafenster im Video erscheinen. Wir schließen es, damit es nicht in der Aufnahme zu sehen ist. Ihre Kamera wird weiterhin aufgenommen.",
+    "description": "Modal body: why the camera window closes when recording the entire screen"
+  },
+  "teleprompterClear": {
+    "message": "Skript löschen",
+    "description": "Script menu item: empty the script"
+  },
+  "teleprompterClearConfirm": {
+    "message": "Zum Löschen erneut klicken",
+    "description": "Script menu item after the first click: asks for a second click to empty the script"
+  },
+  "teleprompterHideCamera": {
+    "message": "Kamera auf die Seite verschieben",
+    "description": "Teleprompter menu option: move the camera picture out of this window and back onto the page"
+  },
+  "teleprompterShowCamera": {
+    "message": "Kamera hierher verschieben",
+    "description": "Teleprompter menu option: move the camera picture from the page into this window"
+  },
+  "teleprompterShow": {
+    "message": "Skript anzeigen",
+    "description": "Teleprompter menu option: show the script in the floating window"
+  },
+  "pressRecordOnPageToast": {
+    "message": "Klicken Sie dieses eine Mal auf der Seite auf „Aufnahme starten“, damit Chrome den Zugriff auf die Bildschirmaufnahme anfragen kann.",
+    "description": "Toast shown when Record was pressed in the floating window and Chrome still needs a click on the page to ask for screen capture access"
+  },
+  "teleprompterRegionStartOnPage": {
+    "message": "Die Aufnahme eines Bereichs muss auf der Seite gestartet werden",
+    "description": "Tooltip on the disabled Start button in the floating teleprompter window when recording a region, which can only be started from the page"
   }
 }

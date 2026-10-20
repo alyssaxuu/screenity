@@ -63,3 +63,29 @@ export const sweepTrackStalls = ({
   }
   return reports;
 };
+
+// Stop-time check: a track whose upload holds only the muxer's init segment.
+// `offset` must be the live uploader offset after the final drain, not the
+// getMeta() copy taken at stop, which is routinely stale on short takes.
+// Fires only when no track carries real media, so a header-only sibling of a
+// healthy track is reported as `mixed` and left alone.
+export const findHeaderOnlyTracks = (tracks, initOnlyOffset = INIT_ONLY_OFFSET) => {
+  const headerOnly = [];
+  let carriesMedia = false;
+  for (const [track, t] of Object.entries(tracks)) {
+    if (!t) continue;
+    const offset = Number(t.offset) || 0;
+    if (offset === 0) continue;
+    const initOnly =
+      offset <= initOnlyOffset &&
+      (Number(t.queueLength) || 0) === 0 &&
+      (Number(t.localBytes) || 0) <= initOnlyOffset;
+    if (initOnly) headerOnly.push(track);
+    else carriesMedia = true;
+  }
+  return {
+    headerOnly,
+    fire: headerOnly.length > 0 && !carriesMedia,
+    mixed: headerOnly.length > 0 && carriesMedia,
+  };
+};

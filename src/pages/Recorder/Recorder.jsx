@@ -26,6 +26,8 @@ import {
   computeTargetVideoBps,
   getFreeCaptureCaps,
   orientBoxToSource,
+  resolveQualityValue,
+  resolveFps,
 } from "./recorderConfig";
 import {
   WebCodecsRecorder,
@@ -44,6 +46,7 @@ import { attachAudioContextWatchdog } from "../utils/audioContextWatchdog";
 import { beginFinalizeHeartbeat } from "../utils/finalizeHeartbeat";
 import { IS_OFFSCREEN_HOST } from "../utils/recordingHost";
 import { sendSystemAudioGuidanceToast } from "../utils/systemAudioGuidance";
+import { createSourceProbe, snapshotProbes } from "./audioSourceProbe";
 import {
   isCaptureAudioSourceError,
   shouldRequestCaptureAudio,
@@ -73,7 +76,12 @@ import {
   validateFastRecorderOutputBlob,
   isTransientFastRecorderError,
   isFastRecorderFailureTransient,
+  RESOLUTION_UNSUPPORTED_CODE,
 } from "../../media/fastRecorderGate";
+import {
+  avcCodecForSize,
+  largeFrameKnownUnsupported,
+} from "../../media/avcLevel";
 
 localforage.config({
   driver: localforage.INDEXEDDB,
@@ -155,16 +163,6 @@ function logRecordingSnapshot(label, data) {
   if (!DEBUG_RECORDER && !isRecordingDebugEnabled()) return;
   debug(`Recording snapshot: ${label}`, data);
 }
-
-const QUALITY_ORDER = ["240p", "360p", "480p", "720p", "1080p", "4k"];
-
-const clampQualityValue = (value, maxValue) => {
-  const current = QUALITY_ORDER.includes(value) ? value : "1080p";
-  const max = QUALITY_ORDER.includes(maxValue) ? maxValue : "1080p";
-  return QUALITY_ORDER.indexOf(current) <= QUALITY_ORDER.indexOf(max)
-    ? current
-    : max;
-};
 
 const Recorder = () => {
   const isRestarting = useRef(false);
@@ -1391,15 +1389,17 @@ const Recorder = () => {
     const endCapsRead = perfSpan("Recorder.preflight storage+caps");
     const [
       { qualityValue, useWebCodecsRecorder: prefUseWebCodecs },
-      { isPro, maxQuality, maxFps },
+      captureCaps,
     ] = await Promise.all([
       chrome.storage.local.get(["qualityValue", "useWebCodecsRecorder"]),
       getFreeCaptureCaps(),
     ]);
+    const { isPro, maxFps } = captureCaps;
     endCapsRead();
-    const effectiveQualityValue = isPro
-      ? qualityValue
-      : clampQualityValue(qualityValue, maxQuality);
+    const effectiveQualityValue = resolveQualityValue(
+      qualityValue,
+      captureCaps,
+    );
     const { audio: audioBitsPerSecond, video: bitratePreset } = getBitrates(
       effectiveQualityValue,
     );
@@ -1631,6 +1631,40 @@ const Recorder = () => {
     const width = Math.max(2, Math.round((trackWidth * fitScale) / 2) * 2);
     const height = Math.max(2, Math.round((trackHeight * fitScale) / 2) * 2);
 
+    // The probe recorded that this size can't be encoded: swap before the
+    // capture is consumed, not after the encoder yields zero chunks. Not sticky.
+    if (
+      canUseWebCodecs &&
+      largeFrameKnownUnsupported(width, height, probeResult?.details)
+    ) {
+      debugWarn("Encode size unsupported by WebCodecs, using MediaRecorder", {
+        width,
+        height,
+      });
+      chrome.runtime
+        .sendMessage({
+          type: "diag-forward",
+          event: "recorder-webcodecs-resolution-swap",
+          data: {
+            stage: "preflight",
+            width,
+            height,
+            supports1440p: probeResult?.details?.supports1440p ?? null,
+            supports4k: probeResult?.details?.supports4k ?? null,
+          },
+        })
+        .catch(() => {});
+      if (chunkWriter.current) {
+        try {
+          await chunkWriter.current.abort();
+        } catch {}
+        chunkWriter.current = null;
+        chunkBackendRef.current = null;
+      }
+      isStarting.current = false;
+      return await startRecording({ forceMediaRecorder: true });
+    }
+
     // MediaRecorder encodes the track as-is, so lower it back to the tier or a
     // 1080p recording ships as 3840x2160. Runs after the probe, so a decision
     // that disagreed with the pre-capture guess still lands right.
@@ -1665,8 +1699,7 @@ const Recorder = () => {
     }
 
     const { fpsValue } = await chrome.storage.local.get(["fpsValue"]);
-    let fps = parseInt(fpsValue);
-    if (Number.isNaN(fps)) fps = 30;
+    let fps = resolveFps(fpsValue, captureCaps);
 
     if (!isPro) {
       fps = Math.min(fps, maxFps);
@@ -1924,6 +1957,7 @@ const Recorder = () => {
     }
 
     let webcodecsFallbackTriggered = false;
+    let webcodecsFailureMarked = false;
     try {
       if (canUseWebCodecs) {
         useWebCodecs.current = true;
@@ -2269,6 +2303,7 @@ const Recorder = () => {
               detail: err?.detail || null,
               finalized: fatalFinalized || undefined,
             });
+            webcodecsFailureMarked = true;
             // Transient stream errors don't disable WebCodecs.
             const persisted = {
               lastWebCodecsFailureAt: Date.now(),
@@ -2303,6 +2338,20 @@ const Recorder = () => {
               trackLive
             ) {
               webcodecsFallbackTriggered = true;
+              if (failureCode === RESOLUTION_UNSUPPORTED_CODE) {
+                chrome.runtime
+                  .sendMessage({
+                    type: "diag-forward",
+                    event: "recorder-webcodecs-resolution-swap",
+                    data: {
+                      stage: "encoder-choice",
+                      width,
+                      height,
+                      tried: err?.detail?.tried ?? null,
+                    },
+                  })
+                  .catch(() => {});
+              }
               debugWarn(
                 "WebCodecs onError: attempting in-session MediaRecorder swap",
               );
@@ -2386,16 +2435,22 @@ const Recorder = () => {
         debug("WebCodecsRecorder.start() result", ok);
 
         if (!ok) {
+          // onError already started the swap; a second start would race it.
+          if (webcodecsFallbackTriggered) return;
           debugWarn(
             "Falling back to MediaRecorder because WebCodecsRecorder failed",
           );
           useWebCodecs.current = false;
           await chrome.storage.local.set({ fastRecorderInUse: false });
           // Recoverable device-sticky disable, not the durable user setting.
-          await markFastRecorderFailure("start-failed", {});
+          if (!webcodecsFailureMarked) {
+            await markFastRecorderFailure("start-failed", {});
+          }
           await chrome.storage.local.set({
             lastWebCodecsFailureAt: Date.now(),
-            lastWebCodecsFailureCode: "start-failed",
+            ...(webcodecsFailureMarked
+              ? {}
+              : { lastWebCodecsFailureCode: "start-failed" }),
           });
           chrome.runtime.sendMessage({
             type: "show-toast",
@@ -3333,6 +3388,17 @@ const Recorder = () => {
       try {
         clearInterval(silenceWatchdogRef.current.intervalId);
         silenceWatchdogRef.current.analyser?.disconnect?.();
+        const { probeId, probes, probeStartedAt } = silenceWatchdogRef.current;
+        clearInterval(probeId);
+        chrome.runtime.sendMessage({
+          type: "diag-forward",
+          event: "recorder-audio-sources-summary",
+          data: {
+            durationMs: Date.now() - probeStartedAt,
+            sources: snapshotProbes(probes),
+          },
+        });
+        Object.values(probes || {}).forEach((p) => p.dispose());
       } catch {}
       silenceWatchdogRef.current = null;
     }
@@ -3609,18 +3675,16 @@ const Recorder = () => {
     });
 
     const { qualityValue } = await chrome.storage.local.get(["qualityValue"]);
-    const { isPro, maxQuality, maxFps } = await getFreeCaptureCaps();
-    const effectiveQualityValue = isPro
-      ? qualityValue
-      : clampQualityValue(qualityValue, maxQuality);
+    const captureCaps = await getFreeCaptureCaps();
+    const { isPro, maxFps } = captureCaps;
+    const effectiveQualityValue = resolveQualityValue(
+      qualityValue,
+      captureCaps,
+    );
     const { width, height } = getResolutionForQuality(effectiveQualityValue);
 
     const { fpsValue } = await chrome.storage.local.get(["fpsValue"]);
-    let fps = parseInt(fpsValue);
-
-    if (isNaN(fps)) {
-      fps = 30;
-    }
+    let fps = resolveFps(fpsValue, captureCaps);
     if (!isPro) {
       fps = Math.min(fps, maxFps);
     }
@@ -3736,37 +3800,50 @@ const Recorder = () => {
             : userConstraints.video,
       };
 
-      userStream = await getUserMediaWithFallback({
-        constraints: cameraConstraints,
-        fallbacks: [
-          hasVideoDevice && desiredVideoLabel
-            ? {
-                kind: "videoinput",
-                desiredDeviceId: data.defaultVideoInput,
-                desiredLabel: desiredVideoLabel,
-                onResolved: (resolvedId) => {
-                  chrome.storage.local.set({
-                    defaultVideoInput: resolvedId,
-                    defaultVideoInputLabel: desiredVideoLabel,
-                  });
-                },
-              }
-            : null,
-          hasAudioDevice && desiredAudioLabel
-            ? {
-                kind: "audioinput",
-                desiredDeviceId: data.defaultAudioInput,
-                desiredLabel: desiredAudioLabel,
-                onResolved: (resolvedId) => {
-                  chrome.storage.local.set({
-                    defaultAudioInput: resolvedId,
-                    defaultAudioInputLabel: desiredAudioLabel,
-                  });
-                },
-              }
-            : null,
-        ].filter(Boolean),
-      });
+      try {
+        userStream = await getUserMediaWithFallback({
+          constraints: cameraConstraints,
+          fallbacks: [
+            hasVideoDevice && desiredVideoLabel
+              ? {
+                  kind: "videoinput",
+                  desiredDeviceId: data.defaultVideoInput,
+                  desiredLabel: desiredVideoLabel,
+                  onResolved: (resolvedId) => {
+                    chrome.storage.local.set({
+                      defaultVideoInput: resolvedId,
+                      defaultVideoInputLabel: desiredVideoLabel,
+                    });
+                  },
+                }
+              : null,
+            hasAudioDevice && desiredAudioLabel
+              ? {
+                  kind: "audioinput",
+                  desiredDeviceId: data.defaultAudioInput,
+                  desiredLabel: desiredAudioLabel,
+                  onResolved: (resolvedId) => {
+                    chrome.storage.local.set({
+                      defaultAudioInput: resolvedId,
+                      defaultAudioInputLabel: desiredAudioLabel,
+                    });
+                  },
+                }
+              : null,
+          ].filter(Boolean),
+        });
+      } catch (err) {
+        const cancelled = err?.name === "NotAllowedError";
+        debugWarn("Camera getUserMedia failed", err);
+        resetGateState();
+        sendRecordingError(
+          cancelled
+            ? "User cancelled the modal"
+            : "Failed to get user media: " + String(err),
+          cancelled,
+        );
+        return;
+      }
       debug("Camera userStream acquired", {
         videoTracks: userStream.getVideoTracks().length,
         audioTracks: userStream.getAudioTracks().length,
@@ -3885,6 +3962,13 @@ const Recorder = () => {
         path: "getDisplayMedia",
         streamId: stream.id,
       });
+      // The page learns what was picked here, as the desktop path does below.
+      chrome.runtime
+        .sendMessage({
+          type: "set-surface",
+          surface: stream.getVideoTracks()[0].getSettings().displaySurface,
+        })
+        .catch(() => {});
     } else {
       // Chrome's tab capture defaults to a 1920x1080 frame and pillarboxes
       // narrower tabs to fit. Match the constraint box to the tab's real
@@ -4192,6 +4276,27 @@ const Recorder = () => {
               tapSource.connect(analyser);
             } catch {}
           });
+        // Raw per-source taps, ahead of any gain, so a silent report can say
+        // which source was quiet and whether the graph or the input lost it.
+        const probes = {};
+        try {
+          if (data.systemAudio && sysTracks[0]) {
+            probes.sys = createSourceProbe(aCtx.current, sysTracks[0]);
+          }
+          const probeMicTrack = helperAudioStream.current?.getAudioTracks?.()[0];
+          if (probeMicTrack) {
+            probes.mic = createSourceProbe(aCtx.current, probeMicTrack);
+          }
+        } catch {}
+        const probeStartedAt = Date.now();
+        const probeId = setInterval(() => {
+          if (!isRecording.current || isFinishing.current) return;
+          Object.values(probes).forEach((p) => {
+            try {
+              p.sample();
+            } catch {}
+          });
+        }, 500);
         let silentSamples = 0;
         let alreadyReported = false;
         const SILENCE_THRESHOLD = 2;
@@ -4237,9 +4342,29 @@ const Recorder = () => {
                       typeof document !== "undefined"
                         ? document.visibilityState
                         : null,
+                    micActive: !!data.micActive,
+                    micGain: audioInputGain.current?.gain?.value ?? null,
+                    sources: snapshotProbes(probes, { resetWindow: true }),
+                    sysTrackLabel: String(sysTracks[0]?.label || "").slice(0, 80),
+                    sysTrackSettings: sysTracks[0]?.getSettings?.() ?? null,
                   },
                 });
               } catch {}
+              navigator.mediaDevices
+                ?.enumerateDevices?.()
+                .then((devices) => {
+                  chrome.runtime.sendMessage({
+                    type: "diag-forward",
+                    event: "recorder-audio-output-devices",
+                    data: {
+                      outputs: devices
+                        .filter((d) => d.kind === "audiooutput")
+                        .map((d) => String(d.label || "").slice(0, 80))
+                        .slice(0, 8),
+                    },
+                  });
+                })
+                .catch(() => {});
               // No toast: silence is normal (nobody speaking, or no audio), so a
               // mid-recording warning just gets in the way. Diag above still logs it.
             }
@@ -4251,12 +4376,19 @@ const Recorder = () => {
                 chrome.runtime.sendMessage({
                   type: "diag-forward",
                   event: "recorder-audio-recovered",
+                  data: { sources: snapshotProbes(probes) },
                 });
               } catch {}
             }
           }
         }, 5000);
-        silenceWatchdogRef.current = { intervalId, analyser };
+        silenceWatchdogRef.current = {
+          intervalId,
+          analyser,
+          probeId,
+          probes,
+          probeStartedAt,
+        };
       } catch (err) {
         console.warn("[Recorder] silence watchdog setup failed", err);
       }
@@ -4302,10 +4434,10 @@ const Recorder = () => {
         const { qualityValue: storedQuality } = await chrome.storage.local.get([
           "qualityValue",
         ]);
-        const { isPro, maxQuality } = await getFreeCaptureCaps();
-        const tierQuality = isPro
-          ? storedQuality
-          : clampQualityValue(storedQuality, maxQuality);
+        const tierQuality = resolveQualityValue(
+          storedQuality,
+          await getFreeCaptureCaps(),
+        );
         const { width: tierW, height: tierH } =
           getResolutionForQuality(tierQuality);
         if (rawW > 0 && rawH > 0 && tierW > 0 && tierH > 0) {
@@ -4322,13 +4454,18 @@ const Recorder = () => {
           probeData?.fastRecorderProbe?.details?.selectedVideoConfig || null;
         // Prefer the probe's codec; fall back to High L4.2 (Main is excluded
         // from the ladder for Windows MFT silent-no-output, see WCR).
-        const codec = probeConfig?.codec || "avc1.64002A";
         const bitrate =
           Number(probeConfig?.bitrate) || 4_000_000;
         const framerate =
           Number(settings.frameRate) ||
           Number(probeConfig?.framerate) ||
           30;
+        const codec = avcCodecForSize(
+          probeConfig?.codec || "avc1.64002A",
+          w,
+          h,
+          framerate,
+        );
         void startEncoderPrewarm({
           width: w,
           height: h,

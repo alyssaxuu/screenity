@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import Background from "./components/Background";
 import { useCameraContext } from "./context/CameraContext";
 import {
+  IS_WINDOW_COPY,
   getCameraStream,
   stopCameraStream,
   surfaceHandler,
@@ -184,6 +185,7 @@ const Camera = () => {
   // recording a monitor, old PiP was destroyed with old page, re-enter once the
   // new camera iframe has a live stream.
   useEffect(() => {
+    if (IS_WINDOW_COPY) return;
     if (!videoRef.current || !streamRef.current?.active) return;
 
     chrome.storage.local.get(
@@ -217,6 +219,7 @@ const Camera = () => {
   };
 
   useEffect(() => {
+    if (IS_WINDOW_COPY) return undefined;
     if (!videoRef.current) {
       console.warn("Video element not ready for PiP events.");
       return;
@@ -248,7 +251,7 @@ const Camera = () => {
           transform: "translate(-50%, -50%)",
           zIndex: 99,
           display: !backgroundEffects ? "block" : "none",
-          objectFit: isCameraMode ? "contain" : "cover",
+          objectFit: isCameraMode && !IS_WINDOW_COPY ? "contain" : "cover",
           objectPosition: "50% 50%",
         }}
         ref={videoRef}

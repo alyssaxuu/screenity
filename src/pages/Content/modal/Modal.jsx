@@ -1,4 +1,10 @@
-import React, { useState, useEffect, useContext, useCallback } from "react";
+import React, {
+  useState,
+  useEffect,
+  useContext,
+  useCallback,
+  useRef,
+} from "react";
 import * as AlertDialog from "@radix-ui/react-alert-dialog";
 
 // Context
@@ -22,6 +28,9 @@ const Modal = (props) => {
   const [colorSafe, setColorSafe] = useState(false);
   const [sideButton, setSideButton] = useState(false);
   const [sideButtonAction, setSideButtonAction] = useState(() => noop);
+  const [escapeAction, setEscapeAction] = useState(null);
+  const [focusAction, setFocusAction] = useState(false);
+  const actionRef = useRef(null);
 
   const openModal = useCallback(
     (
@@ -36,7 +45,9 @@ const Modal = (props) => {
       learnMoreLink = null,
       colorSafe = false,
       sideButton = false,
-      sideButtonAction = () => {}
+      sideButtonAction = () => {},
+      escapeAction = null,
+      focusAction = false
     ) => {
       setTitle(title);
       setDescription(description);
@@ -53,6 +64,10 @@ const Modal = (props) => {
       setSideButtonAction(() =>
         typeof sideButtonAction === "function" ? sideButtonAction : noop,
       );
+      setEscapeAction(() =>
+        typeof escapeAction === "function" ? escapeAction : null
+      );
+      setFocusAction(Boolean(focusAction));
     }
   );
 
@@ -93,11 +108,17 @@ const Modal = (props) => {
         <div className="AlertDialogOverlay"></div>
         <AlertDialog.Content
           className="AlertDialogContent"
+          onOpenAutoFocus={(e) => {
+            // Radix focuses Cancel by default; a safe primary action opts in to take it.
+            if (!focusAction || !actionRef.current) return;
+            e.preventDefault();
+            actionRef.current.focus();
+          }}
           onEscapeKeyDown={() => {
             // Escape == the cancel/secondary action. For modals that pause the
             // recording while open (restart/discard confirm), this resumes it
             // instead of leaving it stuck paused with the modal gone.
-            trigger2();
+            (escapeAction || trigger2)();
           }}
         >
           <AlertDialog.Title className="AlertDialogTitle">
@@ -152,6 +173,7 @@ const Modal = (props) => {
             {button1 && (
               <AlertDialog.Action asChild>
                 <button
+                  ref={actionRef}
                   className={!colorSafe ? "Button red" : "Button blue"}
                   onClick={() => trigger()}
                 >

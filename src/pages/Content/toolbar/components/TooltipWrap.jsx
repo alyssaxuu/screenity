@@ -68,6 +68,7 @@ const TooltipWrap = (props) => {
               }
             >
               <Tooltip.Content
+                sideOffset={props.sideOffset ?? 8}
                 onPointerEnter={cancelOpenTimer}
                 onPointerLeave={() => setOpen(false)}
                 className={

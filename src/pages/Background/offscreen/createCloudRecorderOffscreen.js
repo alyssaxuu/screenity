@@ -1,3 +1,4 @@
+import { noteOffscreenClose } from "./hostWatch";
 // Offscreen doc host for the recorder; immune to background-tab freeze/discard.
 // ?cloud=1 renders <CloudRecorder/>, else <Recorder/>. Chrome allows only one
 // offscreen doc per extension, so any existing one is closed first.
@@ -12,6 +13,7 @@ export const createCloudRecorderOffscreen = async ({ cloud = true } = {}) => {
       (c) => c.contextType === "OFFSCREEN_DOCUMENT",
     );
     if (hasOffscreen) {
+      noteOffscreenClose("create-preclose");
       await chrome.offscreen.closeDocument();
     }
   } catch (err) {

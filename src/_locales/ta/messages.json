@@ -1085,13 +1085,29 @@
     "message": "கணினி ஒலியைப் பதிவு செய்ய விரும்பினால், 'Share system audio' விருப்பத்தை இயக்க உறுதி செய்யுங்கள். இந்த விருப்பம் தெரியவில்லை எனில், Chrome-ஐப் புதுப்பிக்க முயற்சிக்கவும் அல்லது தாவல் பதிவுக்கு மாறவும்.",
     "description": "பிற கணினி வடிவம் க்கு ஒலியின் எச்சரிக்கை தலைப்பு"
   },
-  "maxResolutionLabel": {
-    "message": "அதிசய கருவி",
-    "description": "அமைப்புகள் பட்டியலில் அதிசய கருவி குறியீட்டு"
+  "qualityLabel": {
+    "message": "தரம்",
+    "description": "அமைப்புகள் மெனுவில் தரத்திற்கான லேபிள்"
   },
-  "maxFPSLabel": {
-    "message": "அதிகபட்ச FPS",
-    "description": "அமைப்புகள் பட்டியலில் அதிசய கோட்டிகள் குறியீட்டு"
+  "qualityAutoLabel": {
+    "message": "தானியங்கி",
+    "description": "அமைப்புகள் மெனுவில் தானியங்கி தர விருப்பம்"
+  },
+  "qualityCustomLabel": {
+    "message": "தனிப்பயன்",
+    "description": "தெளிவுத்திறன் அல்லது ஃபிரேம் வீதம் கைமுறையாகத் தேர்ந்தெடுக்கப்பட்டால் காட்டப்படும்"
+  },
+  "smootherMotionLabel": {
+    "message": "மென்மையான இயக்கத்திற்கு முன்னுரிமை",
+    "description": "தெளிவை விட மென்மையான வீடியோவுக்கு முன்னுரிமை தரும் தர அமைப்புகளில் உள்ள சுவிட்ச்"
+  },
+  "resolutionGroupLabel": {
+    "message": "தெளிவுத்திறன்",
+    "description": "தெளிவுத்திறன் விருப்பங்களுக்கு மேலுள்ள தலைப்பு"
+  },
+  "frameRateGroupLabel": {
+    "message": "ஃபிரேம் வீதம்",
+    "description": "ஃபிரேம் வீத விருப்பங்களுக்கு மேலுள்ள தலைப்பு"
   },
   "notEnoughRAM": {
     "message": "புதிய ரேம் போதுமில்லை",
@@ -1904,5 +1920,141 @@
   "unsavedRecordingModalDismiss": {
     "message": "மீண்டும் காட்ட வேண்டாம்",
     "description": "Side button: start the recording and stop prompting about unsaved recordings."
+  },
+  "teleprompterLabel": {
+    "message": "டெலிப்ராம்ப்டர்",
+    "description": "Switch label: opens the floating teleprompter window"
+  },
+  "teleprompterUnavailableLabel": {
+    "message": "டெலிப்ராம்ப்டர் (இந்தப் பக்கத்தில் கிடைக்கவில்லை)",
+    "description": "Switch label shown when the page cannot open the teleprompter window"
+  },
+  "teleprompterIntroTitle": {
+    "message": "டெலிப்ராம்ப்டர் எப்படி வேலை செய்கிறது",
+    "description": "Modal title shown the first time the teleprompter is switched on"
+  },
+  "teleprompterIntroDescription": {
+    "message": "நீங்கள் ஒரு சாளரத்தையோ தாவலையோ பகிரும்போது, ஒரு பகுதியைப் பதிவு செய்யும்போது அல்லது கேமராவை மட்டும் பதிவு செய்யும்போது, உங்கள் ஸ்கிரிப்ட் பதிவில் வராத மிதக்கும் சாளரத்தில் திறக்கும். முழுத் திரையையும் பகிர்ந்தால் அந்தச் சாளரம் வீடியோவில் தெரியும், அதனால் தொடங்கும்போது அது மூடப்படும். உங்கள் ஸ்கிரிப்ட் எப்போதும் சேமிக்கப்படும்.",
+    "description": "Modal body: where the script window shows and when it closes"
+  },
+  "teleprompterClosedToast": {
+    "message": "பதிவில் வராமல் இருக்க டெலிப்ராம்ப்டர் மூடப்பட்டது",
+    "description": "Toast: the teleprompter window was closed because the whole screen is being recorded"
+  },
+  "teleprompterPlaceholder": {
+    "message": "உங்கள் ஸ்கிரிப்டை எழுதவும் அல்லது ஒட்டவும்",
+    "description": "Placeholder in the empty teleprompter script box"
+  },
+  "teleprompterPlay": {
+    "message": "ஸ்க்ரோலிங்கைத் தொடங்கு",
+    "description": "Teleprompter button: start scrolling the script"
+  },
+  "teleprompterPause": {
+    "message": "ஸ்க்ரோலிங்கை இடைநிறுத்து",
+    "description": "Teleprompter button: pause scrolling the script"
+  },
+  "teleprompterMore": {
+    "message": "மேலும் ஸ்கிரிப்ட் விருப்பங்கள்",
+    "description": "Teleprompter button: open the script options menu"
+  },
+  "teleprompterTextSize": {
+    "message": "உரை அளவு",
+    "description": "Teleprompter menu row: text size"
+  },
+  "teleprompterSpeed": {
+    "message": "வேகம்",
+    "description": "Teleprompter menu row: scroll speed"
+  },
+  "teleprompterSmaller": {
+    "message": "சிறிய உரை",
+    "description": "Teleprompter button: decrease text size"
+  },
+  "teleprompterLarger": {
+    "message": "பெரிய உரை",
+    "description": "Teleprompter button: increase text size"
+  },
+  "teleprompterSlower": {
+    "message": "மெதுவாக",
+    "description": "Teleprompter button: scroll slower"
+  },
+  "teleprompterFaster": {
+    "message": "வேகமாக",
+    "description": "Teleprompter button: scroll faster"
+  },
+  "teleprompterWpmUnit": {
+    "message": "சொல்/நிமி",
+    "description": "Unit shown after the scroll speed, words per minute"
+  },
+  "teleprompterScrollOnStart": {
+    "message": "பதிவு தொடங்கும்போது ஸ்க்ரோல் செய்",
+    "description": "Teleprompter menu option: start scrolling when the recording starts"
+  },
+  "teleprompterRewind": {
+    "message": "மேலே திரும்ப ஸ்க்ரோல் செய்",
+    "description": "Teleprompter menu option: scroll the script back to the top"
+  },
+  "teleprompterHide": {
+    "message": "ஸ்கிரிப்டை மறை",
+    "description": "Teleprompter menu option: close the teleprompter window"
+  },
+  "teleprompterPlayDisabled": {
+    "message": "பதிவைத் தொடங்கியவுடன் தானாக ஸ்க்ரோல் ஆகும்",
+    "description": "Tooltip on the disabled teleprompter play button before recording starts"
+  },
+  "teleprompterFullScreenTitle": {
+    "message": "டெலிப்ராம்ப்டர் மூடப்படும்",
+    "description": "Modal title: the teleprompter window is about to be closed because the whole screen is recorded"
+  },
+  "teleprompterFullScreenDescription": {
+    "message": "நீங்கள் முழுத் திரையையும் பதிவு செய்வதால், டெலிப்ராம்ப்டர் சாளரம் வீடியோவில் தெரியும். அது பதிவில் வராமல் இருக்க அதை மூடுவோம். அதைத் திறந்தே வைக்கலாம், ஆனால் அது பதிவாகும்.",
+    "description": "Modal body: why the teleprompter window closes when recording the entire screen"
+  },
+  "teleprompterFullScreenClose": {
+    "message": "சரி, மூடு",
+    "description": "Modal button: close the teleprompter window and start recording"
+  },
+  "teleprompterFullScreenKeep": {
+    "message": "தெரியும்படி வை",
+    "description": "Modal button: keep the teleprompter window open even though it will be recorded"
+  },
+  "teleprompterFullScreenNever": {
+    "message": "மீண்டும் காட்ட வேண்டாம்",
+    "description": "Modal side button: close the teleprompter window and do not show this modal again"
+  },
+  "cameraFullScreenTitle": {
+    "message": "கேமரா சாளரம் மூடப்படும்",
+    "description": "Modal title: the camera window is about to be closed because the whole screen is recorded"
+  },
+  "cameraFullScreenDescription": {
+    "message": "நீங்கள் முழுத் திரையையும் பதிவு செய்கிறீர்கள், அதனால் கேமரா சாளரம் வீடியோவில் தோன்றும். பதிவில் வராமல் இருக்க அதை மூடுவோம். உங்கள் கேமரா தொடர்ந்து பதிவாகும்.",
+    "description": "Modal body: why the camera window closes when recording the entire screen"
+  },
+  "teleprompterClear": {
+    "message": "ஸ்கிரிப்டை அழி",
+    "description": "Script menu item: empty the script"
+  },
+  "teleprompterClearConfirm": {
+    "message": "அழிக்க மீண்டும் கிளிக் செய்யவும்",
+    "description": "Script menu item after the first click: asks for a second click to empty the script"
+  },
+  "teleprompterHideCamera": {
+    "message": "கேமராவைப் பக்கத்துக்கு நகர்த்து",
+    "description": "Teleprompter menu option: move the camera picture out of this window and back onto the page"
+  },
+  "teleprompterShowCamera": {
+    "message": "கேமராவை இங்கே நகர்த்து",
+    "description": "Teleprompter menu option: move the camera picture from the page into this window"
+  },
+  "teleprompterShow": {
+    "message": "ஸ்கிரிப்டைக் காட்டு",
+    "description": "Teleprompter menu option: show the script in the floating window"
+  },
+  "pressRecordOnPageToast": {
+    "message": "முதல் முறை பக்கத்தில் “பதிவு செய்ய ஆரம்பிக்கவும்” என்பதை அழுத்துங்கள்; அப்போது Chrome திரைப் பதிவுக்கான அனுமதியைக் கேட்கும்.",
+    "description": "Toast shown when Record was pressed in the floating window and Chrome still needs a click on the page to ask for screen capture access"
+  },
+  "teleprompterRegionStartOnPage": {
+    "message": "பகுதி பதிவை பக்கத்திலிருந்தே தொடங்க வேண்டும்",
+    "description": "Tooltip on the disabled Start button in the floating teleprompter window when recording a region, which can only be started from the page"
   }
 }

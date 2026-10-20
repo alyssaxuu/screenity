@@ -292,7 +292,11 @@ export const chooseTrackEncoder = async ({
   enableAudio,
   createMediaRecorder,
   onDataAvailable,
+  onRecorderError,
   probeOptions,
+  maxWidth,
+  maxHeight,
+  fps,
 }) => {
   const plan = await inspectTrackPlan({ track, probeOptions, stream, separated });
 
@@ -351,6 +355,9 @@ export const chooseTrackEncoder = async ({
       Boolean(plan.cameraPreferSoftware) ||
       Boolean(plan.screenPreferSoftware),
     trackKind: track,
+    maxWidth,
+    maxHeight,
+    fps,
   });
   recorder.ondataavailable = (event) => {
     if (event.data && event.data.size > 0) {
@@ -378,6 +385,9 @@ export const chooseTrackEncoder = async ({
       `[chooseEncoder] WebCodecs ${track} runtime error:`,
       err,
     );
+    try {
+      onRecorderError?.(err, track);
+    } catch {}
     // Pro marks failures per-session (in-memory) instead of persisting
     // useWebCodecsRecorder=false; fresh HW probes run each session.
     void markFastRecorderFailure(`cloud-${track}-runtime`, {

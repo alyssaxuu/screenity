@@ -6,7 +6,10 @@ import {
   clearEditorTabReference,
 } from "../tabManagement";
 import { loginWithWebsite } from "../auth/loginWithWebsite";
-import { handleFinishMultiRecording } from "../messaging/handlers";
+import {
+  handleFinishMultiRecording,
+  submitStageDiagnosticReport,
+} from "../messaging/handlers";
 
 const CLOUD_FEATURES_ENABLED =
   process.env.SCREENITY_ENABLE_CLOUD_FEATURES === "true";
@@ -15,7 +18,107 @@ export const onMessageExternalListener = () => {
   if (!CLOUD_FEATURES_ENABLED) return;
 
   chrome.runtime.onMessageExternal.addListener(
-    async (message, sender, sendResponse) => {
+    (message, sender, sendResponse) => {
+      // Return true synchronously to keep sendResponse alive across awaits.
+      if (message?.type === "OPEN_POPUP_PROJECT") {
+        handleOpenPopupProject(message).then(sendResponse);
+        return true;
+      }
+      handleExternalMessage(message, sender, sendResponse)
+        .catch((err) => console.warn("External message failed:", err))
+        .finally(() => {
+          try {
+            sendResponse();
+          } catch {}
+        });
+      return true;
+    },
+  );
+};
+
+const reportStage = (stage, extra = {}) =>
+  submitStageDiagnosticReport({
+    attemptId: `op-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
+    trigger: "error",
+    outcome: "error",
+    stage,
+    ...extra,
+  });
+
+const handleOpenPopupProject = async (message) => {
+  try {
+    const tab = await getCurrentTab();
+    if (!tab?.id) {
+      console.warn("No active tab found for popup reopen");
+      reportStage("no-active-tab");
+      return { ok: false, stage: "no-active-tab" };
+    }
+
+    await chrome.storage.local.set({
+      recordingProjectTitle: message.recordingProjectTitle,
+      recordingToScene: true,
+      instantMode: false,
+      projectId: message.projectId,
+      activeSceneId: message.activeSceneId,
+    });
+
+    const parsedTarget = parseEditorTargetUrl(tab.url);
+    if (parsedTarget?.projectId === message.projectId) {
+      await setEditorTabReference({
+        tabId: tab.id,
+        tabUrl: tab.url,
+        source: "webapp-open-popup-project",
+        expectedProjectId: message.projectId,
+      });
+    } else {
+      await clearEditorTabReference("webapp-open-popup-project-not-editor", {
+        tabId: tab.id,
+        tabUrl: tab.url,
+        expectedProjectId: message.projectId,
+      });
+    }
+
+    const result = await loginWithWebsite({ force: true });
+
+    if (!result?.authenticated) {
+      const currentTab = await getCurrentTab();
+      if (currentTab?.id) {
+        await chrome.storage.local.set({ originalTabId: currentTab.id });
+      }
+
+      chrome.tabs.create({
+        url: `${process.env.SCREENITY_APP_BASE}/login?extension=true`,
+        active: true,
+      });
+      return { ok: false, stage: "login-required" };
+    }
+
+    try {
+      await sendMessageTab(tab.id, {
+        type: "open-popup-project",
+        projectTitle: message.recordingProjectTitle,
+        projectId: message.projectId,
+        activeSceneId: message.activeSceneId,
+        recordingToScene: true,
+      });
+    } catch (err) {
+      // Content handler may not reply; a closed port still means delivered.
+      if (!String(err).includes("message port closed before a response")) {
+        console.warn("Failed to send popup project message:", err);
+        reportStage("send-tab-failed");
+        return { ok: false, stage: "send-tab-failed" };
+      }
+    }
+    return { ok: true, stage: "delivered" };
+  } catch (err) {
+    console.warn("Failed to open popup project:", err);
+    reportStage("handler-threw");
+    return { ok: false, stage: "handler-threw" };
+  }
+};
+
+const handleExternalMessage = (message, sender, sendResponse) =>
+  (async () => {
       if (message.type === "AUTH_SUCCESS" && message.token) {
         const { stayLoggedOut } = await chrome.storage.local.get([
           "stayLoggedOut",
@@ -89,63 +192,6 @@ export const onMessageExternalListener = () => {
         ]);
 
         return true;
-      } else if (message.type === "OPEN_POPUP_PROJECT") {
-        try {
-          const tab = await getCurrentTab();
-          if (!tab?.id) {
-            console.warn("No active tab found for popup reopen");
-            return;
-          }
-
-          await chrome.storage.local.set({
-            recordingProjectTitle: message.recordingProjectTitle,
-            recordingToScene: true,
-            instantMode: false,
-            projectId: message.projectId,
-            activeSceneId: message.activeSceneId,
-          });
-
-          const parsedTarget = parseEditorTargetUrl(tab.url);
-          if (parsedTarget?.projectId === message.projectId) {
-            await setEditorTabReference({
-              tabId: tab.id,
-              tabUrl: tab.url,
-              source: "webapp-open-popup-project",
-              expectedProjectId: message.projectId,
-            });
-          } else {
-            await clearEditorTabReference("webapp-open-popup-project-not-editor", {
-              tabId: tab.id,
-              tabUrl: tab.url,
-              expectedProjectId: message.projectId,
-            });
-          }
-
-          const result = await loginWithWebsite({ force: true });
-
-          if (!result?.authenticated) {
-            const currentTab = await getCurrentTab();
-            if (currentTab?.id) {
-              await chrome.storage.local.set({ originalTabId: currentTab.id });
-            }
-
-            chrome.tabs.create({
-              url: `${process.env.SCREENITY_APP_BASE}/login?extension=true`,
-              active: true,
-            });
-            return;
-          }
-
-          await sendMessageTab(tab.id, {
-            type: "open-popup-project",
-            projectTitle: message.recordingProjectTitle,
-            projectId: message.projectId,
-            activeSceneId: message.activeSceneId,
-            recordingToScene: true,
-          });
-        } catch (err) {
-          console.warn("Failed to send popup project message:", err);
-        }
       } else if (message.type === "GET_PROJECT_INFO") {
         const tab = await getCurrentTab();
         if (!tab?.id) {
@@ -180,6 +226,4 @@ export const onMessageExternalListener = () => {
         sendResponse({ success: true });
         return true;
       }
-    }
-  );
-};
+  })();

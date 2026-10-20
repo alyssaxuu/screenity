@@ -1085,13 +1085,29 @@
     "message": "Для записи звука с компьютера убедитесь, что включена опция 'Делиться аудио системы'. Если вы не видите эту опцию, попробуйте обновить Chrome или перейти на опцию записи вкладок.",
     "description": "Описание предупреждения о звуке для других систем"
   },
-  "maxResolutionLabel": {
-    "message": "Максимальное разрешение",
-    "description": "Метка максимального разрешения в меню настроек"
+  "qualityLabel": {
+    "message": "Качество",
+    "description": "Метка качества в меню настроек"
   },
-  "maxFPSLabel": {
-    "message": "Максимальное количество кадров в секунду",
-    "description": "Метка максимального количества кадров в секунду в меню настроек"
+  "qualityAutoLabel": {
+    "message": "Авто",
+    "description": "Вариант автоматического качества в меню настроек"
+  },
+  "qualityCustomLabel": {
+    "message": "Вручную",
+    "description": "Показывается, когда разрешение или частота кадров выбраны вручную"
+  },
+  "smootherMotionLabel": {
+    "message": "Приоритет плавного движения",
+    "description": "Переключатель в настройках качества: плавное видео важнее чёткости"
+  },
+  "resolutionGroupLabel": {
+    "message": "Разрешение",
+    "description": "Заголовок над вариантами разрешения"
+  },
+  "frameRateGroupLabel": {
+    "message": "Частота кадров",
+    "description": "Заголовок над вариантами частоты кадров"
   },
   "notEnoughRAM": {
     "message": "Недостаточно оперативной памяти",
@@ -1904,5 +1920,141 @@
   "unsavedRecordingModalDismiss": {
     "message": "Больше не показывать",
     "description": "Side button: start the recording and stop prompting about unsaved recordings."
+  },
+  "teleprompterLabel": {
+    "message": "Телесуфлёр",
+    "description": "Switch label: opens the floating teleprompter window"
+  },
+  "teleprompterUnavailableLabel": {
+    "message": "Телесуфлёр (недоступен на этой странице)",
+    "description": "Switch label shown when the page cannot open the teleprompter window"
+  },
+  "teleprompterIntroTitle": {
+    "message": "Как работает телесуфлёр",
+    "description": "Modal title shown the first time the teleprompter is switched on"
+  },
+  "teleprompterIntroDescription": {
+    "message": "Ваш сценарий открывается в плавающем окне, которое не попадает в запись, когда вы делитесь окном или вкладкой, записываете область или только камеру. Если вы делитесь всем экраном, окно попало бы в видео, поэтому оно закрывается при старте. Сценарий всегда сохраняется.",
+    "description": "Modal body: where the script window shows and when it closes"
+  },
+  "teleprompterClosedToast": {
+    "message": "Телесуфлёр закрыт, чтобы не попасть в запись",
+    "description": "Toast: the teleprompter window was closed because the whole screen is being recorded"
+  },
+  "teleprompterPlaceholder": {
+    "message": "Напишите или вставьте свой текст",
+    "description": "Placeholder in the empty teleprompter script box"
+  },
+  "teleprompterPlay": {
+    "message": "Начать прокрутку",
+    "description": "Teleprompter button: start scrolling the script"
+  },
+  "teleprompterPause": {
+    "message": "Приостановить прокрутку",
+    "description": "Teleprompter button: pause scrolling the script"
+  },
+  "teleprompterMore": {
+    "message": "Другие параметры текста",
+    "description": "Teleprompter button: open the script options menu"
+  },
+  "teleprompterTextSize": {
+    "message": "Размер текста",
+    "description": "Teleprompter menu row: text size"
+  },
+  "teleprompterSpeed": {
+    "message": "Скорость",
+    "description": "Teleprompter menu row: scroll speed"
+  },
+  "teleprompterSmaller": {
+    "message": "Уменьшить текст",
+    "description": "Teleprompter button: decrease text size"
+  },
+  "teleprompterLarger": {
+    "message": "Увеличить текст",
+    "description": "Teleprompter button: increase text size"
+  },
+  "teleprompterSlower": {
+    "message": "Медленнее",
+    "description": "Teleprompter button: scroll slower"
+  },
+  "teleprompterFaster": {
+    "message": "Быстрее",
+    "description": "Teleprompter button: scroll faster"
+  },
+  "teleprompterWpmUnit": {
+    "message": "сл/мин",
+    "description": "Unit shown after the scroll speed, words per minute"
+  },
+  "teleprompterScrollOnStart": {
+    "message": "Прокручивать при старте записи",
+    "description": "Teleprompter menu option: start scrolling when the recording starts"
+  },
+  "teleprompterRewind": {
+    "message": "Прокрутить в начало",
+    "description": "Teleprompter menu option: scroll the script back to the top"
+  },
+  "teleprompterHide": {
+    "message": "Скрыть текст",
+    "description": "Teleprompter menu option: close the teleprompter window"
+  },
+  "teleprompterPlayDisabled": {
+    "message": "Прокручивается автоматически после начала записи",
+    "description": "Tooltip on the disabled teleprompter play button before recording starts"
+  },
+  "teleprompterFullScreenTitle": {
+    "message": "Телесуфлёр будет закрыт",
+    "description": "Modal title: the teleprompter window is about to be closed because the whole screen is recorded"
+  },
+  "teleprompterFullScreenDescription": {
+    "message": "Вы записываете весь экран, поэтому окно телесуфлёра попало бы в видео. Мы закроем его, чтобы оно не оказалось в записи. Можно оставить его открытым, но тогда оно будет записано.",
+    "description": "Modal body: why the teleprompter window closes when recording the entire screen"
+  },
+  "teleprompterFullScreenClose": {
+    "message": "ОК, закрыть",
+    "description": "Modal button: close the teleprompter window and start recording"
+  },
+  "teleprompterFullScreenKeep": {
+    "message": "Оставить видимым",
+    "description": "Modal button: keep the teleprompter window open even though it will be recorded"
+  },
+  "teleprompterFullScreenNever": {
+    "message": "Больше не показывать",
+    "description": "Modal side button: close the teleprompter window and do not show this modal again"
+  },
+  "cameraFullScreenTitle": {
+    "message": "Окно камеры будет закрыто",
+    "description": "Modal title: the camera window is about to be closed because the whole screen is recorded"
+  },
+  "cameraFullScreenDescription": {
+    "message": "Вы записываете весь экран, поэтому окно камеры попало бы в видео. Мы закроем его, чтобы оно не оказалось в записи. Камера по-прежнему записывается.",
+    "description": "Modal body: why the camera window closes when recording the entire screen"
+  },
+  "teleprompterClear": {
+    "message": "Очистить текст",
+    "description": "Script menu item: empty the script"
+  },
+  "teleprompterClearConfirm": {
+    "message": "Нажмите ещё раз, чтобы очистить",
+    "description": "Script menu item after the first click: asks for a second click to empty the script"
+  },
+  "teleprompterHideCamera": {
+    "message": "Перенести камеру на страницу",
+    "description": "Teleprompter menu option: move the camera picture out of this window and back onto the page"
+  },
+  "teleprompterShowCamera": {
+    "message": "Перенести камеру сюда",
+    "description": "Teleprompter menu option: move the camera picture from the page into this window"
+  },
+  "teleprompterShow": {
+    "message": "Показать текст",
+    "description": "Teleprompter menu option: show the script in the floating window"
+  },
+  "pressRecordOnPageToast": {
+    "message": "Нажмите «Начать запись» на странице один раз, чтобы Chrome мог запросить доступ к захвату экрана.",
+    "description": "Toast shown when Record was pressed in the floating window and Chrome still needs a click on the page to ask for screen capture access"
+  },
+  "teleprompterRegionStartOnPage": {
+    "message": "Запись области нужно начинать со страницы",
+    "description": "Tooltip on the disabled Start button in the floating teleprompter window when recording a region, which can only be started from the page"
   }
 }

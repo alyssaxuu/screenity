@@ -122,15 +122,25 @@ const CameraWrap = (props) => {
     };
   }, []);
 
-  const idle = !contentState.recording && !contentState.pendingRecording;
+  // Starting spans the Start click to the end of the take (picker, preparing,
+  // start prompt, countdown), so the bubble leaves with the click and stays gone.
+  const idle =
+    !contentState.recording &&
+    !contentState.pendingRecording &&
+    !contentState.preparingRecording &&
+    !contentState.startGateOpen &&
+    !contentState.countdownActive &&
+    !contentState.isCountdownVisible;
   // Keyed off the real PiP window, not `surface`, which arrives only after an
   // auth round-trip. pipActive false until "pip-started" keeps the bubble.
   const hidden =
-    !idle &&
-    (contentState.pipActive ||
-      (contentState.isSubscribed &&
-        (!contentState.instantMode || contentState.multiMode)) ||
-      contentState.onboarding);
+    contentState.cameraInWindow ||
+    (!idle &&
+      !contentState.cameraOnPage &&
+      (contentState.pipActive ||
+        (contentState.isSubscribed &&
+          (!contentState.instantMode || contentState.multiMode)) ||
+        contentState.onboarding));
 
   return (
     <div

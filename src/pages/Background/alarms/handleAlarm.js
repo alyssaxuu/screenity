@@ -128,11 +128,13 @@ export const handleAlarm = async (alarm) => {
     ]);
     if (!(snap.recording || snap.pendingRecording) || !snap.recordingTab) {
       await chrome.alarms.clear(RECORDER_KEEPALIVE_ALARM);
-      await chrome.storage.local.set({
-        recordingStallLevel: 0,
-        firstChunkAt: null,
-        lastChunkAt: null,
-      });
+      // A live offscreen take has no recordingTab. Its stamps are what the
+      // dead-host check in resumePendingUploads compares, so keep them.
+      await chrome.storage.local.set(
+        snap.recording || snap.pendingRecording
+          ? {}
+          : { recordingStallLevel: 0, firstChunkAt: null, lastChunkAt: null },
+      );
       // Backstop: the session is over. Remove any recorder tab still
       // alive; a final guard if both the recorder's own abandonment
       // listener and the teardown sweep somehow missed it. Gated on no

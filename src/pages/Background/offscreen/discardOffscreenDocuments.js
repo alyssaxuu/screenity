@@ -1,5 +1,6 @@
 import { closeOffscreenDocumentWithFlush } from "./closeOffscreenDocumentWithFlush";
 import { perfSpan } from "../../utils/perfMarks";
+import { noteOffscreenClose, noteOffscreenCloseSkipped } from "./hostWatch";
 
 // The separated mic uploads from inside the offscreen document after the scene
 // POST, but the BG discards that document ~80ms later on editor-ready, killing
@@ -40,17 +41,51 @@ export const discardOffscreenDocuments = async ({
 } = {}) => {
   console.warn("[Screenity][discardOffscreenDocuments]", { reason, flush, shouldFinalize, stack: new Error().stack });
   const endFlush = perfSpan("BG.offscreen discardOffscreenDocuments", { reason, flush });
+  // The mic wait below can outlast a new recording's start, so pin the document.
+  let expectedDocumentId = null;
+  let contextsRead = false;
+  try {
+    const ctx = await chrome.runtime.getContexts({});
+    expectedDocumentId =
+      ctx.find((c) => c.contextType === "OFFSCREEN_DOCUMENT")?.documentId ||
+      null;
+    contextsRead = true;
+  } catch {}
   // Discard/cancel must not wait on the take it is throwing away.
   if (shouldFinalize) await waitForMicUpload();
+  // No document at discard start, so one now is a new take's.
+  let startedAfterDiscard = false;
+  if (contextsRead && !expectedDocumentId) {
+    try {
+      const ctx = await chrome.runtime.getContexts({});
+      startedAfterDiscard = ctx.some(
+        (c) => c.contextType === "OFFSCREEN_DOCUMENT"
+      );
+    } catch {}
+  }
   try {
-    if (flush) {
-      await closeOffscreenDocumentWithFlush({ reason, shouldFinalize });
+    if (startedAfterDiscard) {
+      noteOffscreenCloseSkipped("discard:replaced");
+    } else if (flush) {
+      await closeOffscreenDocumentWithFlush({
+        reason,
+        shouldFinalize,
+        expectedDocumentId,
+      });
     } else {
       const existingContexts = await chrome.runtime.getContexts({});
       const offscreenDocument = existingContexts.find(
         (c) => c.contextType === "OFFSCREEN_DOCUMENT"
       );
-      if (offscreenDocument) {
+      if (
+        offscreenDocument &&
+        expectedDocumentId &&
+        offscreenDocument.documentId &&
+        offscreenDocument.documentId !== expectedDocumentId
+      ) {
+        noteOffscreenCloseSkipped("discard-noflush:replaced");
+      } else if (offscreenDocument) {
+        noteOffscreenClose("discard-noflush");
         await chrome.offscreen.closeDocument();
       }
     }

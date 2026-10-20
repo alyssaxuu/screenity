@@ -37,12 +37,19 @@ import {
   validateFastRecorderOutputBlob,
   isFastRecorderFailureTransient,
 } from "../../media/fastRecorderGate";
-import { getResolutionForQuality } from "../Recorder/recorderConfig";
+import {
+  getResolutionForQuality,
+  getFreeCaptureCaps,
+  resolveQualityValue,
+  resolveFps,
+} from "../Recorder/recorderConfig";
+import { avcCodecForSize } from "../../media/avcLevel";
 import { chooseWriter } from "../Recorder/recorderStorage/chooseWriter";
 import { chooseReader } from "../Recorder/recorderStorage/chooseReader";
 import { lifecycle } from "../utils/lifecycleLog";
 import { perfMark, perfSpan } from "../utils/perfMarks";
 import { markStartProgress } from "../utils/startProgress";
+import { prewarmSpeedTest, prewarmSustainedEncode } from "../Recorder/prewarmSustained";
 
 import localforage from "localforage";
 import { activeChunksStore } from "../utils/chunkStores";
@@ -666,6 +673,12 @@ const Recorder = () => {
     }
   }
 
+  // Local Auto takes 4K only from a cached speed test, and this hidden iframe
+  // is the one place an unsubscribed user's device gets measured.
+  useEffect(() => {
+    prewarmSpeedTest(prewarmSustainedEncode);
+  }, []);
+
   useEffect(() => {
     window.parent.postMessage(
       {
@@ -839,8 +852,12 @@ const Recorder = () => {
     await chunksStore.clear();
 
     try {
-      const { qualityValue } = await chrome.storage.local.get(["qualityValue"]);
+      const { qualityValue: storedQuality } = await chrome.storage.local.get([
+        "qualityValue",
+      ]);
       const { fpsValue } = await chrome.storage.local.get(["fpsValue"]);
+      const captureCaps = await getFreeCaptureCaps();
+      const qualityValue = resolveQualityValue(storedQuality, captureCaps);
       const activeVideoTrack =
         liveStream.current?.getVideoTracks?.()[0] ||
         helperVideoStream.current?.getVideoTracks?.()[0] ||
@@ -859,8 +876,10 @@ const Recorder = () => {
           : 1080;
       let fps = Number.parseInt(fpsValue, 10);
       if (!Number.isFinite(fps) || fps <= 0) {
-        fps =
-          Number.isFinite(trackSettings.frameRate) && trackSettings.frameRate > 0
+        fps = captureCaps.smoother
+          ? 60
+          : Number.isFinite(trackSettings.frameRate) &&
+              trackSettings.frameRate > 0
             ? Math.round(trackSettings.frameRate)
             : 30;
       }
@@ -2307,13 +2326,12 @@ const Recorder = () => {
     try {
       const endStorageReads = perfSpan("Region.Recorder storage.reads");
       const { qualityValue } = await chrome.storage.local.get(["qualityValue"]);
-      const { width, height } = getResolutionForQuality(qualityValue);
+      const captureCaps = await getFreeCaptureCaps();
+      const { width, height } = getResolutionForQuality(
+        resolveQualityValue(qualityValue, captureCaps),
+      );
       const { fpsValue } = await chrome.storage.local.get(["fpsValue"]);
-      let fps = parseInt(fpsValue);
-
-      if (isNaN(fps)) {
-        fps = 30;
-      }
+      let fps = resolveFps(fpsValue, captureCaps);
       endStorageReads();
 
       let stream;
@@ -2519,7 +2537,12 @@ const Recorder = () => {
               void startEncoderPrewarm({
                 width: warmW,
                 height: warmH,
-                codec: probeConfig?.codec || "avc1.64002A",
+                codec: avcCodecForSize(
+                  probeConfig?.codec || "avc1.64002A",
+                  warmW,
+                  warmH,
+                  fps || 30,
+                ),
                 bitrate: Number(probeConfig?.bitrate) || 4_000_000,
                 framerate: Number(probeConfig?.framerate) || fps || 30,
               });

@@ -1,3 +1,10 @@
+import {
+  readCache,
+  passes,
+  rateKey,
+  TARGET_FPS,
+} from "../CloudRecorder/sustainedEncode.js";
+
 // Pair video + audio codec explicitly (w3c/mediacapture-record#194); Chrome
 // mis-tags blob.type otherwise. MP4 (H.264+AAC) first since VFR VP9/WebM breaks
 // downstream (Bunny drops frames, node-av SIGSEGVs); isTypeSupported gates it.
@@ -58,20 +65,126 @@ export function computeTargetVideoBps(width, height, fps, isPro = false) {
   return Math.max(VIDEO_BPS_MIN, Math.min(VIDEO_BPS_MAX, target));
 }
 
+const QUALITY_ORDER = ["240p", "360p", "480p", "720p", "1080p", "4k"];
+
+export const AUTO = "auto";
+
+// Rates the sustained-encode test cached for this device (null before it
+// runs). Shared with the cloud recorder through localStorage.
+const readSustainedRates = () => {
+  try {
+    return readCache(localStorage);
+  } catch {
+    return null;
+  }
+};
+
+// Same RAM read the settings menu uses: Macs don't report deviceMemory.
+export const deviceRamGb = () => {
+  try {
+    if (navigator.userAgent.includes("Macintosh")) return 32;
+    return Number(navigator.deviceMemory) || 4;
+  } catch {
+    return 4;
+  }
+};
+
 export async function getFreeCaptureCaps() {
   try {
-    const { isLoggedIn, isSubscribed } = await chrome.storage.local.get([
+    const {
+      isLoggedIn,
+      isSubscribed,
+      fastRecorderProbe,
+      smootherMotion,
+      fpsValue,
+    } = await chrome.storage.local.get([
       "isLoggedIn",
       "isSubscribed",
+      "fastRecorderProbe",
+      "smootherMotion",
+      "fpsValue",
     ]);
+    const isPro = Boolean(isLoggedIn && isSubscribed);
     return {
-      isPro: Boolean(isLoggedIn && isSubscribed),
-      maxQuality: "1080p",
+      isPro,
+      maxQuality: "4k",
       maxFps: 60,
+      support: fastRecorderProbe?.details || null,
+      // The checkbox is disabled under a fixed fps, so a stored true is stale.
+      smoother:
+        smootherMotion === true &&
+        !(Number.parseInt(fpsValue, 10) > 0),
+      fixedFps:
+        Number.parseInt(fpsValue, 10) > 0 ? Number.parseInt(fpsValue, 10) : null,
+      sustained: readSustainedRates(),
+      ram: deviceRamGb(),
     };
   } catch {
-    return { isPro: false, maxQuality: "1080p", maxFps: 60 };
+    return {
+      isPro: false,
+      maxQuality: "1080p",
+      maxFps: 60,
+      support: null,
+      smoother: false,
+      fixedFps: null,
+      sustained: null,
+      ram: 4,
+    };
   }
+}
+
+const clampQuality = (value, maxValue) => {
+  const current = QUALITY_ORDER.includes(value) ? value : "1080p";
+  const max = QUALITY_ORDER.includes(maxValue) ? maxValue : "1080p";
+  return QUALITY_ORDER.indexOf(current) <= QUALITY_ORDER.indexOf(max)
+    ? current
+    : max;
+};
+
+const hardware4kPassed = (support) =>
+  support?.supports4k === true &&
+  support?.supports4kConfig?.hardwareAcceleration === "prefer-hardware";
+
+const MIN_AUTO_4K_RAM_GB = 8;
+
+// True only if the speed test measured 4K keeping up at the Auto frame rate.
+// Unmeasured is no: a new device's first take stays at 1080p while the cache fills.
+const sustains4k = (sustained, fps) =>
+  passes(sustained?.[rateKey("2160p", fps)], fps);
+
+// Auto takes 4K only if the probe passed it on hardware AND the sustained test
+// kept up, with a RAM floor as backstop. A picked 4k drops to 1080p only when
+// the probe said 4K can't be encoded; an unknown probe keeps the choice.
+export function resolveQualityValue(stored, caps = {}) {
+  const {
+    maxQuality = "4k",
+    support = null,
+    smoother = false,
+    fixedFps = null,
+    sustained = null,
+    ram = MIN_AUTO_4K_RAM_GB,
+  } = caps;
+  if (stored === AUTO || stored === undefined || stored === null) {
+    // A fixed 60 records at 60, so Auto must check the 60 result, not the 30 one.
+    const fps = fixedFps > TARGET_FPS ? fixedFps : smoother ? 60 : TARGET_FPS;
+    const wanted =
+      hardware4kPassed(support) &&
+      sustains4k(sustained, fps) &&
+      ram >= MIN_AUTO_4K_RAM_GB
+        ? "4k"
+        : "1080p";
+    return clampQuality(wanted, maxQuality);
+  }
+  const picked = QUALITY_ORDER.includes(stored) ? stored : "1080p";
+  if (picked === "4k" && support?.supports4k === false) return "1080p";
+  return clampQuality(picked, maxQuality);
+}
+
+export function resolveFps(stored, caps = {}) {
+  const { smoother = false } = caps;
+  const parsed = Number.parseInt(stored, 10);
+  if (Number.isFinite(parsed) && parsed > 0) return parsed;
+  return smoother ? 60 : 30;
 }
 
 // Every encode cap we ship is landscape, so a portrait source binds on HEIGHT

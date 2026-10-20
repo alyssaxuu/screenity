@@ -31,6 +31,13 @@ export class WebCodecsTrackRecorder {
     // Used by cloud's camera path on macOS to force a software h264
     // encoder, sidestepping VideoToolbox's per-process HW-slot serialization.
     this.preferSoftware = Boolean(options.preferSoftware);
+    // Larger caps come from cloudEncodeCap.js. WCR fits the source inside, never upscales.
+    this.maxWidth = Number(options.maxWidth) > 0 ? Number(options.maxWidth) : 1920;
+    this.maxHeight = Number(options.maxHeight) > 0 ? Number(options.maxHeight) : 1080;
+    // Frame rate the capture really delivers. Without it WebCodecsRecorder
+    // encodes on a 30 fps clock and drops the frames in between, so a 60 fps
+    // capture would come out at 30 with no error. Null keeps that 30 default.
+    this.fps = Number(options.fps) > 0 ? Number(options.fps) : null;
     // Namespaces the decoderConfig sidecar so dual-track keys don't collide.
     this.trackKind = options.trackKind || "default";
     this.encodeStats = null;
@@ -94,7 +101,17 @@ export class WebCodecsTrackRecorder {
     }
   }
 
-  start(_timeslice) {
+  getPerfSnapshot() {
+    try {
+      return this._recorder?.getPerfSnapshot?.() || null;
+    } catch {
+      return null;
+    }
+  }
+
+  // startOptions.startEpochMs: shared take start on this page's performance.now()
+  // clock (see startLeadIn.js). Without it the file starts at its first frame.
+  start(_timeslice, startOptions = {}) {
     // timeslice is a no-op: Mp4MuxerWrapper emits on its own ~1s cadence.
     if (this._state !== "inactive") {
       throw new Error(
@@ -199,11 +216,13 @@ export class WebCodecsTrackRecorder {
       audioBitrate: this.audioBitsPerSecond,
       audioChannels: this.audioChannels,
       preferSoftware: this.preferSoftware,
-      // Cap at 1080p; retina captures exceed AVC L4.2 (~2.2MP) and
-      // throw on first frame, leaving Bunny with the 28-byte init.
-      // Bunny tier caps at 1080p anyway. WCR downscales via canvas.
-      width: 1920,
-      height: 1080,
+      // 1080p default: a retina capture at L4.2 (~2.2MP) throws on the first
+      // frame and leaves Bunny with the 28-byte init. Larger caps (cloudEncodeCap)
+      // make WCR raise the AVC level.
+      width: this.maxWidth,
+      height: this.maxHeight,
+      ...(this.fps ? { fps: this.fps } : {}),
+      startEpochMs: startOptions?.startEpochMs,
     });
     this._state = "recording";
 
@@ -219,6 +238,13 @@ export class WebCodecsTrackRecorder {
       .then(releasePrewarm)
       .then(() => this._recorder.start())
       .catch((err) => handleError(err));
+  }
+
+  // For a track whose epoch was resolved after start(). No-op before start().
+  setStartEpoch(epochMs) {
+    try {
+      this._recorder?.setStartEpoch?.(epochMs);
+    } catch {}
   }
 
   pause() {

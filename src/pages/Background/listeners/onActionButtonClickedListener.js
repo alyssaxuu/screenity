@@ -15,6 +15,8 @@ import { traceStep } from "../../utils/startFlowTrace";
 const CLOUD_FEATURES_ENABLED =
   process.env.SCREENITY_ENABLE_CLOUD_FEATURES === "true";
 
+const PENDING_START_STALE_MS = 45_000;
+
 const handleTabMessaging = async (tab) => {
   const { activeTab, recordingUiTabId, offscreen } =
     await chrome.storage.local.get([
@@ -26,13 +28,13 @@ const handleTabMessaging = async (tab) => {
   if (offscreen) {
     try {
       await sendMessageRecord({ type: "stop-recording-tab", reason: "action-click" });
-      return;
+      return true;
     } catch (err) {
       console.error(
         "[Screenity][ActionClick] offscreen stop-recording send failed:",
         err,
       );
-      return;
+      return false;
     }
   }
 
@@ -49,12 +51,15 @@ const handleTabMessaging = async (tab) => {
       await sendMessageTab(tab.id, { type: "stop-recording-tab", reason: "action-click" });
       chrome.storage.local.set({ activeTab: tab.id });
     }
+    return true;
   } catch (error) {
     console.error("[Screenity][ActionClick] handleTabMessaging failed, trying direct recorder stop:", error);
     try {
       await sendMessageRecord({ type: "stop-recording-tab", reason: "action-click" });
+      return true;
     } catch (recorderErr) {
       console.error("[Screenity][ActionClick] direct recorder stop also failed:", recorderErr);
+      return false;
     }
   }
 };
@@ -65,7 +70,7 @@ const openPlaygroundOrPopup = async (tab) => {
 
   if (tab.url && editorUrlPattern.test(tab.url)) {
     const match = tab.url.match(editorUrlPattern);
-    const projectIdFromUrl = match?.[2] || null;
+    const projectIdFromUrl = match?.[1] || null;
     await setEditorTabReference({
       tabId: tab.id,
       tabUrl: tab.url,
@@ -176,7 +181,7 @@ export const onActionButtonClickedListener = () => {
     runMicRecoveryScan().catch(() => {});
     try {
       const snap = await chrome.storage.local.get([
-        "recording", "pendingRecording", "restarting", "recorderSession",
+        "recording", "pendingRecording", "pendingRecordingAt", "restarting", "recorderSession",
         "recordingTab", "offscreen",
         "postStopEditorOpening", "postStopEditorOpened",
         "editorRecoveryUrl",
@@ -248,6 +253,30 @@ export const onActionButtonClickedListener = () => {
           }
         }
 
+        // A start that never reached recording (picker cancelled) leaves
+        // pendingRecording set. The page ignores stop while not recording and
+        // the start guard refuses a new start, so reset once the window passes.
+        const pendingAgeMs = Date.now() - (Number(snap.pendingRecordingAt) || 0);
+        if (
+          pendingRecording &&
+          !recording &&
+          !restarting &&
+          !sessionRecording &&
+          pendingAgeMs > PENDING_START_STALE_MS
+        ) {
+          hasActiveRecorder = false;
+        }
+
+        let stopDelivered = true;
+        if (hasActiveRecorder) {
+          console.log("[Screenity][ActionClick] branch: handle-tab-messaging (active recorder)");
+          stopDelivered = await handleTabMessaging(tab);
+          // No receiver answered a pending-only start: the flag is stale.
+          if (!stopDelivered && pendingRecording && !recording && !sessionRecording) {
+            hasActiveRecorder = false;
+          }
+        }
+
         if (!hasActiveRecorder) {
           console.warn(
             "[Screenity][ActionClick] branch: stale-reset-then-popup.",
@@ -270,9 +299,6 @@ export const onActionButtonClickedListener = () => {
             .sendMessage({ type: "clear-recording-session-safe", reason: "action-button-stale-reset" })
             .catch(() => {});
           await openPlaygroundOrPopup(tab);
-        } else {
-          console.log("[Screenity][ActionClick] branch: handle-tab-messaging (active recorder)");
-          await handleTabMessaging(tab);
         }
       } else {
         console.log("[Screenity][ActionClick] branch: normal-popup");

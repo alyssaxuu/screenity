@@ -1,7 +1,10 @@
+import { noteOffscreenClose, noteOffscreenCloseSkipped } from "./hostWatch";
 export const closeOffscreenDocumentWithFlush = async ({
   reason = "unknown",
   timeoutMs = 25000,
   shouldFinalize = true,
+  // closeDocument() closes whatever is current, which may be a newer recording's.
+  expectedDocumentId = null,
 } = {}) => {
   let offDoc = null;
   try {
@@ -14,6 +17,15 @@ export const closeOffscreenDocumentWithFlush = async ({
   }
 
   if (!offDoc) return { ok: true, existed: false };
+
+  if (
+    expectedDocumentId &&
+    offDoc.documentId &&
+    offDoc.documentId !== expectedDocumentId
+  ) {
+    noteOffscreenCloseSkipped(`${reason}:replaced-before-flush`);
+    return { ok: true, existed: false, skipped: "replaced" };
+  }
 
   // The long timeout only matters for an in-flight TUS upload (cloud). A free
   // doc has no uploader, so waiting 25s for an ack it may never send just blocks
@@ -70,6 +82,22 @@ export const closeOffscreenDocumentWithFlush = async ({
   cleanupAck();
 
   try {
+    const nowContexts = await chrome.runtime.getContexts({});
+    const nowDoc =
+      nowContexts.find((c) => c.contextType === "OFFSCREEN_DOCUMENT") || null;
+    if (!nowDoc) return { ok: true, existed: true, ...result };
+    if (
+      offDoc.documentId &&
+      nowDoc.documentId &&
+      nowDoc.documentId !== offDoc.documentId
+    ) {
+      noteOffscreenCloseSkipped(`${reason}:replaced-during-flush`);
+      return { ok: true, existed: true, ...result, skipped: "replaced" };
+    }
+  } catch {}
+
+  try {
+    noteOffscreenClose("close-with-flush");
     await chrome.offscreen.closeDocument();
   } catch (err) {
     console.warn("closeOffscreenDocumentWithFlush closeDocument:", err);

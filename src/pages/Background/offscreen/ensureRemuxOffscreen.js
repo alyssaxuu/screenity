@@ -1,3 +1,4 @@
+import { noteOffscreenClose } from "./hostWatch";
 /*
  * Creates or reuses the remux offscreen document. Chrome only permits one
  * offscreen document per extension; if a different offscreen (audio beeps,
@@ -54,6 +55,7 @@ const ensureRemuxOffscreenImpl = async () => {
     }
     // A different offscreen (audio beep / upload resume): close it and proceed.
     try {
+      noteOffscreenClose("remux-preclose");
       await chrome.offscreen.closeDocument();
     } catch (err) {
       console.warn("ensureRemuxOffscreen: closeDocument failed", err);

@@ -24,6 +24,9 @@ const ACTIVE_PIPELINE_STEPS = new Set([
 const PIPELINE_ACTIVE_TTL_MS = 2 * 60 * 1000;
 // CloudRecorder beats every 15s while it holds a take. Past this it is gone.
 const HOST_BUSY_TTL_MS = 90 * 1000;
+// No recorder document and no sign of life for this long means the host died.
+// The server reaps uploads with no completion after 6h, so waiting for a click loses the take.
+const DEAD_HOST_QUIET_MS = 5 * 60 * 1000;
 // stale-cleared and crashed are what a toolbar click or a closed recorder tab
 // rewrites a crashed take to.
 const RECOVERABLE_SESSION_STATUSES = new Set([
@@ -124,6 +127,69 @@ const scheduleRetry = (delayInMinutes = 2) => {
   } catch {}
 };
 
+// null: no usable stamp. false: not quiet long enough. true: quiet past the limit.
+// Stamps from before this take's click belong to an earlier take, so a start stuck in
+// setup can't look like a dead host.
+export const judgeHostQuiet = (snap, now = Date.now()) => {
+  const takeStart = Number.isFinite(snap.pendingRecordingAt)
+    ? snap.pendingRecordingAt
+    : 0;
+  const stamps = [
+    snap.firstChunkAt,
+    snap.lastChunkAt,
+    snap.recorderPipelineState?.ts,
+    snap.cloudRecorderHostBusy?.at,
+  ].filter((t) => Number.isFinite(t) && t > 0 && t >= takeStart);
+  if (!stamps.length) return null;
+  return now - Math.max(...stamps) >= DEAD_HOST_QUIET_MS;
+};
+
+// Same keys the stale-reset in onActionButtonClickedListener and the startup sweep
+// clear. The icon follows `recording` via lifecycleObserver.
+const DEAD_HOST_FLAG_RESET = {
+  recording: false,
+  pendingRecording: false,
+  restarting: false,
+  offscreen: false,
+  recordingTab: null,
+  region: false,
+  customRegion: false,
+  recordingUiTabId: null,
+  tabRecordedID: null,
+  paused: false,
+  pausedAt: null,
+  totalPausedMs: 0,
+  recordingStallLevel: 0,
+  postStopEditorOpened: false,
+  postStopEditorOpening: false,
+  recordingToScene: false,
+  projectId: null,
+  activeSceneId: null,
+  multiMode: false,
+  multiSceneCount: 0,
+  multiProjectId: null,
+  multiLastSceneId: null,
+};
+
+// null: host alive or unjudgeable, flag stands. false: not quiet long enough. true: dead.
+// Only one offscreen document can exist, so resuming beside a live one evicts it.
+const recorderHostIsGone = async (snap) => {
+  try {
+    const contexts = await chrome.runtime.getContexts({
+      contextTypes: ["OFFSCREEN_DOCUMENT"],
+    });
+    if (contexts?.length) return null;
+    // Custom-region and kill-switch recordings host the recorder in a tab.
+    if (snap.recordingTab != null) {
+      const tab = await chrome.tabs.get(snap.recordingTab).catch(() => null);
+      if (tab) return null;
+    }
+    return judgeHostQuiet(snap);
+  } catch {
+    return null;
+  }
+};
+
 export const tryResumePendingUploads = async ({
   trigger = "unknown",
 } = {}) => {
@@ -131,14 +197,26 @@ export const tryResumePendingUploads = async ({
     const snap = await chrome.storage.local.get([
       "recording",
       "pendingRecording",
+      "pendingRecordingAt",
       "resumeInProgress",
       "resumeLockAt",
       "recorderPipelineState",
       "cloudRecorderHostBusy",
+      "firstChunkAt",
+      "lastChunkAt",
+      "recordingTab",
       "screenityToken",
     ]);
     if (snap.recording || snap.pendingRecording) {
-      return { skipped: "recording-active" };
+      const hostGone = await recorderHostIsGone(snap);
+      if (hostGone === null) return { skipped: "recording-active" };
+      if (!hostGone) {
+        scheduleRetry(1);
+        return { skipped: "recording-active" };
+      }
+      // Nothing else clears these once the host is gone, so the popup and toolbar
+      // would keep showing a recording that no longer exists.
+      await chrome.storage.local.set(DEAD_HOST_FLAG_RESET).catch(() => {});
     }
     // Nothing survives a browser start or extension reload, so a leftover step or
     // beat belongs to the host that died.

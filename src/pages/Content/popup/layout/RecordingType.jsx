@@ -10,6 +10,8 @@ import TooltipWrap from "../components/TooltipWrap";
 
 import BackgroundEffects from "../components/BackgroundEffects";
 import ApiIssueWarning from "../components/ApiIssueWarning";
+import TeleprompterRow from "../../teleprompter/TeleprompterRow";
+import { beginRecording } from "../../utils/beginRecording";
 
 import { AlertIcon, TimeIcon } from "../../toolbar/components/SVG";
 
@@ -83,53 +85,7 @@ const RecordingType = (props) => {
     setTime(minutes + ":" + seconds);
   }, [contentState.alarmTime]);
 
-  // An unsaved recording is still in an editor tab and a new one destroys it,
-  // so the user acknowledges it first.
-  const startStreaming = async () => {
-    let unsaved = null;
-    try {
-      unsaved = await chrome.runtime.sendMessage({
-        type: "unsaved-retained-recording",
-      });
-    } catch {}
-    if (
-      unsaved?.hasUnsaved &&
-      typeof contentState.openModal === "function"
-    ) {
-      contentState.openModal(
-        chrome.i18n.getMessage("unsavedRecordingModalTitle"),
-        chrome.i18n.getMessage("unsavedRecordingModalDescription"),
-        chrome.i18n.getMessage("unsavedRecordingModalAction"),
-        chrome.i18n.getMessage("unsavedRecordingModalCancel"),
-        () => {
-          contentState.startStreaming();
-        },
-        () => {
-          chrome.runtime
-            .sendMessage({
-              type: "focus-retained-recording",
-              tabId: unsaved.tabId,
-            })
-            .catch(() => {});
-        },
-        null,
-        null,
-        null,
-        false,
-        chrome.i18n.getMessage("unsavedRecordingModalDismiss"),
-        () => {
-          // Stops the prompt for good and still starts the recording, so the
-          // side button is not a dead end.
-          chrome.storage.local
-            .set({ unsavedRecordingPromptDismissed: Date.now() })
-            .catch(() => {});
-          contentState.startStreaming();
-        },
-      );
-      return;
-    }
-    contentState.startStreaming();
-  };
+  const startStreaming = () => beginRecording(contentState);
 
   useEffect(() => {
     // Check if CropTarget is null
@@ -204,10 +160,7 @@ const RecordingType = (props) => {
           </div>
         )}
       {!contentState.cameraPermission && (
-        <button
-          className="permission-button"
-          onClick={openPermissionsModal}
-        >
+        <button className="permission-button" onClick={openPermissionsModal}>
           <img src={CameraOffBlue} />
           <span>{chrome.i18n.getMessage("allowCameraAccessButton")}</span>
         </button>
@@ -242,10 +195,7 @@ const RecordingType = (props) => {
         )}
 
       {!contentState.microphonePermission && (
-        <button
-          className="permission-button"
-          onClick={openPermissionsModal}
-        >
+        <button className="permission-button" onClick={openPermissionsModal}>
           <img src={MicOffBlue} />
           <span>{chrome.i18n.getMessage("allowMicrophoneAccessButton")}</span>
         </button>
@@ -281,6 +231,8 @@ const RecordingType = (props) => {
           />
         </div>
       )}
+      <div className="popup-content-divider"></div>
+      <TeleprompterRow />
       {contentState.recordingType === "region" && cropActive && (
         <div>
           <div className="popup-content-divider"></div>
@@ -293,6 +245,8 @@ const RecordingType = (props) => {
         </div>
       )}
       {contentState.isLoggedIn &&
+        // Instant mode needs the cloud recorder, which only subscribers get.
+        contentState.isSubscribed &&
         !contentState.recordingToScene &&
         // Instant mode bakes the whole recording into one non-editable
         // video, incompatible with multi-scene composition. Hide the

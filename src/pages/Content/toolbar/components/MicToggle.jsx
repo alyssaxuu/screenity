@@ -14,10 +14,11 @@ const MicToggle = (props) => {
 
   return (
     <TooltipWrap
+      shortcut={contentState.toggleMicShortcut}
       content={
         contentState.microphonePermission && contentState.micActive
           ? chrome.i18n.getMessage("disableMicrophoneTooltip")
-          : contentState.microphonePermission && !contentState.micactive
+          : contentState.microphonePermission && !contentState.micActive
           ? chrome.i18n.getMessage("enableMicrophoneTooltip")
           : chrome.i18n.getMessage("noMicrophonePermissionsTooltip")
       }

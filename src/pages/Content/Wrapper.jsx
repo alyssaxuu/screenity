@@ -14,6 +14,7 @@ import Modal from "./modal/Modal";
 import Warning from "./warning/Warning";
 
 import Region from "./region/Region";
+import TeleprompterController from "./teleprompter/TeleprompterController";
 
 // Using ShadowDOM
 import root from "react-shadow";
@@ -146,6 +147,7 @@ const Wrapper = () => {
     // (stream acquired) closes it; that's the pre-acquisition feedback, so
     // don't stack the loader on top. Only fill the post-popup → countdown gap.
     !contentState.showPopup &&
+    !contentState.startGateOpen &&
     !contentState.countdownActive &&
     !contentState.isCountdownVisible &&
     !contentState.recording &&
@@ -172,6 +174,7 @@ const Wrapper = () => {
     !contentState.countdownActive &&
     !contentState.isCountdownVisible &&
     !contentState.recording &&
+    !contentState.startGateOpen &&
     contentState.useOffscreenCloud !== false;
   const waitActive =
     inPreCountdownWait || inPostStopWait || inRestartWait || inPreparingWait;
@@ -336,6 +339,7 @@ const Wrapper = () => {
 
   return (
     <div ref={parentRef}>
+      <TeleprompterController />
       {contentState.showExtension && (
         <iframe
           className="screenity-iframe"
