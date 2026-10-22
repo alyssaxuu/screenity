@@ -45,6 +45,53 @@ const reportStage = (stage, extra = {}) =>
     ...extra,
   });
 
+const PENDING_OPEN_TTL_MS = 10 * 60 * 1000;
+
+const openOrFocusLoginTab = async () => {
+  const base = process.env.SCREENITY_APP_BASE;
+  try {
+    const existing = await chrome.tabs.query({ url: `${base}/login*` });
+    const tab = existing.find((t) => t.id);
+    if (tab) {
+      await chrome.tabs.update(tab.id, { active: true });
+      if (tab.windowId) {
+        await chrome.windows.update(tab.windowId, { focused: true });
+      }
+      return;
+    }
+  } catch {}
+  chrome.tabs.create({ url: `${base}/login?extension=true`, active: true });
+};
+
+const resumePendingOpenPopupProject = async () => {
+  const { pendingOpenPopupProject: pending } = await chrome.storage.local.get(
+    "pendingOpenPopupProject",
+  );
+  if (!pending) return;
+  await chrome.storage.local.remove("pendingOpenPopupProject");
+  if (!pending.tabId || Date.now() - pending.at > PENDING_OPEN_TTL_MS) return;
+
+  try {
+    await chrome.tabs.get(pending.tabId);
+    await sendMessageTab(pending.tabId, {
+      type: "open-popup-project",
+      projectTitle: pending.recordingProjectTitle,
+      projectId: pending.projectId,
+      activeSceneId: pending.activeSceneId,
+      recordingToScene: true,
+    });
+  } catch (err) {
+    if (!String(err).includes("message port closed before a response")) {
+      reportStage("login-resume-failed");
+      return;
+    }
+  }
+  reportStage("login-required-recovered", {
+    outcome: "ok",
+    trigger: "success-summary",
+  });
+};
+
 const handleOpenPopupProject = async (message) => {
   try {
     const tab = await getCurrentTab();
@@ -86,12 +133,21 @@ const handleOpenPopupProject = async (message) => {
         await chrome.storage.local.set({ originalTabId: currentTab.id });
       }
 
-      chrome.tabs.create({
-        url: `${process.env.SCREENITY_APP_BASE}/login?extension=true`,
-        active: true,
+      await chrome.storage.local.set({
+        pendingOpenPopupProject: {
+          tabId: tab.id,
+          at: Date.now(),
+          recordingProjectTitle: message.recordingProjectTitle,
+          projectId: message.projectId,
+          activeSceneId: message.activeSceneId,
+        },
       });
+
+      await openOrFocusLoginTab();
       return { ok: false, stage: "login-required" };
     }
+
+    await chrome.storage.local.remove("pendingOpenPopupProject");
 
     try {
       await sendMessageTab(tab.id, {
@@ -170,6 +226,8 @@ const handleExternalMessage = (message, sender, sendResponse) =>
           hasSubscribedBefore: auth.hasSubscribedBefore,
           lastAuthCheck: Date.now(),
         });
+
+        await resumePendingOpenPopupProject().catch(() => {});
 
         // loginWithWebsite does the refocus, but only this scope knows the
         // sender, so the close lives here. Gated so a hand-opened /login stays put.

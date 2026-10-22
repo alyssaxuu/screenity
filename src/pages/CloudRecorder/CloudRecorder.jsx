@@ -1315,21 +1315,44 @@ const CloudRecorder = () => {
     } catch {}
   };
 
+  // Uncoded failures are raw encoder errors; name and message are what tell a codec/OS problem apart.
+  const describeRecorderError = (err) => {
+    const name = String(err?.name || "?").slice(0, 40);
+    const message = String(err?.message || err || "")
+      .replace(/\s+/g, " ")
+      .slice(0, 120);
+    return { name, message };
+  };
+
   // Sends recorder failure code and counters (no first chunk, zero frames, stall) to the session.
   const reportRecorderFailure = (err, track) => {
     try {
       const d = err?.detail || {};
       const sw = d.swRetry ? d.swRetry.reason || 1 : 0;
+      const { name, message } = describeRecorderError(err);
+      const code = typeof err?.code === "string" && err.code ? err.code : null;
       logForensicEvent("recorder-failure", {
         trackType: track,
-        reason: String(err?.code || "unknown").slice(0, 120),
+        reason: (code || name).slice(0, 120),
         errMsg: `frames=${d.framesEncoded ?? "?"} mstp=${
           d.framesFromMSTP ?? "?"
         } chunk=${d.firstChunkSeen ? 1 : 0} sw=${sw} vis=${
           d.visibility?.changes ?? "?"
         } q=${d.peakEncodeQueueSize?.video ?? "?"} drop=${
           d.droppedForBackpressure?.video ?? "?"
-        }`,
+        } n=${name} m=${message}`,
+      });
+    } catch {}
+  };
+
+  // Chunks flowed after the error, so the device is not held against WebCodecs.
+  const reportRecorderRecovered = (err, track) => {
+    try {
+      const { name, message } = describeRecorderError(err);
+      logForensicEvent("recorder-failure-recovered", {
+        trackType: track,
+        reason: name.slice(0, 120),
+        errMsg: `n=${name} m=${message}`,
       });
     } catch {}
   };
@@ -5433,6 +5456,7 @@ const CloudRecorder = () => {
           fps: screenFpsRef.current,
           createMediaRecorder,
           onRecorderError: reportRecorderFailure,
+          onRecorderRecovered: reportRecorderRecovered,
           onDataAvailable: async (blob) => {
             checkMaxMemory();
 
@@ -5912,6 +5936,7 @@ const CloudRecorder = () => {
           enableAudio: cameraHasAudio,
           createMediaRecorder,
           onRecorderError: reportRecorderFailure,
+          onRecorderRecovered: reportRecorderRecovered,
           probeOptions: {
             cameraWidth: Number(cameraSettings.width) || 1280,
             cameraHeight: Number(cameraSettings.height) || 720,

@@ -1889,7 +1889,7 @@
     "description": "Modal title when Google Drive authentication expired or was revoked"
   },
   "driveAuthModalDescription": {
-    "message": "请重新登录。",
+    "message": "Google 不允许 Screenity 登录。请换一个 Google 账号再试，或改为下载视频。学校和工作账号可能会阻止此操作。",
     "description": "Modal description when Google Drive authentication expired or was revoked"
   },
   "emptyRecordingTitle": {

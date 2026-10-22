@@ -23,6 +23,7 @@ import {
   applyEncoderConfigOverrides,
   computeSteadyQueueCap,
   isAacRateInSpec,
+  isLinuxDesktopUserAgent,
   isReclaimErrorMessage,
   shouldFailZeroChunksAtStop,
   shouldResetReclaimCounter,
@@ -2819,7 +2820,9 @@ export class WebCodecsRecorder {
     // VideoToolbox serializes h264 encoders per-process and a second
     // prefer-hardware silently falls back at unpredictable fps).
     // Forcing SW gives a reliable 30fps instead of contended 5fps.
-    const preferSoftware = Boolean(this.options?.preferSoftware);
+    const preferSoftware =
+      Boolean(this.options?.preferSoftware) ||
+      isLinuxDesktopUserAgent(globalThis.navigator?.userAgent);
     const candidates =
       this.containerKind === "webm"
         ? preferSoftware

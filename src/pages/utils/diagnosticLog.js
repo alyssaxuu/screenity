@@ -36,6 +36,7 @@ const ALWAYS_FLUSH = [
   "drive-upload-fail",
   "drive-save-fail",
   "drive-auth-fail",
+  "drive-auth-fallback",
   // Client-side save/download breadcrumbs (forwarded from the editor). The
   // trigger + delivery steps were console-only, so a failed save left no trace.
   "editor-drive-save-start",

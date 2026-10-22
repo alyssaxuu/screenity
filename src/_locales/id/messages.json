@@ -1890,7 +1890,7 @@
     "description": "Modal title when Google Drive authentication expired or was revoked"
   },
   "driveAuthModalDescription": {
-    "message": "Silakan masuk kembali.",
+    "message": "Google tidak mengizinkan Screenity untuk masuk. Coba lagi dengan akun Google lain, atau unduh videonya saja. Akun sekolah dan akun kerja bisa memblokir ini.",
     "description": "Modal description when Google Drive authentication expired or was revoked"
   },
   "emptyRecordingTitle": {

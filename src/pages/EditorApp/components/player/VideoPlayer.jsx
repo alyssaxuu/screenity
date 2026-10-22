@@ -94,8 +94,9 @@ const VideoPlayer = (props) => {
       });
       setUrl(objectURL);
 
+      // A rebuilt blob swaps the source mid-load; revoking now fails the old load with ERR_FILE_NOT_FOUND.
       return () => {
-        URL.revokeObjectURL(objectURL);
+        setTimeout(() => URL.revokeObjectURL(objectURL), 5000);
       };
     }
   }, [contentState.webm, contentState.blob, playerRef]);

@@ -1890,7 +1890,7 @@
     "description": "Modal title when Google Drive authentication expired or was revoked"
   },
   "driveAuthModalDescription": {
-    "message": "மீண்டும் உள்நுழையவும்.",
+    "message": "Screenity உள்நுழைவதை Google அனுமதிக்கவில்லை. வேறு Google கணக்கில் மீண்டும் முயலவும், அல்லது அதற்குப் பதிலாக வீடியோவைப் பதிவிறக்கவும். பள்ளி மற்றும் பணி கணக்குகள் இதைத் தடுக்கலாம்.",
     "description": "Modal description when Google Drive authentication expired or was revoked"
   },
   "emptyRecordingTitle": {

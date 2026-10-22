@@ -34,6 +34,14 @@ export function isReclaimErrorMessage(errOrMessage) {
   return RECLAIM_MESSAGE_RE.test(msg);
 }
 
+// Desktop Linux Chrome has no hardware VideoEncoder by default and treats prefer-hardware
+// as required: configure() passes, then it errors or emits nothing for ~12s until the
+// watchdog rebuilds in software. ChromeOS and Android have hardware encode.
+export function isLinuxDesktopUserAgent(ua) {
+  if (typeof ua !== "string") return false;
+  return /\bLinux\b/.test(ua) && !/\b(Android|CrOS)\b/.test(ua);
+}
+
 export function isAacRateInSpec(rate) {
   return Number.isFinite(rate) && AAC_SUPPORTED_RATES.has(rate);
 }
