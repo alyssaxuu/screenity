@@ -743,7 +743,16 @@ const SettingsMenu = (props) => {
               {chrome.i18n.getMessage("accountSettingsOption")}
             </DropdownMenu.Item>
           )}
-          {contentState.isLoggedIn && !CLOUD_FEATURES_ENABLED && (
+          <DropdownMenu.Item
+            className="DropdownMenuItem"
+            onSelect={(e) => {
+              e.preventDefault();
+              chrome.runtime.sendMessage({ type: "open-help" });
+            }}
+          >
+            {chrome.i18n.getMessage("getHelpNav")}
+          </DropdownMenu.Item>
+          {contentState.isLoggedIn && CLOUD_FEATURES_ENABLED && (
             <DropdownMenu.Item
               className="DropdownMenuItem"
               onSelect={(e) => {

@@ -208,6 +208,8 @@ export const getErrorSnapshot = async () => {
     "fastRecorderDisabledAt",
     "memoryError",
     "recordingAttemptId",
+    "lastRecorderStartFailure",
+    "lastRecordingStartContext",
     // WebCodecs failure/retry telemetry; the rich payload that turns
     // "my recording failed" into a precise diagnosis (zero-frame vs
     // configure-failed vs flush-timeout vs HW-encoder-quota).
@@ -271,6 +273,8 @@ export const getStorageFlags = async () => {
     "recorderSession",
     "recorderPipelineState",
     "lastStartRecordingTabMessage",
+    "lastRecorderStartFailure",
+    "lastRecordingStartContext",
     "lastRecordingBackendRef",
     "screenTrackLog",
     "cloudRestartPhase",

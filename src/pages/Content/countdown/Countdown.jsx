@@ -32,6 +32,7 @@ const Countdown = () => {
   const startTimeoutRef = useRef(null);
   const startAtRef = useRef(0);
   const runIdRef = useRef(0);
+  const countdownIdRef = useRef(null);
 
   const cleanupTimers = () => {
     if (intervalRef.current) {
@@ -110,6 +111,7 @@ const Countdown = () => {
     setCount(COUNTDOWN_TIME);
     completedRef.current = false;
     runIdRef.current += 1;
+    countdownIdRef.current = contentState.countdownId || null;
     const runId = runIdRef.current;
     startAtRef.current = performance.now();
     logStartFlow("countdown_start", { visible: true });
@@ -136,7 +138,7 @@ const Countdown = () => {
     intervalRef.current = setTimeout(tick, 100);
 
     return cleanupTimers;
-  }, [contentState.countdownActive]);
+  }, [contentState.countdownActive, contentState.countdownId]);
 
   // Mirrored into state for the floating window's countdown.
   useEffect(() => {
@@ -186,6 +188,7 @@ const Countdown = () => {
           countdownActive: false,
         }));
         const endedAt = Date.now();
+        const countdownId = countdownIdRef.current;
         lifecycle("Content.Countdown", "ui-end-hidden", { endedAt });
         const dispatchStartAfterHide = () => {
           if (cancelledRef.current) return;
@@ -225,6 +228,7 @@ const Countdown = () => {
               .sendMessage({
                 type: "countdown-finished",
                 endedAt,
+                countdownId,
               })
               .catch(() => {});
             startTimeoutRef.current = null;

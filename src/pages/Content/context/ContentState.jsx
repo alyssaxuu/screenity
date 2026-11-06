@@ -13,6 +13,7 @@ import { cameraPipOnOtherTab } from "../teleprompter/prompterRules";
 import { getPrompterWindow } from "../teleprompter/prompterWindow";
 import { lifecycle } from "../../utils/lifecycleLog";
 import { perfMark, perfReset } from "../../utils/perfMarks";
+import { HELP_LINKS } from "../../utils/helpLinks";
 
 import Shortcuts from "../shortcuts/Shortcuts";
 import DevHUD from "../DevHUD";
@@ -73,10 +74,10 @@ const ContentState = (props) => {
     process.env.SCREENITY_ENABLE_CLOUD_FEATURES === "true";
   setTimer = setTimerInternal;
   const [URL] = useState(
-    "https://help.screenity.io/getting-started/77KizPC8MHVGfpKpqdux9D/why-does-screenity-ask-for-permissions/9AAE8zJ6iiUtCAtjn4SUT1"
+    HELP_LINKS.permissionsWhy
   );
   const [URL2] = useState(
-    "https://help.screenity.io/troubleshooting/9Jy5RGjNrBB42hqUdREQ7W/how-to-grant-screenity-permission-to-record-your-camera-and-microphone/x6U69TnrbMjy5CQ96Er2E9"
+    HELP_LINKS.permissionsGrant
   );
   const startBeepRef = useRef(null);
   const stopBeepRef = useRef(null);
@@ -726,6 +727,7 @@ const ContentState = (props) => {
       chrome.storage.local.set({
         pendingRecording: true,
         pendingRecordingAt: Date.now(),
+        activeCountdownId: null,
       });
       setContentState((prev) => ({
         ...prev,
@@ -910,7 +912,7 @@ const ContentState = (props) => {
           let clear = null;
           let clearAction = () => {};
           const helpURL =
-            "https://help.screenity.io/troubleshooting/9Jy5RGjNrBB42hqUdREQ7W/what-does-%E2%80%9Cmemory-limit-reached%E2%80%9D-mean-when-recording/8WkwHbt3puuXunYqQnyPcb";
+            HELP_LINKS.memoryLimit;
 
           const response = await chrome.runtime.sendMessage({
             type: "check-restore",

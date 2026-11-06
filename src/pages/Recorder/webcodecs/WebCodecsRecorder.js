@@ -1153,7 +1153,7 @@ export class WebCodecsRecorder {
           new Promise((_, reject) =>
             setTimeout(
               () => reject(new Error("muxer-finalize-timeout")),
-              5000,
+              20000,
             ),
           ),
         ]);
@@ -1428,6 +1428,8 @@ export class WebCodecsRecorder {
     }
     return {
       videoCodecString: this.actualVideoCodec || null,
+      videoBitrateMode: this._activeVideoConfig?.bitrateMode ?? null,
+      videoBitrate: this._activeVideoConfig?.bitrate ?? null,
       hardwareAccelerationActual:
         this._activeVideoConfig?.hardwareAcceleration || "no-preference",
       videoCodecConfigsTried: this._videoCodecConfigsTried.slice(0, 8),
@@ -1455,7 +1457,19 @@ export class WebCodecsRecorder {
       closedEncoderRebuilds: this._closedEncoderRebuilds,
       encoderErrorDecisions: this._encErrDecisions.slice(),
       lastWebCodecsFailureCode: this._lastFailureCode || null,
+      ...(this._muxerDiag() || {}),
     };
+  }
+
+  _muxerDiag() {
+    try {
+      const s = this.muxer?.getStats?.();
+      if (!s) return null;
+      const { totalEmittedBytes, emitCount, ...rest } = s;
+      return rest;
+    } catch {
+      return null;
+    }
   }
 
   pause() {

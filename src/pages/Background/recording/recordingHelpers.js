@@ -124,8 +124,9 @@ export const handleRecordingError = async (request) => {
   const errorCode =
     request?.errorCode ||
     classifyError(request?.why || "", request?.error || "");
+  const isWarningOnly = request.error === "stream-ended";
 
-  try {
+  if (!isWarningOnly) try {
     const { recordingAttemptId } = await chrome.storage.local.get([
       "recordingAttemptId",
     ]);
@@ -146,11 +147,6 @@ export const handleRecordingError = async (request) => {
       "tabRecordedID",
     ]);
 
-  await chrome.storage.local.set({
-    pendingRecording: false,
-  });
-
-  const isWarningOnly = request.error === "stream-ended";
   diagEvent(isWarningOnly ? "warning" : "error", {
     error: request?.error || null,
     why: request?.why || null,
@@ -167,6 +163,8 @@ export const handleRecordingError = async (request) => {
     });
     return;
   }
+
+  await chrome.storage.local.set({ pendingRecording: false });
 
   endDiagSession("error");
 

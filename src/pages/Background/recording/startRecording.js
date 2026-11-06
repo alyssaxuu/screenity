@@ -60,7 +60,7 @@ export const isRecordingStartInFlight = (flags) => {
   return false;
 };
 
-export const startRecording = async (caller = "unknown") => {
+export const startRecording = async (caller = "unknown", countdownId = null) => {
   if (_startRecordingInFlight) {
     diagEvent("warning", {
       note: "startRecording suppressed (in-flight)",
@@ -74,7 +74,7 @@ export const startRecording = async (caller = "unknown") => {
     STARTRECORDING_GUARD_TIMEOUT_MS,
   );
   try {
-    return await _startRecordingInner(caller);
+    return await _startRecordingInner(caller, countdownId);
   } catch (err) {
     // sync failure before sendMessageRecord's deferred catch; release immediately
     releaseStartRecordingGuard();
@@ -86,7 +86,7 @@ export const startRecording = async (caller = "unknown") => {
 // finished start landing sooner than this after stop is stale.
 const STALE_START_WINDOW_MS = 3000;
 
-const _startRecordingInner = async (caller) => {
+const _startRecordingInner = async (caller, countdownId) => {
   const recordingAttemptId = makeRecordingAttemptId();
   // only gate countdown-finished; direct/fallback/restart don't share it.
   try {
@@ -94,15 +94,28 @@ const _startRecordingInner = async (caller) => {
       recordingStoppedAt,
       recording,
       restarting,
+      pendingRecording,
+      activeCountdownId,
       countdownStartedAt,
       countdownFinishedAt,
     } = await chrome.storage.local.get([
       "recordingStoppedAt",
       "recording",
       "restarting",
+      "pendingRecording",
+      "activeCountdownId",
       "countdownStartedAt",
       "countdownFinishedAt",
     ]);
+    // The error can arrive after the countdown handler's check but before
+    // this async dispatch reads storage. Do not revive that failed start.
+    const countdownDispatch = caller === "countdown-finished" ||
+      caller === "countdownFallback" || caller === "countdownFallback-sw-restart";
+    if ((typeof countdownId === "string" && countdownId && countdownId !== activeCountdownId) ||
+      (countdownDispatch && pendingRecording === false && !restarting)) {
+      releaseStartRecordingGuard();
+      return;
+    }
     const sinceStopMs =
       typeof recordingStoppedAt === "number"
         ? Date.now() - recordingStoppedAt
@@ -415,6 +428,20 @@ const _startRecordingInner = async (caller) => {
         pendingClick && Date.now() - pendingClick.at < 30000
           ? pendingClick.clickId
           : null;
+      const startContext = {
+        ts: Date.now(),
+        recordingType: recordingType || "screen",
+        cameraActive: Boolean(extras?.cameraActive),
+        micActive: Boolean(extras?.micActive),
+        systemAudio: Boolean(systemAudio),
+        backgroundEffectsActive: Boolean(extras?.backgroundEffectsActive),
+        tabsCount: Array.isArray(tabs) ? tabs.length : null,
+        windowsCount: Array.isArray(wins) ? wins.length : null,
+        hardwareConcurrency: Number.isFinite(navigator?.hardwareConcurrency)
+          ? navigator.hardwareConcurrency
+          : null,
+      };
+      await chrome.storage.local.set({ lastRecordingStartContext: startContext });
       await emitRecordingTelemetry("recording_initiated_beacon", {
         recordingSessionId: recordingAttemptId,
         clickId,
@@ -430,20 +457,20 @@ const _startRecordingInner = async (caller) => {
         hardwareConcurrency: Number.isFinite(navigator?.hardwareConcurrency)
           ? navigator.hardwareConcurrency
           : null,
-        recordingType: recordingType || "screen",
+        recordingType: startContext.recordingType,
         // Storage canonical key is qualityValue, not quality. `quality`
         // is unset on this read path; reading it returned undefined and
         // surfaced as null on every beacon.
         qualityValue: extras?.qualityValue || null,
         fpsValue: extras?.fpsValue || null,
-        cameraActive: Boolean(extras?.cameraActive),
-        micActive: Boolean(extras?.micActive),
-        systemAudio: Boolean(systemAudio),
+        cameraActive: startContext.cameraActive,
+        micActive: startContext.micActive,
+        systemAudio: startContext.systemAudio,
         multiMode: Boolean(multiMode),
         instantMode: Boolean(extras?.instantMode),
-        backgroundEffectsActive: Boolean(extras?.backgroundEffectsActive),
-        tabsCount: Array.isArray(tabs) ? tabs.length : null,
-        windowsCount: Array.isArray(wins) ? wins.length : null,
+        backgroundEffectsActive: startContext.backgroundEffectsActive,
+        tabsCount: startContext.tabsCount,
+        windowsCount: startContext.windowsCount,
         recordedTabDomain: extras?.recordedTabDomain || null,
       });
     } catch {}
@@ -574,7 +601,7 @@ const _startRecordingInner = async (caller) => {
   }
 };
 
-export const startAfterCountdown = (caller = "startAfterCountdown") => {
+export const startAfterCountdown = (caller = "startAfterCountdown", countdownId = null) => {
   chrome.storage.local.get(["recordingTab", "offscreen"], (result) => {
     if (chrome.runtime.lastError) {
       console.error(
@@ -599,6 +626,6 @@ export const startAfterCountdown = (caller = "startAfterCountdown") => {
         "[Screenity] startAfterCountdown: no recordingTab/offscreen available, starting with fallback routing"
       );
     }
-    startRecording(caller);
+    startRecording(caller, countdownId);
   });
 };

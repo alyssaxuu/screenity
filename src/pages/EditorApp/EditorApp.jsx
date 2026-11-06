@@ -187,7 +187,7 @@ const EditorApp = () => {
         contentState.getFrame();
       }, 50);
     }
-  }, [contentState.mode]);
+  }, [contentState.mode, contentState.blob]);
 
   return (
     <div ref={parentRef}>

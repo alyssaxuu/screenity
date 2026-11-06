@@ -56,7 +56,8 @@ export const emitRecordingTelemetry = async (eventType, extra = {}) => {
     // so we don't tag the beacon with a stale mediaId.
     const isEarlyBeacon =
       eventType === "recording_initiated_beacon" ||
-      eventType === "recording_click_beacon";
+      eventType === "recording_click_beacon" ||
+      (eventType === "recording_forensic_event" && extra.name === "cloud-startup-failure");
     const mediaId =
       extra.mediaId ||
       (isEarlyBeacon
@@ -71,8 +72,8 @@ export const emitRecordingTelemetry = async (eventType, extra = {}) => {
     const body = JSON.stringify({
       recordingId: requestRecordingId,
       recordingSessionId,
-      projectId: extra.projectId || session?.projectId || null,
-      sceneId: extra.sceneId || session?.sceneId || null,
+      projectId: extra.projectId || (isEarlyBeacon ? null : session?.projectId) || null,
+      sceneId: extra.sceneId || (isEarlyBeacon ? null : session?.sceneId) || null,
       mediaId,
       source: "extension",
       extVersion,
@@ -87,8 +88,8 @@ export const emitRecordingTelemetry = async (eventType, extra = {}) => {
         t: Date.now(),
         ...extra,
         recordingSessionId,
-        projectId: extra.projectId || session?.projectId || null,
-        sceneId: extra.sceneId || session?.sceneId || null,
+        projectId: extra.projectId || (isEarlyBeacon ? null : session?.projectId) || null,
+        sceneId: extra.sceneId || (isEarlyBeacon ? null : session?.sceneId) || null,
         mediaId,
       },
     });
