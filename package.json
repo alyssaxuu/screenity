@@ -38,7 +38,7 @@
   },
   "dependencies": {
     "@babel/plugin-transform-react-jsx": "^7.27.1",
-    "@mediabunny/aac-encoder": "^1.62.1",
+    "@mediabunny/aac-encoder": "^1.65.2",
     "@mediapipe/tasks-vision": "1.1.1",
     "@radix-ui/react-alert-dialog": "^1.0.4",
     "@radix-ui/react-collapsible": "^1.0.2",
@@ -65,7 +65,7 @@
     "gif.js": "^0.2.0",
     "jszip": "^3.10.1",
     "localforage": "^1.10.0",
-    "mediabunny": "^1.62.1",
+    "mediabunny": "^1.65.2",
     "patch-package": "^8.0.0",
     "plyr": "3.7.8",
     "plyr-react": "^5.3.0",

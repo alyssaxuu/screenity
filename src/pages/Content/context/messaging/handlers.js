@@ -657,24 +657,36 @@ export const setupHandlers = () => {
 
     // BG is source of truth; reading React default would race the user
     // setting and produce double beeps.
-    const { countdown: storedCountdown } = await chrome.storage.local.get([
+    const { countdown: storedCountdown, restarting } = await chrome.storage.local.get([
       "countdown",
+      "restarting",
     ]);
     const state = getState();
 
     if (storedCountdown) {
+      // Restart can reuse the countdown already visible in this tab. Its
+      // component does not remount, so retain that run's ID in that case.
+      let countdownId = restarting && state.countdownActive && state.isCountdownVisible && state.countdownId
+        ? state.countdownId
+        : `countdown-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+      try {
+        await chrome.storage.local.set({ activeCountdownId: countdownId });
+      } catch {
+        countdownId = null;
+      }
       perfMark("Content countdown.start");
       traceStep("countdownStart");
       setContentState((prev) => ({
         ...prev,
         countdownActive: true,
+        countdownId,
         isCountdownVisible: true,
         countdownCancelled: false,
         // Latch: the pre-countdown loader must never re-show, or it bleeds
         // into the captured frame for region/desktop (stream already live).
         countdownEverShown: true,
       }));
-      chrome.runtime.sendMessage({ type: "diag-countdown-started" }).catch(() => {});
+      chrome.runtime.sendMessage({ type: "diag-countdown-started", countdownId }).catch(() => {});
     } else {
       // countdownCancelled is cleared in startStreaming, so not stale here.
       state.startRecordingAfterCountdown();

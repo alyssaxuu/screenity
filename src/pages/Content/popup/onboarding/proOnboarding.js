@@ -1,13 +1,13 @@
 import { driver } from "driver.js";
 import "driver.js/dist/driver.css";
 import { hasSeenOnboarding, markOnboardingSeen } from "./storage";
+import { HELP_LINKS } from "../../../utils/helpLinks";
 
 const CORE_KEY = "proPopupCore";
 const CAMERA_KEY = "proCameraInfo";
 const POPOVER_CLASS = "ScreenityOnboardingPopover onboarding-popover";
 const DRIVER_STYLE_ID = "screenity-driver-onboarding-style";
-const TOOLBAR_HELP_URL =
-  "https://help.screenity.io/recording/how-to-hide-the-toolbar";
+const TOOLBAR_HELP_URL = HELP_LINKS.hideToolbar;
 const IDLE_START_DELAY_MS = 420;
 
 const STEP_IDS = {

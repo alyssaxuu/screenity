@@ -107,6 +107,7 @@ export const buildSupportContext = async (opts = {}) => {
         "editorRecordingError",
         "lastTabStreamMintMs",
         "lastTabStreamMintOk",
+        "lastTabStreamMintErr",
         "lastTabStreamMintOffscreen",
       ];
       const store = await chrome.storage.local.get(keys);
@@ -147,6 +148,8 @@ export const buildSupportContext = async (opts = {}) => {
       if (store.lastTabStreamMintMs != null) {
         ctx.mintMs = String(store.lastTabStreamMintMs);
         ctx.mintOk = store.lastTabStreamMintOk ? "1" : "0";
+        if (store.lastTabStreamMintErr)
+          ctx.mintErr = String(store.lastTabStreamMintErr);
         ctx.mintOff = store.lastTabStreamMintOffscreen ? "1" : "0";
       }
 

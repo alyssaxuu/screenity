@@ -218,6 +218,16 @@ const Recorder = () => {
       slLog("msg-streaming-data-duplicate");
       return;
     }
+    // startRecording() clears streamingDataReceivedAt, so a late second
+    // response would re-run getUserMedia on a tab already being captured.
+    if (
+      recorder.current !== null ||
+      isStarting.current ||
+      helperVideoStream.current?.getVideoTracks()[0]?.readyState === "live"
+    ) {
+      slLog("msg-streaming-data-duplicate", { afterStart: true });
+      return;
+    }
     slLog("msg-streaming-data");
     perfMark("Recorder streaming-data.received");
     streamingDataReceivedAt.current = Date.now();
@@ -4884,6 +4894,9 @@ const Recorder = () => {
       chrome.storage.local.set({
         lastTabStreamMintMs: Date.now() - mintStartedAt,
         lastTabStreamMintOk: Boolean(tabID.current),
+        lastTabStreamMintErr: tabID.current
+          ? null
+          : String(tabIDError.current || "").slice(0, 120),
         lastTabStreamMintOffscreen: IS_OFFSCREEN_HOST,
       });
     } catch {}

@@ -77,6 +77,7 @@ const CropperWrap = () => {
   return (
     <div>
       <Cropper
+        key={image || "empty-crop-frame"}
         src={image}
         ref={cropperRef}
         onChange={onChange}
