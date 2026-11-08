@@ -3,6 +3,7 @@ import { registerMessage } from "../../../messaging/messageRouter";
 import { appendUploadTelemetryEventSerialized } from "../utils/serializedTelemetryStore";
 import { noteApiError, noteApiResponse } from "../utils/apiReachability";
 import { perfMark, perfSpan } from "../../utils/perfMarks";
+import { HELP_LINKS, HELP_CENTER_URL } from "../../utils/helpLinks";
 import {
   focusTab,
   createTab,
@@ -87,6 +88,7 @@ import { supportContextQuery } from "../../utils/buildSupportContext";
 
 const API_BASE = process.env.SCREENITY_API_BASE_URL;
 const APP_BASE = process.env.SCREENITY_APP_BASE;
+let startupTelemetryTail = Promise.resolve();
 
 // Flip a project to isPublic:true after recording finishes. v2 removed
 // the publish system, so isPublic is the only access gate; without
@@ -1477,11 +1479,12 @@ export const setupHandlers = () => {
 
   registerMessage("start-recording", (message) => startRecording("start-recording-message"));
   registerMessage("countdown-finished", async (message) => {
-    const { recording, restarting, pendingRecording } =
+    const { recording, restarting, pendingRecording, activeCountdownId } =
       await chrome.storage.local.get([
       "recording",
       "restarting",
       "pendingRecording",
+      "activeCountdownId",
     ]);
     const writeDecision = (reason, started, extra = {}) => {
       const decisionAt = Date.now();
@@ -1520,6 +1523,17 @@ export const setupHandlers = () => {
       await writeDecision("stale-dispatch", false, { ageMs });
       return { ok: true, skipped: true };
     }
+    if (message?.countdownId && message.countdownId !== activeCountdownId) {
+      await writeDecision("countdown-mismatch", false);
+      return { ok: true, skipped: true };
+    }
+    // A countdown can outlive an error or cancel; its completion must not start
+    // a new attempt. Restart sequences itself and may have no pending flag.
+    if (pendingRecording === false && !restarting) {
+      diagEvent("countdown-finished", { skipped: true, reason: "not-pending" });
+      await writeDecision("not-pending", false);
+      return { ok: true, skipped: true };
+    }
     diagEvent("countdown-finished", { skipped: false });
     const decisionAt = Date.now();
     // Don't block startAfterCountdown on the diagnostic write; the
@@ -1539,7 +1553,7 @@ export const setupHandlers = () => {
         started: true,
       },
     });
-    startAfterCountdown("countdown-finished");
+    startAfterCountdown("countdown-finished", message?.countdownId || null);
     return { ok: true };
   });
   registerMessage("restarted", (message) => restartActiveTab(message));
@@ -1632,11 +1646,11 @@ export const setupHandlers = () => {
     })();
   });
 
-  registerMessage("diag-countdown-started", () => {
+  registerMessage("diag-countdown-started", (message) => {
     diagEvent("countdown-started");
     // countdown started means stream setup is done; extend the fallback window
     // so it doesn't fire during countdown (and start the recording too early)
-    noteCountdownStarted();
+    void noteCountdownStarted(message?.countdownId || null);
   });
   registerMessage("diag-countdown-cancelled", () => diagEvent("countdown-cancelled"));
   registerMessage("diag-editor-ready", (message) =>
@@ -1733,6 +1747,21 @@ export const setupHandlers = () => {
     if (!allowedPrefixes.some((p) => ev.startsWith(p))) return;
     diagEvent(ev, message?.data ?? null);
   });
+  registerMessage("startup-failure-telemetry", (message) => {
+    const attemptId = message?.attemptId;
+    if (typeof attemptId !== "string" || !/^ra-[a-z0-9-]+$/.test(attemptId)) return;
+    // Key on the click ID: recorderSession in storage can still point at the
+    // previous take before uploaders have a media ID. Serialized because the
+    // early and enriched snapshots share a row and the server's read/modify/write loses one.
+    startupTelemetryTail = startupTelemetryTail.catch(() => {}).then(() =>
+      emitRecordingTelemetry("recording_forensic_event", {
+        recordingId: attemptId,
+        recordingSessionId: attemptId,
+        name: "cloud-startup-failure",
+        startupFailure: message?.snapshot || null,
+      }),
+    );
+  });
   registerMessage("open-editor-recovery", async () => {
     const { editorRecoveryUrl } = await chrome.storage.local.get(["editorRecoveryUrl"]);
     if (!editorRecoveryUrl) return;
@@ -1751,6 +1780,7 @@ export const setupHandlers = () => {
       return;
     }
     await handleRecordingError(message);
+    if (message?.error === "stream-ended") return;
     await clearRecordingSessionSafe("recording-error", {
       error: message?.error || null,
     });
@@ -1854,19 +1884,19 @@ export const setupHandlers = () => {
   });
   registerMessage("open-processing-info", () =>
     createTab(
-      "https://help.screenity.io/editing-and-exporting/dJRFpGq56JFKC7k8zEvsqb/why-is-there-a-5-minute-limit-for-editing/ddy4e4TpbnrFJ8VoRT37tQ",
+      HELP_LINKS.editingLimit,
       true,
     ),
   );
   registerMessage("upgrade-info", () =>
     createTab(
-      "https://help.screenity.io/getting-started/77KizPC8MHVGfpKpqdux9D/what-are-the-technical-requirements-for-using-screenity/6kdB6qru6naVD8ZLFvX3m9",
+      HELP_LINKS.technicalRequirements,
       true,
     ),
   );
   registerMessage("trim-info", () =>
     createTab(
-      "https://help.screenity.io/editing-and-exporting/dJRFpGq56JFKC7k8zEvsqb/how-to-cut-trim-or-mute-parts-of-your-video/svNbM7YHYY717MuSWXrKXH",
+      HELP_LINKS.trimAndCut,
       true,
     ),
   );
@@ -1875,7 +1905,7 @@ export const setupHandlers = () => {
   );
   registerMessage("chrome-update-info", () =>
     createTab(
-      "https://help.screenity.io/getting-started/77KizPC8MHVGfpKpqdux9D/what-are-the-technical-requirements-for-using-screenity/6kdB6qru6naVD8ZLFvX3m9",
+      HELP_LINKS.technicalRequirements,
       true,
     ),
   );
@@ -1884,11 +1914,11 @@ export const setupHandlers = () => {
   registerMessage("pip-started", () => handlePip(true));
   registerMessage("sign-out-drive", (message) => handleSignOutDrive(message));
   registerMessage("open-help", () =>
-    createTab("https://help.screenity.io/", true),
+    createTab(HELP_CENTER_URL, true),
   );
   registerMessage("memory-limit-help", () =>
     createTab(
-      "https://help.screenity.io/troubleshooting/9Jy5RGjNrBB42hqUdREQ7W/what-does-%E2%80%9Cmemory-limit-reached%E2%80%9D-mean-when-recording/8WkwHbt3puuXunYqQnyPcb",
+      HELP_LINKS.memoryLimit,
       true,
     ),
   );

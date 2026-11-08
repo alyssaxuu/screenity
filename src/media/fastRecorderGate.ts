@@ -128,6 +128,8 @@ const TRANSIENT_ERROR_PATTERNS = [
   /track ended/i,
   /track inactive/i,
   /capture stream is not ready/i,
+  // No frame and no track size: capture starved, not a codec defect.
+  /cannot probe frame resolution/i,
   // Hardware codec reclaimed by Chrome (idle/background/pressure).
   /codec reclaimed/i,
   /reclaimed due to inactivity/i,
