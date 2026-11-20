@@ -3,7 +3,7 @@
   "name": "__MSG_extName__",
   "description": "__MSG_extDesc__",
   "default_locale": "en",
-  "version": "4.7.2",
+  "version": "4.8.0",
   "background": {
     "service_worker": "background.bundle.js"
   },
@@ -32,25 +32,13 @@
   "web_accessible_resources": [
     {
       "resources": [
-        "content.styles.css",
-        "blank.mp4",
         "assets/*",
-        "setup.html",
-        "worker.js",
-        "vendor/*",
+        "camera.html",
         "cloudrecorder.html",
         "localplaybackbridge.html",
-        "recorder.html",
-        "offscreenrecorder.html",
-        "wrapper.html",
-        "camera.html",
         "permissions.html",
         "region.html",
-        "waveform.html",
-        "playground.html",
-        "editor.html",
-        "download.html",
-        "*"
+        "waveform.html"
       ],
       "matches": [
         "<all_urls>"

@@ -952,7 +952,7 @@
     "description": "புதியவில் போக்கு இல்லை தலைப்பு"
   },
   "notEnoughSpaceDescription": {
-    "message": "பதிவு செய்ய Screenity-க்கு குறைந்தபட்சம் 1GB இலவச இடம் தேவை. தயவுசெய்து சிறிது இடத்தைக் காலி செய்து மீண்டும் முயற்சிக்கவும்.",
+    "message": "பதிவு செய்ய Screenity-க்கு குறைந்தபட்சம் 500MB இலவச இடம் தேவை. தயவுசெய்து சிறிது இடத்தைக் காலி செய்து மீண்டும் முயற்சிக்கவும்.",
     "description": "புதியவில் போக்கு இல்லை விளக்கம்"
   },
   "clearSpaceButton": {
@@ -1078,7 +1078,7 @@
     "description": "பிற கணினி வடிவம் க்கு ஒலியின் எச்சரிக்கை தலைப்பு"
   },
   "recordAudioWarningOtherDescription": {
-    "message": "கணினி ஒலியைப் பதிவு செய்ய விரும்பினால், 'Share system audio' விருப்பத்தை இயக்க உறுதி செய்யுங்கள். இந்த விருப்பம் தெரியவில்லை எனில், Chrome-ஐப் புதுப்பிக்க முயற்சிக்கவும் அல்லது தாவல் பதிவுக்கு மாறவும்.",
+    "message": "கணினி ஒலியைப் பதிவு செய்ய விரும்பினால், 'Share system audio' விருப்பத்தை இயக்க உறுதி செய்யுங்கள்.",
     "description": "பிற கணினி வடிவம் க்கு ஒலியின் எச்சரிக்கை தலைப்பு"
   },
   "qualityLabel": {
@@ -1194,11 +1194,23 @@
     "description": "Toast message shown when the user is in an existing project and ready to record a new scene"
   },
   "reachingRecordingLimitToast": {
-    "message": "பதிவு 90 நிமிட வரம்பை நெருங்குகிறது, விரைவில் நிறுத்தப்படும்",
-    "description": "Toast message shown when the recording is reaching the 90 minute limit"
+    "message": "பதிவு $MINUTES$ நிமிட வரம்பை நெருங்குகிறது, விரைவில் நிறுத்தப்படும்",
+    "placeholders": {
+      "minutes": {
+        "content": "$1",
+        "example": "120"
+      }
+    },
+    "description": "Toast message shown when the recording is reaching the recording length limit"
   },
   "recordingLimitReachedToast": {
-    "message": "90 நிமிட வரம்பின் காரணமாக பதிவு நிறுத்தப்பட்டது",
+    "message": "$MINUTES$ நிமிட வரம்பின் காரணமாக பதிவு நிறுத்தப்பட்டது",
+    "placeholders": {
+      "minutes": {
+        "content": "$1",
+        "example": "120"
+      }
+    },
     "description": "Toast message shown when the recording limit is reached"
   },
   "tabRecordingDisabledToast": {
@@ -1604,7 +1616,7 @@
     "description": "Reset pro onboarding option label in popup settings menu"
   },
   "recoverLastRecordingOption": {
-    "message": "கடைசிப் பதிவை மீட்டெடுக்கவும்",
+    "message": "பதிவுகளை மீட்டெடுக்கவும்",
     "description": "Settings menu item to manually trigger cloud recording recovery"
   },
   "toastRecoveredSession": {
@@ -1614,6 +1626,10 @@
   "toastStorageCritical": {
     "message": "டிஸ்க் இடம் குறைவு. உங்கள் பதிவு சேமிக்கப்படுகிறது. இதுவரை பதிவான அனைத்தும் பாதுகாப்பாக உள்ளது.",
     "description": "Toast shown when available storage drops below the critical threshold during recording; reassures that captured data is preserved"
+  },
+  "recordingTailLostToast": {
+    "message": "உங்கள் டிஸ்க் நிரம்பியதால் இந்தப் பதிவின் இறுதிப் பகுதியைச் சேமிக்க முடியவில்லை. மீதி எடிட்டரில் திறக்கும். மீண்டும் பதிவு செய்வதற்கு முன் இடத்தைக் காலி செய்யவும்.",
+    "description": "Toast when the last part of a recording could not be written to disk"
   },
   "toastStorageLow": {
     "message": "சேமிப்பகம் குறைந்து வருகிறது. நீண்ட பதிவுகளுக்கு பதிவேற்ற நம்பகத்தன்மை குறையலாம்.",
@@ -1626,6 +1642,10 @@
   "toastNetworkOffline": {
     "message": "நெட்வொர்க் ஆஃப்லைனில் உள்ளது. பதிவேற்றம் இடைநிறுத்தப்பட்டது. திரைத் துண்டுகள் உள்ளூரில் சேமிக்கப்படுகின்றன.",
     "description": "Toast shown when the browser goes offline during a cloud recording upload"
+  },
+  "toastLocalCopyIncomplete": {
+    "message": "உள்ளூர் காப்புப் பிரதி நின்றுவிட்டது. பதிவேற்றம் தோல்வியடைந்தால், இந்தப் பதிவின் ஒரு பகுதியை மீட்டெடுக்க முடியாது.",
+    "description": "Toast shown when the local copy of a cloud recording stops being saved because the disk keeps failing"
   },
   "longRecordingTitle": {
     "message": "நீண்ட பதிவு",
@@ -1683,9 +1703,25 @@
     "message": "திரைப் பகிர்வு நிறுத்தப்பட்டது. உங்கள் பதிவு சேமிக்கப்படுகிறது. இதுவரை பதிவான அனைத்தும் பாதுகாப்பாக உள்ளது.",
     "description": "Toast shown when the video track ends mid-recording (e.g. monitor disconnected, screen share revoked)"
   },
-  "audioTrackEndedToast": {
-    "message": "ஆடியோ துண்டிக்கப்பட்டது. உங்கள் பதிவு சேமிக்கப்படுகிறது. இதுவரை பதிவான வீடியோ பாதுகாப்பாக உள்ளது.",
-    "description": "Toast shown when the audio track ends mid-recording (e.g. mic unplugged, permission revoked)"
+  "micDisconnectedNote": {
+    "message": "$TIME$ இல் மைக் துண்டிக்கப்பட்டது. அதன் பிறகு ஆடியோ இல்லை.",
+    "description": "Note shown in the editor when the microphone disconnected during the recording and could not be reconnected; $TIME$ is the recording time (m:ss) when it dropped",
+    "placeholders": {
+      "time": {
+        "content": "$1",
+        "example": "1:05"
+      }
+    }
+  },
+  "systemAudioDisconnectedNote": {
+    "message": "$TIME$ இல் சிஸ்டம் ஆடியோ துண்டிக்கப்பட்டது. அதன் பிறகு ஆடியோ இல்லை.",
+    "description": "Note shown in the editor when the system or tab audio disconnected during the recording and the take was stopped; $TIME$ is the recording time (m:ss) when it dropped",
+    "placeholders": {
+      "time": {
+        "content": "$1",
+        "example": "1:05"
+      }
+    }
   },
   "captureAudioUnavailableToast": {
     "message": "கணினி ஒலியைப் பதிவு செய்ய முடியவில்லை, எனவே இந்தப் பதிவில் காணொளி மட்டுமே உள்ளது.",
@@ -2060,5 +2096,127 @@
   "sandboxEditorAudioPendingHint": {
     "message": "மாற்றங்களை சேமிக்க முதலில் ஒரு ஆடியோ கோப்பைச் சேர்க்கவும்.",
     "description": "Tooltip on the disabled save button in the audio editor until an audio file is added"
+  },
+  "emptyTakeNotSaved": {
+    "message": "வீடியோ எதுவும் பதிவாகவில்லை, அதனால் இந்தப் பதிவைச் சேமிக்க முடியவில்லை. மீண்டும் முயற்சிக்கவும்.",
+    "description": "Error shown when a cloud recording ended with no video frames captured, so nothing could be saved"
+  },
+  "idbBlockedModalTitle": {
+    "message": "இன்னும் பதிவைத் தொடங்க முடியாது",
+    "description": "Modal title when an earlier recording is still stored in this browser"
+  },
+  "idbUploadingModalDescription": {
+    "message": "ஒரு பதிவு இன்னும் பதிவேற்றப்படுகிறது. அது முடியும் வரை காத்திருந்து, பிறகு மீண்டும் பதிவு செய்யவும்.",
+    "description": "Modal text: earlier recording still uploading"
+  },
+  "idbHeldModalDescription": {
+    "message": "ஒரு பதிவின் பதிவேற்றம் முடியவில்லை. முதலில் நீட்டிப்பு மெனுவிலிருந்து அதை மீட்டெடுக்கவும் அல்லது நீக்கவும்.",
+    "description": "Modal text: earlier recording needs recover or discard"
+  },
+  "emptyTakeModalTitle": {
+    "message": "பதிவு சேமிக்கப்படவில்லை",
+    "description": "Modal title when a take captured no video"
+  },
+  "heldTakesTitle": {
+    "message": "இந்தக் கணினியில் வைத்திருக்கப்பட்ட பதிவுகள்",
+    "description": "Recovery page (download.html?held=1): page heading"
+  },
+  "heldTakesLoading": {
+    "message": "ஏற்றுகிறது",
+    "description": "Recovery page (download.html?held=1): shown while the list is read"
+  },
+  "heldTakesIntro": {
+    "message": "இந்தப் பதிவுகளின் பதிவேற்றம் முடியவில்லை, அதனால் ஒரு நகல் இங்கே வைக்கப்பட்டுள்ளது. ஒரு கோப்பாகச் சேமிக்கவும், அல்லது நகல் தேவையில்லை என்றால் அதை நீக்கவும். நீங்கள் நீக்கும் வரை எதுவும் அழிக்கப்படாது.",
+    "description": "Recovery page (download.html?held=1): intro under the heading"
+  },
+  "heldTakesEmpty": {
+    "message": "காத்திருப்பது எதுவும் இல்லை. இந்தத் தாவலை மூடலாம்.",
+    "description": "Recovery page (download.html?held=1): shown when no take is held"
+  },
+  "heldTakesUntitled": {
+    "message": "பெயரில்லாத பதிவு",
+    "description": "Recovery page (download.html?held=1): card title when the recording has no title"
+  },
+  "heldTakesStored": {
+    "message": "$SIZE$ சேமிக்கப்பட்டது",
+    "description": "Recovery page (download.html?held=1): size of the stored copy, e.g. 412.6 MB stored",
+    "placeholders": {
+      "size": {
+        "content": "$1",
+        "example": "412.6 MB"
+      }
+    }
+  },
+  "heldTakesTrackScreen": {
+    "message": "திரை",
+    "description": "Recovery page (download.html?held=1): track label on a card"
+  },
+  "heldTakesTrackCamera": {
+    "message": "கேமரா",
+    "description": "Recovery page (download.html?held=1): track label on a card"
+  },
+  "heldTakesTrackAudio": {
+    "message": "ஆடியோ",
+    "description": "Recovery page (download.html?held=1): track label on a card"
+  },
+  "heldTakesPartial": {
+    "message": "இந்தப் பதிவின் ஒரு பகுதி ஏற்கனவே சர்வரில் உள்ளது, அதனால் இந்த நகல் முழுமையற்றதாக இருக்கலாம்.",
+    "description": "Recovery page (download.html?held=1): warning on a card"
+  },
+  "heldTakesGap": {
+    "message": "பதிவின் நடுவில் இந்தச் சாதனத்தில் இடம் தீர்ந்துவிட்டது, அதனால் இந்த நகலில் ஒரு இடைவெளி உள்ளது, அதைத் தாண்டி இயங்காமல் போகலாம்.",
+    "description": "Recovery page (download.html?held=1): warning on a card"
+  },
+  "heldTakesSave": {
+    "message": "கோப்பாகச் சேமி",
+    "description": "Recovery page (download.html?held=1): button"
+  },
+  "heldTakesDiscard": {
+    "message": "நீக்கு",
+    "description": "Recovery page (download.html?held=1): button"
+  },
+  "heldTakesDiscardConfirm": {
+    "message": "ஆம், நீக்கு",
+    "description": "Recovery page (download.html?held=1): button that confirms the discard"
+  },
+  "heldTakesKeep": {
+    "message": "வைத்திரு",
+    "description": "Recovery page (download.html?held=1): button that cancels the discard"
+  },
+  "heldTakesDiscardWarning": {
+    "message": "நீக்கினால் சேமிக்கப்பட்ட நகல் இந்தக் கணினியிலிருந்து அகற்றப்படும். இதைத் திரும்பப் பெற முடியாது.",
+    "description": "Recovery page (download.html?held=1): shown next to the confirm button"
+  },
+  "heldTakesSaved": {
+    "message": "உங்கள் பதிவிறக்கங்கள் கோப்புறையில் சேமிக்கப்பட்டது. சேமிக்கப்பட்ட நகல் நீங்கள் நீக்கும் வரை இருக்கும்.",
+    "description": "Recovery page (download.html?held=1): note after a successful save"
+  },
+  "heldTakesSaveFailed": {
+    "message": "சில கோப்புகளைச் சேமிக்க முடியவில்லை. உங்கள் பதிவு இன்னும் சேமிக்கப்பட்டுள்ளது, மீண்டும் முயற்சிக்கவும்.",
+    "description": "Recovery page (download.html?held=1): note after a failed save"
+  },
+  "heldTakesNoData": {
+    "message": "இந்தப் பதிவுக்குச் சேமிக்கப்பட்ட தரவு எதுவும் கிடைக்கவில்லை.",
+    "description": "Recovery page (download.html?held=1): note when a save finds nothing"
+  },
+  "heldTakesDiscardFailed": {
+    "message": "இந்தப் பதிவை அகற்ற முடியவில்லை. மீண்டும் முயற்சிக்கவும்.",
+    "description": "Recovery page (download.html?held=1): note after a failed discard"
+  },
+  "heldTakesRetrying": {
+    "message": "இன்னும் பதிவேற்ற முயற்சிக்கிறது. நீக்கினால் அது நிற்கும்.",
+    "description": "Recovery page (download.html?held=1): note on a take that is still retrying its upload"
+  },
+  "cameraPermissionBlockedError": {
+    "message": "கேமரா அனுமதி தடுக்கப்பட்டுள்ளது. பதிவு செய்ய கேமரா அணுகலை அனுமதிக்கவும்.",
+    "description": "Shown when a camera-only recording cannot start because camera permission is blocked"
+  },
+  "cameraBusyError": {
+    "message": "Screenity உங்கள் கேமராவைப் பயன்படுத்த முடியவில்லை. வேறு பயன்பாடு அதைப் பயன்படுத்திக் கொண்டிருக்கலாம். அதைப் பயன்படுத்தும் மற்ற பயன்பாடுகளை மூடிவிட்டு மீண்டும் முயலவும்.",
+    "description": "Shown when a camera-only recording cannot start because the camera is busy or unavailable"
+  },
+  "cameraNotFoundError": {
+    "message": "Screenity-ஆல் கேமராவைக் கண்டுபிடிக்க முடியவில்லை. அது இணைக்கப்பட்டுள்ளதா என்று சரிபார்த்து மீண்டும் முயலவும்.",
+    "description": "Shown when a camera-only recording cannot start because no camera is found or the chosen camera is gone"
   }
 }

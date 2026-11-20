@@ -6,6 +6,7 @@ import {
   clearEditorTabReference,
 } from "../tabManagement";
 import { loginWithWebsite } from "../auth/loginWithWebsite";
+import { tryResumePendingUploads } from "../recording/resumePendingUploads";
 import {
   handleFinishMultiRecording,
   submitStageDiagnosticReport,
@@ -228,6 +229,8 @@ const handleExternalMessage = (message, sender, sendResponse) =>
         });
 
         await resumePendingOpenPopupProject().catch(() => {});
+        // A take held because the server refused the old sign-in can land now.
+        void tryResumePendingUploads({ trigger: "auth-success" });
 
         // loginWithWebsite does the refocus, but only this scope knows the
         // sender, so the close lives here. Gated so a hand-opened /login stays put.

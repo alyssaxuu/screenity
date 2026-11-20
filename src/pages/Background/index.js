@@ -16,6 +16,7 @@ import {
 import { handleGetStreamingData } from "./recording/recordingHelpers";
 import { initUninstallSurvey } from "./utils/uninstallSurvey";
 import { initRecorderHostWatch } from "./offscreen/hostWatch";
+import { isActiveRecorderAlive } from "./offscreen/recorderHost";
 
 // Don't tear down an in-flight start on SW restart: a fresh start is
 // mid-setup (recorder tab not loaded yet), not dead. Mirrors the alarm
@@ -85,10 +86,7 @@ const clearStaleLocks = async () => {
       // Treat the offscreen doc's existence as the recorder being alive.
       if (!recorderAlive && offscreen) {
         try {
-          const contexts = await chrome.runtime.getContexts({});
-          recorderAlive = (contexts || []).some(
-            (c) => c.contextType === "OFFSCREEN_DOCUMENT",
-          );
+          recorderAlive = await isActiveRecorderAlive();
         } catch {}
       }
       // A start younger than START_GRACE_MS is mid-setup, not dead: the SW

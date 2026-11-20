@@ -1,10 +1,24 @@
-import React, { useEffect, useRef, useCallback } from "react";
+import React, { useEffect, useRef, useCallback, useState } from "react";
 import { createDebugLogger } from "../utils/recorderDebug";
 import { selectMimeType, getCodecLabel, buildTrackSnapshot } from "../utils/recorderCodec";
 import { getUserMediaWithFallback } from "../utils/mediaDeviceFallback";
 import { isCaptureAudioSourceError } from "../utils/captureAudioFallback";
 import { startAudioStream as acquireMicStream } from "../utils/startAudioStream";
 import { shouldAcquireMicAtStart } from "../utils/micAcquisitionPolicy";
+import {
+  computeMicDropElapsedMs,
+  buildMicDropInWindowEvent,
+  buildMicDropRecoveredEvent,
+} from "../utils/micDropElapsed";
+import { isSameMicDevice } from "../utils/micLabelMatch";
+import {
+  reacquireMicWindow,
+  acquireExactMic,
+  resolveMicDeviceId,
+  isMicRetryStale,
+  MIC_REACQUIRE_MAX_PER_WINDOW,
+  MIC_REACQUIRE_RATE_WINDOW_MS,
+} from "../utils/micReacquire";
 import { attachAudioContextWatchdog } from "../utils/audioContextWatchdog";
 import { beginFinalizeHeartbeat } from "../utils/finalizeHeartbeat";
 import { acquireDisplayMediaWithFocusRetry } from "../utils/acquireDisplayMedia";
@@ -17,6 +31,13 @@ import {
   preloadWebCodecsModules,
 } from "../Recorder/webcodecs/WebCodecsRecorder";
 import { startPrewarm, stopPrewarm } from "../Recorder/streamWarmup";
+import {
+  SYSTEM_AUDIO_STOP_REASON,
+  createSystemAudioEndGate,
+  buildSystemAudioDropEvent,
+  resolveSystemAudioDropEvent,
+  shouldWriteMicRecoveredEvent,
+} from "../utils/systemAudioDrop";
 import {
   startEncoderPrewarm,
   closeActiveEncoderPrewarm,
@@ -34,6 +55,8 @@ import {
   resolveFastRecorderUserSetting,
   getFastRecorderStickyState,
   markFastRecorderFailure,
+  shouldStickyDisableOnValidation,
+  validationFromException,
   validateFastRecorderOutputBlob,
   isFastRecorderFailureTransient,
 } from "../../media/fastRecorderGate";
@@ -49,10 +72,23 @@ import { chooseReader } from "../Recorder/recorderStorage/chooseReader";
 import { lifecycle } from "../utils/lifecycleLog";
 import { perfMark, perfSpan } from "../utils/perfMarks";
 import { markStartProgress } from "../utils/startProgress";
+import { stampNoticeAttempt, trackNoticeAttempt } from "../utils/noticeAttemptStamp";
 import { prewarmSpeedTest, prewarmSustainedEncode } from "../Recorder/prewarmSustained";
 
 import localforage from "localforage";
-import { activeChunksStore } from "../utils/chunkStores";
+import {
+  activeChunksStore,
+  loadActiveSlot,
+  LOCAL_CHUNK_TAG,
+} from "../utils/chunkStores";
+import { guardedClear } from "../CloudRecorder/localCopyGate";
+import {
+  resetRecordingSignals,
+  noteRecordingSignals,
+  noteTakeAttempt,
+  reportTakeStart,
+  reportTakeStop,
+} from "../utils/recordingSignals";
 
 localforage.config({
   driver: localforage.INDEXEDDB,
@@ -81,8 +117,16 @@ function logRecordingSnapshot(label, data) {
 
 const Recorder = () => {
   const isRestarting = useRef(false);
+  // BG's attempt id for this take, from its start-recording-tab message. video-ready
+  // carries it so a late one cannot clear the next take's state.
+  const takeAttemptIdRef = useRef(null);
+  // Lets the SW hold this take's notices once a newer take records.
+  const [noticeAttempt] = useState(() => trackNoticeAttempt(takeAttemptIdRef));
+  useEffect(() => stampNoticeAttempt(chrome.runtime, noticeAttempt.get), []);
   const isDismissing = useRef(false);
   const isFinishing = useRef(false);
+  const micReacquireRecent = useRef([]);
+  const micDeviceIdRef = useRef(undefined);
   const isFinished = useRef(false);
   const sentLast = useRef(false);
   const index = useRef(0);
@@ -132,6 +176,10 @@ const Recorder = () => {
   const target = useRef(null);
 
   const recordingRef = useRef();
+  // Bumped when a take starts, stops, is discarded or restarted; a mic retry
+  // compares it to the value it captured so it cannot act on a later take.
+  const recordingGeneration = useRef(0);
+  const systemStopSentRef = useRef(false);
   const regionRef = useRef();
 
   const pending = useRef([]);
@@ -471,6 +519,7 @@ const Recorder = () => {
           index: i,
           chunk: e.data,
           timestamp: ts,
+          ...LOCAL_CHUNK_TAG,
         });
       }
     } catch (err) {
@@ -714,13 +763,16 @@ const Recorder = () => {
 
   useEffect(() => {
     const onMessage = (event) => {
-      if (event.data.type === "crop-target") {
+      if (event.source !== window.parent) return;
+      if (event.data?.type === "crop-target") {
         target.current = event.data.target;
         regionRef.current = true;
         // regionRef is now set; apply any streaming-data that arrived first.
         flushPendingStreamingData();
-      } else if (event.data.type === "restart-recording") {
-        restartRecording();
+        // A stop of an earlier take can clear held data while idle; pull again.
+        if (pendingStreamingData.current == null && !streamingDataHandled.current) {
+          requestStreamingDataWithRetry();
+        }
       }
     };
     window.addEventListener("message", onMessage);
@@ -731,6 +783,7 @@ const Recorder = () => {
   }, []);
 
   async function startRecording() {
+    recordingGeneration.current += 1;
     if (recorder.current !== null) return;
     // Bail if this iframe isn't the recording target: stale state would
     // fire "Capture stream not ready" and tear down the real recording.
@@ -873,7 +926,22 @@ const Recorder = () => {
       return;
     }
 
-    await chunksStore.clear();
+    const startClear = await guardedClear(chunksStore, loadActiveSlot);
+    if (!startClear.cleared) {
+      const progressing = startClear.kind === "progressing";
+      chrome.runtime.sendMessage({
+        type: "recording-error",
+        error: "stream-error",
+        why: progressing
+          ? "A recording is still uploading."
+          : "A recording did not finish uploading.",
+        errorCode: progressing
+          ? "REC_START_IDB_UPLOADING"
+          : "REC_START_IDB_HELD",
+      });
+      window.location.reload();
+      return;
+    }
 
     try {
       const { qualityValue: storedQuality } = await chrome.storage.local.get([
@@ -1033,7 +1101,7 @@ const Recorder = () => {
       });
 
       const resetChunkState = async () => {
-        await chunksStore.clear();
+        await guardedClear(chunksStore, loadActiveSlot);
         index.current = 0;
         pending.current = [];
         pendingBytes.current = 0;
@@ -1247,14 +1315,9 @@ const Recorder = () => {
                   validation,
                 });
               } catch (err) {
-                validation = {
-                  ok: false,
-                  hardFail: true,
-                  reasons: ["validation-exception"],
-                  details: { error: String(err) },
-                };
+                validation = validationFromException(err);
               }
-              if (validation && !validation.ok) {
+              if (shouldStickyDisableOnValidation(validation)) {
                 await markFastRecorderFailure("validation-failed", validation);
                 await chrome.storage.local.set({
                   lastWebCodecsFailureAt: Date.now(),
@@ -1284,7 +1347,10 @@ const Recorder = () => {
                     why: "No recording data was generated",
                   });
                 } else {
-                  chrome.runtime.sendMessage({ type: "video-ready" });
+                  chrome.runtime.sendMessage({
+  type: "video-ready",
+  recordingAttemptId: takeAttemptIdRef.current,
+});
                 }
               }
             }
@@ -1642,7 +1708,10 @@ const Recorder = () => {
           if (!sentLast.current) {
             sentLast.current = true;
             isFinished.current = true;
-            chrome.runtime.sendMessage({ type: "video-ready" });
+            chrome.runtime.sendMessage({
+  type: "video-ready",
+  recordingAttemptId: takeAttemptIdRef.current,
+});
             isFinishing.current = false;
           }
         };
@@ -1832,6 +1901,7 @@ const Recorder = () => {
     isRestarting.current = false;
     index.current = 0;
     recordingRef.current = true;
+    noticeAttempt.release();
     isDismissing.current = false;
 
     const isMediaRecorder = recorder.current instanceof MediaRecorder;
@@ -1973,43 +2043,174 @@ const Recorder = () => {
           why: "Audio track became inactive",
         });
       };
-      // Mirrors Recorder.jsx sysTrack.onended. Below 30s the salvage prompt
-      // would over-promise (Continuity Mic often drops 10-20s in).
-      aTrack.onended = () => {
-        const dur = recordingStartTimeRef.current
-          ? Date.now() - recordingStartTimeRef.current
-          : null;
-        const SALVAGE_THRESHOLD_MS = 30000;
-        const isShort = !dur || dur < SALVAGE_THRESHOLD_MS;
-        const trackLabel = String(aTrack.label || "");
-        const isLikelyContinuityMic = /\biphone\b/i.test(trackLabel);
-        try {
-          chrome.runtime.sendMessage({
-            type: "diag-forward",
-            event: "recorder-region-audio-track-ended",
-            data: {
-              trackLabel: trackLabel.slice(0, 80),
-              recordingDuration: dur,
-              isLikelyContinuityMic,
-              salvageOffered: !isShort,
-              audioContextState: aCtx.current?.state ?? null,
-              docVisibility:
-                typeof document !== "undefined"
-                  ? document.visibilityState
-                  : null,
+      // Mic ended mid-take: retry the same device for a few seconds, and if it
+      // cannot come back stop the take through the normal stop flow. No toast:
+      // it would be burned into the recording. Mirrors Recorder.jsx.
+      const attachMicEnded = (track) => {
+        track.onended = async () => {
+          // Before any await: a discard during the storage read must be seen.
+          const generation = recordingGeneration.current;
+          if (isFinishing.current || !recordingRef.current) return;
+          if (helperAudioStream.current?.getAudioTracks?.()[0] !== track) return;
+          const endedAt = Date.now();
+          const trackLabel = String(track.label || "");
+          const info = {
+            reason: "audio-track-ended",
+            ts: endedAt,
+            trackLabel: trackLabel.slice(0, 80),
+            recordingDuration: recordingStartTimeRef.current
+              ? endedAt - recordingStartTimeRef.current
+              : null,
+            isLikelyContinuityMic: /\biphone\b/i.test(trackLabel),
+            audioContextState: aCtx.current?.state ?? null,
+            docVisibility:
+              typeof document !== "undefined" ? document.visibilityState : null,
+          };
+          try {
+            chrome.runtime.sendMessage({
+              type: "diag-forward",
+              event: "recorder-region-audio-track-ended",
+              data: info,
+            });
+          } catch {}
+          let elapsedMs = null;
+          try {
+            const pauseState = await chrome.storage.local.get([
+              "totalPausedMs",
+              "pausedAt",
+              "paused",
+            ]);
+            elapsedMs = computeMicDropElapsedMs({
+              endedAt,
+              startedAt: recordingStartTimeRef.current,
+              ...pauseState,
+            });
+          } catch {}
+          // A user stop during the window still needs the editor note.
+          chrome.storage.local.set({
+            lastTrackEndEvent: buildMicDropInWindowEvent({ info, elapsedMs }),
+          });
+          // The stored id may have been re-resolved by label since the take began.
+          try {
+            const { defaultAudioInput } = await chrome.storage.local.get([
+              "defaultAudioInput",
+            ]);
+            micDeviceIdRef.current = resolveMicDeviceId(
+              defaultAudioInput,
+              micDeviceIdRef.current,
+            );
+          } catch {}
+          const recent = micReacquireRecent.current.filter(
+            (t) => endedAt - t < MIC_REACQUIRE_RATE_WINDOW_MS,
+          );
+          recent.push(endedAt);
+          micReacquireRecent.current = recent;
+          const stale = () =>
+            isMicRetryStale({
+              generation,
+              currentGeneration: recordingGeneration.current,
+              finishing: isFinishing.current,
+              recording: recordingRef.current,
+            });
+          const outcome =
+            recent.length <= MIC_REACQUIRE_MAX_PER_WINDOW
+              ? await reacquireMicWindow({
+                  startedAt: endedAt,
+                  deviceId: micDeviceIdRef.current,
+                  previousLabel: trackLabel,
+                  sameDevice: (newLabel) =>
+                    isSameMicDevice({
+                      deviceId: micDeviceIdRef.current,
+                      previousLabel: trackLabel,
+                      newLabel,
+                    }),
+                  isStale: stale,
+                  acquire: () => startAudioStream(micDeviceIdRef.current),
+                  acquireExact: () => acquireExactMic(micDeviceIdRef.current),
+                  wire: (stream, newTrack) => {
+                    if (!aCtx.current || !destination.current) return false;
+                    try {
+                      audioInputSource.current?.disconnect();
+                    } catch {}
+                    const src = aCtx.current.createMediaStreamSource(
+                      new MediaStream([newTrack]),
+                    );
+                    // The gain node carries the user's mic toggle.
+                    if (!audioInputGain.current) {
+                      audioInputGain.current = aCtx.current.createGain();
+                      audioInputGain.current.connect(destination.current);
+                    }
+                    src.connect(audioInputGain.current);
+                    audioInputSource.current = src;
+                    helperAudioStream.current = stream;
+                    attachMicEnded(newTrack);
+                    return true;
+                  },
+                }).catch(() => ({
+                  ok: false,
+                  attempts: 0,
+                  reason: "error",
+                  gapMs: Date.now() - endedAt,
+                }))
+              : {
+                  ok: false,
+                  attempts: 0,
+                  reason: "rate-cap",
+                  gapMs: Date.now() - endedAt,
+                };
+          const { ok, attempts } = outcome;
+          // Recovered: never show the note, even if the user stops right after.
+          if (
+            shouldWriteMicRecoveredEvent({
+              ok,
+              generation,
+              currentGeneration: recordingGeneration.current,
+              stopSent: systemStopSentRef.current,
+            })
+          ) {
+            chrome.storage.local.set({
+              lastTrackEndEvent: buildMicDropRecoveredEvent({ info }),
+            });
+          }
+          if (stale()) return;
+          try {
+            chrome.runtime.sendMessage({
+              type: "diag-forward",
+              event: "recorder-region-mic-reacquire",
+              data: { ok, attempts, gapMs: Date.now() - endedAt },
+            });
+          } catch {}
+          if (ok) return;
+          try {
+            chrome.runtime.sendMessage({
+              type: "diag-forward",
+              event: "recorder-region-mic-window-stop",
+              data: {
+                reason: outcome.reason,
+                gapMs: outcome.gapMs,
+                attempts,
+                docVisibility:
+                  typeof document !== "undefined"
+                    ? document.visibilityState
+                    : null,
+              },
+            });
+          } catch {}
+          chrome.storage.local.set({
+            recording: false,
+            restarting: false,
+            tabRecordedID: null,
+            lastTrackEndEvent: {
+              ...info,
+              source: "mic",
+              elapsedMs,
+              reacquireAttempts: attempts,
             },
           });
-        } catch {}
-        chrome.runtime.sendMessage({
-          type: "show-toast",
-          message: chrome.i18n.getMessage(
-            isShort
-              ? "streamErrorModalDescription"
-              : "audioTrackEndedToast",
-          ),
-          timeout: 8000,
-        }).catch(() => {});
+          sendStopWithReason("region-audio-track-ended");
+        };
       };
+      attachMicEnded(aTrack);
       aTrack.onmute = () => {
         try {
           chrome.runtime.sendMessage({
@@ -2034,9 +2235,104 @@ const Recorder = () => {
         sendStopWithReason("region-helper-video-ended");
       };
     }
+
+    // System/tab audio ended mid-take: stop after a short settle unless the
+    // video ended too (a closing tab ends both; the video path owns that).
+    // No toast: it would be burned into the recording.
+    const sysTrack = helperVideoStream.current?.getAudioTracks?.()[0] || null;
+    systemStopSentRef.current = false;
+    if (sysTrack) {
+      let sysEndGeneration = 0;
+      let sysEndedAt = 0;
+      let sysPauseState = null;
+      const sysTakeGone = (generation) =>
+        recordingGeneration.current !== generation ||
+        isFinishing.current ||
+        !recordingRef.current;
+      const sysStale = (generation) =>
+        sysTakeGone(generation) || systemStopSentRef.current;
+      const sysEndGate = createSystemAudioEndGate({
+        isStale: () => sysStale(sysEndGeneration),
+        isVideoEnded: () =>
+          [helperVideoStream.current, liveStream.current].some((s) =>
+            s?.getVideoTracks?.().some((t) => t.readyState === "ended"),
+          ),
+        onSkip: (why) => {
+          try {
+            chrome.runtime.sendMessage({
+              type: "diag-forward",
+              event: "recorder-region-system-audio-stop-skipped",
+              data: { why },
+            });
+          } catch {}
+        },
+        onStop: async () => {
+          const generation = sysEndGeneration;
+          const endedAt = sysEndedAt;
+          let pauseState = {};
+          try {
+            pauseState = (await sysPauseState) || {};
+          } catch {}
+          if (sysStale(generation)) return;
+          const elapsedMs = computeMicDropElapsedMs({
+            endedAt,
+            startedAt: recordingStartTimeRef.current,
+            ...pauseState,
+          });
+          // Pending from here: a mic reconnect finishing during the read below
+          // must not write a recovered event this stop would then overwrite.
+          systemStopSentRef.current = true;
+          let existing = null;
+          try {
+            existing = (await chrome.storage.local.get(["lastTrackEndEvent"]))
+              .lastTrackEndEvent;
+          } catch {}
+          if (sysTakeGone(generation)) {
+            systemStopSentRef.current = false;
+            return;
+          }
+          chrome.storage.local.set({
+            recording: false,
+            restarting: false,
+            tabRecordedID: null,
+            lastTrackEndEvent: resolveSystemAudioDropEvent({
+              existing,
+              next: buildSystemAudioDropEvent({
+                info: { trackLabel: String(sysTrack.label || "").slice(0, 80) },
+                ts: endedAt,
+                elapsedMs,
+              }),
+            }),
+          });
+          sendStopWithReason(SYSTEM_AUDIO_STOP_REASON);
+        },
+      });
+      sysTrack.onended = () => {
+        if (isFinishing.current || !recordingRef.current) return;
+        try {
+          chrome.runtime.sendMessage({
+            type: "diag-forward",
+            event: "recorder-region-system-audio-track-ended",
+            data: { trackLabel: String(sysTrack.label || "").slice(0, 80) },
+          });
+        } catch {}
+        sysEndGeneration = recordingGeneration.current;
+        sysEndedAt = Date.now();
+        sysPauseState = chrome.storage.local
+          .get(["totalPausedMs", "pausedAt", "paused"])
+          .catch(() => ({}));
+        sysEndGate.arm();
+      };
+    }
   }
 
   async function stopRecording() {
+    reportTakeStop({
+      attemptId: takeAttemptIdRef.current,
+      micStream: helperAudioStream.current,
+      captureStream: helperVideoStream.current,
+    });
+    recordingGeneration.current += 1;
     clearStartRetry();
     stopRecordingTick();
     if (keepAliveHandle.current) {
@@ -2056,6 +2352,7 @@ const Recorder = () => {
     }
     recordingStartTimeRef.current = null;
     isFinishing.current = true;
+    noticeAttempt.freeze();
     regionRef.current = false;
     // Reset customRegion crop target: otherwise it sticks for the iframe's
     // life and a later regular screen recording (stream in a separate
@@ -2121,7 +2418,10 @@ const Recorder = () => {
             });
             return;
           }
-          chrome.runtime.sendMessage({ type: "video-ready" });
+          chrome.runtime.sendMessage({
+  type: "video-ready",
+  recordingAttemptId: takeAttemptIdRef.current,
+});
         }, 15000);
 
         await waitForDrain();
@@ -2172,6 +2472,7 @@ const Recorder = () => {
   }
 
   const dismissRecording = async () => {
+    recordingGeneration.current += 1;
     clearStartRetry();
     stopRecordingTick();
     // Match stopRecording teardown: tab keepalive + BG guards must be
@@ -2262,6 +2563,7 @@ const Recorder = () => {
     }
     await setRegionRestartPhase("restart-requested");
     const wasRegionMode = Boolean(regionRef.current || target.current);
+    recordingGeneration.current += 1;
     isRestarting.current = true;
     isDismissing.current = false;
     pausedStateRef.current = false;
@@ -2310,7 +2612,7 @@ const Recorder = () => {
     savedCount.current = 0;
     pending.current = [];
     pendingBytes.current = 0;
-    await chunksStore.clear();
+    await guardedClear(chunksStore, loadActiveSlot);
     await setRecordingTimingState({
       recording: false,
       paused: false,
@@ -2329,7 +2631,9 @@ const Recorder = () => {
   };
 
   function startAudioStream(id) {
-    return acquireMicStream(id);
+    return acquireMicStream(id, {
+      logger: { warn: (_msg, err) => noteRecordingSignals({ micErrorName: err }) },
+    });
   }
   function setAudioInputVolume(volume) {
     if (!audioInputGain.current) return;
@@ -2347,6 +2651,7 @@ const Recorder = () => {
       systemAudio: Boolean(data?.systemAudio),
       hasMic: Boolean(data?.defaultAudioInput && data.defaultAudioInput !== "none"),
     });
+    resetRecordingSignals();
     try {
       const endStorageReads = perfSpan("Region.Recorder storage.reads");
       const { qualityValue } = await chrome.storage.local.get(["qualityValue"]);
@@ -2394,6 +2699,7 @@ const Recorder = () => {
         // fails after the user has picked, so the retry costs a second pick.
         if (!constraints.audio || !isCaptureAudioSourceError(err)) throw err;
         console.warn("[Region] capture audio source failed", err);
+        noteRecordingSignals({ captureAudioDropped: true });
         try {
           chrome.runtime.sendMessage({
             type: "diag-forward",
@@ -2451,6 +2757,7 @@ const Recorder = () => {
       liveStream.current = new MediaStream();
       // If the user disabled the mic, skip getUserMedia: gain-muting still
       // wakes iPhone Continuity etc. Toggle-on mid-recording goes via setMic().
+      micDeviceIdRef.current = data.defaultAudioInput;
       const endMic = perfSpan("Region.Recorder startAudioStream(mic)");
       const micstream = shouldAcquireMicAtStart(data)
         ? await startAudioStream(data.defaultAudioInput)
@@ -2522,6 +2829,17 @@ const Recorder = () => {
           liveStream.current.addTrack(mixedAudioTrack);
         }
       }
+
+      reportTakeStart({
+        micChosen: data.micActive === true,
+        micDeviceId: data.defaultAudioInput,
+        micStream: helperAudioStream.current,
+        captureStream: helperVideoStream.current,
+        systemAudio: data.systemAudio === true,
+        recordedStream: liveStream.current,
+        requestedFps: fps,
+        requestedHeight: height,
+      });
 
       try {
         if (target.current) {
@@ -2687,8 +3005,33 @@ const Recorder = () => {
     }
   };
 
+  // In the offscreen route this idle content-script iframe is not the
+  // recorder; acking there ends the SW's `loaded` retry loop before the
+  // offscreen take frame is listening.
+  const offscreenRoute = useRef(false);
+  useEffect(() => {
+    try {
+      chrome.storage.local.get(["offscreen"], (r) => {
+        offscreenRoute.current = Boolean(r?.offscreen);
+      });
+    } catch {}
+    const onChanged = (changes, area) => {
+      if (area === "local" && changes.offscreen) {
+        offscreenRoute.current = Boolean(changes.offscreen.newValue);
+      }
+    };
+    chrome.storage.onChanged.addListener(onChanged);
+    return () => chrome.storage.onChanged.removeListener(onChanged);
+  }, []);
+
   const onMessage = useCallback(
     (request, sender, sendResponse) => {
+      if (
+        offscreenRoute.current &&
+        (request.type === "loaded" || request.type === "streaming-data")
+      ) {
+        return false;
+      }
       if (request.type === "loaded") {
         perfMark("Region.Recorder loaded.received", {
           isRegion: Boolean(request.region),
@@ -2711,6 +3054,8 @@ const Recorder = () => {
         try { sendResponse?.({ ok: true, duplicate: wasDuplicate }); } catch {}
         return true;
       } else if (request.type === "start-recording-tab") {
+        takeAttemptIdRef.current = request.recordingAttemptId || null;
+        noteTakeAttempt(takeAttemptIdRef.current);
         setRegionRestartPhase("restart-start-message-received", {
           regionMode: Boolean(regionRef.current),
           hasTarget: Boolean(target.current),

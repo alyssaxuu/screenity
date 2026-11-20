@@ -1,5 +1,6 @@
 import { discardRecording } from "./discardRecording";
 import { discardOffscreenDocuments } from "../offscreen/discardOffscreenDocuments";
+import { isActiveRecorderAlive } from "../offscreen/recorderHost";
 
 export const checkRecording = async () => {
   const { recordingTab, offscreen } = await chrome.storage.local.get([
@@ -19,12 +20,7 @@ export const checkRecording = async () => {
     }
   } else if (offscreen) {
     try {
-      const existingContexts = await chrome.runtime.getContexts({});
-      const offDocument = existingContexts.find(
-        (c) => c.contextType === "OFFSCREEN_DOCUMENT"
-      );
-
-      if (!offDocument) {
+      if (!(await isActiveRecorderAlive())) {
         discardOffscreenDocuments();
         discardRecording();
       }

@@ -5,6 +5,7 @@
 
 import { makeSupportCode } from "./errorCodes";
 import { getStartFlowTrace, formatStartFlowTimeline } from "./startFlowTrace";
+import { formatRecordingSignals } from "./recordingSignals";
 
 const MAX_ERR_LEN = 120;
 
@@ -55,6 +56,7 @@ export const buildSupportDebugInfo = async (opts = {}) => {
       "lastAutoDiscardableError",
       "streamLifecycleLog",
       "diagnosticLog",
+      "lastRecordingSignals",
     ]);
   } catch {}
 
@@ -119,6 +121,8 @@ export const buildSupportDebugInfo = async (opts = {}) => {
     const tags = sl.map((e) => `${e.tag}@${e.t}`).join(" → ");
     lines.push(`SL(${sl.length}): ${tags.slice(0, 300)}`);
   }
+  const audio = formatRecordingSignals(store.lastRecordingSignals);
+  if (audio) lines.push(`Audio:     ${audio}`);
   if (attemptId) lines.push(`Ref:       ${attemptId}`);
   lines.push(`Time:      ${ts}`);
 

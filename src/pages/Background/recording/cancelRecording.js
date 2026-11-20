@@ -1,3 +1,4 @@
+import { releaseAttemptClaim } from "./attemptLock";
 import { sendMessageTab, focusTab } from "../tabManagement";
 import { removeTab } from "../tabManagement/removeTab";
 import { discardOffscreenDocuments } from "../offscreen/discardOffscreenDocuments";
@@ -5,6 +6,7 @@ import { resetWatchdogState } from "./resetWatchdogState";
 
 export const handleDismiss = async () => {
   try {
+    await releaseAttemptClaim().catch(() => {});
     await chrome.storage.local.set({ restarting: true });
 
     const { region, wasRegion } = await chrome.storage.local.get([
@@ -44,6 +46,7 @@ export const cancelRecording = async () => {
         "recordingTab",
       ]);
 
+    await releaseAttemptClaim().catch(() => {});
     await chrome.storage.local.set({
       pendingRecording: false,
       recordingUiTabId: null,

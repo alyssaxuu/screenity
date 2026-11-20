@@ -8,6 +8,9 @@ const INTENT_WINDOW_MS = 15000;
 // dependency-light for its tests. Fires past DEAD_HOST_QUIET_MS.
 const RESUME_RETRY_ALARM = "resume-pending-uploads-retry";
 const RESUME_AFTER_LOST_MIN = 5.5;
+// A take parked for the next recording resumes once that recording stops. Nothing runs
+// the resume chain after a keyboard-shortcut start, so the close that parked it arms the first retry.
+const RESUME_AFTER_PARK_MIN = 2;
 const STATE_KEYS = [
   "recording",
   "pendingRecording",
@@ -70,12 +73,25 @@ export const noteOffscreenCloseSkipped = (caller) => {
   } catch {}
 };
 
+export const armResumeAfterPark = async () => {
+  try {
+    const s = await chrome.storage.local.get(STATE_KEYS);
+    if (!(s.recording || s.pendingRecording)) return;
+    chrome.alarms?.create?.(RESUME_RETRY_ALARM, {
+      delayInMinutes: RESUME_AFTER_PARK_MIN,
+    });
+  } catch {}
+};
+
 export const initRecorderHostWatch = () => {
   chrome.runtime.onConnect.addListener((port) => {
     if (port.name !== PORT_NAME) return;
     if (docKind(port.sender?.url) === "resume") return;
     port.onDisconnect.addListener(() => {
-      if (lastIntent && Date.now() - lastIntent.at < INTENT_WINDOW_MS) return;
+      if (lastIntent && Date.now() - lastIntent.at < INTENT_WINDOW_MS) {
+        if (lastIntent.caller === "close-with-flush") void armResumeAfterPark();
+        return;
+      }
       void emit("recorder-host-lost", "port-disconnect");
       try {
         chrome.alarms?.create?.(RESUME_RETRY_ALARM, {

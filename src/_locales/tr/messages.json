@@ -952,7 +952,7 @@
     "description": "Yetersiz Alan Başlık"
   },
   "notEnoughSpaceDescription": {
-    "message": "Screenity, kayıt için en az 1 GB boş alan gerektirir. Lütfen cihazınızda alan açın ve yeniden deneyin.",
+    "message": "Screenity, kayıt için en az 500 MB boş alan gerektirir. Lütfen cihazında alan açın ve yeniden deneyin.",
     "description": "Yetersiz Alan Açıklama"
   },
   "clearSpaceButton": {
@@ -1078,7 +1078,7 @@
     "description": "Diğer Sistemler İçin Ses Uyarı Başlığı"
   },
   "recordAudioWarningOtherDescription": {
-    "message": "Bilgisayar sesini kaydetmek istiyorsanız, 'Sistem Sesini Paylaş' seçeneğinin etkin olduğundan emin olun. Bu seçeneği görmüyorsanız, Chrome'u güncellemeyi deneyin veya sekme kaydı seçeneğine geçin.",
+    "message": "Bilgisayar sesini kaydetmek istiyorsanız, 'Sistem Sesini Paylaş' seçeneğinin etkin olduğundan emin olun.",
     "description": "Diğer Sistemler İçin Ses Uyarı Açıklaması"
   },
   "qualityLabel": {
@@ -1194,11 +1194,23 @@
     "description": "Toast message shown when the user is in an existing project and ready to record a new scene"
   },
   "reachingRecordingLimitToast": {
-    "message": "Kayıt 90 dakikalık sınıra ulaşıyor, yakında duracak",
-    "description": "Toast message shown when the recording is reaching the 90 minute limit"
+    "message": "Kayıt $MINUTES$ dakikalık sınıra ulaşıyor, yakında duracak",
+    "placeholders": {
+      "minutes": {
+        "content": "$1",
+        "example": "120"
+      }
+    },
+    "description": "Toast message shown when the recording is reaching the recording length limit"
   },
   "recordingLimitReachedToast": {
-    "message": "Kayıt 90 dakikalık sınıra ulaştığı için durduruldu",
+    "message": "Kayıt $MINUTES$ dakikalık sınıra ulaştığı için durduruldu",
+    "placeholders": {
+      "minutes": {
+        "content": "$1",
+        "example": "120"
+      }
+    },
     "description": "Toast message shown when the recording limit is reached"
   },
   "tabRecordingDisabledToast": {
@@ -1604,7 +1616,7 @@
     "description": "Reset pro onboarding option label in popup settings menu"
   },
   "recoverLastRecordingOption": {
-    "message": "Recover last recording",
+    "message": "Kayıtları kurtar",
     "description": "Settings menu item to manually trigger cloud recording recovery"
   },
   "toastRecoveredSession": {
@@ -1614,6 +1626,10 @@
   "toastStorageCritical": {
     "message": "Disk alanı düşük. Kaydınız şimdi kaydediliyor. Şimdiye kadar yakalanan her şey güvende.",
     "description": "Toast shown when available storage drops below the critical threshold during recording; reassures that captured data is preserved"
+  },
+  "recordingTailLostToast": {
+    "message": "Diskiniz dolu olduğu için bu kaydın sonu kaydedilemedi. Geri kalanı düzenleyicide açılır. Yeniden kayıt yapmadan önce yer açın.",
+    "description": "Toast when the last part of a recording could not be written to disk"
   },
   "toastStorageLow": {
     "message": "Storage is running low. Upload reliability may degrade for long recordings.",
@@ -1626,6 +1642,10 @@
   "toastNetworkOffline": {
     "message": "Network offline. Upload paused. Screen chunks are saved locally.",
     "description": "Toast shown when the browser goes offline during a cloud recording upload"
+  },
+  "toastLocalCopyIncomplete": {
+    "message": "Yerel yedekleme durdu. Yükleme başarısız olursa bu kaydın bir kısmı kurtarılamaz.",
+    "description": "Toast shown when the local copy of a cloud recording stops being saved because the disk keeps failing"
   },
   "longRecordingTitle": {
     "message": "Uzun kayıt",
@@ -1683,9 +1703,25 @@
     "message": "Ekran paylaşımı durdu. Kaydınız şimdi kaydediliyor. Şimdiye kadar yakalanan her şey güvende.",
     "description": "Toast shown when the video track ends mid-recording (e.g. monitor disconnected, screen share revoked)"
   },
-  "audioTrackEndedToast": {
-    "message": "Ses bağlantısı kesildi. Kaydınız şimdi kaydediliyor. Şimdiye kadar yakalanan video güvende.",
-    "description": "Toast shown when the audio track ends mid-recording (e.g. mic unplugged, permission revoked)"
+  "micDisconnectedNote": {
+    "message": "Mikrofon $TIME$ anında bağlantıyı kaybetti. Sonrasındaki ses eksik.",
+    "description": "Note shown in the editor when the microphone disconnected during the recording and could not be reconnected; $TIME$ is the recording time (m:ss) when it dropped",
+    "placeholders": {
+      "time": {
+        "content": "$1",
+        "example": "1:05"
+      }
+    }
+  },
+  "systemAudioDisconnectedNote": {
+    "message": "Sistem sesi $TIME$ anında bağlantıyı kaybetti. Sonrasındaki ses eksik.",
+    "description": "Note shown in the editor when the system or tab audio disconnected during the recording and the take was stopped; $TIME$ is the recording time (m:ss) when it dropped",
+    "placeholders": {
+      "time": {
+        "content": "$1",
+        "example": "1:05"
+      }
+    }
   },
   "captureAudioUnavailableToast": {
     "message": "Bilgisayar sesi kaydedilemedi, bu nedenle bu kayıtta yalnızca video var.",
@@ -2060,5 +2096,127 @@
   "sandboxEditorAudioPendingHint": {
     "message": "Değişiklikleri kaydetmek için önce bir ses dosyası ekleyin.",
     "description": "Tooltip on the disabled save button in the audio editor until an audio file is added"
+  },
+  "emptyTakeNotSaved": {
+    "message": "Hiç video yakalanmadı, bu yüzden kayıt kaydedilemedi. Lütfen tekrar dene.",
+    "description": "Error shown when a cloud recording ended with no video frames captured, so nothing could be saved"
+  },
+  "idbBlockedModalTitle": {
+    "message": "Kayıt henüz başlatılamıyor",
+    "description": "Modal title when an earlier recording is still stored in this browser"
+  },
+  "idbUploadingModalDescription": {
+    "message": "Bir kayıt hâlâ yükleniyor. Bitmesini bekle, sonra tekrar kaydet.",
+    "description": "Modal text: earlier recording still uploading"
+  },
+  "idbHeldModalDescription": {
+    "message": "Bir kayıt yüklemeyi bitiremedi. Önce uzantı menüsünden kurtar veya at.",
+    "description": "Modal text: earlier recording needs recover or discard"
+  },
+  "emptyTakeModalTitle": {
+    "message": "Kayıt kaydedilmedi",
+    "description": "Modal title when a take captured no video"
+  },
+  "heldTakesTitle": {
+    "message": "Bu bilgisayarda tutulan kayıtlar",
+    "description": "Recovery page (download.html?held=1): page heading"
+  },
+  "heldTakesLoading": {
+    "message": "Yükleniyor",
+    "description": "Recovery page (download.html?held=1): shown while the list is read"
+  },
+  "heldTakesIntro": {
+    "message": "Bu kayıtların yüklemesi tamamlanamadı, bu yüzden burada bir kopya tutuldu. Bir dosya kaydet veya artık gerekmediğinde kopyayı at. Sen atana kadar hiçbir şey silinmez.",
+    "description": "Recovery page (download.html?held=1): intro under the heading"
+  },
+  "heldTakesEmpty": {
+    "message": "Bekleyen bir şey yok. Bu sekmeyi kapatabilirsin.",
+    "description": "Recovery page (download.html?held=1): shown when no take is held"
+  },
+  "heldTakesUntitled": {
+    "message": "Adsız kayıt",
+    "description": "Recovery page (download.html?held=1): card title when the recording has no title"
+  },
+  "heldTakesStored": {
+    "message": "$SIZE$ depolandı",
+    "description": "Recovery page (download.html?held=1): size of the stored copy, e.g. 412.6 MB stored",
+    "placeholders": {
+      "size": {
+        "content": "$1",
+        "example": "412.6 MB"
+      }
+    }
+  },
+  "heldTakesTrackScreen": {
+    "message": "Ekran",
+    "description": "Recovery page (download.html?held=1): track label on a card"
+  },
+  "heldTakesTrackCamera": {
+    "message": "Kamera",
+    "description": "Recovery page (download.html?held=1): track label on a card"
+  },
+  "heldTakesTrackAudio": {
+    "message": "Ses",
+    "description": "Recovery page (download.html?held=1): track label on a card"
+  },
+  "heldTakesPartial": {
+    "message": "Bu kaydın bir kısmı zaten sunucuda, bu yüzden bu kopya eksik olabilir.",
+    "description": "Recovery page (download.html?held=1): warning on a card"
+  },
+  "heldTakesGap": {
+    "message": "Bu cihazda kayıt sırasında yer bitti, bu yüzden bu kopyada bir boşluk var ve o noktadan sonrası oynatılmayabilir.",
+    "description": "Recovery page (download.html?held=1): warning on a card"
+  },
+  "heldTakesSave": {
+    "message": "Dosyaya kaydet",
+    "description": "Recovery page (download.html?held=1): button"
+  },
+  "heldTakesDiscard": {
+    "message": "At",
+    "description": "Recovery page (download.html?held=1): button"
+  },
+  "heldTakesDiscardConfirm": {
+    "message": "Evet, at",
+    "description": "Recovery page (download.html?held=1): button that confirms the discard"
+  },
+  "heldTakesKeep": {
+    "message": "Tut",
+    "description": "Recovery page (download.html?held=1): button that cancels the discard"
+  },
+  "heldTakesDiscardWarning": {
+    "message": "Atınca depolanan kopya bu bilgisayardan kaldırılır. Bu işlem geri alınamaz.",
+    "description": "Recovery page (download.html?held=1): shown next to the confirm button"
+  },
+  "heldTakesSaved": {
+    "message": "İndirilenler klasörüne kaydedildi. Depolanan kopya, sen atana kadar tutulur.",
+    "description": "Recovery page (download.html?held=1): note after a successful save"
+  },
+  "heldTakesSaveFailed": {
+    "message": "Bazı dosyalar kaydedilemedi. Kaydın hâlâ depolanıyor, tekrar dene.",
+    "description": "Recovery page (download.html?held=1): note after a failed save"
+  },
+  "heldTakesNoData": {
+    "message": "Bu kayıt için depolanmış veri bulunamadı.",
+    "description": "Recovery page (download.html?held=1): note when a save finds nothing"
+  },
+  "heldTakesDiscardFailed": {
+    "message": "Bu kayıt kaldırılamadı. Lütfen tekrar dene.",
+    "description": "Recovery page (download.html?held=1): note after a failed discard"
+  },
+  "heldTakesRetrying": {
+    "message": "Yükleme hâlâ deneniyor. Atarsan durur.",
+    "description": "Recovery page (download.html?held=1): note on a take that is still retrying its upload"
+  },
+  "cameraPermissionBlockedError": {
+    "message": "Kamera izni engellenmiş. Kayıt yapmak için kamera erişimine izin verin.",
+    "description": "Shown when a camera-only recording cannot start because camera permission is blocked"
+  },
+  "cameraBusyError": {
+    "message": "Screenity kameranızı kullanamıyor. Başka bir uygulama kullanıyor olabilir. Kamerayı kullanan diğer uygulamaları kapatıp tekrar deneyin.",
+    "description": "Shown when a camera-only recording cannot start because the camera is busy or unavailable"
+  },
+  "cameraNotFoundError": {
+    "message": "Screenity bir kamera bulamıyor. Bağlı olduğundan emin olun ve tekrar deneyin.",
+    "description": "Shown when a camera-only recording cannot start because no camera is found or the chosen camera is gone"
   }
 }

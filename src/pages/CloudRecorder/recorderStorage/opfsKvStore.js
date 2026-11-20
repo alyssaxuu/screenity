@@ -251,18 +251,24 @@ const removeDirRecursive = async (parent, name) => {
 
 // Best-effort whole-session cleanup. Call once after all per-track
 // destroyTrackDir() complete (or independently for orphan reaping).
+// Resolves { removed: false, error } when the folder is still there after.
 export const destroySessionDir = async (sessionId) => {
-  if (!sessionId) return;
+  if (!sessionId) return { removed: true };
   try {
     const root = await navigator.storage.getDirectory();
     const cloud = await root.getDirectoryHandle(ROOT_DIR_NAME).catch(() => null);
-    if (!cloud) return;
+    if (!cloud) return { removed: true };
     await removeDirRecursive(cloud, sessionId);
+    // removeDirRecursive logs a failed remove and carries on.
+    const left = await cloud.getDirectoryHandle(sessionId).then(
+      () => true,
+      (err) => err?.name !== "NotFoundError"
+    );
+    return left ? { removed: false, error: "session-dir-left" } : { removed: true };
   } catch (err) {
-    opfsDiag("destroy-session-failed", {
-      sessionId,
-      error: String(err?.message || err),
-    });
+    const error = String(err?.message || err);
+    opfsDiag("destroy-session-failed", { sessionId, error });
+    return { removed: false, error };
   }
 };
 

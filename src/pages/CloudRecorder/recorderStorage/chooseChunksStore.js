@@ -50,6 +50,14 @@ export const chooseChunksStore = async ({
   const prefix = TRACK_KEY_PREFIX[track];
   if (!prefix) throw new Error(`chooseChunksStore: unknown track ${track}`);
 
+  // Why IDB was chosen, for telemetry. Only set on the IDB result.
+  // "other" covers the caller opting out (preferOpfs false) or passing no
+  // session id; neither is a browser limitation.
+  let fallbackReason = "other";
+  if (preferOpfs && sessionId && !isOpfsSupported()) {
+    fallbackReason = "opfs-unsupported";
+  }
+
   if (preferOpfs && sessionId && isOpfsSupported()) {
     const startedAt = Date.now();
     const store = new OpfsKvStore({ sessionId, track, prefix });
@@ -71,10 +79,16 @@ export const chooseChunksStore = async ({
       // Probe may have created the track dir before failing; reap it so we
       // don't leave empty dirs behind when we fall back to IDB.
       store.destroyTrackDir().catch(() => {});
+      fallbackReason = "opfs-probe-failed";
     }
   }
 
-  return { store: idbInstance(track), backend: "idb", initMs: 0 };
+  return {
+    store: idbInstance(track),
+    backend: "idb",
+    initMs: 0,
+    fallbackReason,
+  };
 };
 
 // reconstructs a store for a recording that's already on disk (resume/

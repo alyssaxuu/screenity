@@ -1,3 +1,4 @@
+import { releaseAttemptClaim } from "./attemptLock";
 import { sendMessageRecord } from "./sendMessageRecord";
 import { removeTab } from "../tabManagement/removeTab";
 import { discardOffscreenDocuments } from "../offscreen/discardOffscreenDocuments";
@@ -73,6 +74,8 @@ export const discardRecording = async ({
         multiLastSceneId: null,
       };
 
+  // A countdown cancelled before any start leaves the click's claim behind.
+  await releaseAttemptClaim().catch(() => {});
   chrome.storage.local.set({
     recordingTab: null,
     sandboxTab: null,

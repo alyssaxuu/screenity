@@ -2,18 +2,12 @@
 // iframe-context reload on error is a no-op for the offscreen Recorder, so it's safe to share.
 // sendStopRecording accepts a string or object reason, plus optional extra fields.
 import { classifyError } from "./errorCodes";
+import { IS_IFRAME_HOST } from "./recordingHost";
 
-const urlParams = new URLSearchParams(window.location.search);
-const IS_INJECTED_IFRAME = urlParams.has("injected");
-const IS_IFRAME_CONTEXT =
-  IS_INJECTED_IFRAME ||
-  (window.top !== window.self &&
-    !document.referrer.startsWith("chrome-extension://"));
-
-export function sendRecordingError(why, cancel = false) {
+export function sendRecordingError(why, cancel = false, errorCodeOverride = null) {
   const errorType = !cancel ? "stream-error" : "cancel-modal";
   const whyStr = typeof why === "string" ? why : JSON.stringify(why);
-  const errorCode = classifyError(whyStr, errorType);
+  const errorCode = errorCodeOverride || classifyError(whyStr, errorType);
 
   chrome.runtime.sendMessage({
     type: "recording-error",
@@ -22,7 +16,7 @@ export function sendRecordingError(why, cancel = false) {
     errorCode,
   });
 
-  if (IS_IFRAME_CONTEXT) {
+  if (IS_IFRAME_HOST) {
     window.location.reload();
   }
 }

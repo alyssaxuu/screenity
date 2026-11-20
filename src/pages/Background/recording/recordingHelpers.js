@@ -5,7 +5,11 @@ import {
   getCurrentTab,
 } from "../tabManagement";
 import { sendMessageRecord } from "./sendMessageRecord";
-import { stopRecording, clearInMemoryEditorLock } from "./stopRecording";
+import {
+  stopRecording,
+  clearInMemoryEditorLock,
+  openEarlierLocalTakeEditor,
+} from "./stopRecording";
 import { addAlarmListener } from "../alarms/addAlarmListener";
 import { getStreamingData } from "./getStreamingData";
 import { discardOffscreenDocuments } from "../offscreen/discardOffscreenDocuments";
@@ -13,7 +17,9 @@ import { diagEvent, endDiagSession } from "../../utils/diagnosticLog";
 import { perfMark, perfSpan } from "../../utils/perfMarks";
 import { classifyError } from "../../utils/errorCodes";
 import { resetWatchdogState } from "./resetWatchdogState";
+import { ATTEMPT_STATE_KEYS, isAttemptSuperseded } from "./attemptLock";
 import { sweepRecorderTabs } from "./sweepRecorderTabs";
+import { hasTakeFailed } from "./failedTakes";
 import { emitRecordingTelemetry } from "./emitRecordingTelemetry";
 
 // Mirrors CloudRecorder.appendUploadTelemetryEvent so BG-side projectId mutations
@@ -85,10 +91,12 @@ export const handleOnGetPermissions = async (request) => {
 
 export const handleRecordingComplete = async () => {
   perfMark("BG.recordingHelpers handleRecordingComplete.enter");
-  const { recordingTab, completingRecordingTab } =
+  const { recordingTab, completingRecordingTab, recording, pendingRecording } =
     await chrome.storage.local.get([
       "recordingTab",
       "completingRecordingTab",
+      "recording",
+      "pendingRecording",
     ]);
 
   // snapshot at stop time; live recordingTab may belong to a new session by now
@@ -107,7 +115,10 @@ export const handleRecordingComplete = async () => {
   }
 
   // null recordingTab only if still pointing at the tab we just finished
-  const updates = { offscreen: false, completingRecordingTab: null };
+  // The editor sends this once its video loads, possibly well into the next take, whose offscreen flag
+  // it would clear: an action click would then treat the live recording as stale and reset it.
+  const updates = { completingRecordingTab: null };
+  if (!recording && !pendingRecording) updates.offscreen = false;
   if (target != null && recordingTab === target) {
     updates.recordingTab = null;
   }
@@ -118,14 +129,32 @@ export const handleRecordingComplete = async () => {
   );
 };
 
+const keepUnresolvedPendingScenes = async () => {
+  let index = [];
+  try {
+    const raw = await chrome.storage.local.get(["pendingSceneIndex"]);
+    index = Array.isArray(raw?.pendingSceneIndex) ? raw.pendingSceneIndex : [];
+    if (!index.length) return [];
+    const payloads = await chrome.storage.local.get(index.map((id) => `pendingScene:${id}`));
+    return index.filter((id) => {
+      const p = payloads?.[`pendingScene:${id}`];
+      return p && p.status !== "created";
+    });
+  } catch {
+    // Unreadable storage proves nothing resolved, so the index stays as read.
+    return index;
+  }
+};
+
 export const handleRecordingError = async (request) => {
   console.warn("[Screenity][handleRecordingError]", request);
 
   const errorCode =
     request?.errorCode ||
     classifyError(request?.why || "", request?.error || "");
+  const isWarningOnly = request.error === "stream-ended";
 
-  try {
+  if (!isWarningOnly) try {
     const { recordingAttemptId } = await chrome.storage.local.get([
       "recordingAttemptId",
     ]);
@@ -146,11 +175,6 @@ export const handleRecordingError = async (request) => {
       "tabRecordedID",
     ]);
 
-  await chrome.storage.local.set({
-    pendingRecording: false,
-  });
-
-  const isWarningOnly = request.error === "stream-ended";
   diagEvent(isWarningOnly ? "warning" : "error", {
     error: request?.error || null,
     why: request?.why || null,
@@ -167,6 +191,8 @@ export const handleRecordingError = async (request) => {
     });
     return;
   }
+
+  await chrome.storage.local.set({ pendingRecording: false });
 
   endDiagSession("error");
 
@@ -190,6 +216,10 @@ export const handleRecordingError = async (request) => {
     Boolean(multiMode) && Number(multiSceneCount) > 0;
   // Clear scene state when projectId clears so retries don't inherit it.
   // pendingSceneIndex must be [], not null (defaults don't fire on null).
+  // Entries whose pendingScene payload still exists stay: recovery needs them.
+  const keptPendingScenes = preserveMultiProject
+    ? []
+    : await keepUnresolvedPendingScenes();
   const multiState = preserveMultiProject
     ? {}
     : {
@@ -202,7 +232,7 @@ export const handleRecordingError = async (request) => {
         activeSceneId: null,
         sceneId: null,
         sceneIdStatus: null,
-        pendingSceneIndex: [],
+        pendingSceneIndex: keptPendingScenes,
       };
 
   clearInMemoryEditorLock();
@@ -357,12 +387,16 @@ export const handleRecordingError = async (request) => {
 // Push streaming-data to the recorder tab. Used for the SW-initiated
 // path (openRecorderTab). Dropped delivery causes REC_START_NO_STREAM_MSG
 // at the tab's 12s gate; the tab side is idempotent so retries are safe.
-const pushStreamingData = async (dataStr) => {
+const pushStreamingData = async (dataStr, takeId) => {
   const payload = { type: "streaming-data", data: dataStr };
   const backoffMs = [0, 300, 800];
   for (let attempt = 0; attempt < backoffMs.length; attempt++) {
     if (backoffMs[attempt] > 0) {
       await new Promise((r) => setTimeout(r, backoffMs[attempt]));
+    }
+    if (hasTakeFailed(takeId)) {
+      diagEvent("sw-streaming-data-push-dropped", { attempt, reason: "take-failed" });
+      return;
     }
     try {
       await sendMessageRecord(payload);
@@ -382,8 +416,21 @@ const pushStreamingData = async (dataStr) => {
   }
 };
 
-export const handleGetStreamingData = async () => {
+export const handleGetStreamingData = async (message) => {
   perfMark("BG.handleGetStreamingData.enter");
+  // SW-initiated pushes name no take: they are for the take started last.
+  let takeId = message?.__takeId || null;
+  if (!takeId) {
+    try {
+      ({ activeRecorderTakeId: takeId = null } = await chrome.storage.local.get([
+        "activeRecorderTakeId",
+      ]));
+    } catch {}
+  }
+  if (hasTakeFailed(takeId)) {
+    diagEvent("sw-streaming-data-refused", { reason: "take-failed" });
+    return { ok: false, error: "take-failed" };
+  }
   const data = await getStreamingData();
   // micActive decides whether a mic stream, and so a separated audio recorder,
   // exists at all; it was only observable from the offscreen document's console.
@@ -397,7 +444,7 @@ export const handleGetStreamingData = async () => {
   // Fire-and-forget push (SW-initiated openRecorderTab path). Not awaited:
   // a `get-streaming-data` pull must get its response immediately, not
   // after the push retry loop.
-  void pushStreamingData(dataStr);
+  void pushStreamingData(dataStr, takeId);
   // Returned to a `get-streaming-data` pull as the direct response. This
   // is the robust delivery path; it does not depend on the recorder
   // tab's onMessage listener being registered yet, nor on `recordingTab`
@@ -405,7 +452,51 @@ export const handleGetStreamingData = async () => {
   return { ok: true, data: dataStr };
 };
 
-export const videoReady = async () => {
+// A late video-ready from take N-1 must not tear down take N's state: compare the attempt
+// id it carries with storage. No id on either side (free/region recorders) keeps the old behaviour.
+export const isVideoReadyForEarlierTake = async (message) => {
+  const messageAttemptId = message?.recordingAttemptId;
+  if (!messageAttemptId) return false;
+  try {
+    const state = await chrome.storage.local.get(ATTEMPT_STATE_KEYS);
+    return isAttemptSuperseded(state, messageAttemptId);
+  } catch (err) {
+    // Cannot tell, and the message names a take: leave the session alone.
+    diagEvent("warning", {
+      note: "video-ready attempt id unreadable, treating as earlier take",
+      err: String(err).slice(0, 80),
+    });
+    return true;
+  }
+};
+
+// Close the take that sent a video-ready, and only that one. In the host
+// document it is a frame beside the newer take's; the flush lets it finish its mic.
+// A free take whose Stop opened no editor gets one first, holding its bytes.
+const closeEarlierTake = async (message, sender) => {
+  await openEarlierLocalTakeEditor({
+    localTake: message?.localTake || null,
+    attemptId: message?.recordingAttemptId || null,
+    takeSlot: message?.__takeSlot || null,
+  });
+  if (message?.__takeId) {
+    await discardOffscreenDocuments({
+      reason: "video-ready-earlier-take",
+      onlyTakeId: message.__takeId,
+    });
+  } else if (sender?.documentId) {
+    await discardOffscreenDocuments({
+      reason: "video-ready-earlier-take",
+      onlyDocumentId: sender.documentId,
+    });
+  }
+};
+
+export const videoReady = async (
+  message,
+  { earlierTake = false, sender = null } = {},
+) => {
+  const expectedAttemptId = message?.recordingAttemptId || null;
   perfMark("BG.recordingHelpers videoReady.enter");
   const {
     recordingDuration,
@@ -436,10 +527,30 @@ export const videoReady = async () => {
       });
     } catch {}
   }
+  // The rest (tab, session, documents) now belongs to the newer take.
+  if (earlierTake) {
+    diagEvent("video-ready-earlier-take", {
+      messageAttemptId: expectedAttemptId,
+    });
+    await closeEarlierTake(message, sender);
+    return;
+  }
+  // A newer take can start during any await below, so each destructive step
+  // re-checks right before it runs.
+  if (await isVideoReadyForEarlierTake(message)) {
+    diagEvent("video-ready-earlier-take", {
+      messageAttemptId: expectedAttemptId,
+      late: true,
+    });
+    // Its frame is done either way. Left open it stays in the host for good.
+    await closeEarlierTake(message, sender);
+    return;
+  }
   chrome.runtime
     .sendMessage({
       type: "clear-recording-session-safe",
       reason: "video-ready-terminal",
+      expectedAttemptId,
     })
     .catch((err) => {
       diagEvent("warning", { note: "clear-session-safe undelivered (video-ready)", err: String(err).slice(0, 80) });
@@ -449,7 +560,11 @@ export const videoReady = async () => {
   // tab-capture binding, which makes the next getMediaStreamId reject
   // with "Cannot capture a tab with an active stream" until Chrome
   // restarts. Cloudrecorder runs its own close on finalize, so skip it.
-  if (lastRecordingBackendRef?.backend === "opfs" && recordingTab) {
+  if (
+    lastRecordingBackendRef?.backend === "opfs" &&
+    recordingTab &&
+    !(await isVideoReadyForEarlierTake(message))
+  ) {
     try {
       const tab = await chrome.tabs.get(recordingTab).catch(() => null);
       const tabUrl = tab?.url ? new URL(tab.url) : null;
@@ -471,5 +586,10 @@ export const videoReady = async () => {
       });
     }
   }
-  await stopRecording();
+  await stopRecording({
+    expectedAttemptId,
+    takeId: message?.__takeId || null,
+    takeSlot: message?.__takeSlot || null,
+    localTake: message?.localTake || null,
+  });
 };

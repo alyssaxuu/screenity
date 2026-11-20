@@ -35,13 +35,19 @@ const toGIF = lazyUtil(() => import("../Editor/utils/toGIF"));
 const getFrame = lazyUtil(() => import("../Editor/utils/getFrame"));
 const convertMp4ToWebm = lazyUtil(() => import("../Editor/utils/convertMp4ToWebm"));
 
-const toBase64 = (blob) =>
-  new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.readAsDataURL(blob);
-    reader.onloadend = () => resolve(reader.result);
-    reader.onerror = reject;
-  });
+// Results go back as Blobs. They used to be base64 data URLs, but Chrome caps
+// a string at ~536M chars, so readAsDataURL on anything over ~384MiB quietly
+// returns "" and the editor swapped the recording for an empty video.
+const requireResult = (blob, op) => {
+  if (!(blob instanceof Blob) || blob.size === 0) {
+    throw new Error(`${op}: empty result`);
+  }
+  return blob;
+};
+
+// The mediabunny utils report 0..1; the editor shows 0..100.
+const percent = (reply) => (progress) =>
+  reply({ type: "ffmpeg-progress", progress: Math.round(progress * 100) });
 
 // Viewer mode (editor.html?view=1): playback only, edit ops rejected. WebM
 // duration fix still runs (metadata repair, not an edit) for seekability.
@@ -135,16 +141,11 @@ export async function runEditorOp(message, reply, { viewer = false } = {}) {
           message.duration,
           message.volume,
           message.replaceAudio,
-          (progress) =>
-            reply({
-              type: "ffmpeg-progress",
-              progress: Math.round(progress * 100),
-            }),
+          percent(reply),
         );
-        const base64 = await toBase64(blob);
         reply({
           type: "updated-blob",
-          base64,
+          blob: requireResult(blob, "add-audio-to-video"),
           topLevel: true,
           fromAudio: true,
           skipReencode: true,
@@ -154,23 +155,16 @@ export async function runEditorOp(message, reply, { viewer = false } = {}) {
       }
 
       case "base64-to-blob": {
-        if (
-          typeof message.base64 !== "string" ||
-          !message.base64.startsWith("data:")
-        ) {
-          throw new Error("base64-to-blob: expected data: URL");
+        const rawBlob = message.blob;
+        if (!(rawBlob instanceof Blob)) {
+          throw new Error("base64-to-blob: expected a Blob");
         }
-        const rawBlob = await fetch(message.base64).then((r) => r.blob());
 
         const header = await rawBlob.slice(4, 8).text();
         const looksMp4 = header === "ftyp";
 
         if (looksMp4) {
-          reply({
-            type: "updated-blob",
-            base64: message.base64,
-            topLevel: true,
-          });
+          reply({ type: "updated-blob", blob: rawBlob, topLevel: true });
           break;
         }
 
@@ -182,25 +176,19 @@ export async function runEditorOp(message, reply, { viewer = false } = {}) {
           aacOk = await ensureAacEncoder();
         } catch {}
         if (!aacOk && (await blobHasAudioTrack(rawBlob))) {
-          reply({
-            type: "updated-blob",
-            base64: message.base64,
-            topLevel: true,
-          });
+          reply({ type: "updated-blob", blob: rawBlob, topLevel: true });
           break;
         }
 
         // reuse the already-decoded rawBlob; mediabunny sniffs the container
         // from bytes, so no second base64 decode is needed
-        const mp4Blob = await convertWebmToMp4(rawBlob, (progress) =>
-          reply({
-            type: "ffmpeg-progress",
-            progress: Math.round(progress * 100),
-          }),
-        );
+        const mp4Blob = await convertWebmToMp4(rawBlob, percent(reply));
 
-        const base64 = await toBase64(mp4Blob);
-        reply({ type: "updated-blob", base64, topLevel: true });
+        reply({
+          type: "updated-blob",
+          blob: requireResult(mp4Blob, "base64-to-blob"),
+          topLevel: true,
+        });
         break;
       }
 
@@ -214,12 +202,11 @@ export async function runEditorOp(message, reply, { viewer = false } = {}) {
             width: message.width,
             height: message.height,
           },
-          (progress) => reply({ type: "ffmpeg-progress", progress }),
+          percent(reply),
         );
-        const base64 = await toBase64(blob);
         reply({
           type: "updated-blob",
-          base64,
+          blob: requireResult(blob, "crop-video"),
           topLevel: true,
           _opId: message._opId,
         });
@@ -235,12 +222,11 @@ export async function runEditorOp(message, reply, { viewer = false } = {}) {
           message.cut,
           message.duration,
           message.encode,
-          (progress) => reply({ type: "ffmpeg-progress", progress }),
+          percent(reply),
         );
-        const base64 = await toBase64(blob);
         reply({
           type: "updated-blob",
-          base64,
+          blob: requireResult(blob, "cut-video"),
           addToHistory: true,
           topLevel: true,
           _opId: message._opId,
@@ -261,12 +247,11 @@ export async function runEditorOp(message, reply, { viewer = false } = {}) {
           message.startTime,
           message.endTime,
           message.duration,
-          (progress) => reply({ type: "ffmpeg-progress", progress }),
+          percent(reply),
         );
-        const base64 = await toBase64(blob);
         reply({
           type: "updated-blob",
-          base64,
+          blob: requireResult(blob, "mute-video"),
           addToHistory: true,
           topLevel: true,
           _opId: message._opId,
@@ -279,16 +264,11 @@ export async function runEditorOp(message, reply, { viewer = false } = {}) {
           null,
           message.blob,
           message.duration,
-          (progress) =>
-            reply({
-              type: "ffmpeg-progress",
-              progress: Math.round(progress * 100),
-            }),
+          percent(reply),
         );
-        const base64 = await toBase64(blob);
         reply({
           type: "updated-blob",
-          base64,
+          blob: requireResult(blob, "reencode-video"),
           topLevel: true,
           _opId: message._opId,
         });
@@ -297,27 +277,22 @@ export async function runEditorOp(message, reply, { viewer = false } = {}) {
 
       case "to-gif": {
         const blob = await toGIF(null, message.blob);
-        const base64 = await toBase64(blob);
-        reply({ type: "download-gif", base64 });
+        reply({ type: "download-gif", blob: requireResult(blob, "to-gif") });
         break;
       }
 
       case "to-webm": {
         if (message.blob?.type === "video/webm") {
-          const base64 = await toBase64(message.blob);
-          reply({ type: "download-webm", base64 });
+          reply({ type: "download-webm", blob: message.blob });
           break;
         }
 
-        const result = await convertMp4ToWebm(message.blob, (progress) =>
-          reply({
-            type: "ffmpeg-progress",
-            progress: Math.round(progress * 100),
-          }),
-        );
+        const result = await convertMp4ToWebm(message.blob, percent(reply));
 
-        const base64 = await toBase64(result);
-        reply({ type: "download-webm", base64 });
+        reply({
+          type: "download-webm",
+          blob: requireResult(result, "to-webm"),
+        });
         break;
       }
 

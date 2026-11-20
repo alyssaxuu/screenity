@@ -17,6 +17,7 @@ export class IdbChunkReader {
   // editor reads whichever slot is live, which is the newer recording.
   async open(backendRef) {
     const slot = backendRef?.slot || (await loadActiveSlot());
+    this._slot = slot;
     this._store = instanceForSlot(slot);
     await this._store.ready();
     this._opened = true;
@@ -52,7 +53,13 @@ export class IdbChunkReader {
     const blob = parts.length
       ? new Blob(parts, { type: inferredType })
       : new Blob([], { type: inferredType });
-    return { blob, byteSize, chunkCount: parts.length };
+    return {
+      blob,
+      byteSize,
+      chunkCount: parts.length,
+      slot: this._slot,
+      firstTimestamp: items.length ? (items[0].timestamp ?? 0) : null,
+    };
   }
 
   async close() {

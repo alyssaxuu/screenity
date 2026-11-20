@@ -1,4 +1,6 @@
 import { base64ToUint8Array } from "../utils/base64ToUint8Array";
+import { orderChunks } from "./orderChunks";
+import { sniffContainer } from "./chunkContainer";
 import { sendMessageTab } from "../tabManagement";
 import { chunksStore } from "../recording/chunkHandler";
 import {
@@ -516,17 +518,15 @@ export const handleSaveToDrive = async (request, fallback = false, tabId = null)
         return { status: "ew", url: null, error: "No recording data found" };
       }
 
-      chunks.sort((a, b) => {
-        const ta = a.timestamp ?? a.index ?? 0;
-        const tb = b.timestamp ?? b.index ?? 0;
-        return ta - tb;
-      });
+      orderChunks(chunks);
 
       const parts = chunks.map((c) =>
         c.chunk instanceof Blob ? c.chunk : new Blob([c.chunk])
       );
-      const blob = new Blob(parts, { type: "video/webm" });
-      const fileName = (request.title || "Screenity Recording") + ".webm";
+      const container = await sniffContainer(parts[0]);
+      const blob = new Blob(parts, { type: container.mime });
+      const fileName =
+        (request.title || "Screenity Recording") + container.ext;
       response = await saveToDrive(blob, fileName);
     }
 

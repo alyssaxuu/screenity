@@ -10,6 +10,9 @@ import {
   EncodedPacketSink,
   EncodedVideoPacketSource,
   EncodedAudioPacketSource,
+  AudioSampleSink,
+  AudioSampleSource,
+  canEncodeAudio,
   type OutputFormat,
 } from "mediabunny";
 
@@ -43,10 +46,12 @@ const sweepStaleTrimFiles = async () => {
 
 export class VideoTrimmer {
   async trim(sourceBlob: Blob, options: TrimOptions): Promise<Blob> {
-    const { startTime, endTime, outputFormat, onProgress } = options;
+    const { startTime, endTime, outputFormat, audioBitrate, onProgress } =
+      options;
 
     if (startTime < 0) throw new Error("Start time cannot be negative");
-    if (endTime <= startTime) throw new Error("End time must be greater than start time");
+    if (endTime <= startTime)
+      throw new Error("End time must be greater than start time");
 
     await sweepStaleTrimFiles();
 
@@ -98,14 +103,32 @@ export class VideoTrimmer {
 
     let audioSource: any = null;
     let audioDecoderConfig: any = null;
+    let audioSampleSink: any = null;
     if (audioTrack) {
       try {
         audioDecoderConfig = await audioTrack.getDecoderConfig();
-        audioSource = new EncodedAudioPacketSource(audioTrack.codec);
+        // Packet-copied AAC across a trim boundary plays in Chrome/macOS but
+        // Web Audio can't decode it. Re-encode MP4 audio so boundary samples
+        // clip cleanly and the AAC priming metadata is valid.
+        if (
+          targetFormat === "mp4" &&
+          typeof AudioEncoder !== "undefined" &&
+          (await canEncodeAudio("aac").catch(() => false)) &&
+          (await audioTrack.canDecode().catch(() => false))
+        ) {
+          audioSampleSink = new AudioSampleSink(audioTrack);
+          audioSource = new AudioSampleSource({
+            codec: "aac",
+            bitrate: audioBitrate || 128000,
+          });
+        } else {
+          audioSource = new EncodedAudioPacketSource(audioTrack.codec);
+        }
         output.addAudioTrack(audioSource);
       } catch {
         audioSource = null;
         audioDecoderConfig = null;
+        audioSampleSink = null;
       }
     }
 
@@ -119,7 +142,9 @@ export class VideoTrimmer {
         ? videoSink.packets(startKey, endVideoPacket)
         : videoSink.packets(startKey);
       for await (const packet of iter) {
-        const rebased = packet.clone({ timestamp: packet.timestamp - baseTime });
+        const rebased = packet.clone({
+          timestamp: packet.timestamp - baseTime,
+        });
         if (isFirst) {
           await videoSource.add(rebased, { decoderConfig: videoDecoderConfig });
           isFirst = false;
@@ -135,6 +160,40 @@ export class VideoTrimmer {
 
     const pipeAudio = async () => {
       if (!audioSource || !audioTrack) return;
+
+      if (audioSampleSink) {
+        for await (const sample of audioSampleSink.samples(baseTime, endTime)) {
+          let startFrame = 0;
+          let endFrame = sample.numberOfFrames;
+
+          if (sample.timestamp < baseTime) {
+            startFrame = Math.round(
+              (baseTime - sample.timestamp) * sample.sampleRate
+            );
+          }
+          if (sample.timestamp + sample.duration > endTime) {
+            endFrame = Math.round(
+              (endTime - sample.timestamp) * sample.sampleRate
+            );
+          }
+
+          if (startFrame >= endFrame) {
+            sample.close();
+            continue;
+          }
+
+          const clipped =
+            startFrame > 0 || endFrame < sample.numberOfFrames
+              ? sample.trim(startFrame, endFrame)
+              : sample;
+          if (clipped !== sample) sample.close();
+          clipped.setTimestamp(clipped.timestamp - baseTime);
+          await audioSource.add(clipped);
+          clipped.close();
+        }
+        return;
+      }
+
       const audioSink = new EncodedPacketSink(audioTrack);
       const startA = await audioSink.getPacket(baseTime);
       if (!startA) return;
@@ -142,7 +201,9 @@ export class VideoTrimmer {
         ? await audioSink.getPacket(endTime)
         : null;
       let isFirst = true;
-      const iter = endA ? audioSink.packets(startA, endA) : audioSink.packets(startA);
+      const iter = endA
+        ? audioSink.packets(startA, endA)
+        : audioSink.packets(startA);
       for await (const packet of iter) {
         // First audio packet may sit slightly before baseTime.
         const ts = Math.max(0, packet.timestamp - baseTime);
@@ -161,8 +222,12 @@ export class VideoTrimmer {
       await output.finalize();
       // finalize() owns the writable lock; don't close here.
     } catch (err) {
-      try { await writable.abort(); } catch {}
-      try { await dir.removeEntry(outFileName); } catch {}
+      try {
+        await writable.abort();
+      } catch {}
+      try {
+        await dir.removeEntry(outFileName);
+      } catch {}
       throw err;
     }
 
@@ -170,7 +235,9 @@ export class VideoTrimmer {
     // Read into ArrayBuffer so deleting the OPFS entry doesn't invalidate
     // the returned Blob (some impls back File lazily by the handle).
     const bytes = await file.arrayBuffer();
-    try { await dir.removeEntry(outFileName); } catch {}
+    try {
+      await dir.removeEntry(outFileName);
+    } catch {}
     return new Blob([bytes], {
       type: targetFormat === "mp4" ? "video/mp4" : "video/webm",
     });

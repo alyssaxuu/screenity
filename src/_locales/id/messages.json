@@ -952,7 +952,7 @@
     "description": "Judul Ruang Tidak Cukup"
   },
   "notEnoughSpaceDescription": {
-    "message": "Screenity memerlukan setidaknya 1 GB ruang kosong untuk merekam. Silakan mengosongkan beberapa ruang pada perangkat Anda dan coba lagi.",
+    "message": "Screenity memerlukan setidaknya 500 MB ruang kosong untuk merekam. Silakan mengosongkan beberapa ruang pada perangkat Anda dan coba lagi.",
     "description": "Deskripsi Ruang Tidak Cukup"
   },
   "clearSpaceButton": {
@@ -1078,7 +1078,7 @@
     "description": "Judul Peringatan Audio untuk Sistem Lainnya"
   },
   "recordAudioWarningOtherDescription": {
-    "message": "Pastikan Anda mengaktifkan opsi 'Bagikan audio sistem' jika Anda ingin merekam audio dari komputer. Jika Anda tidak melihat opsi ini, coba perbarui Chrome atau beralih ke opsi merekam tab.",
+    "message": "Pastikan Anda mengaktifkan opsi 'Bagikan audio sistem' jika Anda ingin merekam audio dari komputer.",
     "description": "Deskripsi Peringatan Audio untuk Sistem Lainnya"
   },
   "qualityLabel": {
@@ -1194,11 +1194,23 @@
     "description": "Toast message shown when the user is in an existing project and ready to record a new scene"
   },
   "reachingRecordingLimitToast": {
-    "message": "Rekaman mendekati batas 90 menit, akan segera berhenti",
-    "description": "Toast message shown when the recording is reaching the 90 minute limit"
+    "message": "Rekaman mendekati batas $MINUTES$ menit, akan segera berhenti",
+    "placeholders": {
+      "minutes": {
+        "content": "$1",
+        "example": "120"
+      }
+    },
+    "description": "Toast message shown when the recording is reaching the recording length limit"
   },
   "recordingLimitReachedToast": {
-    "message": "Rekaman dihentikan karena batas 90 menit",
+    "message": "Rekaman dihentikan karena batas $MINUTES$ menit",
+    "placeholders": {
+      "minutes": {
+        "content": "$1",
+        "example": "120"
+      }
+    },
     "description": "Toast message shown when the recording limit is reached"
   },
   "tabRecordingDisabledToast": {
@@ -1604,7 +1616,7 @@
     "description": "Reset pro onboarding option label in popup settings menu"
   },
   "recoverLastRecordingOption": {
-    "message": "Recover last recording",
+    "message": "Pulihkan rekaman",
     "description": "Settings menu item to manually trigger cloud recording recovery"
   },
   "toastRecoveredSession": {
@@ -1614,6 +1626,10 @@
   "toastStorageCritical": {
     "message": "Ruang disk rendah. Menyimpan rekaman Anda. Semua yang direkam sejauh ini aman.",
     "description": "Toast shown when available storage drops below the critical threshold during recording; reassures that captured data is preserved"
+  },
+  "recordingTailLostToast": {
+    "message": "Disk Anda penuh, jadi bagian akhir rekaman ini tidak dapat disimpan. Sisanya terbuka di editor. Kosongkan ruang sebelum merekam lagi.",
+    "description": "Toast when the last part of a recording could not be written to disk"
   },
   "toastStorageLow": {
     "message": "Storage is running low. Upload reliability may degrade for long recordings.",
@@ -1626,6 +1642,10 @@
   "toastNetworkOffline": {
     "message": "Network offline. Upload paused. Screen chunks are saved locally.",
     "description": "Toast shown when the browser goes offline during a cloud recording upload"
+  },
+  "toastLocalCopyIncomplete": {
+    "message": "Cadangan lokal berhenti. Jika unggahan gagal, sebagian rekaman ini tidak dapat dipulihkan.",
+    "description": "Toast shown when the local copy of a cloud recording stops being saved because the disk keeps failing"
   },
   "longRecordingTitle": {
     "message": "Rekaman panjang",
@@ -1683,9 +1703,25 @@
     "message": "Berbagi layar berhenti. Menyimpan rekaman Anda. Semua yang direkam sejauh ini aman.",
     "description": "Toast shown when the video track ends mid-recording (e.g. monitor disconnected, screen share revoked)"
   },
-  "audioTrackEndedToast": {
-    "message": "Audio terputus. Menyimpan rekaman Anda. Video yang direkam sejauh ini aman.",
-    "description": "Toast shown when the audio track ends mid-recording (e.g. mic unplugged, permission revoked)"
+  "micDisconnectedNote": {
+    "message": "Mikrofon terputus pada $TIME$. Audio setelah itu hilang.",
+    "description": "Note shown in the editor when the microphone disconnected during the recording and could not be reconnected; $TIME$ is the recording time (m:ss) when it dropped",
+    "placeholders": {
+      "time": {
+        "content": "$1",
+        "example": "1:05"
+      }
+    }
+  },
+  "systemAudioDisconnectedNote": {
+    "message": "Audio sistem terputus pada $TIME$. Audio setelah itu hilang.",
+    "description": "Note shown in the editor when the system or tab audio disconnected during the recording and the take was stopped; $TIME$ is the recording time (m:ss) when it dropped",
+    "placeholders": {
+      "time": {
+        "content": "$1",
+        "example": "1:05"
+      }
+    }
   },
   "captureAudioUnavailableToast": {
     "message": "Audio komputer tidak dapat direkam, jadi rekaman ini hanya berisi video.",
@@ -2060,5 +2096,127 @@
   "sandboxEditorAudioPendingHint": {
     "message": "Tambahkan file audio terlebih dahulu untuk menyimpan perubahan.",
     "description": "Tooltip on the disabled save button in the audio editor until an audio file is added"
+  },
+  "emptyTakeNotSaved": {
+    "message": "Tidak ada video yang terekam, jadi rekaman ini tidak dapat disimpan. Coba lagi.",
+    "description": "Error shown when a cloud recording ended with no video frames captured, so nothing could be saved"
+  },
+  "idbBlockedModalTitle": {
+    "message": "Belum bisa mulai merekam",
+    "description": "Modal title when an earlier recording is still stored in this browser"
+  },
+  "idbUploadingModalDescription": {
+    "message": "Sebuah rekaman masih diunggah. Tunggu sampai selesai, lalu rekam lagi.",
+    "description": "Modal text: earlier recording still uploading"
+  },
+  "idbHeldModalDescription": {
+    "message": "Sebuah rekaman belum selesai diunggah. Pulihkan atau hapus dulu dari menu ekstensi.",
+    "description": "Modal text: earlier recording needs recover or discard"
+  },
+  "emptyTakeModalTitle": {
+    "message": "Rekaman tidak disimpan",
+    "description": "Modal title when a take captured no video"
+  },
+  "heldTakesTitle": {
+    "message": "Rekaman yang disimpan di komputer ini",
+    "description": "Recovery page (download.html?held=1): page heading"
+  },
+  "heldTakesLoading": {
+    "message": "Memuat",
+    "description": "Recovery page (download.html?held=1): shown while the list is read"
+  },
+  "heldTakesIntro": {
+    "message": "Rekaman ini tidak selesai diunggah, jadi salinannya disimpan di sini. Simpan sebagai file, atau hapus salinan saat sudah tidak diperlukan. Tidak ada yang dihapus sampai Anda menghapusnya.",
+    "description": "Recovery page (download.html?held=1): intro under the heading"
+  },
+  "heldTakesEmpty": {
+    "message": "Tidak ada yang menunggu. Anda bisa menutup tab ini.",
+    "description": "Recovery page (download.html?held=1): shown when no take is held"
+  },
+  "heldTakesUntitled": {
+    "message": "Rekaman tanpa judul",
+    "description": "Recovery page (download.html?held=1): card title when the recording has no title"
+  },
+  "heldTakesStored": {
+    "message": "$SIZE$ tersimpan",
+    "description": "Recovery page (download.html?held=1): size of the stored copy, e.g. 412.6 MB stored",
+    "placeholders": {
+      "size": {
+        "content": "$1",
+        "example": "412.6 MB"
+      }
+    }
+  },
+  "heldTakesTrackScreen": {
+    "message": "Layar",
+    "description": "Recovery page (download.html?held=1): track label on a card"
+  },
+  "heldTakesTrackCamera": {
+    "message": "Kamera",
+    "description": "Recovery page (download.html?held=1): track label on a card"
+  },
+  "heldTakesTrackAudio": {
+    "message": "Audio",
+    "description": "Recovery page (download.html?held=1): track label on a card"
+  },
+  "heldTakesPartial": {
+    "message": "Sebagian rekaman ini sudah ada di server, jadi salinan ini mungkin tidak lengkap.",
+    "description": "Recovery page (download.html?held=1): warning on a card"
+  },
+  "heldTakesGap": {
+    "message": "Ruang di perangkat ini habis di tengah rekaman, jadi salinan ini punya bagian yang hilang dan mungkin tidak bisa diputar melewatinya.",
+    "description": "Recovery page (download.html?held=1): warning on a card"
+  },
+  "heldTakesSave": {
+    "message": "Simpan ke file",
+    "description": "Recovery page (download.html?held=1): button"
+  },
+  "heldTakesDiscard": {
+    "message": "Hapus",
+    "description": "Recovery page (download.html?held=1): button"
+  },
+  "heldTakesDiscardConfirm": {
+    "message": "Ya, hapus",
+    "description": "Recovery page (download.html?held=1): button that confirms the discard"
+  },
+  "heldTakesKeep": {
+    "message": "Simpan",
+    "description": "Recovery page (download.html?held=1): button that cancels the discard"
+  },
+  "heldTakesDiscardWarning": {
+    "message": "Menghapus akan membuang salinan tersimpan dari komputer ini. Tindakan ini tidak dapat dibatalkan.",
+    "description": "Recovery page (download.html?held=1): shown next to the confirm button"
+  },
+  "heldTakesSaved": {
+    "message": "Disimpan di folder Unduhan Anda. Salinan tersimpan tetap ada sampai Anda menghapusnya.",
+    "description": "Recovery page (download.html?held=1): note after a successful save"
+  },
+  "heldTakesSaveFailed": {
+    "message": "Beberapa file tidak dapat disimpan. Rekaman Anda masih tersimpan, coba lagi.",
+    "description": "Recovery page (download.html?held=1): note after a failed save"
+  },
+  "heldTakesNoData": {
+    "message": "Tidak ada data tersimpan untuk rekaman ini.",
+    "description": "Recovery page (download.html?held=1): note when a save finds nothing"
+  },
+  "heldTakesDiscardFailed": {
+    "message": "Rekaman ini tidak dapat dihapus. Coba lagi.",
+    "description": "Recovery page (download.html?held=1): note after a failed discard"
+  },
+  "heldTakesRetrying": {
+    "message": "Masih mencoba mengunggah. Menghapus akan menghentikannya.",
+    "description": "Recovery page (download.html?held=1): note on a take that is still retrying its upload"
+  },
+  "cameraPermissionBlockedError": {
+    "message": "Izin kamera diblokir. Izinkan akses kamera untuk merekam.",
+    "description": "Shown when a camera-only recording cannot start because camera permission is blocked"
+  },
+  "cameraBusyError": {
+    "message": "Screenity tidak dapat menggunakan kameramu. Mungkin sedang dipakai aplikasi lain. Tutup aplikasi lain yang memakainya lalu coba lagi.",
+    "description": "Shown when a camera-only recording cannot start because the camera is busy or unavailable"
+  },
+  "cameraNotFoundError": {
+    "message": "Screenity tidak dapat menemukan kamera. Pastikan kamera terhubung lalu coba lagi.",
+    "description": "Shown when a camera-only recording cannot start because no camera is found or the chosen camera is gone"
   }
 }

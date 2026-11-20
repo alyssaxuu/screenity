@@ -15,6 +15,9 @@ import { getPrompterWindow } from "../../teleprompter/prompterWindow";
 import { traceStep, setStartFlowOutcome } from "../../../utils/startFlowTrace";
 import { perfMark } from "../../../utils/perfMarks";
 import { triggerSupportDownload } from "../../../utils/triggerSupportDownload";
+import { recordingLimitMinutes } from "../../../utils/recordingLimit";
+import { micDropFields } from "../../../utils/micDropHandoff";
+import { clearCaptureStarting } from "../captureStarting";
 const CLOUD_FEATURES_ENABLED =
   process.env.SCREENITY_ENABLE_CLOUD_FEATURES === "true";
 
@@ -657,24 +660,36 @@ export const setupHandlers = () => {
 
     // BG is source of truth; reading React default would race the user
     // setting and produce double beeps.
-    const { countdown: storedCountdown } = await chrome.storage.local.get([
+    const { countdown: storedCountdown, restarting } = await chrome.storage.local.get([
       "countdown",
+      "restarting",
     ]);
     const state = getState();
 
     if (storedCountdown) {
+      // Restart can reuse the countdown already visible in this tab. Its
+      // component does not remount, so retain that run's ID in that case.
+      let countdownId = restarting && state.countdownActive && state.isCountdownVisible && state.countdownId
+        ? state.countdownId
+        : `countdown-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+      try {
+        await chrome.storage.local.set({ activeCountdownId: countdownId });
+      } catch {
+        countdownId = null;
+      }
       perfMark("Content countdown.start");
       traceStep("countdownStart");
       setContentState((prev) => ({
         ...prev,
         countdownActive: true,
+        countdownId,
         isCountdownVisible: true,
         countdownCancelled: false,
         // Latch: the pre-countdown loader must never re-show, or it bleeds
         // into the captured frame for region/desktop (stream already live).
         countdownEverShown: true,
       }));
-      chrome.runtime.sendMessage({ type: "diag-countdown-started" }).catch(() => {});
+      chrome.runtime.sendMessage({ type: "diag-countdown-started", countdownId }).catch(() => {});
     } else {
       // countdownCancelled is cleared in startStreaming, so not stale here.
       state.startRecordingAfterCountdown();
@@ -869,11 +884,8 @@ export const setupHandlers = () => {
       errorCode: message?.errorCode || null,
     });
     setContentState((prev) => ({
-      ...prev,
-      pendingRecording: false,
-      preparingRecording: false,
+      ...clearCaptureStarting(prev),
       startGateOpen: false,
-      recording: false,
       paused: false,
       time: 0,
       timer: 0,
@@ -1087,6 +1099,36 @@ export const setupHandlers = () => {
       return;
     }
 
+    // Another take's copy is in this browser, or nothing was captured. Not a
+    // recorder fault, so no restart-your-browser copy and no support report.
+    const blockedKeys = {
+      REC_START_IDB_UPLOADING: "idbUploadingModalDescription",
+      REC_START_IDB_HELD: "idbHeldModalDescription",
+      REC_START_EMPTY_TAKE: "emptyTakeNotSaved",
+      REC_START_CAMERA_PERM: "cameraPermissionBlockedError",
+      REC_START_CAMERA_BUSY: "cameraBusyError",
+      REC_START_CAMERA_NOTFOUND: "cameraNotFoundError",
+    };
+    if (blockedKeys[errorCode]) {
+      state.openModal(
+        chrome.i18n.getMessage(
+          errorCode === "REC_START_EMPTY_TAKE"
+            ? "emptyTakeModalTitle"
+            : "idbBlockedModalTitle",
+        ),
+        chrome.i18n.getMessage(blockedKeys[errorCode]),
+        chrome.i18n.getMessage("permissionsModalDismiss"),
+        null,
+        () => {
+          state.dismissRecording("stream-error");
+        },
+        () => {
+          state.dismissRecording("stream-error");
+        },
+      );
+      return;
+    }
+
     state.openModal(
       chrome.i18n.getMessage("streamErrorModalTitle"),
       chrome.i18n.getMessage("streamErrorModalDescription"),
@@ -1131,7 +1173,13 @@ export const setupHandlers = () => {
   registerMessage("show-toast", (message) => {
     const state = getState();
     if (typeof state.openToast !== "function") return;
-    state.openToast(message?.message || "", () => {}, message?.timeout || 5000);
+    state.openToast(
+      message?.message || "",
+      () => {},
+      message?.timeout || 5000,
+      // A held notice shows between takes and must not stay up into the next.
+      message?.heldNotice ? { quietWhileRecording: true } : undefined,
+    );
   });
   // Offscreen recordings relay the system-audio guidance here so it shows in the
   // dedicated Warning component (dark pill + audio icon), matching the in-page
@@ -1406,14 +1454,6 @@ export const setupHandlers = () => {
         ...prev,
         timeWarning: true,
       }));
-
-      if (state.openToast) {
-        state.openToast(
-          chrome.i18n.getMessage("reachingRecordingLimitToast"),
-          () => {},
-          5000,
-        );
-      }
     }
   });
   registerMessage("time-stopped", () => {
@@ -1426,7 +1466,9 @@ export const setupHandlers = () => {
 
       if (state.openToast) {
         state.openToast(
-          chrome.i18n.getMessage("recordingLimitReachedToast"),
+          chrome.i18n.getMessage("recordingLimitReachedToast", [
+            recordingLimitMinutes(),
+          ]),
           () => {},
           5000,
         );
@@ -1558,6 +1600,7 @@ export const setupHandlers = () => {
       newProject: message.newProject,
       sceneId: message.sceneId,
       projectId,
+      ...micDropFields(message),
       localPlayback:
         localPlayback?.available && localPlayback?.trackType === "screen"
           ? {

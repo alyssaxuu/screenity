@@ -9,34 +9,36 @@ const FALLBACK_AFTER_COUNTDOWN_STARTED_MS = 8000;
 // this it's a phantom start, not recovery: a real SW restart lands in seconds.
 const FALLBACK_RECOVERY_CEILING_MS = 60000;
 
-let fallbackTimerId = null;
+const fallbackTimers = new Map();
 
 const clearFallback = () => {
-  if (fallbackTimerId !== null) {
-    clearTimeout(fallbackTimerId);
-    fallbackTimerId = null;
-  }
+  for (const timer of fallbackTimers.values()) clearTimeout(timer);
+  fallbackTimers.clear();
 };
 
-const scheduleFallback = (delayMs = FALLBACK_AFTER_COUNTDOWN_STARTED_MS) => {
-  clearFallback();
-  fallbackTimerId = setTimeout(async () => {
-    fallbackTimerId = null;
+const scheduleFallback = (delayMs = FALLBACK_AFTER_COUNTDOWN_STARTED_MS, countdownId = null) => {
+  const key = countdownId || "legacy";
+  if (fallbackTimers.has(key)) clearTimeout(fallbackTimers.get(key));
+  const timer = setTimeout(async () => {
+    if (fallbackTimers.get(key) !== timer) return;
+    fallbackTimers.delete(key);
     try {
-      const { pendingRecording, recording, restarting } =
+      const { pendingRecording, recording, restarting, activeCountdownId } =
         await chrome.storage.local.get([
           "pendingRecording",
           "recording",
           "restarting",
+          "activeCountdownId",
         ]);
       // Only auto-dispatch if still pending and recording hasn't started.
       // Skip during restart - that flow has its own start sequencing.
-      if (!pendingRecording || recording || restarting) return;
+      if (!pendingRecording || recording || restarting ||
+          (countdownId && countdownId !== activeCountdownId)) return;
       console.info(
         "[Screenity][BG] countdown-finished missing after delay, auto-dispatching start",
       );
       try {
-        startAfterCountdown("countdownFallback");
+        startAfterCountdown("countdownFallback", countdownId);
       } catch (err) {
         console.error(
           "[Screenity][BG] countdownFallback startAfterCountdown failed",
@@ -47,18 +49,23 @@ const scheduleFallback = (delayMs = FALLBACK_AFTER_COUNTDOWN_STARTED_MS) => {
       console.error("[Screenity][BG] countdownFallback storage read failed", err);
     }
   }, delayMs);
+  fallbackTimers.set(key, timer);
 };
 
 // Called when the countdown UI actually starts ticking (content script
 // sends diag-countdown-started). This is the only trigger for the
 // fallback timer.
-export const noteCountdownStarted = () => {
+export const noteCountdownStarted = async (countdownId = null) => {
   // Timestamp so startRecording can distinguish a fresh countdown from
   // a stale dispatch.
   try {
-    chrome.storage.local.set({ countdownStartedAt: Date.now() });
+    if (countdownId) {
+      const { activeCountdownId } = await chrome.storage.local.get(["activeCountdownId"]);
+      if (countdownId !== activeCountdownId) return;
+    }
+    await chrome.storage.local.set({ countdownStartedAt: Date.now(), countdownStartedId: countdownId });
   } catch {}
-  scheduleFallback();
+  scheduleFallback(FALLBACK_AFTER_COUNTDOWN_STARTED_MS, countdownId);
 };
 
 // SW-death recovery. setTimeout dies with the service worker and
@@ -71,15 +78,20 @@ export const recoverPendingCountdownOnStartup = async () => {
       recording,
       restarting,
       countdownStartedAt,
+      activeCountdownId,
+      countdownStartedId,
       recordingStoppedAt,
     } = await chrome.storage.local.get([
       "pendingRecording",
       "recording",
       "restarting",
       "countdownStartedAt",
+      "activeCountdownId",
+      "countdownStartedId",
       "recordingStoppedAt",
     ]);
     if (!pendingRecording || recording || restarting) return;
+    if (countdownStartedId && countdownStartedId !== activeCountdownId) return;
     const startedAt = Number(countdownStartedAt) || 0;
     if (!startedAt) return;
     // A countdown that predates the last stop belongs to a finished recording.
@@ -108,7 +120,7 @@ export const recoverPendingCountdownOnStartup = async () => {
       { elapsedMs: elapsed },
     );
     try {
-      startAfterCountdown("countdownFallback-sw-restart");
+      startAfterCountdown("countdownFallback-sw-restart", activeCountdownId || null);
     } catch (err) {
       console.error(
         "[Screenity][BG] recoverPendingCountdownOnStartup startAfterCountdown failed",

@@ -38,6 +38,14 @@ export const resolvePrefixBudget = ({
   return transportCapBytes;
 };
 
+// Mid-recording, chunks the server has acknowledged are deleted only while the
+// disk is known to be short. Everything else waits for Bunny to confirm the take
+// (the two-point rule), and an unknown estimate keeps everything.
+export const mayPurgeAcknowledgedChunks = ({
+  headroom,
+  comfortBytes = CHUNK_PURGE_COMFORT_HEADROOM_BYTES,
+}) => headroomKnown(headroom) && headroom < comfortBytes;
+
 // "trailing" spares the leading prefix, "all" purges it too. No keep-everything
 // mode: quota-based headroom never lapses on a roomy disk, so the prefix budget
 // is the real bound.
@@ -171,3 +179,78 @@ export const resolveLocalPlaybackPlan = ({
         : "source-too-large",
   };
 };
+
+// A take still uploading from its OPFS copy (draining, parked, waiting on Bunny, held) has nothing
+// else on disk, so a copy going away must not take it along. "stopping" is kept whatever started it:
+// the offer registers before the deferred finalize and the separated mic's inline upload.
+// Crashed, stale-cleared and killed takes keep the folder too (settle judges them).
+const OFFER_BYTES_STATUSES = new Set([
+  "recording",
+  "hidden",
+  "unload",
+  "upload-stalled",
+  "finalize-failed",
+  "awaiting-confirm",
+  "crashed",
+  "stale-cleared",
+]);
+
+export const sessionKeepsOfferBytes = (session) => {
+  if (!session || typeof session !== "object") return false;
+  if (session.discardedAt) return false;
+  if (session.holdUntilRecovered === true) return true;
+  if (session.status === "stopping") return true;
+  return OFFER_BYTES_STATUSES.has(session.status);
+};
+
+// An IDB offer points at the shared store, which may hold the only copy of an unconfirmed take
+// (an upload-stalled one), so the same rule applies. The next start does not clear a store such a take owns.
+const sessionKeepsIdbOfferBytes = sessionKeepsOfferBytes;
+
+// Drops the bytes an offer points at, unless the take they belong to still
+// needs them. A snapshot that cannot be read keeps the bytes: nothing here may
+// delete what it cannot prove is spare.
+export const clearOfferBytes = async ({
+  offer,
+  readSession,
+  clearStore,
+  destroyDir,
+}) => {
+  // No stored offer proves nothing about whose bytes the shared store holds
+  // (an expired offer leaves a take awaiting Bunny with no record here).
+  if (!offer) return { kept: true };
+  const opfs = offer?.storageBackend === "opfs" && Boolean(offer?.opfsSessionId);
+  if (opfs) {
+    const sessionId = offer.recordingSessionId || offer.opfsSessionId;
+    try {
+      if (sessionKeepsOfferBytes(await readSession(sessionId))) {
+        return { kept: true };
+      }
+    } catch {
+      return { kept: true };
+    }
+  }
+  if (!opfs) {
+    const sessionId = offer?.recordingSessionId || null;
+    if (sessionId) {
+      try {
+        if (sessionKeepsIdbOfferBytes(await readSession(sessionId))) {
+          return { kept: true };
+        }
+      } catch {
+        return { kept: true };
+      }
+    }
+  }
+  await clearStore();
+  if (opfs) await destroyDir(offer.opfsSessionId);
+  return { kept: false };
+};
+
+// At completion the folder stays only for an offer the editor can still collect (this document's,
+// unexpired): the expiry timer drops a stored offer mid-upload, and Stop's in-memory copy would
+// keep the folder with nothing left to clear it.
+export const offerStillCollectable = (stored, mine, now = Date.now()) =>
+  Boolean(mine?.offerId) &&
+  stored?.offerId === mine.offerId &&
+  Number(stored.expiresAt || 0) > now;

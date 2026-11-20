@@ -1,16 +1,21 @@
 import { chunksStore } from "./chunkHandler";
 import { handleChunks } from "./chunkHandler";
 import { diagEvent } from "../../utils/diagnosticLog";
+import { instanceForSlot } from "../../utils/chunkStores";
 
-export const sendChunks = async (override = false, target = null) => {
+// `slot` names the take's own chunk store. Without it this reads the active
+// slot, which a take started right after Stop has already moved.
+export const sendChunks = async (override = false, target = null, { slot = null } = {}) => {
   const startedAt = Date.now();
+  const store =
+    slot === "chunks" || slot === "chunks_b" ? instanceForSlot(slot) : chunksStore;
   try {
     const maxAttempts = 50;
     const delayMs = 200;
     let chunkCount = 0;
     for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
       chunkCount = 0;
-      await chunksStore.iterate(() => {
+      await store.iterate(() => {
         chunkCount += 1;
       });
       console.debug("[Screenity][BG] sendChunks: chunkCount check", {
@@ -51,7 +56,7 @@ export const sendChunks = async (override = false, target = null) => {
     }
 
     const chunks = [];
-    await chunksStore.iterate((value) => {
+    await store.iterate((value) => {
       chunks.push(value);
     });
     console.debug("[Screenity][BG] sendChunks: collected chunks", {

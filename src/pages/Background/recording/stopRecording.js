@@ -1,25 +1,46 @@
 import { focusTab, sendMessageTab } from "../tabManagement/";
 import { discardOffscreenDocuments } from "../offscreen/discardOffscreenDocuments";
 import { sendMessageRecord } from "./sendMessageRecord";
+import { awaitStopAck } from "./awaitStopAck";
+import { stopReceivedSince } from "./stopReceipt";
 import { sendChunks } from "./sendChunks";
+import { waitForTakeWritesSettled } from "./takeWritesSettled";
 import { waitForContentScript } from "../utils/waitForContentScript";
 import { diagEvent, endDiagSession } from "../../utils/diagnosticLog";
+import { trackEditorRegistration } from "./editorRegistration";
+import { retentionBackendRefFor, retentionSlotFor } from "./finishingLocalTakes";
 import { registerRetainable } from "./recordingRetention";
+import { holdNoticeFromFinishingTake } from "./finishingTakeNotices";
 import { perfMark, perfSpan } from "../../utils/perfMarks";
+import { withAttemptLock, ATTEMPT_STATE_KEYS, isAttemptSuperseded } from "./attemptLock";
+import {
+  LOCAL_EDITOR_ATTEMPTS_KEY,
+  earlierLocalTakeEditor,
+  withEditorAttempt,
+} from "./earlierLocalTake";
 
 // As soon as the editor tab exists, not inside the tab-load callbacks. Those
 // await the content script, and a slow load left the recording unprotected.
-const registerEditorTabForRetention = (tabId, recordingId) => {
+const registerEditorTabForRetention = (
+  tabId,
+  recordingId,
+  takeSlot = null,
+  backendRefAtStop = null,
+) => {
   if (typeof tabId !== "number") return;
-  chrome.storage.local
+  const registration = chrome.storage.local
     .get(["lastRecordingBackendRef", "activeChunkSlot", "recordingDuration"])
     .then(async (r) => {
-      const fileName = r?.lastRecordingBackendRef?.fileName || null;
+      const backendRef = retentionBackendRefFor({
+        atStop: backendRefAtStop,
+        now: r?.lastRecordingBackendRef,
+      });
+      const fileName = backendRef?.fileName || null;
       await registerRetainable({
         recordingId: recordingId || null,
-        backend: r?.lastRecordingBackendRef?.backend || null,
+        backend: backendRef?.backend || null,
         fileName,
-        slot: r?.activeChunkSlot || null,
+        slot: retentionSlotFor({ takeSlot, activeChunkSlot: r?.activeChunkSlot }),
         durationMs: r?.recordingDuration || 0,
         tabId,
       });
@@ -30,7 +51,8 @@ const registerEditorTabForRetention = (tabId, recordingId) => {
         tabId,
         recordingId: recordingId || null,
         fileName,
-        backend: r?.lastRecordingBackendRef?.backend || null,
+        backend: backendRef?.backend || null,
+        slot: retentionSlotFor({ takeSlot, activeChunkSlot: r?.activeChunkSlot }),
         count: Array.isArray(retainedRecordings) ? retainedRecordings.length : 0,
       });
     })
@@ -42,6 +64,7 @@ const registerEditorTabForRetention = (tabId, recordingId) => {
         });
       } catch {}
     });
+  trackEditorRegistration(tabId, registration);
 };
 
 // resolves via onReady, onTimeout (30s), or onClosed
@@ -163,10 +186,163 @@ const handleEditorOpenFailed = async (editorUrl, lastError) => {
   } catch (_) {}
 };
 
-export const stopRecording = async () => {
+// Attempts whose free editor is already open. In memory as well, so a late
+// video-ready in the same SW never waits on the storage write.
+const localEditorAttempts = new Set();
+
+const noteLocalEditorAttempt = async (attemptId) => {
+  if (!attemptId) return;
+  localEditorAttempts.add(attemptId);
+  try {
+    const got = await chrome.storage.local.get([LOCAL_EDITOR_ATTEMPTS_KEY]);
+    await chrome.storage.local.set({
+      [LOCAL_EDITOR_ATTEMPTS_KEY]: withEditorAttempt(
+        got?.[LOCAL_EDITOR_ATTEMPTS_KEY],
+        attemptId,
+      ),
+    });
+  } catch {}
+};
+
+const readLocalEditorAttempts = async () => {
+  let stored = [];
+  try {
+    const got = await chrome.storage.local.get([LOCAL_EDITOR_ATTEMPTS_KEY]);
+    if (Array.isArray(got?.[LOCAL_EDITOR_ATTEMPTS_KEY])) {
+      stored = got[LOCAL_EDITOR_ATTEMPTS_KEY];
+    }
+  } catch {}
+  return [...localEditorAttempts, ...stored];
+};
+
+// A free take whose video-ready came after the next Start click, with no editor opened at its
+// Stop. Its editor opens in the background and owns the take's bytes, registered before this
+// resolves: the caller closes the take's frame next, and that frame was what kept the next
+// start's cleanup off them.
+export const openEarlierLocalTakeEditor = async ({
+  localTake = null,
+  attemptId = null,
+  takeSlot = null,
+} = {}) => {
+  const plan = earlierLocalTakeEditor({
+    localTake,
+    attemptId,
+    takeSlot,
+    editorAttempts: await readLocalEditorAttempts(),
+  });
+  if (!plan) return false;
+  await noteLocalEditorAttempt(attemptId);
+  const url = plan.viewer
+    ? "editor.html?mode=postStop&view=1"
+    : "editor.html?mode=postStop";
+  diagEvent("editor-open", {
+    type: "editor",
+    via: "earlier-take",
+    backend: plan.backend,
+    viewer: plan.viewer,
+  });
+  const tab = await new Promise((resolve) => {
+    chrome.tabs.create({ url, active: false }, (created) => {
+      resolve(chrome.runtime.lastError || !created?.id ? null : created);
+    });
+  });
+  if (!tab) {
+    // No recovery URL: an editor opened later without a registration would
+    // read the shared pointer, which names the next take.
+    diagEvent("editor-open-failed", { editorUrl: url, via: "earlier-take" });
+    return false;
+  }
+  const registration = registerRetainable({
+    recordingId: plan.recordingId,
+    backend: plan.backend,
+    fileName: plan.fileName,
+    slot: plan.slot,
+    durationMs: plan.durationMs,
+    tabId: tab.id,
+  });
+  trackEditorRegistration(tab.id, registration);
+  await registration;
+  diagEvent("recorder-retention-registered", {
+    tabId: tab.id,
+    via: "earlier-take",
+    backend: plan.backend,
+    slot: plan.slot,
+  });
+  onTabLoaded(
+    tab.id,
+    async () => {
+      try {
+        await waitForContentScript(tab.id);
+      } catch (err) {
+        await markEditorStartFailed(
+          tab.id,
+          "EDITOR_CONTENT_SCRIPT_TIMEOUT",
+          String(err?.message || err).slice(0, 200),
+        );
+        return;
+      }
+      try {
+        await sendMessageTab(tab.id, {
+          type: plan.viewer ? "viewer-recording" : "fallback-recording",
+        });
+      } catch (err) {
+        await markEditorStartFailed(
+          tab.id,
+          "EDITOR_MESSAGE_DELIVERY_FAILED",
+          String(err?.message || err).slice(0, 200),
+        );
+      }
+    },
+    () =>
+      markEditorStartFailed(
+        tab.id,
+        "EDITOR_TAB_LOAD_TIMEOUT",
+        "editor tab never reached status=complete within 30s",
+      ),
+  );
+  return true;
+};
+
+export const stopRecording = async ({ expectedAttemptId = null, takeId = null, takeSlot = null, localTake = null } = {}) => {
+  // A late video-ready names the take it belongs to; once a newer attempt is in
+  // storage, everything below would tear that one down.
+  const attemptMoved = async () => {
+    if (!expectedAttemptId) return false;
+    try {
+      const state = await chrome.storage.local.get(ATTEMPT_STATE_KEYS);
+      return isAttemptSuperseded(state, expectedAttemptId);
+    } catch {
+      return true;
+    }
+  };
+  // Check and write as one step against startRecording's attempt-id write.
+  const guardedSet = (values) =>
+    withAttemptLock(async () => {
+      if (await attemptMoved()) return false;
+      await chrome.storage.local.set(values);
+      return true;
+    });
+  // A newer take owns the session now. This take's frame is still closed: its
+  // video-ready means it is done, and left open it stays in the host for good.
+  const skipForNewerAttempt = async () => {
+    diagEvent("stop-skipped-newer-attempt", { expectedAttemptId, takeId });
+    await openEarlierLocalTakeEditor({
+      localTake,
+      attemptId: expectedAttemptId,
+      takeSlot,
+    });
+    if (takeId) {
+      await discardOffscreenDocuments({
+        reason: "video-ready-earlier-take",
+        onlyTakeId: takeId,
+      });
+    }
+  };
+  if (!(await guardedSet({ restarting: false }))) {
+    await skipForNewerAttempt();
+    return;
+  }
   chrome.action.setIcon({ path: "assets/icon-34.png" });
-  // await the clear so a quick subsequent restart can't race startRecording's gate
-  await chrome.storage.local.set({ restarting: false });
   const { recordingStartTime, isSubscribed, paused, pausedAt, totalPausedMs, recordingDuration: storedDuration } =
     await chrome.storage.local.get([
       "recordingStartTime",
@@ -201,7 +377,7 @@ export const stopRecording = async () => {
   diagEvent("stop", { duration, isSubscribed: Boolean(isSubscribed) });
 
   // single batched write; splitting risks partial cleanup on storage failure
-  await chrome.storage.local.set({
+  const wrote = await guardedSet({
     recording: false,
     recordingDuration: duration,
     tabRecordedID: null,
@@ -214,6 +390,10 @@ export const stopRecording = async () => {
     // marker for the start-path rapid-restart guard.
     recordingStoppedAt: Date.now(),
   });
+  if (!wrote) {
+    await skipForNewerAttempt();
+    return;
+  }
 
   const {
     fastRecorderInUse,
@@ -266,7 +446,8 @@ export const stopRecording = async () => {
 
   if (isSubscribed) {
     chrome.alarms.clear("recording-alarm");
-    discardOffscreenDocuments();
+    // Named so a take started meanwhile in the host is not the one closed.
+    discardOffscreenDocuments({ onlyTakeId: takeId });
     chrome.storage.local.remove(["recordingMeta"]);
   } else if (
     _inMemoryEditorLockHeld ||
@@ -276,6 +457,7 @@ export const stopRecording = async () => {
     // editor already opened by stop-recording-tab flow; avoid duplicate
   } else if (hasWebCodecs) {
     diagEvent("editor-open", { type: "editor" });
+    void noteLocalEditorAttempt(expectedAttemptId);
     const query = postStopRecordingId
       ? `?mode=postStop&recordingId=${encodeURIComponent(postStopRecordingId)}`
       : "?mode=postStop";
@@ -287,7 +469,7 @@ export const stopRecording = async () => {
           handleEditorOpenFailed(wcUrl, chrome.runtime.lastError?.message);
           return;
         }
-        registerEditorTabForRetention(tab.id, postStopRecordingId || null);
+        registerEditorTabForRetention(tab.id, postStopRecordingId || null, takeSlot, lastRecordingBackendRef);
         onTabLoaded(
           tab.id,
           async () => {
@@ -327,6 +509,7 @@ export const stopRecording = async () => {
     chrome.runtime.sendMessage({ type: "turn-off-pip" });
   } else if (duration > maxDuration) {
     diagEvent("editor-open", { type: "editor", viewer: true, duration });
+    void noteLocalEditorAttempt(expectedAttemptId);
     // Fallback for large recordings without WebCodecs - use viewer mode
 
     const query = postStopRecordingId
@@ -340,7 +523,7 @@ export const stopRecording = async () => {
           handleEditorOpenFailed(viewerUrl, chrome.runtime.lastError?.message);
           return;
         }
-        registerEditorTabForRetention(tab.id, postStopRecordingId || null);
+        registerEditorTabForRetention(tab.id, postStopRecordingId || null, takeSlot, lastRecordingBackendRef);
         onTabLoaded(
           tab.id,
           async () => {
@@ -381,6 +564,7 @@ export const stopRecording = async () => {
   } else {
     // IDB-backed (MediaRecorder) recordings open editor too; fallback-recording drives the read
     diagEvent("editor-open", { type: "editor", via: "stop-idb" });
+    void noteLocalEditorAttempt(expectedAttemptId);
     const query = postStopRecordingId
       ? `?mode=postStop&recordingId=${encodeURIComponent(postStopRecordingId)}`
       : "?mode=postStop";
@@ -390,7 +574,7 @@ export const stopRecording = async () => {
         handleEditorOpenFailed(editorUrl, chrome.runtime.lastError?.message);
         return;
       }
-      registerEditorTabForRetention(tab.id, postStopRecordingId || null);
+      registerEditorTabForRetention(tab.id, postStopRecordingId || null, takeSlot, lastRecordingBackendRef);
       onTabLoaded(
         tab.id,
         async () => {
@@ -484,7 +668,7 @@ export const stopRecording = async () => {
   chrome.storage.local.set({ postStopEditorOpened: false });
 
   chrome.alarms.clear("recording-alarm");
-  discardOffscreenDocuments();
+  discardOffscreenDocuments({ onlyTakeId: takeId });
 };
 
 export const handleStopRecordingTab = async (request) => {
@@ -518,6 +702,8 @@ export const handleStopRecordingTab = async (request) => {
     fastRecorderInUse,
     fastRecorderActiveRecordingId,
     lastRecordingBackendRef,
+    activeChunkSlot,
+    recordingAttemptId: stopAttemptId,
   } = await chrome.storage.local.get([
     "isSubscribed",
     "recordingStartTime",
@@ -527,8 +713,19 @@ export const handleStopRecordingTab = async (request) => {
     "fastRecorderInUse",
     "fastRecorderActiveRecordingId",
     "lastRecordingBackendRef",
+    "recordingAttemptId",
+    "activeChunkSlot",
   ]);
   endStorageGet1();
+  // Before anything else awaits: this take's video-ready may land after the next
+  // Start click, and must not open a second editor.
+  if (!isSubscribed) void noteLocalEditorAttempt(stopAttemptId);
+  // The toolbar's Stop carries no take slot. Read it now: a take started right
+  // after this Stop moves the pointer before the editor tab exists.
+  const stopTakeSlot = retentionSlotFor({
+    takeSlot: request?.__takeSlot,
+    activeChunkSlot,
+  });
   // Same rule as handleRecordingComplete: route by backend, not by the
   // encoder flag. fastRecorderInUse can lie when WebCodecs fell back to MR
   // mid-pipeline (probe disagreement, in-session swap). Bytes location wins.
@@ -606,7 +803,7 @@ export const handleStopRecordingTab = async (request) => {
             handleEditorOpenFailed(fullUrl, errMsg);
             return;
           }
-          registerEditorTabForRetention(tab.id, recordingId);
+          registerEditorTabForRetention(tab.id, recordingId, stopTakeSlot, lastRecordingBackendRef);
           let settled = false;
           let onUpdatedListener = null;
           // 45s tolerates slow OPFS/editor mounts (saw 24s in prod); on fire
@@ -688,7 +885,7 @@ export const handleStopRecordingTab = async (request) => {
           return;
         }
         perfMark("BG.stopRecording editor-tab-create.done", { tabId: tab.id });
-        registerEditorTabForRetention(tab.id, null);
+        registerEditorTabForRetention(tab.id, null, stopTakeSlot, lastRecordingBackendRef);
         let settled = false;
         let onUpdatedListener = null;
         // See matching block above for rationale (45s + final-check).
@@ -765,6 +962,16 @@ export const handleStopRecordingTab = async (request) => {
                   );
                   return;
                 }
+                // The store is read once: let this take's last chunk land first.
+                const endSettle = perfSpan("BG.stopRecording idb-take-settle");
+                const takeSettled = await waitForTakeWritesSettled(stopAttemptId);
+                endSettle({ takeSettled });
+                if (!takeSettled) {
+                  diagEvent("warning", {
+                    note: "idb editor read before take video-ready",
+                    attemptId: stopAttemptId || null,
+                  });
+                }
                 const endChunkLoop = perfSpan("BG.stopRecording sendChunks-loop");
                 // hard cap; covers 6 attempts × ~1s but bails on a wedged sendChunks
                 const SEND_CHUNKS_LOOP_TIMEOUT_MS = 15000;
@@ -779,7 +986,7 @@ export const handleStopRecordingTab = async (request) => {
                   perfMark("BG.stopRecording sendChunks.attempt", { attempt: i + 1 });
                   // eslint-disable-next-line no-await-in-loop
                   const result = await Promise.race([
-                    sendChunks(),
+                    sendChunks(false, { tabId: tab.id }, { slot: stopTakeSlot }),
                     new Promise((resolve) =>
                       setTimeout(
                         () => resolve({ status: "timeout" }),
@@ -838,29 +1045,54 @@ export const handleStopRecordingTab = async (request) => {
   }
 
   (async () => {
-    const STOP_ACK_TIMEOUT_MS = 3000;
     const endAck = perfSpan("BG.stopRecording stop-ack-wait");
-    try {
-      const ack = await Promise.race([
-        sendMessageRecord({ type: "stop-recording-tab" }),
-        new Promise((_, reject) =>
-          setTimeout(() => reject(new Error("stop-ack-timeout")), STOP_ACK_TIMEOUT_MS)
-        ),
-      ]);
-      if (!ack || ack.ok !== true) throw new Error("stop-no-ack");
-      endAck({ result: "acked" });
-    } catch (err) {
-      endAck({ result: String(err?.message || err).slice(0, 60) });
-      diagEvent("stop-ack-failed", { error: String(err).slice(0, 120) });
+    let ackRoute = null;
+    const ackStartedAt = Date.now();
+    const ack = await awaitStopAck(
+      () =>
+        sendMessageRecord({ type: "stop-recording-tab" }, null, {
+          onRoute: (r) => {
+            ackRoute = r;
+          },
+        }),
+      {
+        timeoutMs: 3000,
+        // The toolbar's own Stop can reach the frame just before this send.
+        received: () => stopReceivedSince(ackStartedAt - 1000),
+      }
+    );
+    if (ack.acked) {
+      if (ack.viaReceipt) {
+        diagEvent("stop-ack-via-receipt", {
+          reply: JSON.stringify(ack.reply ?? null)?.slice(0, 80),
+          route: ackRoute,
+        });
+      }
+      endAck({ result: "acked", viaReceipt: ack.viaReceipt === true });
+    } else {
+      endAck({ result: ack.error.slice(0, 60) });
+      diagEvent("stop-ack-failed", {
+        error: ack.error.slice(0, 120),
+        reply: JSON.stringify(ack.reply ?? null)?.slice(0, 200),
+        route: ackRoute,
+      });
       try {
+        const payload = {
+          type: "show-toast",
+          message: chrome.i18n.getMessage("stopAckTimeoutToast"),
+          // 12s matches editorRecoveryToast; text asks about data safety
+          timeout: 12000,
+        };
+        // A next take may already be recording; the toast waits until it stops.
+        const held = await holdNoticeFromFinishingTake(
+          { type: "show-toast", holdWhileRecording: true },
+          payload
+        );
         const { activeTab } = await chrome.storage.local.get(["activeTab"]);
-        if (activeTab) {
-          sendMessageTab(activeTab, {
-            type: "show-toast",
-            message: chrome.i18n.getMessage("stopAckTimeoutToast"),
-            // 12s matches editorRecoveryToast; text asks about data safety
-            timeout: 12000,
-          }).catch((sendErr) => {
+        if (held) {
+          diagEvent("stop-ack-toast-held", {});
+        } else if (activeTab) {
+          sendMessageTab(activeTab, payload).catch((sendErr) => {
             diagEvent("warning", {
               note: "stop-ack-toast undelivered",
               tabId: activeTab,

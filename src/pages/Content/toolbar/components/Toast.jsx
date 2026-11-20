@@ -10,6 +10,7 @@ import * as ToastEl from "@radix-ui/react-toast";
 
 // Context
 import { contentStateContext } from "../../context/ContentState";
+import { isCaptureStarting } from "../../context/captureStarting";
 
 const Toast = () => {
   const [contentState, setContentState] = useContext(contentStateContext);
@@ -22,6 +23,10 @@ const Toast = () => {
   const triggerRef = useRef(trigger);
   const openRef = useRef(open);
   const contentStateRef = useRef(contentState);
+  const quietRef = useRef(false);
+  // A quiet toast that arrived while a take was starting or recording. The
+  // background has already removed it from storage, so it waits here.
+  const waitingQuietRef = useRef(null);
   const [toastDuration, setToastDuration] = useState(2000);
 
   useEffect(() => {
@@ -30,7 +35,11 @@ const Toast = () => {
 
   const openToast = useCallback((title, action, durationMs = 2000, opts) => {
     // The toast is in the page, so a tab or screen capture records it.
-    if (opts?.quietWhileRecording && contentStateRef.current.recording) return;
+    if (opts?.quietWhileRecording && isCaptureStarting(contentStateRef.current)) {
+      waitingQuietRef.current = [title, action, durationMs, opts];
+      return;
+    }
+    quietRef.current = Boolean(opts?.quietWhileRecording);
     setTitle(title);
     setOpen(true);
     // Keep trigger callable even when a toast is opened without an action.
@@ -55,6 +64,18 @@ const Toast = () => {
   useEffect(() => {
     openRef.current = open;
   }, [open]);
+
+  // A take starting while a quiet toast shows would capture it.
+  const captureStarting = isCaptureStarting(contentState);
+  useEffect(() => {
+    if (captureStarting) {
+      if (quietRef.current) setOpen(false);
+      return;
+    }
+    const waiting = waitingQuietRef.current;
+    waitingQuietRef.current = null;
+    if (waiting) openToast(...waiting);
+  }, [captureStarting]);
 
   useEffect(() => {
     triggerRef.current = trigger;

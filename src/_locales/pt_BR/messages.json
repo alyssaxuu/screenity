@@ -952,7 +952,7 @@
     "description": "Título de espaço insuficiente"
   },
   "notEnoughSpaceDescription": {
-    "message": "O Screenity precisa de pelo menos 1 GB de espaço livre para gravar. Por favor, libere espaço e tente novamente.",
+    "message": "O Screenity precisa de pelo menos 500 MB de espaço livre para gravar. Por favor, libere espaço e tente novamente.",
     "description": "Descrição de espaço insuficiente"
   },
   "clearSpaceButton": {
@@ -1078,7 +1078,7 @@
     "description": "Título de Aviso de Áudio para Outros Sistemas"
   },
   "recordAudioWarningOtherDescription": {
-    "message": "Certifique-se de ativar a opção 'Compartilhar áudio do sistema' se desejar gravar áudio do computador. Se você não vir essa opção, tente atualizar o Chrome ou alternar para a gravação da guia.",
+    "message": "Certifique-se de ativar a opção 'Compartilhar áudio do sistema' se desejar gravar áudio do computador.",
     "description": "Descrição de Aviso de Áudio para Outros Sistemas"
   },
   "qualityLabel": {
@@ -1194,11 +1194,23 @@
     "description": "Toast message shown when the user is in an existing project and ready to record a new scene"
   },
   "reachingRecordingLimitToast": {
-    "message": "A gravação está perto do limite de 90 minutos, será encerrada em breve",
-    "description": "Toast message shown when the recording is reaching the 90 minute limit"
+    "message": "A gravação está perto do limite de $MINUTES$ minutos, será encerrada em breve",
+    "placeholders": {
+      "minutes": {
+        "content": "$1",
+        "example": "120"
+      }
+    },
+    "description": "Toast message shown when the recording is reaching the recording length limit"
   },
   "recordingLimitReachedToast": {
-    "message": "Gravação encerrada ao atingir o limite de 90 minutos",
+    "message": "Gravação encerrada ao atingir o limite de $MINUTES$ minutos",
+    "placeholders": {
+      "minutes": {
+        "content": "$1",
+        "example": "120"
+      }
+    },
     "description": "Toast message shown when the recording limit is reached"
   },
   "tabRecordingDisabledToast": {
@@ -1604,7 +1616,7 @@
     "description": "Reset pro onboarding option label in popup settings menu"
   },
   "recoverLastRecordingOption": {
-    "message": "Recover last recording",
+    "message": "Recuperar gravações",
     "description": "Settings menu item to manually trigger cloud recording recovery"
   },
   "toastRecoveredSession": {
@@ -1614,6 +1626,10 @@
   "toastStorageCritical": {
     "message": "Pouco espaço em disco. Salvando sua gravação. Tudo que foi capturado até agora está seguro.",
     "description": "Toast shown when available storage drops below the critical threshold during recording; reassures that captured data is preserved"
+  },
+  "recordingTailLostToast": {
+    "message": "Seu disco está cheio, então o final desta gravação não pôde ser salvo. O restante abre no editor. Libere espaço antes de gravar de novo.",
+    "description": "Toast when the last part of a recording could not be written to disk"
   },
   "toastStorageLow": {
     "message": "Storage is running low. Upload reliability may degrade for long recordings.",
@@ -1626,6 +1642,10 @@
   "toastNetworkOffline": {
     "message": "Network offline. Upload paused. Screen chunks are saved locally.",
     "description": "Toast shown when the browser goes offline during a cloud recording upload"
+  },
+  "toastLocalCopyIncomplete": {
+    "message": "O backup local parou. Se o envio falhar, parte desta gravação não poderá ser recuperada.",
+    "description": "Toast shown when the local copy of a cloud recording stops being saved because the disk keeps failing"
   },
   "longRecordingTitle": {
     "message": "Gravação longa",
@@ -1683,9 +1703,25 @@
     "message": "O compartilhamento de tela parou. Salvando sua gravação. Tudo que foi capturado até agora está seguro.",
     "description": "Toast shown when the video track ends mid-recording (e.g. monitor disconnected, screen share revoked)"
   },
-  "audioTrackEndedToast": {
-    "message": "Áudio desconectado. Salvando sua gravação. O vídeo capturado até agora está seguro.",
-    "description": "Toast shown when the audio track ends mid-recording (e.g. mic unplugged, permission revoked)"
+  "micDisconnectedNote": {
+    "message": "O microfone foi desconectado em $TIME$. O áudio depois disso está faltando.",
+    "description": "Note shown in the editor when the microphone disconnected during the recording and could not be reconnected; $TIME$ is the recording time (m:ss) when it dropped",
+    "placeholders": {
+      "time": {
+        "content": "$1",
+        "example": "1:05"
+      }
+    }
+  },
+  "systemAudioDisconnectedNote": {
+    "message": "O áudio do sistema foi desconectado em $TIME$. O áudio depois disso está faltando.",
+    "description": "Note shown in the editor when the system or tab audio disconnected during the recording and the take was stopped; $TIME$ is the recording time (m:ss) when it dropped",
+    "placeholders": {
+      "time": {
+        "content": "$1",
+        "example": "1:05"
+      }
+    }
   },
   "captureAudioUnavailableToast": {
     "message": "Não foi possível capturar o áudio do computador, então esta gravação tem apenas vídeo.",
@@ -2060,5 +2096,127 @@
   "sandboxEditorAudioPendingHint": {
     "message": "Adicione primeiro um arquivo de áudio para salvar as alterações.",
     "description": "Tooltip on the disabled save button in the audio editor until an audio file is added"
+  },
+  "emptyTakeNotSaved": {
+    "message": "Nenhum vídeo foi capturado, então não foi possível salvar esta gravação. Tente novamente.",
+    "description": "Error shown when a cloud recording ended with no video frames captured, so nothing could be saved"
+  },
+  "idbBlockedModalTitle": {
+    "message": "Ainda não é possível iniciar a gravação",
+    "description": "Modal title when an earlier recording is still stored in this browser"
+  },
+  "idbUploadingModalDescription": {
+    "message": "Uma gravação ainda está sendo enviada. Espere terminar e grave de novo.",
+    "description": "Modal text: earlier recording still uploading"
+  },
+  "idbHeldModalDescription": {
+    "message": "Uma gravação não terminou de ser enviada. Recupere ou descarte pelo menu da extensão primeiro.",
+    "description": "Modal text: earlier recording needs recover or discard"
+  },
+  "emptyTakeModalTitle": {
+    "message": "Gravação não salva",
+    "description": "Modal title when a take captured no video"
+  },
+  "heldTakesTitle": {
+    "message": "Gravações mantidas neste computador",
+    "description": "Recovery page (download.html?held=1): page heading"
+  },
+  "heldTakesLoading": {
+    "message": "Carregando",
+    "description": "Recovery page (download.html?held=1): shown while the list is read"
+  },
+  "heldTakesIntro": {
+    "message": "Essas gravações não conseguiram terminar de ser enviadas, então uma cópia foi mantida aqui. Salve um arquivo ou descarte a cópia quando não precisar mais dela. Nada é apagado até você descartar.",
+    "description": "Recovery page (download.html?held=1): intro under the heading"
+  },
+  "heldTakesEmpty": {
+    "message": "Nada na fila. Você pode fechar esta aba.",
+    "description": "Recovery page (download.html?held=1): shown when no take is held"
+  },
+  "heldTakesUntitled": {
+    "message": "Gravação sem título",
+    "description": "Recovery page (download.html?held=1): card title when the recording has no title"
+  },
+  "heldTakesStored": {
+    "message": "$SIZE$ armazenados",
+    "description": "Recovery page (download.html?held=1): size of the stored copy, e.g. 412.6 MB stored",
+    "placeholders": {
+      "size": {
+        "content": "$1",
+        "example": "412.6 MB"
+      }
+    }
+  },
+  "heldTakesTrackScreen": {
+    "message": "Tela",
+    "description": "Recovery page (download.html?held=1): track label on a card"
+  },
+  "heldTakesTrackCamera": {
+    "message": "Câmera",
+    "description": "Recovery page (download.html?held=1): track label on a card"
+  },
+  "heldTakesTrackAudio": {
+    "message": "Áudio",
+    "description": "Recovery page (download.html?held=1): track label on a card"
+  },
+  "heldTakesPartial": {
+    "message": "Parte desta gravação já está no servidor, então esta cópia pode estar incompleta.",
+    "description": "Recovery page (download.html?held=1): warning on a card"
+  },
+  "heldTakesGap": {
+    "message": "Este dispositivo ficou sem espaço no meio da gravação, então esta cópia tem uma lacuna e pode não ser reproduzida depois dela.",
+    "description": "Recovery page (download.html?held=1): warning on a card"
+  },
+  "heldTakesSave": {
+    "message": "Salvar em arquivo",
+    "description": "Recovery page (download.html?held=1): button"
+  },
+  "heldTakesDiscard": {
+    "message": "Descartar",
+    "description": "Recovery page (download.html?held=1): button"
+  },
+  "heldTakesDiscardConfirm": {
+    "message": "Sim, descartar",
+    "description": "Recovery page (download.html?held=1): button that confirms the discard"
+  },
+  "heldTakesKeep": {
+    "message": "Manter",
+    "description": "Recovery page (download.html?held=1): button that cancels the discard"
+  },
+  "heldTakesDiscardWarning": {
+    "message": "Descartar remove a cópia armazenada deste computador. Isso não pode ser desfeito.",
+    "description": "Recovery page (download.html?held=1): shown next to the confirm button"
+  },
+  "heldTakesSaved": {
+    "message": "Salvo na sua pasta Downloads. A cópia armazenada fica guardada até você descartar.",
+    "description": "Recovery page (download.html?held=1): note after a successful save"
+  },
+  "heldTakesSaveFailed": {
+    "message": "Alguns arquivos não puderam ser salvos. Sua gravação continua armazenada, tente de novo.",
+    "description": "Recovery page (download.html?held=1): note after a failed save"
+  },
+  "heldTakesNoData": {
+    "message": "Nenhum dado armazenado foi encontrado para esta gravação.",
+    "description": "Recovery page (download.html?held=1): note when a save finds nothing"
+  },
+  "heldTakesDiscardFailed": {
+    "message": "Não foi possível remover esta gravação. Tente novamente.",
+    "description": "Recovery page (download.html?held=1): note after a failed discard"
+  },
+  "heldTakesRetrying": {
+    "message": "Ainda tentando enviar. Descartar interrompe o envio.",
+    "description": "Recovery page (download.html?held=1): note on a take that is still retrying its upload"
+  },
+  "cameraPermissionBlockedError": {
+    "message": "A permissão da câmera está bloqueada. Permita o acesso à câmera para gravar.",
+    "description": "Shown when a camera-only recording cannot start because camera permission is blocked"
+  },
+  "cameraBusyError": {
+    "message": "O Screenity não consegue usar sua câmera. Ela pode estar em uso por outro app. Feche os outros apps que a usam e tente de novo.",
+    "description": "Shown when a camera-only recording cannot start because the camera is busy or unavailable"
+  },
+  "cameraNotFoundError": {
+    "message": "O Screenity não encontra uma câmera. Verifique se ela está conectada e tente de novo.",
+    "description": "Shown when a camera-only recording cannot start because no camera is found or the chosen camera is gone"
   }
 }

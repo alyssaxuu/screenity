@@ -1,7 +1,10 @@
 import { stopRecording } from "../recording/stopRecording.js";
 import { sendMessageTab } from "../tabManagement";
 import { sendMessageRecord } from "../recording/sendMessageRecord.js";
-import { handleRecordingError } from "../recording/recordingHelpers.js";
+import {
+  handleRecordingError,
+  isVideoReadyForEarlierTake,
+} from "../recording/recordingHelpers.js";
 import { sweepRecorderTabs } from "../recording/sweepRecorderTabs.js";
 import { diagEvent } from "../../utils/diagnosticLog";
 import { lifecycle } from "../../utils/lifecycleLog";
@@ -9,15 +12,18 @@ import { chunksStore } from "../recording/chunkHandler";
 import { openExistingChunksStore } from "../../CloudRecorder/recorderStorage/chooseChunksStore";
 import { destroySessionDir } from "../../CloudRecorder/recorderStorage/opfsKvStore";
 import { emitRecordingTelemetry } from "../recording/emitRecordingTelemetry";
+import { clearOfferBytes } from "../../CloudRecorder/localPlaybackRetention";
 import { markFastRecorderFailure } from "../../../media/fastRecorderGate";
 import {
   runMicRecoveryScan,
-  hasAwaitSceneMarkers,
+  listPendingMicRecovery,
   MIC_AWAIT_SCENE_ALARM,
 } from "../../CloudRecorder/micRecovery";
 import {
   tryResumePendingUploads,
   RESUME_RETRY_ALARM,
+  HELD_RETRY_ALARM,
+  CONFIRM_ALARM,
 } from "../recording/resumePendingUploads";
 import {
   CLOUD_LOCAL_PLAYBACK_KEY,
@@ -40,7 +46,7 @@ const FIRST_CHUNK_WATCHDOG_MAX_REARMS = 3;
 // WebCodecs muxer only finalizes inside the recorder tab; without this salvage
 // step the MP4 moov never gets written and chunks on disk are unplayable.
 const STALL_RECOVERY_TIMEOUT_MS = 5000;
-const attemptStallRecovery = (recordingTabId) => {
+export const attemptStallRecovery = (recordingTabId) => {
   return new Promise((resolve) => {
     if (!recordingTabId) {
       resolve(false);
@@ -50,9 +56,13 @@ const attemptStallRecovery = (recordingTabId) => {
     const onMsg = (message) => {
       if (settled) return;
       if (message?.type === "video-ready") {
-        settled = true;
-        chrome.runtime.onMessage.removeListener(onMsg);
-        resolve(true);
+        // An earlier take finishing late says nothing about this one.
+        isVideoReadyForEarlierTake(message).then((earlier) => {
+          if (earlier || settled) return;
+          settled = true;
+          chrome.runtime.onMessage.removeListener(onMsg);
+          resolve(true);
+        });
       }
     };
     chrome.runtime.onMessage.addListener(onMsg);
@@ -102,9 +112,17 @@ export const handleAlarm = async (alarm) => {
     await tryResumePendingUploads({ trigger: "retry-alarm" });
     return;
   }
+  if (alarm.name === HELD_RETRY_ALARM) {
+    await tryResumePendingUploads({ trigger: "held-retry-alarm" });
+    return;
+  }
+  if (alarm.name === CONFIRM_ALARM) {
+    await tryResumePendingUploads({ trigger: "confirm-alarm" });
+    return;
+  }
   if (alarm.name === MIC_AWAIT_SCENE_ALARM) {
     await runMicRecoveryScan().catch(() => {});
-    if (!(await hasAwaitSceneMarkers())) {
+    if (!(await listPendingMicRecovery()).length) {
       await chrome.alarms.clear(MIC_AWAIT_SCENE_ALARM).catch(() => {});
     }
     return;
@@ -452,27 +470,44 @@ export const handleAlarm = async (alarm) => {
 
     // Clearing IDB unconditionally left OPFS sessions on disk. Survivable at 250MB
     // offers, a whole-recording leak now, so route to the backend the writer used.
-    const expiredStore =
-      localPlaybackOffer.storageBackend === "opfs" &&
-      localPlaybackOffer.opfsSessionId
-        ? openExistingChunksStore({
-            sessionId: localPlaybackOffer.opfsSessionId,
-            track: "screen",
-            backend: "opfs",
-          }).store
-        : chunksStore;
-    await expiredStore.clear().catch((err) => {
-      console.warn(
-        "[Screenity][BG] Failed to clear chunk store for local playback expiry",
-        err,
-      );
+    // A take still draining, parked, held or awaiting Bunny keeps its bytes: the
+    // timer fires at 20 minutes and a slow link outlasts it.
+    await clearOfferBytes({
+      offer: localPlaybackOffer,
+      readSession: async (sessionId) => {
+        const key = `cloudRecorderSession:${sessionId}`;
+        return (await chrome.storage.local.get([key]))?.[key] || null;
+      },
+      clearStore: () => {
+        const expiredStore =
+          localPlaybackOffer.storageBackend === "opfs" &&
+          localPlaybackOffer.opfsSessionId
+            ? openExistingChunksStore({
+                sessionId: localPlaybackOffer.opfsSessionId,
+                track: "screen",
+                backend: "opfs",
+              }).store
+            : chunksStore;
+        return expiredStore.clear().catch((err) => {
+          console.warn(
+            "[Screenity][BG] Failed to clear chunk store for local playback expiry",
+            err,
+          );
+        });
+      },
+      destroyDir: (sessionId) =>
+        destroySessionDir(sessionId)
+          .then((res) => {
+            // The folder leaks: its snapshot keeps the orphan reaper off it.
+            if (res?.removed === false) {
+              lifecycle("BG", "offer-folder-left", {
+                opfsSessionId: sessionId,
+                error: res.error || null,
+              });
+            }
+          })
+          .catch(() => {}),
     });
-    if (
-      localPlaybackOffer.storageBackend === "opfs" &&
-      localPlaybackOffer.opfsSessionId
-    ) {
-      await destroySessionDir(localPlaybackOffer.opfsSessionId).catch(() => {});
-    }
     await chrome.storage.local.remove([CLOUD_LOCAL_PLAYBACK_KEY]);
     // Still "available" at TTL means the editor never collected it, the one
     // outcome nothing else reports.

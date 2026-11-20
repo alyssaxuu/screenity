@@ -15,6 +15,16 @@ export const REC_START_NO_STREAM_MSG = "REC_START_NO_STREAM_MSG";
 export const REC_START_ACCOUNT = "REC_START_ACCOUNT";
 // The session, not the subscription: subscribers hit this too.
 export const REC_START_AUTH = "REC_START_AUTH";
+// Another take's copy is in this browser's IDB: still uploading, or waiting
+// for Recover or Discard. Never the generic "restart your browser" message.
+export const REC_START_IDB_UPLOADING = "REC_START_IDB_UPLOADING";
+export const REC_START_IDB_HELD = "REC_START_IDB_HELD";
+// A camera-only take could not open the camera: blocked, busy or missing.
+export const REC_START_CAMERA_PERM = "REC_START_CAMERA_PERM";
+export const REC_START_CAMERA_BUSY = "REC_START_CAMERA_BUSY";
+export const REC_START_CAMERA_NOTFOUND = "REC_START_CAMERA_NOTFOUND";
+// The take recorded nothing (header-only). Not a recorder fault.
+export const REC_START_EMPTY_TAKE = "REC_START_EMPTY_TAKE";
 
 export const REC_RUN_STREAM_END = "REC_RUN_STREAM_END";
 export const REC_RUN_MEMORY = "REC_RUN_MEMORY";

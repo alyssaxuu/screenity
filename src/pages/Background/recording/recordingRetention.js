@@ -1,11 +1,22 @@
 // Keeps a finished recording safe from the next recording's cleanup while its
 // editor tab is open. Closing the tab drops the protection, never the bytes.
-// Logged out only: a signed-in recording is already uploaded.
+// Subscribers only skip it: their recording is already uploaded. A signed-in
+// user without a subscription records locally like a logged-out one.
 import {
   CHUNK_SLOT_A,
   CHUNK_SLOT_B,
   instanceForSlot,
 } from "../../utils/chunkStores";
+import {
+  guardedClear,
+  heldSlotsFor,
+  planActiveSlot,
+} from "../../CloudRecorder/localCopyGate";
+import { readOffscreenContexts } from "../offscreen/recorderHost";
+import {
+  splitFinishingLocalTakes,
+  withFinishingTakes,
+} from "./finishingLocalTakes";
 
 const KEY = "retainedRecordings";
 // Below this much free space retention yields. A recording nobody can write
@@ -39,10 +50,10 @@ const tabExists = async (tabId) => {
   }
 };
 
-const isLoggedIn = async () => {
+const isSubscribed = async () => {
   try {
-    const got = await chrome.storage.local.get(["isLoggedIn"]);
-    return got?.isLoggedIn === true;
+    const got = await chrome.storage.local.get(["isSubscribed"]);
+    return got?.isSubscribed === true;
   } catch {
     return false;
   }
@@ -67,7 +78,7 @@ export const registerRetainable = async (entry) => {
   // its identity from the tab holding it.
   const id =
     entry.recordingId || entry.fileName || `tab:${entry.tabId}`;
-  if (await isLoggedIn()) return;
+  if (await isSubscribed()) return;
   const list = await read();
   const next = list.filter((e) => e.recordingId !== id && e.tabId !== entry.tabId);
   next.push({
@@ -115,7 +126,7 @@ export const PROMPT_MIN_DURATION_MS = 0;
 const PROMPT_DISMISS_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
 export const unsavedRetained = async () => {
-  if (await isLoggedIn()) return null;
+  if (await isSubscribed()) return null;
   try {
     const { unsavedRecordingPromptDismissed: dismissedAt } =
       await chrome.storage.local.get(["unsavedRecordingPromptDismissed"]);
@@ -146,11 +157,34 @@ export const pruneRetained = async () => {
 // What the next recording may keep. `keepNames` are OPFS files to skip,
 // `retainSlot` is the IDB slot to leave alone so the new one takes the other.
 export const computeRetentionPlan = async () => {
+  let live = [];
+  try {
+    const [{ frames }, storage] = await Promise.all([
+      readOffscreenContexts(),
+      chrome.storage.local.get(null),
+    ]);
+    const split = splitFinishingLocalTakes(
+      storage,
+      frames.map((f) => f.takeId),
+    );
+    live = split.live;
+    if (split.dead.length) chrome.storage.local.remove(split.dead).catch(() => {});
+  } catch {}
+  // Frames before the registry: a take registers its editor and then closes its
+  // frame, so read in this order it is seen in at least one of the two.
+  const plan = await computeEditorRetentionPlan();
+  return withFinishingTakes(plan, live, {
+    slotA: CHUNK_SLOT_A,
+    slotB: CHUNK_SLOT_B,
+  });
+};
+
+const computeEditorRetentionPlan = async () => {
   const empty = { keepNames: [], retainSlot: null, activeSlot: CHUNK_SLOT_A };
   // The common case, and this sits on the start path. One storage read before
   // the estimate and the tab lookups.
   if (!(await read()).length) return empty;
-  if (await isLoggedIn()) return empty;
+  if (await isSubscribed()) return empty;
   if (!(await hasHeadroom())) return empty;
 
   const alive = await pruneRetained();
@@ -204,6 +238,19 @@ export const forgetRetained = async (tabId) => {
 // clearing the chunk store, and a later plan is read after that clear.
 export const applyRetentionPlan = async () => {
   const plan = await computeRetentionPlan();
+  // A held cloud take's slot (only A: CloudRecorder writes "chunks") is never the local run's target:
+  // with A held and B retained the pointer stays on A and the guarded clear refuses the start.
+  const heldSlots = await heldSlotsFor([CHUNK_SLOT_A], instanceForSlot).catch(
+    () => [],
+  );
+  if (heldSlots.length) {
+    plan.activeSlot = planActiveSlot({
+      retainSlot: plan.retainSlot,
+      heldSlots,
+      current: plan.activeSlot,
+    });
+    plan.heldSlots = heldSlots;
+  }
   await chrome.storage.local.set({
     retentionPlan: plan,
     activeChunkSlot: plan.activeSlot,
@@ -228,7 +275,8 @@ export const reclaimIdleSlot = async (plan) => {
   const cleared = [];
   for (const slot of [CHUNK_SLOT_A, CHUNK_SLOT_B]) {
     if (slot === active || slot === retain) continue;
-    await instanceForSlot(slot).clear();
+    const res = await guardedClear(instanceForSlot(slot), slot);
+    if (!res.cleared) continue;
     cleared.push(slot);
   }
   if (!cleared.length) return;

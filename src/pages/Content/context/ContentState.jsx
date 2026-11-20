@@ -13,6 +13,7 @@ import { cameraPipOnOtherTab } from "../teleprompter/prompterRules";
 import { getPrompterWindow } from "../teleprompter/prompterWindow";
 import { lifecycle } from "../../utils/lifecycleLog";
 import { perfMark, perfReset } from "../../utils/perfMarks";
+import { HELP_LINKS } from "../../utils/helpLinks";
 
 import Shortcuts from "../shortcuts/Shortcuts";
 import DevHUD from "../DevHUD";
@@ -27,6 +28,8 @@ import {
   setStartFlowOutcome,
 } from "../../utils/startFlowTrace";
 import { triggerSupportDownload } from "../../utils/triggerSupportDownload";
+import { sendRecordingSignals } from "../../utils/recordingSignals";
+import { isLowOnSpace, lowSpaceRestore } from "../utils/lowSpaceModal";
 import { apiIssueCopy } from "../utils/apiIssueCopy";
 
 // Re-asking can't change these, so the retry would only re-open the modal.
@@ -73,10 +76,10 @@ const ContentState = (props) => {
     process.env.SCREENITY_ENABLE_CLOUD_FEATURES === "true";
   setTimer = setTimerInternal;
   const [URL] = useState(
-    "https://help.screenity.io/getting-started/77KizPC8MHVGfpKpqdux9D/why-does-screenity-ask-for-permissions/9AAE8zJ6iiUtCAtjn4SUT1"
+    HELP_LINKS.permissionsWhy
   );
   const [URL2] = useState(
-    "https://help.screenity.io/troubleshooting/9Jy5RGjNrBB42hqUdREQ7W/how-to-grant-screenity-permission-to-record-your-camera-and-microphone/x6U69TnrbMjy5CQ96Er2E9"
+    HELP_LINKS.permissionsGrant
   );
   const startBeepRef = useRef(null);
   const stopBeepRef = useRef(null);
@@ -723,9 +726,29 @@ const ContentState = (props) => {
       // takes focus. Clear countdownCancelled to avoid stale block. Storage
       // write must precede recorder-tab open so the activation listener sees it.
       attempt.armed = true;
+      // Claim this take's attempt id before the click is visible, so the previous
+      // take's late video-ready sees a different id. A failure falls back to the
+      // id startRecording mints later.
+      try {
+        const claimed = await chrome.runtime.sendMessage({
+          type: "claim-recording-attempt",
+        });
+        attempt.claimedId = claimed?.attemptId || null;
+      } catch {}
+      // Scoped to the id this click claimed, so a newer click's claim survives.
+      const releaseClaim = () => {
+        if (!attempt.claimedId) return;
+        chrome.runtime
+          .sendMessage({
+            type: "release-recording-attempt",
+            attemptId: attempt.claimedId,
+          })
+          .catch(() => {});
+      };
       chrome.storage.local.set({
         pendingRecording: true,
         pendingRecordingAt: Date.now(),
+        activeCountdownId: null,
       });
       setContentState((prev) => ({
         ...prev,
@@ -836,6 +859,7 @@ const ContentState = (props) => {
           });
           // Explicit storage write; see note on the removed
           // contentState→storage useEffect.
+          releaseClaim();
           chrome.storage.local.set({ pendingRecording: false });
           setContentState((prev) => ({
             ...prev,
@@ -862,7 +886,8 @@ const ContentState = (props) => {
           6000
         );
         setStartFlowOutcome("cancelled", { error: "permission-needs-page-click" });
-        chrome.storage.local.set({ pendingRecording: false });
+        releaseClaim();
+          chrome.storage.local.set({ pendingRecording: false });
         setContentState((prevContentState) => ({
           ...prevContentState,
           pendingRecording: false,
@@ -888,7 +913,8 @@ const ContentState = (props) => {
           true
         );
         setStartFlowOutcome("cancelled", { error: "permission-denied" });
-        chrome.storage.local.set({ pendingRecording: false });
+        releaseClaim();
+          chrome.storage.local.set({ pendingRecording: false });
         setContentState((prevContentState) => ({
           ...prevContentState,
           pendingRecording: false,
@@ -902,37 +928,34 @@ const ContentState = (props) => {
       });
 
       if (
-        data.quota < 524288000 &&
+        isLowOnSpace(data) &&
         !contentStateRef.current.isLoggedIn &&
         !contentStateRef.current.isSubscribed
       ) {
         if (typeof contentStateRef.current.openModal === "function") {
-          let clear = null;
-          let clearAction = () => {};
           const helpURL =
-            "https://help.screenity.io/troubleshooting/9Jy5RGjNrBB42hqUdREQ7W/what-does-%E2%80%9Cmemory-limit-reached%E2%80%9D-mean-when-recording/8WkwHbt3puuXunYqQnyPcb";
+            HELP_LINKS.memoryLimit;
 
           const response = await chrome.runtime.sendMessage({
             type: "check-restore",
           });
-          if (response.restore) {
-            clear = chrome.i18n.getMessage("clearSpaceButton");
-            clearAction = () => {
-              chrome.runtime.sendMessage({ type: "clear-recordings" });
-            };
-          }
+          const restore = lowSpaceRestore(response);
 
           contentStateRef.current.openModal(
             chrome.i18n.getMessage("notEnoughSpaceTitle"),
             chrome.i18n.getMessage("notEnoughSpaceDescription"),
-            clear,
+            restore ? chrome.i18n.getMessage(restore.labelKey) : null,
             chrome.i18n.getMessage("permissionsModalDismiss"),
-            clearAction,
+            () => {
+              if (restore) {
+                chrome.runtime.sendMessage({ type: restore.messageType });
+              }
+            },
             () => {},
             null,
             chrome.i18n.getMessage("learnMoreDot"),
             helpURL,
-            false,
+            Boolean(restore),
             chrome.i18n.getMessage("getHelpButton"),
             () => {
               triggerSupportDownload({ source: "not-enough-space" });
@@ -942,11 +965,12 @@ const ContentState = (props) => {
                 source: "not-enough-space",
                 zipBundled: true,
               });
-            }
+            },
           );
         }
         setStartFlowOutcome("error", { error: "insufficient-memory" });
-        chrome.storage.local.set({ pendingRecording: false });
+        releaseClaim();
+          chrome.storage.local.set({ pendingRecording: false });
         setContentState((prevContentState) => ({
           ...prevContentState,
           pendingRecording: false,
@@ -983,6 +1007,39 @@ const ContentState = (props) => {
         showOnboardingArrow: false,
       }));
 
+      const startAfterMicMuted = () => {
+        // Crop target first (after the user confirmed mic-off): this flushes
+        // the recorder's deferred streaming-data and starts getDisplayMedia.
+        sendRegionCropTarget();
+        chrome.runtime.sendMessage({
+          type: "desktop-capture",
+          region:
+            contentStateRef.current.recordingType === "region"
+              ? true
+              : false,
+          customRegion: contentStateRef.current.customRegion,
+          offscreenRecording: contentStateRef.current.offscreenRecording,
+          camera:
+            contentStateRef.current.recordingType === "camera"
+              ? true
+              : false,
+        });
+        // The start gate reads this before the new pick lands.
+        chrome.storage.local.remove("surface").catch(() => {});
+        setContentState((prevContentState) => ({
+          ...prevContentState,
+
+          surface: "default",
+          pipEnded: false,
+          pipActive: false,
+        }));
+      };
+
+      const confirmMicMuted = () => {
+        sendRecordingSignals("mic-modal", { micModal: "confirm" }, attempt.claimedId);
+        startAfterMicMuted();
+      };
+
       if (
         !contentStateRef.current.micActive &&
         contentStateRef.current.askMicrophone
@@ -992,35 +1049,11 @@ const ContentState = (props) => {
           chrome.i18n.getMessage("micMutedModalDescription"),
           chrome.i18n.getMessage("micMutedModalAction"),
           chrome.i18n.getMessage("micMutedModalCancel"),
+          confirmMicMuted,
           () => {
-            // Crop target first (after the user confirmed mic-off): this flushes
-            // the recorder's deferred streaming-data and starts getDisplayMedia.
-            sendRegionCropTarget();
-            chrome.runtime.sendMessage({
-              type: "desktop-capture",
-              region:
-                contentStateRef.current.recordingType === "region"
-                  ? true
-                  : false,
-              customRegion: contentStateRef.current.customRegion,
-              offscreenRecording: contentStateRef.current.offscreenRecording,
-              camera:
-                contentStateRef.current.recordingType === "camera"
-                  ? true
-                  : false,
-            });
-            // The start gate reads this before the new pick lands.
-            chrome.storage.local.remove("surface").catch(() => {});
-            setContentState((prevContentState) => ({
-              ...prevContentState,
-
-              surface: "default",
-              pipEnded: false,
-              pipActive: false,
-            }));
-          },
-          () => {
+            sendRecordingSignals("mic-modal", { micModal: "cancel" }, attempt.claimedId);
             setStartFlowOutcome("cancelled", { error: "mic-muted-cancel" });
+            releaseClaim();
             chrome.storage.local.set({ pendingRecording: false });
             setContentState((prevContentState) => ({
               ...prevContentState,
@@ -1034,14 +1067,20 @@ const ContentState = (props) => {
           false,
           chrome.i18n.getMessage("noShowAgain"),
           () => {
+            sendRecordingSignals("mic-modal", { micModal: "dont-show-again" }, attempt.claimedId);
             setContentState((prevContentState) => ({
               ...prevContentState,
               askMicrophone: false,
             }));
             chrome.storage.local.set({ askMicrophone: false });
+            startAfterMicMuted();
           }
         );
       } else {
+        // Mic off with the modal turned off earlier ("don't show again").
+        if (!contentStateRef.current.micActive) {
+          sendRecordingSignals("mic-modal", { micModal: "skipped-dont-ask" }, attempt.claimedId);
+        }
         // Crop target first: flushes the recorder's deferred streaming-data and
         // starts getDisplayMedia (no mic modal to gate behind in this branch).
         sendRegionCropTarget();
@@ -1084,6 +1123,14 @@ const ContentState = (props) => {
       await startStreamingImpl(attempt, opts);
     } catch (err) {
       if (attempt.armed) {
+        if (attempt.claimedId) {
+          chrome.runtime
+            .sendMessage({
+              type: "release-recording-attempt",
+              attemptId: attempt.claimedId,
+            })
+            .catch(() => {});
+        }
         chrome.storage.local.set({ pendingRecording: false });
         setContentState((prev) => ({
           ...prev,

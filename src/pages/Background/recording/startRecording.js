@@ -2,11 +2,13 @@ import { sendMessageRecord } from "./sendMessageRecord";
 import { sendMessageTab } from "../tabManagement";
 import { discardOffscreenDocuments } from "../offscreen/discardOffscreenDocuments";
 import { initDiagSession, diagEvent } from "../../utils/diagnosticLog";
+import { withAttemptLock, releaseAttemptClaim } from "./attemptLock";
 import { makeRecordingAttemptId } from "../../utils/errorCodes";
 import { lifecycle } from "../../utils/lifecycleLog";
 import { sweepRecorderTabs } from "./sweepRecorderTabs";
 import { emitRecordingTelemetry } from "./emitRecordingTelemetry";
 import { retainedTabIdsFor } from "./recordingRetention";
+import { awaitPendingEditorRegistrations } from "./editorRegistration";
 
 // `recording` flag isn't set until the recorder iframe inits (seconds later),
 // so countdown-finished + 8s fallback can both fire and open two recorder tabs
@@ -60,7 +62,7 @@ export const isRecordingStartInFlight = (flags) => {
   return false;
 };
 
-export const startRecording = async (caller = "unknown") => {
+export const startRecording = async (caller = "unknown", countdownId = null) => {
   if (_startRecordingInFlight) {
     diagEvent("warning", {
       note: "startRecording suppressed (in-flight)",
@@ -74,7 +76,7 @@ export const startRecording = async (caller = "unknown") => {
     STARTRECORDING_GUARD_TIMEOUT_MS,
   );
   try {
-    return await _startRecordingInner(caller);
+    return await _startRecordingInner(caller, countdownId);
   } catch (err) {
     // sync failure before sendMessageRecord's deferred catch; release immediately
     releaseStartRecordingGuard();
@@ -86,23 +88,49 @@ export const startRecording = async (caller = "unknown") => {
 // finished start landing sooner than this after stop is stale.
 const STALE_START_WINDOW_MS = 3000;
 
-const _startRecordingInner = async (caller) => {
-  const recordingAttemptId = makeRecordingAttemptId();
+const _startRecordingInner = async (caller, countdownId) => {
+  // A click-time claim already put this take's id in storage; reuse it.
+  let recordingAttemptId = null;
+  let consumedClaim = false;
+  try {
+    const claim = await withAttemptLock(() =>
+      chrome.storage.local.get(["recordingAttemptClaimed", "recordingAttemptId"]),
+    );
+    if (claim?.recordingAttemptClaimed && claim.recordingAttemptId) {
+      recordingAttemptId = claim.recordingAttemptId;
+      consumedClaim = true;
+    }
+  } catch {}
+  if (!recordingAttemptId) recordingAttemptId = makeRecordingAttemptId();
   // only gate countdown-finished; direct/fallback/restart don't share it.
   try {
     const {
       recordingStoppedAt,
       recording,
       restarting,
+      pendingRecording,
+      activeCountdownId,
       countdownStartedAt,
       countdownFinishedAt,
     } = await chrome.storage.local.get([
       "recordingStoppedAt",
       "recording",
       "restarting",
+      "pendingRecording",
+      "activeCountdownId",
       "countdownStartedAt",
       "countdownFinishedAt",
     ]);
+    // The error can arrive after the countdown handler's check but before
+    // this async dispatch reads storage. Do not revive that failed start.
+    const countdownDispatch = caller === "countdown-finished" ||
+      caller === "countdownFallback" || caller === "countdownFallback-sw-restart";
+    if ((typeof countdownId === "string" && countdownId && countdownId !== activeCountdownId) ||
+      (countdownDispatch && pendingRecording === false && !restarting)) {
+      if (consumedClaim) releaseAttemptClaim(recordingAttemptId).catch(() => {});
+      releaseStartRecordingGuard();
+      return;
+    }
     const sinceStopMs =
       typeof recordingStoppedAt === "number"
         ? Date.now() - recordingStoppedAt
@@ -141,6 +169,7 @@ const _startRecordingInner = async (caller) => {
           pendingRecording: false,
         });
       } catch {}
+      if (consumedClaim) releaseAttemptClaim(recordingAttemptId).catch(() => {});
       return;
     }
   } catch {}
@@ -207,6 +236,9 @@ const _startRecordingInner = async (caller) => {
     // Read, not recomputed. startRecorderSession published this before the
     // recorder acted on it, and a second answer here would disagree.
     const stored = await chrome.storage.local.get(["retentionPlan"]);
+    // An editor opened for an earlier take's late video-ready may still be
+    // registering; unregistered, the sweep below would close it.
+    await awaitPendingEditorRegistrations();
     retainedTabIds = await retainedTabIdsFor(stored?.retentionPlan);
   } catch (err) {
     // Retention is best-effort. A failure here must not stop a recording, and
@@ -247,9 +279,18 @@ const _startRecordingInner = async (caller) => {
     }
   } catch {}
 
-  chrome.storage.local.set({
+  // Awaited and serialized with the guarded clears: a late video-ready from the
+  // previous take compares against this.
+  await withAttemptLock(async () => {
+    // Consume the claim here, in the locked write. A newer click may have
+    // claimed since this start read its id; that claim and its id stay.
+    const cur = await chrome.storage.local.get(["recordingAttemptClaimed", "recordingAttemptId"]);
+    const newerClaim = Boolean(cur.recordingAttemptClaimed) && cur.recordingAttemptId !== recordingAttemptId;
+    await chrome.storage.local.set({
     restarting: false,
-    recordingAttemptId,
+    ...(newerClaim
+      ? {}
+      : { recordingAttemptId, recordingAttemptClaimed: false, recordingAttemptPrevId: null }),
     memoryError: false,
     cloudRecorderDegradedMode: null,
     editorRecordingError: null,
@@ -259,6 +300,8 @@ const _startRecordingInner = async (caller) => {
     firstChunkWatchdogState: null,
     // prior sandboxTab would route this attempt's errors to the wrong editor
     sandboxTab: null,
+    // a prior recording's track-end would be blamed for this attempt in reports
+    lastTrackEndEvent: null,
     // paused leak from a prior errored recording would mis-account duration
     paused: false,
     pausedAt: null,
@@ -276,6 +319,7 @@ const _startRecordingInner = async (caller) => {
     lastChunkSendFailure: null,
     lastRecordingSalvaged: null,
     lastStartRecordingCaller: { caller, stack, ts: Date.now() },
+    });
   });
 
   // Clear leaked sceneId so cloudrecorder doesn't tag new telemetry with it.
@@ -415,6 +459,20 @@ const _startRecordingInner = async (caller) => {
         pendingClick && Date.now() - pendingClick.at < 30000
           ? pendingClick.clickId
           : null;
+      const startContext = {
+        ts: Date.now(),
+        recordingType: recordingType || "screen",
+        cameraActive: Boolean(extras?.cameraActive),
+        micActive: Boolean(extras?.micActive),
+        systemAudio: Boolean(systemAudio),
+        backgroundEffectsActive: Boolean(extras?.backgroundEffectsActive),
+        tabsCount: Array.isArray(tabs) ? tabs.length : null,
+        windowsCount: Array.isArray(wins) ? wins.length : null,
+        hardwareConcurrency: Number.isFinite(navigator?.hardwareConcurrency)
+          ? navigator.hardwareConcurrency
+          : null,
+      };
+      await chrome.storage.local.set({ lastRecordingStartContext: startContext });
       await emitRecordingTelemetry("recording_initiated_beacon", {
         recordingSessionId: recordingAttemptId,
         clickId,
@@ -430,20 +488,20 @@ const _startRecordingInner = async (caller) => {
         hardwareConcurrency: Number.isFinite(navigator?.hardwareConcurrency)
           ? navigator.hardwareConcurrency
           : null,
-        recordingType: recordingType || "screen",
+        recordingType: startContext.recordingType,
         // Storage canonical key is qualityValue, not quality. `quality`
         // is unset on this read path; reading it returned undefined and
         // surfaced as null on every beacon.
         qualityValue: extras?.qualityValue || null,
         fpsValue: extras?.fpsValue || null,
-        cameraActive: Boolean(extras?.cameraActive),
-        micActive: Boolean(extras?.micActive),
-        systemAudio: Boolean(systemAudio),
+        cameraActive: startContext.cameraActive,
+        micActive: startContext.micActive,
+        systemAudio: startContext.systemAudio,
         multiMode: Boolean(multiMode),
         instantMode: Boolean(extras?.instantMode),
-        backgroundEffectsActive: Boolean(extras?.backgroundEffectsActive),
-        tabsCount: Array.isArray(tabs) ? tabs.length : null,
-        windowsCount: Array.isArray(wins) ? wins.length : null,
+        backgroundEffectsActive: startContext.backgroundEffectsActive,
+        tabsCount: startContext.tabsCount,
+        windowsCount: startContext.windowsCount,
         recordedTabDomain: extras?.recordedTabDomain || null,
       });
     } catch {}
@@ -462,8 +520,8 @@ const _startRecordingInner = async (caller) => {
   }
 
   const startMsg = customRegion
-    ? { type: "start-recording-tab", region: true }
-    : { type: "start-recording-tab" };
+    ? { type: "start-recording-tab", region: true, recordingAttemptId }
+    : { type: "start-recording-tab", recordingAttemptId };
 
   const startDispatchedAt = Date.now();
 
@@ -574,7 +632,7 @@ const _startRecordingInner = async (caller) => {
   }
 };
 
-export const startAfterCountdown = (caller = "startAfterCountdown") => {
+export const startAfterCountdown = (caller = "startAfterCountdown", countdownId = null) => {
   chrome.storage.local.get(["recordingTab", "offscreen"], (result) => {
     if (chrome.runtime.lastError) {
       console.error(
@@ -599,6 +657,6 @@ export const startAfterCountdown = (caller = "startAfterCountdown") => {
         "[Screenity] startAfterCountdown: no recordingTab/offscreen available, starting with fallback routing"
       );
     }
-    startRecording(caller);
+    startRecording(caller, countdownId);
   });
 };

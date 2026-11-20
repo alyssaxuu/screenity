@@ -952,7 +952,7 @@
     "description": "공간 부족 제목"
   },
   "notEnoughSpaceDescription": {
-    "message": "Screenity는 녹화를 위해 최소 1GB의 빈 공간이 필요합니다. 장치의 공간을 확보하고 다시 시도하십시오.",
+    "message": "Screenity는 녹화를 위해 최소 500MB의 빈 공간이 필요합니다. 장치의 공간을 확보하고 다시 시도하십시오.",
     "description": "공간 부족 설명"
   },
   "clearSpaceButton": {
@@ -1078,7 +1078,7 @@
     "description": "기타 시스템용 오디오 경고 제목"
   },
   "recordAudioWarningOtherDescription": {
-    "message": "컴퓨터 오디오를 녹음하려면 '시스템 오디오 공유' 옵션을 활성화하세요. 이 옵션을 보지 못하는 경우 Chrome을 업데이트하거나 탭 녹음 옵션으로 전환해 보세요.",
+    "message": "컴퓨터 오디오를 녹음하려면 '시스템 오디오 공유' 옵션을 활성화하세요.",
     "description": "기타 시스템용 오디오 경고 설명"
   },
   "qualityLabel": {
@@ -1194,11 +1194,23 @@
     "description": "Toast message shown when the user is in an existing project and ready to record a new scene"
   },
   "reachingRecordingLimitToast": {
-    "message": "녹화가 90분 제한에 가까워지고 있어 곧 종료됩니다",
-    "description": "Toast message shown when the recording is reaching the 90 minute limit"
+    "message": "녹화가 $MINUTES$분 제한에 가까워지고 있어 곧 종료됩니다",
+    "placeholders": {
+      "minutes": {
+        "content": "$1",
+        "example": "120"
+      }
+    },
+    "description": "Toast message shown when the recording is reaching the recording length limit"
   },
   "recordingLimitReachedToast": {
-    "message": "90분 녹화 제한으로 녹화가 종료되었습니다",
+    "message": "$MINUTES$분 녹화 제한으로 녹화가 종료되었습니다",
+    "placeholders": {
+      "minutes": {
+        "content": "$1",
+        "example": "120"
+      }
+    },
     "description": "Toast message shown when the recording limit is reached"
   },
   "tabRecordingDisabledToast": {
@@ -1604,7 +1616,7 @@
     "description": "Reset pro onboarding option label in popup settings menu"
   },
   "recoverLastRecordingOption": {
-    "message": "Recover last recording",
+    "message": "녹화 복구",
     "description": "Settings menu item to manually trigger cloud recording recovery"
   },
   "toastRecoveredSession": {
@@ -1614,6 +1626,10 @@
   "toastStorageCritical": {
     "message": "디스크 공간이 부족합니다. 녹화를 저장하고 있어요. 지금까지 캡처된 내용은 안전합니다.",
     "description": "Toast shown when available storage drops below the critical threshold during recording; reassures that captured data is preserved"
+  },
+  "recordingTailLostToast": {
+    "message": "디스크가 가득 차서 이 녹화의 마지막 부분을 저장하지 못했어요. 나머지는 편집기에서 열립니다. 다시 녹화하기 전에 공간을 확보해 주세요.",
+    "description": "Toast when the last part of a recording could not be written to disk"
   },
   "toastStorageLow": {
     "message": "Storage is running low. Upload reliability may degrade for long recordings.",
@@ -1626,6 +1642,10 @@
   "toastNetworkOffline": {
     "message": "Network offline. Upload paused. Screen chunks are saved locally.",
     "description": "Toast shown when the browser goes offline during a cloud recording upload"
+  },
+  "toastLocalCopyIncomplete": {
+    "message": "로컬 백업이 중지되었습니다. 업로드에 실패하면 이 녹화의 일부를 복구할 수 없습니다.",
+    "description": "Toast shown when the local copy of a cloud recording stops being saved because the disk keeps failing"
   },
   "longRecordingTitle": {
     "message": "긴 녹화",
@@ -1683,9 +1703,25 @@
     "message": "화면 공유가 중단되었어요. 녹화를 저장하고 있습니다. 지금까지 캡처된 내용은 안전합니다.",
     "description": "Toast shown when the video track ends mid-recording (e.g. monitor disconnected, screen share revoked)"
   },
-  "audioTrackEndedToast": {
-    "message": "오디오가 연결 해제되었어요. 녹화를 저장하고 있습니다. 지금까지 캡처된 영상은 안전합니다.",
-    "description": "Toast shown when the audio track ends mid-recording (e.g. mic unplugged, permission revoked)"
+  "micDisconnectedNote": {
+    "message": "$TIME$에 마이크 연결이 끊겼습니다. 그 이후의 오디오는 없습니다.",
+    "description": "Note shown in the editor when the microphone disconnected during the recording and could not be reconnected; $TIME$ is the recording time (m:ss) when it dropped",
+    "placeholders": {
+      "time": {
+        "content": "$1",
+        "example": "1:05"
+      }
+    }
+  },
+  "systemAudioDisconnectedNote": {
+    "message": "$TIME$에 시스템 오디오 연결이 끊겼습니다. 그 이후의 오디오는 없습니다.",
+    "description": "Note shown in the editor when the system or tab audio disconnected during the recording and the take was stopped; $TIME$ is the recording time (m:ss) when it dropped",
+    "placeholders": {
+      "time": {
+        "content": "$1",
+        "example": "1:05"
+      }
+    }
   },
   "captureAudioUnavailableToast": {
     "message": "컴퓨터 오디오를 캡처할 수 없어 이 녹화는 영상만 포함됩니다.",
@@ -2060,5 +2096,127 @@
   "sandboxEditorAudioPendingHint": {
     "message": "변경 사항을 저장하려면 먼저 오디오 파일을 추가하세요.",
     "description": "Tooltip on the disabled save button in the audio editor until an audio file is added"
+  },
+  "emptyTakeNotSaved": {
+    "message": "캡처된 영상이 없어서 이 녹화를 저장하지 못했습니다. 다시 시도해 주세요.",
+    "description": "Error shown when a cloud recording ended with no video frames captured, so nothing could be saved"
+  },
+  "idbBlockedModalTitle": {
+    "message": "아직 녹화를 시작할 수 없습니다",
+    "description": "Modal title when an earlier recording is still stored in this browser"
+  },
+  "idbUploadingModalDescription": {
+    "message": "녹화본이 아직 업로드 중입니다. 완료될 때까지 기다린 후 다시 녹화해 주세요.",
+    "description": "Modal text: earlier recording still uploading"
+  },
+  "idbHeldModalDescription": {
+    "message": "업로드를 끝내지 못한 녹화본이 있습니다. 먼저 확장 프로그램 메뉴에서 복구하거나 삭제해 주세요.",
+    "description": "Modal text: earlier recording needs recover or discard"
+  },
+  "emptyTakeModalTitle": {
+    "message": "녹화가 저장되지 않았습니다",
+    "description": "Modal title when a take captured no video"
+  },
+  "heldTakesTitle": {
+    "message": "이 컴퓨터에 보관된 녹화",
+    "description": "Recovery page (download.html?held=1): page heading"
+  },
+  "heldTakesLoading": {
+    "message": "불러오는 중",
+    "description": "Recovery page (download.html?held=1): shown while the list is read"
+  },
+  "heldTakesIntro": {
+    "message": "이 녹화들은 업로드를 끝내지 못해서 사본이 여기에 보관되었습니다. 파일로 저장하거나, 더 이상 필요하지 않으면 사본을 삭제하세요. 삭제하기 전에는 아무것도 지워지지 않습니다.",
+    "description": "Recovery page (download.html?held=1): intro under the heading"
+  },
+  "heldTakesEmpty": {
+    "message": "대기 중인 항목이 없습니다. 이 탭을 닫아도 됩니다.",
+    "description": "Recovery page (download.html?held=1): shown when no take is held"
+  },
+  "heldTakesUntitled": {
+    "message": "제목 없는 녹화",
+    "description": "Recovery page (download.html?held=1): card title when the recording has no title"
+  },
+  "heldTakesStored": {
+    "message": "$SIZE$ 저장됨",
+    "description": "Recovery page (download.html?held=1): size of the stored copy, e.g. 412.6 MB stored",
+    "placeholders": {
+      "size": {
+        "content": "$1",
+        "example": "412.6 MB"
+      }
+    }
+  },
+  "heldTakesTrackScreen": {
+    "message": "화면",
+    "description": "Recovery page (download.html?held=1): track label on a card"
+  },
+  "heldTakesTrackCamera": {
+    "message": "카메라",
+    "description": "Recovery page (download.html?held=1): track label on a card"
+  },
+  "heldTakesTrackAudio": {
+    "message": "오디오",
+    "description": "Recovery page (download.html?held=1): track label on a card"
+  },
+  "heldTakesPartial": {
+    "message": "이 녹화의 일부가 이미 서버에 있어서 이 사본은 불완전할 수 있습니다.",
+    "description": "Recovery page (download.html?held=1): warning on a card"
+  },
+  "heldTakesGap": {
+    "message": "녹화 도중 이 기기의 공간이 부족해져서 이 사본에는 빠진 구간이 있고, 그 이후는 재생되지 않을 수 있습니다.",
+    "description": "Recovery page (download.html?held=1): warning on a card"
+  },
+  "heldTakesSave": {
+    "message": "파일로 저장",
+    "description": "Recovery page (download.html?held=1): button"
+  },
+  "heldTakesDiscard": {
+    "message": "삭제",
+    "description": "Recovery page (download.html?held=1): button"
+  },
+  "heldTakesDiscardConfirm": {
+    "message": "예, 삭제합니다",
+    "description": "Recovery page (download.html?held=1): button that confirms the discard"
+  },
+  "heldTakesKeep": {
+    "message": "유지",
+    "description": "Recovery page (download.html?held=1): button that cancels the discard"
+  },
+  "heldTakesDiscardWarning": {
+    "message": "삭제하면 보관된 사본이 이 컴퓨터에서 제거됩니다. 되돌릴 수 없습니다.",
+    "description": "Recovery page (download.html?held=1): shown next to the confirm button"
+  },
+  "heldTakesSaved": {
+    "message": "다운로드 폴더에 저장했습니다. 보관된 사본은 삭제하기 전까지 유지됩니다.",
+    "description": "Recovery page (download.html?held=1): note after a successful save"
+  },
+  "heldTakesSaveFailed": {
+    "message": "일부 파일을 저장하지 못했습니다. 녹화는 계속 보관되어 있으니 다시 시도해 주세요.",
+    "description": "Recovery page (download.html?held=1): note after a failed save"
+  },
+  "heldTakesNoData": {
+    "message": "이 녹화에 저장된 데이터가 없습니다.",
+    "description": "Recovery page (download.html?held=1): note when a save finds nothing"
+  },
+  "heldTakesDiscardFailed": {
+    "message": "이 녹화를 제거하지 못했습니다. 다시 시도해 주세요.",
+    "description": "Recovery page (download.html?held=1): note after a failed discard"
+  },
+  "heldTakesRetrying": {
+    "message": "아직 업로드를 시도하는 중입니다. 삭제하면 업로드가 중단됩니다.",
+    "description": "Recovery page (download.html?held=1): note on a take that is still retrying its upload"
+  },
+  "cameraPermissionBlockedError": {
+    "message": "카메라 권한이 차단되어 있습니다. 녹화하려면 카메라 접근을 허용해 주세요.",
+    "description": "Shown when a camera-only recording cannot start because camera permission is blocked"
+  },
+  "cameraBusyError": {
+    "message": "Screenity에서 카메라를 사용할 수 없습니다. 다른 앱에서 사용 중일 수 있습니다. 카메라를 사용하는 다른 앱을 닫고 다시 시도해 주세요.",
+    "description": "Shown when a camera-only recording cannot start because the camera is busy or unavailable"
+  },
+  "cameraNotFoundError": {
+    "message": "Screenity에서 카메라를 찾을 수 없습니다. 카메라가 연결되어 있는지 확인하고 다시 시도해 주세요.",
+    "description": "Shown when a camera-only recording cannot start because no camera is found or the chosen camera is gone"
   }
 }

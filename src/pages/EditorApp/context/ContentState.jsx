@@ -25,9 +25,25 @@ import { diagForward } from "../../utils/diagForward";
 import { perfMark, perfSpan } from "../../utils/perfMarks";
 import { triggerSupportDownload } from "../../utils/triggerSupportDownload";
 import { chooseReader } from "../recorderStorage/chooseReader";
+import {
+  idbRefFor,
+  resolveOwnRecordingRef,
+} from "../recorderStorage/ownRecordingRef";
 import { downloadResolvedRecording } from "../recorderStorage/resolveRecordingFile";
+import {
+  buildMarker,
+  matches as markerMatches,
+  readMarker,
+  shouldRegisterAfterSelfLoad,
+  writeMarker,
+} from "../recorderStorage/editorLoadMarker";
 import { runEditorOp } from "../editorOps";
 import { showEditorToast } from "../utils/editorToast";
+import {
+  formatMicDropTime,
+  shouldShowMicDropNote,
+  dropNoteMessageKey,
+} from "../../utils/micDropElapsed";
 // mediabunny is ~630KB, only used by export/remux/conversion on user action.
 // Lazy-load to keep parse cost off editor mount. Cached promise.
 let _mbPromise = null;
@@ -98,6 +114,13 @@ const ContentState = (props) => {
     props.viewer === true ||
     (typeof window !== "undefined" &&
       new URLSearchParams(window.location.search).get("view") === "1");
+  const isPageReload = () => {
+    try {
+      return performance.getEntriesByType("navigation")[0]?.type === "reload";
+    } catch {
+      return false;
+    }
+  };
 
   const makeVideoCheck = useRef(false);
   const chunkCount = useRef(0);
@@ -217,6 +240,8 @@ const ContentState = (props) => {
       }));
     };
 
+    showStuckErrorRef.current = showStuckError;
+
     const interval = setInterval(() => {
       const s = contentStateRef.current;
       if (s?.ready) {
@@ -310,7 +335,7 @@ const ContentState = (props) => {
     top: 0,
     left: 0,
     fromCropper: false,
-    base64: null,
+    webmToConvert: null,
     saveDrive: false,
     downloading: false,
     downloadingWEBM: false,
@@ -346,6 +371,7 @@ const ContentState = (props) => {
   const contentStateRef = useRef(contentState);
   const launchModeRef = useRef("normal");
   const launchRecordingIdRef = useRef(null);
+  const micDropNoteDoneRef = useRef(false);
   const pseudoProgressTimerRef = useRef(null);
   const pseudoProgressStartRef = useRef(null);
   const pseudoProgressStartAtRef = useRef(null);
@@ -358,6 +384,10 @@ const ContentState = (props) => {
   // surfaces via OPFS_LOAD_FAILED).
   const opfsReadInFlightRef = useRef(false);
   const diagHeartbeatCountRef = useRef(0);
+  const showStuckErrorRef = useRef(null);
+  const markerLoadRef = useRef(null);
+  const selfLoadStartedRef = useRef(false);
+  const lastIdbReadRef = useRef(null);
 
   const setContentState = useCallback((updater) => {
     _setContentState((prev) => {
@@ -374,6 +404,48 @@ const ContentState = (props) => {
       launchRecordingIdRef.current = params.get("recordingId") || null;
     } catch {}
   }, []);
+
+  // A mic that dropped and could not be reconnected stopped the take; say
+  // where the audio ends. Shown once, only for the recording that was stopped.
+  useEffect(() => {
+    if (!contentState.ready || typeof contentState.openToast !== "function") {
+      return;
+    }
+    if (micDropNoteDoneRef.current) return;
+    micDropNoteDoneRef.current = true;
+    (async () => {
+      try {
+        const { lastTrackEndEvent, lastRecordingBackendRef } =
+          await chrome.storage.local.get([
+            "lastTrackEndEvent",
+            "lastRecordingBackendRef",
+          ]);
+        if (
+          !shouldShowMicDropNote({
+            event: lastTrackEndEvent,
+            launchRecordingId: launchRecordingIdRef.current,
+            backendFileName: lastRecordingBackendRef?.fileName,
+            backend: lastRecordingBackendRef?.backend,
+            launchMode: launchModeRef.current,
+          })
+        ) {
+          return;
+        }
+        // Consume before showing so a reload does not repeat it. The event
+        // itself stays for diagnostics.
+        await chrome.storage.local.set({
+          lastTrackEndEvent: { ...lastTrackEndEvent, editorNoteShown: true },
+        });
+        showEditorToast(
+          contentStateRef.current,
+          chrome.i18n.getMessage(dropNoteMessageKey(lastTrackEndEvent.source), [
+            formatMicDropTime(lastTrackEndEvent.elapsedMs),
+          ]),
+          10000,
+        );
+      } catch {}
+    })();
+  }, [contentState.ready, contentState.openToast]);
 
   useEffect(() => {
     // emit diag-editor-ready once; WebM has many "ready:true" branches
@@ -641,37 +713,23 @@ const ContentState = (props) => {
   // lastRecordingBackendRef is one slot the next recording overwrites, so a tab
   // re-reading it later loads a different recording. Resolve once and pin it.
   const pinnedBackendRef = useRef(null);
+  const ownRefSourceRef = useRef(null);
   const resolveOwnBackendRef = async () => {
     if (pinnedBackendRef.current) return pinnedBackendRef.current;
-    // Ask what this tab owns before falling back to the shared pointer, which
-    // only ever names the newest recording.
-    try {
-      const owned = await chrome.runtime.sendMessage({
-        type: "resolve-editor-recording",
-      });
-      if (owned?.ref?.backend) {
-        pinnedBackendRef.current = owned.ref;
-        return owned.ref;
-      }
-    } catch {}
-    const { lastRecordingBackendRef } = await chrome.storage.local.get([
-      "lastRecordingBackendRef",
-    ]);
-    const mine = launchRecordingIdRef.current;
-    if (
-      mine &&
-      lastRecordingBackendRef?.fileName &&
-      !String(lastRecordingBackendRef.fileName).includes(mine)
-    ) {
-      // The pointer has moved on. Ours may still be on disk, but it is not
-      // what this key names any more, so reading it would be the wrong file.
-      return null;
-    }
-    pinnedBackendRef.current = lastRecordingBackendRef || null;
-    return pinnedBackendRef.current;
+    const { ref, source } = await resolveOwnRecordingRef({
+      ask: () =>
+        chrome.runtime.sendMessage({ type: "resolve-editor-recording" }),
+      readShared: async () =>
+        (await chrome.storage.local.get(["lastRecordingBackendRef"]))
+          ?.lastRecordingBackendRef,
+      launchRecordingId: launchRecordingIdRef.current,
+    });
+    ownRefSourceRef.current = source;
+    pinnedBackendRef.current = ref;
+    return ref;
   };
 
-  const buildBlobFromChunks = async () => {
+  const buildBlobFromChunks = async ({ viewer = false } = {}) => {
     const lastRecordingBackendRef = await resolveOwnBackendRef();
     if (!lastRecordingBackendRef) {
       throw new Error("recording-no-longer-available");
@@ -684,6 +742,7 @@ const ContentState = (props) => {
     } finally {
       await reader.close().catch(() => {});
     }
+    lastIdbReadRef.current = readResult || null;
     if (!readResult || readResult.chunkCount === 0) {
       if (DEBUG_POSTSTOP)
         console.warn(
@@ -693,6 +752,24 @@ const ContentState = (props) => {
         chunkCount: 0,
       });
       return null;
+    }
+    if (lastRecordingBackendRef.backend === "idb") {
+      // A reloaded tab must not load a newer recording that took its slot.
+      if (
+        markerLoadRef.current &&
+        !markerMatches(markerLoadRef.current, readResult)
+      ) {
+        throw new Error("recording-no-longer-available");
+      }
+      writeMarker(
+        buildMarker({
+          slot: readResult.slot,
+          firstTimestamp: readResult.firstTimestamp,
+          chunkCount: readResult.chunkCount,
+          byteSize: readResult.byteSize,
+          viewer: viewer || isViewer,
+        }),
+      );
     }
     const blob = readResult.blob;
     if (DEBUG_POSTSTOP)
@@ -706,6 +783,40 @@ const ContentState = (props) => {
       );
     reconstructVideo(blob);
     return blob;
+  };
+
+  // Shared by the stop message and a reloaded tab loading itself. gate waits
+  // for finalize, which a reloaded tab skips: its take finalized long ago.
+  const loadAfterStop = ({ gate, viewer, deferEmpty, respond }) => {
+    const load = () =>
+      buildBlobFromChunks({ viewer })
+        .then((blob) =>
+          respond?.(
+            deferEmpty && !blob ? { status: "deferred" } : { status: "ok" },
+          ),
+        )
+        .catch((error) =>
+          respond?.({ status: "error", error: error.message }),
+        );
+    if (!gate) {
+      load();
+      return;
+    }
+    waitForFinalizeReady(launchRecordingIdRef.current).then((result) => {
+      if (!result.ok) {
+        setContentState((prev) => ({
+          ...prev,
+          isFfmpegRunning: false,
+          noffmpeg: true,
+          ffmpegLoaded: true,
+          processingProgress: 0,
+        }));
+        buildBlobFromChunks({ viewer }).catch(() => {});
+        respond?.({ status: "error", error: result.error });
+        return;
+      }
+      load();
+    });
   };
 
   useEffect(() => {
@@ -1133,16 +1244,12 @@ const ContentState = (props) => {
                 return;
               }
 
-              const reader = new FileReader();
-              reader.onloadend = function () {
-                const base64data = reader.result;
-                setContentState((prevContentState) => ({
-                  ...prevContentState,
-                  base64: base64data,
-                  driveEnabled: driveEnabled,
-                }));
-              };
-              reader.readAsDataURL(fixedWebm);
+              // keep the Blob: a data URL over ~384MiB silently comes back empty
+              setContentState((prevContentState) => ({
+                ...prevContentState,
+                webmToConvert: fixedWebm,
+                driveEnabled: driveEnabled,
+              }));
             },
             { logger: false },
           );
@@ -1167,16 +1274,12 @@ const ContentState = (props) => {
             return;
           }
 
-          const reader = new FileReader();
-          reader.onloadend = function () {
-            const base64data = reader.result;
-            setContentState((prevContentState) => ({
-              ...prevContentState,
-              base64: base64data,
-              driveEnabled: driveEnabled,
-            }));
-          };
-          reader.readAsDataURL(fixedWebm);
+          // keep the Blob: a data URL over ~384MiB silently comes back empty
+          setContentState((prevContentState) => ({
+            ...prevContentState,
+            webmToConvert: fixedWebm,
+            driveEnabled: driveEnabled,
+          }));
         }
       } else {
         console.warn(
@@ -1199,16 +1302,12 @@ const ContentState = (props) => {
           return;
         }
 
-        const reader = new FileReader();
-        reader.onloadend = function () {
-          const base64data = reader.result;
-          setContentState((prevContentState) => ({
-            ...prevContentState,
-            base64: base64data,
-            driveEnabled: driveEnabled,
-          }));
-        };
-        reader.readAsDataURL(blob);
+        // keep the Blob: a data URL over ~384MiB silently comes back empty
+        setContentState((prevContentState) => ({
+          ...prevContentState,
+          webmToConvert: blob,
+          driveEnabled: driveEnabled,
+        }));
       }
     } catch (error) {
       console.error(
@@ -1320,9 +1419,9 @@ const ContentState = (props) => {
     let opfsEmpty = false;
     let backendRefForThisLoad = null;
     try {
-      const { lastRecordingBackendRef } = await chrome.storage.local.get([
-        "lastRecordingBackendRef",
-      ]);
+      // This tab's own recording. The shared key names the newest one, which a
+      // back-to-back take has already replaced.
+      const lastRecordingBackendRef = await resolveOwnBackendRef();
       backendRefForThisLoad = lastRecordingBackendRef;
       if (process.env.SCREENITY_DEV_MODE === "true") {
         console.log(
@@ -1463,20 +1562,29 @@ const ContentState = (props) => {
     // read IDB directly when the recording is IDB-backed, not just on OPFS
     // failure. editor is a top-level page with IDB access, no chunk relay (the
     // legacy relay raced the editor open and delivered 0 chunks = black video).
+    // A recording this tab no longer owns is not replaced by whichever one the
+    // active slot holds now.
+    const ownRecordingLost =
+      !backendRefForThisLoad &&
+      (ownRefSourceRef.current === "gone" ||
+        ownRefSourceRef.current === "moved");
     const needsIdbDirectRead =
       !directBlob &&
+      !ownRecordingLost &&
       (opfsReadFailed || backendRefForThisLoad?.backend !== "opfs");
     if (needsIdbDirectRead) {
       try {
         const idbReader = chooseReader({ backend: "idb" });
-        await idbReader.open({ backend: "idb" });
-        const { blob, chunkCount } = await idbReader.readBlob();
+        await idbReader.open(idbRefFor(backendRefForThisLoad));
+        const { blob, chunkCount, slot } = await idbReader.readBlob();
         await idbReader.close().catch(() => {});
         if (blob && chunkCount > 0) {
           directBlob = blob;
           diagForward("sandbox-idb-direct-read", {
             bytes: blob.size,
             chunkCount,
+            slot,
+            refSource: ownRefSourceRef.current,
           });
           if (process.env.SCREENITY_DEV_MODE === "true") {
             console.log(
@@ -1799,6 +1907,10 @@ const ContentState = (props) => {
 
         return true;
       } else if (message.type === "fallback-recording") {
+        if (selfLoadStartedRef.current) {
+          sendResponse({ status: "ok" });
+          return true;
+        }
         setContentState((prevContentState) => ({
           ...prevContentState,
           fallback: true,
@@ -1806,52 +1918,21 @@ const ContentState = (props) => {
           isFfmpegRunning: true,
           editLimit: MAX_EDIT_LIMIT_S,
         }));
-        const shouldGate =
-          launchModeRef.current === "postStop" &&
-          Boolean(launchRecordingIdRef.current);
-        if (shouldGate) {
-          waitForFinalizeReady(launchRecordingIdRef.current).then((result) => {
-            if (!result.ok) {
-              setContentState((prev) => ({
-                ...prev,
-                isFfmpegRunning: false,
-                noffmpeg: true,
-                ffmpegLoaded: true,
-                processingProgress: 0,
-              }));
-              buildBlobFromChunks().catch(() => {});
-              sendResponse({ status: "error", error: result.error });
-              return;
-            }
-            buildBlobFromChunks()
-              .then((blob) => {
-                if (!blob) {
-                  sendResponse({ status: "deferred" });
-                  return;
-                }
-                sendResponse({ status: "ok" });
-              })
-              .catch((error) =>
-                sendResponse({ status: "error", error: error.message }),
-              );
-          });
-          return true;
-        }
-
-        buildBlobFromChunks()
-          .then((blob) => {
-            if (!blob) {
-              sendResponse({ status: "deferred" });
-              return;
-            }
-            sendResponse({ status: "ok" });
-          })
-          .catch((error) => {
-            sendResponse({ status: "error", error: error.message });
-          });
+        loadAfterStop({
+          gate:
+            launchModeRef.current === "postStop" &&
+            Boolean(launchRecordingIdRef.current),
+          viewer: false,
+          deferEmpty: true,
+          respond: sendResponse,
+        });
 
         return true;
       } else if (message.type === "viewer-recording") {
+        if (selfLoadStartedRef.current) {
+          sendResponse({ status: "ok" });
+          return true;
+        }
         setContentState((prevContentState) => ({
           ...prevContentState,
           fallback: true,
@@ -1859,39 +1940,14 @@ const ContentState = (props) => {
           isFfmpegRunning: true,
           editLimit: 0,
         }));
-        const shouldGate =
-          launchModeRef.current === "postStop" &&
-          Boolean(launchRecordingIdRef.current);
-        if (shouldGate) {
-          waitForFinalizeReady(launchRecordingIdRef.current).then((result) => {
-            if (!result.ok) {
-              setContentState((prev) => ({
-                ...prev,
-                isFfmpegRunning: false,
-                noffmpeg: true,
-                ffmpegLoaded: true,
-                processingProgress: 0,
-              }));
-              buildBlobFromChunks().catch(() => {});
-              sendResponse({ status: "error", error: result.error });
-              return;
-            }
-            buildBlobFromChunks()
-              .then(() => sendResponse({ status: "ok" }))
-              .catch((error) =>
-                sendResponse({ status: "error", error: error.message }),
-              );
-          });
-          return true;
-        }
-
-        buildBlobFromChunks()
-          .then(() => {
-            sendResponse({ status: "ok" });
-          })
-          .catch((error) => {
-            sendResponse({ status: "error", error: error.message });
-          });
+        loadAfterStop({
+          gate:
+            launchModeRef.current === "postStop" &&
+            Boolean(launchRecordingIdRef.current),
+          viewer: true,
+          deferEmpty: false,
+          respond: sendResponse,
+        });
 
         return true;
       } else if (message.type === "banner-support") {
@@ -1915,7 +1971,12 @@ const ContentState = (props) => {
     let cancelled = false;
     const params = new URLSearchParams(window.location.search || "");
     const isRecoveryMode = params.get("mode") === "recover";
-    if (isRecoveryMode) return;
+    // first open of a recovery tab is driven by the background's message; a
+    // refresh gets no second message, so it loads the recording itself
+    if (isRecoveryMode && !isPageReload()) return;
+    // The marker effect below owns the read for a tab with a load marker: the
+    // shared pointer names the newest recording, not this tab's IDB take.
+    if (readMarker()) return;
 
     // 500ms retry in case backendRef hasn't propagated yet
     const attemptSelfTrigger = async (isRetry = false) => {
@@ -1932,6 +1993,49 @@ const ContentState = (props) => {
             );
           }
           makeVideoTab(null, { override: false });
+          return true;
+        }
+        // The background's fallback-recording message only fires on the first
+        // load, so a refresh used to sit on 90% pseudo-progress until the 3 min
+        // stuck modal.
+        if (isPageReload()) {
+          const { recording, sendingChunks } = await chrome.storage.local.get([
+            "recording",
+            "sendingChunks",
+          ]);
+          if (cancelled) return true;
+          if (!isRecoveryMode && (recording || sendingChunks)) return true;
+          setContentState((prev) => ({
+            ...prev,
+            fallback: true,
+            noffmpeg: isViewer,
+            editLimit: isViewer ? 0 : MAX_EDIT_LIMIT_S,
+          }));
+          // Same read the first load does: it resolves the recording this tab
+          // owns, where makeVideoTab would open whichever IDB slot is live.
+          // A failed read must say so, or the 90% pseudo-progress hangs.
+          const showLoadError = (empty) => {
+            if (cancelled) return;
+            contentStateRef.current?.openModal?.(
+              chrome.i18n.getMessage(
+                empty ? "emptyRecordingTitle" : "opfsLoadErrorTitle",
+              ),
+              chrome.i18n.getMessage(
+                empty
+                  ? "emptyRecordingDescription"
+                  : "opfsLoadErrorDescription",
+              ),
+              null,
+              chrome.i18n.getMessage("permissionsModalDismiss"),
+              () => {},
+              () => {},
+            );
+          };
+          buildBlobFromChunks()
+            .then((blob) => {
+              if (!blob) showLoadError(true);
+            })
+            .catch(() => showLoadError(false));
           return true;
         }
         return false;
@@ -1958,6 +2062,69 @@ const ContentState = (props) => {
     return () => {
       cancelled = true;
     };
+  }, []);
+
+  // A reloaded IDB editor gets no stop message, so it loads the recording its
+  // marker names. A tab's first open has an empty sessionStorage, so a marker
+  // means a reload, duplicate or reopen, recovery tabs included.
+  useEffect(() => {
+    const marker = readMarker();
+    if (!marker || selfLoadStartedRef.current) return;
+    selfLoadStartedRef.current = true;
+    (async () => {
+      // The modal child installs openModal after mount, and the answer can
+      // beat it.
+      const fail = async () => {
+        for (let i = 0; i < 100; i++) {
+          if (typeof contentStateRef.current?.openModal === "function") break;
+          await new Promise((r) => setTimeout(r, 50));
+        }
+        showStuckErrorRef.current?.(
+          contentStateRef.current,
+          "recording-no-longer-available",
+        );
+      };
+      let owned = null;
+      try {
+        owned = await chrome.runtime.sendMessage({
+          type: "resolve-editor-recording",
+        });
+      } catch {}
+      if (owned?.gone) {
+        fail();
+        return;
+      }
+      pinnedBackendRef.current =
+        owned?.ref?.backend === "idb"
+          ? owned.ref
+          : { backend: "idb", slot: marker.slot };
+      markerLoadRef.current = marker;
+      const viewer = marker.viewer || isViewer;
+      setContentState((prev) => ({
+        ...prev,
+        fallback: true,
+        noffmpeg: viewer,
+        isFfmpegRunning: true,
+        editLimit: viewer ? 0 : MAX_EDIT_LIMIT_S,
+      }));
+      loadAfterStop({
+        gate: false,
+        viewer,
+        deferEmpty: !viewer,
+        respond: (r) => {
+          if (
+            r.status !== "ok" ||
+            !shouldRegisterAfterSelfLoad(lastIdbReadRef.current, marker)
+          ) {
+            fail();
+            return;
+          }
+          chrome.runtime
+            .sendMessage({ type: "register-editor-retention", slot: marker.slot })
+            .catch(() => {});
+        },
+      });
+    })();
   }, []);
 
   useEffect(() => {
@@ -2229,11 +2396,23 @@ const ContentState = (props) => {
       // discard timed-out/superseded ops
       const msgOpId = event.data._opId;
       if (msgOpId != null && msgOpId !== opIdRef.current) return;
+
+      const blob = event.data.blob;
+      if (!(blob instanceof Blob) || blob.size === 0) {
+        // never swap the recording for nothing; report it as a failed edit
+        window.dispatchEvent(
+          new MessageEvent("message", {
+            data: {
+              type: "ffmpeg-error",
+              error: "updated-blob: empty result",
+              opType: "updated-blob",
+              _opId: msgOpId,
+            },
+          }),
+        );
+        return;
+      }
       settleEditWaiters(true);
-
-      const base64 = event.data.base64;
-
-      const blob = base64ToUint8Array(base64);
 
       const wasCropping = contentState.cropping;
       const isTopLevel = event.data.topLevel === true;
@@ -2341,8 +2520,7 @@ const ContentState = (props) => {
         downloading: false,
       }));
     } else if (event.data.type === "download-gif") {
-      const base64 = event.data.base64;
-      const blob = base64ToUint8Array(base64);
+      const blob = event.data.blob;
       const url = URL.createObjectURL(blob);
       await requestDownload(url, ".gif");
       setContentState((prevContentState) => ({
@@ -2473,9 +2651,7 @@ const ContentState = (props) => {
         processingProgress: pct,
       }));
     } else if (event.data.type === "download-webm") {
-      const base64 = event.data.base64;
-      const blob = base64ToUint8Array(base64);
-
+      const blob = event.data.blob;
       const url = URL.createObjectURL(blob);
       await requestDownload(url, ".webm");
 
@@ -2562,7 +2738,7 @@ const ContentState = (props) => {
       return;
     }
 
-    const webmVideo = base64ToUint8Array(contentState.base64);
+    const webmVideo = contentState.webmToConvert;
 
     setContentState((prevState) => ({
       ...prevState,
@@ -2581,7 +2757,7 @@ const ContentState = (props) => {
       }));
       sendMessage({
         type: "base64-to-blob",
-        base64: contentState.base64,
+        blob: contentState.webmToConvert,
         topLevel: true,
       });
     }
@@ -2590,16 +2766,16 @@ const ContentState = (props) => {
   };
 
   useEffect(() => {
-    if (!contentState.base64) return;
+    if (!contentState.webmToConvert) return;
     if (!contentState.ffmpeg) return;
     if (!contentState.ffmpegLoaded) return;
 
     getBlob();
-  }, [contentState.base64, contentState.ffmpeg, contentState.ffmpegLoaded]);
+  }, [contentState.webmToConvert, contentState.ffmpeg, contentState.ffmpegLoaded]);
 
   // 30s fallback for blocked CDN / worker crash; force recovery mode
   useEffect(() => {
-    if (!contentState.base64) return;
+    if (!contentState.webmToConvert) return;
     if (!contentState.ffmpeg) return;
     if (contentState.ffmpegLoaded) return;
     if (contentState.noffmpeg) return;
@@ -2627,7 +2803,7 @@ const ContentState = (props) => {
     }, 30000);
 
     return () => clearTimeout(timer);
-  }, [contentState.base64, contentState.ffmpeg, contentState.ffmpegLoaded, contentState.noffmpeg]);
+  }, [contentState.webmToConvert, contentState.ffmpeg, contentState.ffmpegLoaded, contentState.noffmpeg]);
 
   const getImage = useCallback(async () => {
     if (!contentState.blob) return;
@@ -2942,6 +3118,24 @@ const ContentState = (props) => {
     if ((navigator.brave && (await navigator.brave.isBrave())) || false) {
       const resp = await fetch(url);
       const blob = await resp.blob();
+      // runtime messages cap at ~64MB and base64 inflates 4/3, so larger files
+      // are saved straight from this page with an anchor click
+      if (blob.size > 30 * 1024 * 1024) {
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        // the download reads the blob asynchronously, so keep the URL alive
+        setContentState((prev) => ({ ...prev, downloadInProgress: false }));
+        setTimeout(() => {
+          try {
+            URL.revokeObjectURL(url);
+          } catch {}
+        }, 60_000);
+        return;
+      }
       await new Promise((resolve) => {
         const reader = new FileReader();
         reader.onloadend = () => {

@@ -2,6 +2,7 @@
  * Builds a URL-safe support-context object for Tally form prefills.
  * No URLs, tokens, page content, or blobs, only sanitized technical metadata.
  */
+import { formatRecordingSignals } from "./recordingSignals";
 
 const MAX_ERR_LEN = 120;
 
@@ -107,7 +108,9 @@ export const buildSupportContext = async (opts = {}) => {
         "editorRecordingError",
         "lastTabStreamMintMs",
         "lastTabStreamMintOk",
+        "lastTabStreamMintErr",
         "lastTabStreamMintOffscreen",
+        "lastRecordingSignals",
       ];
       const store = await chrome.storage.local.get(keys);
 
@@ -128,6 +131,10 @@ export const buildSupportContext = async (opts = {}) => {
       }
       if (store.recordingAttemptId)
         ctx.attemptId = store.recordingAttemptId;
+      // Mic chosen/acquired/error, picker audio, mute modal: a no-sound
+      // report answered from the form.
+      const audio = formatRecordingSignals(store.lastRecordingSignals);
+      if (audio) ctx.audio = audio;
 
       // Distinguishes writer-hung from writer-ok-editor-failed for
       // triaging stuck-at-90% reports.
@@ -147,6 +154,8 @@ export const buildSupportContext = async (opts = {}) => {
       if (store.lastTabStreamMintMs != null) {
         ctx.mintMs = String(store.lastTabStreamMintMs);
         ctx.mintOk = store.lastTabStreamMintOk ? "1" : "0";
+        if (store.lastTabStreamMintErr)
+          ctx.mintErr = String(store.lastTabStreamMintErr);
         ctx.mintOff = store.lastTabStreamMintOffscreen ? "1" : "0";
       }
 

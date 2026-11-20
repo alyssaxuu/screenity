@@ -13,6 +13,9 @@ localforage.config({
 export const CHUNK_SLOT_A = "chunks";
 export const CHUNK_SLOT_B = "chunks_b";
 export const CHUNK_SLOTS = [CHUNK_SLOT_A, CHUNK_SLOT_B];
+// What the local Recorder and Region stamp on every chunk they write. It is no
+// cloud take's session id, so a held cloud take never claims these chunks.
+export const LOCAL_CHUNK_TAG = { sessionId: "local-recorder" };
 const ACTIVE_SLOT_KEY = "activeChunkSlot";
 
 const instances = new Map();
@@ -28,23 +31,48 @@ export const instanceForSlot = (slot) => {
 // store every prior version wrote to.
 let activeSlot = CHUNK_SLOT_A;
 
+// A take finishing in the recorder host keeps the slot it recorded into while
+// the next take, beside it, moves the pointer to the other slot.
+const slotPinned = () => {
+  try {
+    return typeof window !== "undefined" && window.__takeFrame?.finishing === true;
+  } catch {
+    return false;
+  }
+};
+
+// The slot this frame's take wrote, stamped on every message the frame sends
+// (takeFrameRouting), so the SW registers the editor against it instead of
+// the shared pointer the next take's start has already moved.
+const publishTakeSlot = () => {
+  try {
+    if (slotPinned()) return;
+    if (typeof window !== "undefined" && window.__takeFrame) {
+      window.__takeFrame.slot = activeSlot;
+    }
+  } catch {}
+};
+
 export const getActiveSlot = () => activeSlot;
 
 export const otherSlot = (slot = activeSlot) =>
   slot === CHUNK_SLOT_A ? CHUNK_SLOT_B : CHUNK_SLOT_A;
 
 export const loadActiveSlot = async () => {
+  if (slotPinned()) return activeSlot;
   try {
     const stored = await chrome.storage.local.get([ACTIVE_SLOT_KEY]);
     const slot = stored?.[ACTIVE_SLOT_KEY];
     if (slot === CHUNK_SLOT_A || slot === CHUNK_SLOT_B) activeSlot = slot;
   } catch {}
+  publishTakeSlot();
   return activeSlot;
 };
 
 export const setActiveSlot = async (slot) => {
   const next = slot === CHUNK_SLOT_B ? CHUNK_SLOT_B : CHUNK_SLOT_A;
   activeSlot = next;
+  publishTakeSlot();
   try {
     await chrome.storage.local.set({ [ACTIVE_SLOT_KEY]: next });
   } catch {}
@@ -57,8 +85,12 @@ try {
   if (typeof chrome !== "undefined" && chrome.storage?.onChanged) {
     chrome.storage.onChanged.addListener((changes, area) => {
       if (area !== "local" || !changes[ACTIVE_SLOT_KEY]) return;
+      if (slotPinned()) return;
       const next = changes[ACTIVE_SLOT_KEY].newValue;
-      if (next === CHUNK_SLOT_A || next === CHUNK_SLOT_B) activeSlot = next;
+      if (next === CHUNK_SLOT_A || next === CHUNK_SLOT_B) {
+        activeSlot = next;
+        publishTakeSlot();
+      }
     });
   }
 } catch {}

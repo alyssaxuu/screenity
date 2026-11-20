@@ -1,5 +1,5 @@
 // IDB-backed ChunkWriter. Fallback when OPFS unavailable.
-import { activeChunksStore } from "../../utils/chunkStores";
+import { activeChunksStore, LOCAL_CHUNK_TAG } from "../../utils/chunkStores";
 
 const chunksStore = activeChunksStore;
 
@@ -25,6 +25,7 @@ export class IdbChunkWriter {
       index,
       chunk,
       timestamp,
+      ...LOCAL_CHUNK_TAG,
     });
     this._byteSize += chunk?.size || 0;
     this._chunkCount += 1;

@@ -11,6 +11,7 @@ import { runMicRecoveryScan } from "../../CloudRecorder/micRecovery";
 import { clearInMemoryEditorLock } from "../recording/stopRecording";
 import { sendMessageEnsuringContentScript } from "../utils/executeScripts";
 import { traceStep } from "../../utils/startFlowTrace";
+import { isActiveRecorderAlive } from "../offscreen/recorderHost";
 
 const CLOUD_FEATURES_ENABLED =
   process.env.SCREENITY_ENABLE_CLOUD_FEATURES === "true";
@@ -167,8 +168,7 @@ const doesTabExist = async (tabId) => {
 
 const isOffscreenAlive = async () => {
   try {
-    const contexts = await chrome.runtime.getContexts({});
-    return contexts.some((c) => c.contextType === "OFFSCREEN_DOCUMENT");
+    return await isActiveRecorderAlive();
   } catch {
     return false;
   }

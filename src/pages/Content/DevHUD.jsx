@@ -92,10 +92,6 @@ const DevHUD = ({ contentStateRef, setContentState }) => {
       fn: () => toast(chrome.i18n.getMessage("videoTrackEndedToast")),
     },
     {
-      label: "Audio track ended",
-      fn: () => toast(chrome.i18n.getMessage("audioTrackEndedToast")),
-    },
-    {
       label: "Stop-ack timeout",
       fn: () => toast(chrome.i18n.getMessage("stopAckTimeoutToast")),
     },

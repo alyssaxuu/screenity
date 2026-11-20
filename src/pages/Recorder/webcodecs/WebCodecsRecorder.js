@@ -13,6 +13,7 @@ import { perfMark, perfSpan } from "../../utils/perfMarks";
 import { diagForward } from "../../utils/diagForward";
 import { computeLetterboxRect } from "./letterbox";
 import { createFpsWindows } from "../perfTelemetry";
+import { primeDeviceHints } from "../deviceHints";
 import {
   AAC_SUPPORTED_RATES,
   AVC_MAX_PIXELS,
@@ -118,6 +119,9 @@ export class WebCodecsRecorder {
     this._videoStartUs = null;
     this._frameDurationUs = null;
     this._lastKeyFrameIndex = 0;
+    this._keyframeSubmitted = false;
+    this._resetLoadTiming();
+    primeDeviceHints();
     this._keyFrameIntervalFrames = 60;
     // Shared start epoch (startLeadIn.js): first video frame and first audio
     // packet are padded to their offset from it.
@@ -571,6 +575,8 @@ export class WebCodecsRecorder {
     this._videoStartUs = null;
     this._frameDurationUs = null;
     this._lastKeyFrameIndex = 0;
+    this._keyframeSubmitted = false;
+    this._resetLoadTiming();
     this._startEpochUs = isValidStartEpochMs(this.options.startEpochMs)
       ? this.options.startEpochMs * 1000
       : null;
@@ -1153,7 +1159,7 @@ export class WebCodecsRecorder {
           new Promise((_, reject) =>
             setTimeout(
               () => reject(new Error("muxer-finalize-timeout")),
-              5000,
+              20000,
             ),
           ),
         ]);
@@ -1350,6 +1356,68 @@ export class WebCodecsRecorder {
       startLagMs: this._startLagMs,
       startLeadInMs: this._startLeadInMs,
       audioStartLeadInMs: this._audioStartLeadInMs,
+      ...this._getLoadTiming(),
+      ...this._getEncodeConfigFields(),
+    };
+  }
+
+  // Where the time goes on a weak machine: the canvas hop (drawImage plus
+  // building the VideoFrame) versus the encoder itself (encode() to its output
+  // callback). Averages and maxima only, no per-frame data.
+  _resetLoadTiming() {
+    this._canvasPrepCount = 0;
+    this._canvasPrepSumMs = 0;
+    this._canvasPrepMaxMs = 0;
+    this._encodeLatCount = 0;
+    this._encodeLatSumMs = 0;
+    this._encodeLatMaxMs = 0;
+    this._encodeSubmitAt = new Map();
+  }
+
+  _noteCanvasPrep(ms) {
+    this._canvasPrepCount += 1;
+    this._canvasPrepSumMs += ms;
+    if (ms > this._canvasPrepMaxMs) this._canvasPrepMaxMs = ms;
+  }
+
+  _noteEncodeSubmitted(tsUs) {
+    const m = this._encodeSubmitAt;
+    if (m.size >= 256) m.delete(m.keys().next().value);
+    m.set(tsUs, performance.now());
+  }
+
+  _noteEncodeOutput(tsUs) {
+    const t0 = this._encodeSubmitAt?.get(tsUs);
+    if (t0 === undefined) return;
+    this._encodeSubmitAt.delete(tsUs);
+    const ms = performance.now() - t0;
+    this._encodeLatCount += 1;
+    this._encodeLatSumMs += ms;
+    if (ms > this._encodeLatMaxMs) this._encodeLatMaxMs = ms;
+  }
+
+  _getLoadTiming() {
+    const avg = (sum, n) => (n > 0 ? Math.round((sum / n) * 10) / 10 : null);
+    return {
+      canvasPrepAvgMs: avg(this._canvasPrepSumMs, this._canvasPrepCount),
+      canvasPrepMaxMs: this._canvasPrepCount
+        ? Math.round(this._canvasPrepMaxMs)
+        : null,
+      encodeLatencyAvgMs: avg(this._encodeLatSumMs, this._encodeLatCount),
+      encodeLatencyMaxMs: this._encodeLatCount
+        ? Math.round(this._encodeLatMaxMs)
+        : null,
+    };
+  }
+
+  // What was asked for, and whether the browser may have fallen back: 'no-preference' can land
+  // on software without saying so. Device hints ride flattenPerfStats, behind the telemetry token.
+  _getEncodeConfigFields() {
+    const hw = this._activeVideoConfig?.hardwareAcceleration;
+    return {
+      encodeHwPref: typeof hw === "string" ? hw : null,
+      encodeSwFallback: this._didSwRetry === true,
+      audioDisabledReason: this._audioDisabledReason ?? null,
     };
   }
 
@@ -1428,6 +1496,8 @@ export class WebCodecsRecorder {
     }
     return {
       videoCodecString: this.actualVideoCodec || null,
+      videoBitrateMode: this._activeVideoConfig?.bitrateMode ?? null,
+      videoBitrate: this._activeVideoConfig?.bitrate ?? null,
       hardwareAccelerationActual:
         this._activeVideoConfig?.hardwareAcceleration || "no-preference",
       videoCodecConfigsTried: this._videoCodecConfigsTried.slice(0, 8),
@@ -1442,6 +1512,16 @@ export class WebCodecsRecorder {
       encodeHeight: this.targetHeight ?? null,
       framesFed: this._framesFed,
       chunksOut: this._chunksOut,
+      // Age of the newest frame and chunk at snapshot time: a stalled capture
+      // reads as a growing value here while the counters above stay put.
+      lastFrameAgoMs:
+        this._lastFrameArrivalAt != null
+          ? Math.round(performance.now() - this._lastFrameArrivalAt)
+          : null,
+      msSinceLastChunk:
+        this._lastChunkAt != null
+          ? Math.round(performance.now() - this._lastChunkAt)
+          : null,
       framesFromMSTP: this._framesFromMSTP,
       staticFrameSyntheticCount: this._staticFrameSyntheticCount,
       framesDroppedAheadOfClock: this._framesDroppedAheadOfClock,
@@ -1455,7 +1535,19 @@ export class WebCodecsRecorder {
       closedEncoderRebuilds: this._closedEncoderRebuilds,
       encoderErrorDecisions: this._encErrDecisions.slice(),
       lastWebCodecsFailureCode: this._lastFailureCode || null,
+      ...(this._muxerDiag() || {}),
     };
+  }
+
+  _muxerDiag() {
+    try {
+      const s = this.muxer?.getStats?.();
+      if (!s) return null;
+      const { totalEmittedBytes, emitCount, ...rest } = s;
+      return rest;
+    } catch {
+      return null;
+    }
   }
 
   pause() {
@@ -1625,6 +1717,7 @@ export class WebCodecsRecorder {
     this._videoStartUs = null;
     this._frameDurationUs = null;
     this._lastKeyFrameIndex = 0;
+    this._keyframeSubmitted = false;
     // Fold before zeroing keeps audioWrittenMs readable post-stop. The nulled
     // anchor below makes getAudioDiag fall back to the last in-loop lag.
     this._audioTimeBaseUs = this._audioWrittenUs();
@@ -2071,6 +2164,7 @@ export class WebCodecsRecorder {
     // Extract output/error callbacks so the prefer-software retry below
     // can rebuild the VideoEncoder with the same handlers.
     const videoEncoderOutput = (chunk, meta) => {
+        this._noteEncodeOutput(chunk.timestamp);
         // An adopted encoder already emitted its decoderConfig to the prewarm's
         // discard sink, and Chrome only re-emits when the reported config
         // changes. Without a replay of the one captured at warmup the muxer
@@ -2978,26 +3072,35 @@ export class WebCodecsRecorder {
       });
     } catch {}
 
-    const candidateConfig = {
-      codec: this.containerKind === "webm" ? "opus" : "mp4a.40.2",
-      sampleRate,
-      numberOfChannels,
-      bitrate: this.options.audioBitrate || 128000,
-    };
+    const codec = this.containerKind === "webm" ? "opus" : "mp4a.40.2";
+    const bitrate = this.options.audioBitrate || 128000;
 
-    try {
-      const support = await AudioEncoder.isConfigSupported(candidateConfig);
-      if (!support.supported) {
-        this.warn("[WCR] audio codec unsupported", candidateConfig.codec);
-        return null;
+    // Input samples keep the mic's own rate and channel count (nothing
+    // resamples them), so only the bitrate can vary between attempts. An
+    // encoder configured for a different rate would reject that input.
+    const candidates = [{ codec, sampleRate, numberOfChannels, bitrate }];
+    for (const b of [96000, 64000]) {
+      if (b !== bitrate) {
+        candidates.push({ codec, sampleRate, numberOfChannels, bitrate: b });
       }
-      this.audioSampleRate = support.config?.sampleRate || candidateConfig.sampleRate;
-      this.audioChannelCount = support.config?.numberOfChannels || numberOfChannels;
-      return support.config || candidateConfig;
-    } catch {
-      this.warn("[WCR] audio probe failed", candidateConfig.codec);
-      return null;
     }
+
+    this._audioDisabledReason = null;
+    for (const candidateConfig of candidates) {
+      try {
+        const support = await AudioEncoder.isConfigSupported(candidateConfig);
+        if (!support.supported) continue;
+        this.audioSampleRate = support.config?.sampleRate || candidateConfig.sampleRate;
+        this.audioChannelCount =
+          support.config?.numberOfChannels || candidateConfig.numberOfChannels;
+        return support.config || candidateConfig;
+      } catch {
+        this._audioDisabledReason = "probe-threw";
+      }
+    }
+    this.warn("[WCR] audio codec unsupported", codec);
+    this._audioDisabledReason = this._audioDisabledReason || "unsupported";
+    return null;
   }
 
   async chooseVideoEncoderConfig({ width, height, fps, bitrate }) {
@@ -3352,17 +3455,18 @@ export class WebCodecsRecorder {
         }
       }
 
-      // Backpressure: drop the frame and force a keyframe next so
-      // the stream stays decodable. An unbounded queue can stop
-      // emitting chunks entirely.
+      // Backpressure: an unbounded queue can stop emitting chunks entirely. A dropped frame never
+      // reached the encoder, so the stream stays decodable without a keyframe; forcing one per
+      // drop made an overloaded encoder redo its costliest work. Only the first frame needs one.
       if (vQueueSize > effectiveQueueCap) {
         this._droppedForBackpressureCount += 1;
-        this._forceNextKeyframe = true;
+        if (!this._keyframeSubmitted) this._forceNextKeyframe = true;
         // A dropped lead-in hold leaves index 0 for the retry.
         if (holdUntilIndex == null) this._videoFrameIndex = i + 1;
         continue;
       }
 
+      const prepStart = performance.now();
       const resized = new VideoFrame(this.resizeCanvas, {
         timestamp: tsUs,
         duration:
@@ -3370,6 +3474,9 @@ export class WebCodecsRecorder {
             ? (holdUntilIndex + 1 - i) * frameDurationUs
             : frameDurationUs,
       });
+
+      this._noteCanvasPrep(performance.now() - prepStart + (this._drawMs || 0));
+      this._drawMs = 0;
 
       const keyFrame =
         i === 0 ||
@@ -3450,6 +3557,8 @@ export class WebCodecsRecorder {
           }
           throw encErr;
         }
+        if (keyFrame) this._keyframeSubmitted = true;
+        this._noteEncodeSubmitted(tsUs);
         if (
           this.debug &&
           (this.frameCount < 5 || this.frameCount % 300 === 0)
@@ -3687,7 +3796,9 @@ export class WebCodecsRecorder {
           // Must run before the draw: the canvas still holds the picture the late slots should show.
           this._encodeHeldGap();
 
+          const drawStart = performance.now();
           this.drawFrameToResizeCanvas(frame);
+          this._drawMs = performance.now() - drawStart;
 
           if (!this._videoStartUs) {
             this._anchorVideoStart(performance.now() * 1000);

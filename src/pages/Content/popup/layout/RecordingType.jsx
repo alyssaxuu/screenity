@@ -14,6 +14,7 @@ import TeleprompterRow from "../../teleprompter/TeleprompterRow";
 import { beginRecording } from "../../utils/beginRecording";
 
 import { AlertIcon, TimeIcon } from "../../toolbar/components/SVG";
+import { HELP_LINKS } from "../../../utils/helpLinks";
 
 const CLOUD_FEATURES_ENABLED =
   process.env.SCREENITY_ENABLE_CLOUD_FEATURES === "true";
@@ -23,10 +24,10 @@ const RecordingType = (props) => {
   const [cropActive, setCropActive] = useState(false);
   const [time, setTime] = useState(0);
   const [URL] = useState(
-    "https://help.screenity.io/getting-started/77KizPC8MHVGfpKpqdux9D/what-are-the-technical-requirements-for-using-screenity/6kdB6qru6naVD8ZLFvX3m9"
+    HELP_LINKS.technicalRequirements
   );
   const [URL2] = useState(
-    "https://help.screenity.io/troubleshooting/9Jy5RGjNrBB42hqUdREQ7W/how-to-grant-screenity-permission-to-record-your-camera-and-microphone/x6U69TnrbMjy5CQ96Er2E9"
+    HELP_LINKS.permissionsGrant
   );
 
   const buttonRef = useRef(null);
@@ -224,7 +225,7 @@ const RecordingType = (props) => {
             label={
               isMac
                 ? chrome.i18n.getMessage("pushToTalkLabel") + " (⌥⇧U)"
-                : chrome.i18n.getMessage("pushToTalkLabel") + " (Alt⇧U)"
+                : chrome.i18n.getMessage("pushToTalkLabel") + " (Alt+Shift+U)"
             }
             name="pushToTalk"
             value="pushToTalk"

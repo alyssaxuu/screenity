@@ -952,7 +952,7 @@
     "description": "Заголовок повідомлення про недостатньо місця"
   },
   "notEnoughSpaceDescription": {
-    "message": "Для роботи Screenity потрібно принаймні 1 ГБ вільного місця. Будь ласка, звільніть простір на пристрої і спробуйте ще раз.",
+    "message": "Для роботи Screenity потрібно принаймні 500 МБ вільного місця. Будь ласка, звільніть простір на пристрої і спробуйте ще раз.",
     "description": "Опис повідомлення про недостатньо місця"
   },
   "clearSpaceButton": {
@@ -1078,7 +1078,7 @@
     "description": "Заголовок попередження про аудіо для інших систем"
   },
   "recordAudioWarningOtherDescription": {
-    "message": "Якщо ви хочете записувати звук комп'ютера, переконайтеся, що опція 'Ділитися аудіо системи' активована. Якщо ви не бачите цю опцію, спробуйте оновити Chrome або перейти до опції запису вкладок.",
+    "message": "Якщо ви хочете записувати звук комп'ютера, переконайтеся, що опція 'Ділитися аудіо системи' активована.",
     "description": "Опис попередження про аудіо для інших систем"
   },
   "qualityLabel": {
@@ -1194,11 +1194,23 @@
     "description": "Toast message shown when the user is in an existing project and ready to record a new scene"
   },
   "reachingRecordingLimitToast": {
-    "message": "Запис наближається до 90-хвилинної межі, незабаром завершиться",
-    "description": "Toast message shown when the recording is reaching the 90 minute limit"
+    "message": "Запис наближається до $MINUTES$-хвилинної межі, незабаром завершиться",
+    "placeholders": {
+      "minutes": {
+        "content": "$1",
+        "example": "120"
+      }
+    },
+    "description": "Toast message shown when the recording is reaching the recording length limit"
   },
   "recordingLimitReachedToast": {
-    "message": "Запис зупинено через 90-хвилинне обмеження",
+    "message": "Запис зупинено через $MINUTES$-хвилинне обмеження",
+    "placeholders": {
+      "minutes": {
+        "content": "$1",
+        "example": "120"
+      }
+    },
     "description": "Toast message shown when the recording limit is reached"
   },
   "tabRecordingDisabledToast": {
@@ -1596,7 +1608,7 @@
     "description": "Reset pro onboarding option label in popup settings menu"
   },
   "recoverLastRecordingOption": {
-    "message": "Recover last recording",
+    "message": "Відновити записи",
     "description": "Settings menu item to manually trigger cloud recording recovery"
   },
   "toastRecoveredSession": {
@@ -1606,6 +1618,10 @@
   "toastStorageCritical": {
     "message": "Мало місця на диску. Зберігаємо запис. Все, що було записано, у безпеці.",
     "description": "Toast shown when available storage drops below the critical threshold during recording; reassures that captured data is preserved"
+  },
+  "recordingTailLostToast": {
+    "message": "Диск заповнений, тому кінець цього запису не вдалося зберегти. Решта відкриється в редакторі. Звільніть місце перед наступним записом.",
+    "description": "Toast when the last part of a recording could not be written to disk"
   },
   "toastStorageLow": {
     "message": "Storage is running low. Upload reliability may degrade for long recordings.",
@@ -1618,6 +1634,10 @@
   "toastNetworkOffline": {
     "message": "Network offline. Upload paused. Screen chunks are saved locally.",
     "description": "Toast shown when the browser goes offline during a cloud recording upload"
+  },
+  "toastLocalCopyIncomplete": {
+    "message": "Локальну копію зупинено. Якщо завантаження не вдасться, частину цього запису відновити не вийде.",
+    "description": "Toast shown when the local copy of a cloud recording stops being saved because the disk keeps failing"
   },
   "longRecordingTitle": {
     "message": "Довгий запис",
@@ -1675,9 +1695,25 @@
     "message": "Демонстрацію екрана зупинено. Зберігаємо запис. Все, що було записано, у безпеці.",
     "description": "Toast shown when the video track ends mid-recording (e.g. monitor disconnected, screen share revoked)"
   },
-  "audioTrackEndedToast": {
-    "message": "Аудіо від'єднано. Зберігаємо запис. Записане відео у безпеці.",
-    "description": "Toast shown when the audio track ends mid-recording (e.g. mic unplugged, permission revoked)"
+  "micDisconnectedNote": {
+    "message": "Мікрофон відключився на $TIME$. Звуку після цього моменту немає.",
+    "description": "Note shown in the editor when the microphone disconnected during the recording and could not be reconnected; $TIME$ is the recording time (m:ss) when it dropped",
+    "placeholders": {
+      "time": {
+        "content": "$1",
+        "example": "1:05"
+      }
+    }
+  },
+  "systemAudioDisconnectedNote": {
+    "message": "Системний звук відключився на $TIME$. Звуку після цього моменту немає.",
+    "description": "Note shown in the editor when the system or tab audio disconnected during the recording and the take was stopped; $TIME$ is the recording time (m:ss) when it dropped",
+    "placeholders": {
+      "time": {
+        "content": "$1",
+        "example": "1:05"
+      }
+    }
   },
   "captureAudioUnavailableToast": {
     "message": "Не вдалося записати звук комп'ютера, тому цей запис містить лише відео.",
@@ -2058,5 +2094,127 @@
   "sandboxEditorAudioPendingHint": {
     "message": "Щоб зберегти зміни, спочатку додайте аудіофайл.",
     "description": "Tooltip on the disabled save button in the audio editor until an audio file is added"
+  },
+  "emptyTakeNotSaved": {
+    "message": "Відео не було записано, тому зберегти цей запис не вдалося. Спробуйте ще раз.",
+    "description": "Error shown when a cloud recording ended with no video frames captured, so nothing could be saved"
+  },
+  "idbBlockedModalTitle": {
+    "message": "Поки що не можна почати запис",
+    "description": "Modal title when an earlier recording is still stored in this browser"
+  },
+  "idbUploadingModalDescription": {
+    "message": "Запис ще завантажується. Дочекайтеся завершення і запишіть знову.",
+    "description": "Modal text: earlier recording still uploading"
+  },
+  "idbHeldModalDescription": {
+    "message": "Запис не встиг завантажитися. Спочатку відновіть або видаліть його в меню розширення.",
+    "description": "Modal text: earlier recording needs recover or discard"
+  },
+  "emptyTakeModalTitle": {
+    "message": "Запис не збережено",
+    "description": "Modal title when a take captured no video"
+  },
+  "heldTakesTitle": {
+    "message": "Записи, збережені на цьому комп'ютері",
+    "description": "Recovery page (download.html?held=1): page heading"
+  },
+  "heldTakesLoading": {
+    "message": "Завантаження",
+    "description": "Recovery page (download.html?held=1): shown while the list is read"
+  },
+  "heldTakesIntro": {
+    "message": "Ці записи не вдалося завантажити до кінця, тому тут збережено копію. Збережіть файл або видаліть копію, коли вона більше не потрібна. Нічого не видаляється, доки ви самі цього не зробите.",
+    "description": "Recovery page (download.html?held=1): intro under the heading"
+  },
+  "heldTakesEmpty": {
+    "message": "Нічого не очікує. Цю вкладку можна закрити.",
+    "description": "Recovery page (download.html?held=1): shown when no take is held"
+  },
+  "heldTakesUntitled": {
+    "message": "Запис без назви",
+    "description": "Recovery page (download.html?held=1): card title when the recording has no title"
+  },
+  "heldTakesStored": {
+    "message": "Збережено: $SIZE$",
+    "description": "Recovery page (download.html?held=1): size of the stored copy, e.g. 412.6 MB stored",
+    "placeholders": {
+      "size": {
+        "content": "$1",
+        "example": "412.6 MB"
+      }
+    }
+  },
+  "heldTakesTrackScreen": {
+    "message": "Екран",
+    "description": "Recovery page (download.html?held=1): track label on a card"
+  },
+  "heldTakesTrackCamera": {
+    "message": "Камера",
+    "description": "Recovery page (download.html?held=1): track label on a card"
+  },
+  "heldTakesTrackAudio": {
+    "message": "Звук",
+    "description": "Recovery page (download.html?held=1): track label on a card"
+  },
+  "heldTakesPartial": {
+    "message": "Частина цього запису вже на сервері, тому ця копія може бути неповною.",
+    "description": "Recovery page (download.html?held=1): warning on a card"
+  },
+  "heldTakesGap": {
+    "message": "На пристрої закінчилося місце посеред запису, тому в цій копії є пропуск, і далі нього вона може не відтворюватися.",
+    "description": "Recovery page (download.html?held=1): warning on a card"
+  },
+  "heldTakesSave": {
+    "message": "Зберегти у файл",
+    "description": "Recovery page (download.html?held=1): button"
+  },
+  "heldTakesDiscard": {
+    "message": "Видалити",
+    "description": "Recovery page (download.html?held=1): button"
+  },
+  "heldTakesDiscardConfirm": {
+    "message": "Так, видалити",
+    "description": "Recovery page (download.html?held=1): button that confirms the discard"
+  },
+  "heldTakesKeep": {
+    "message": "Залишити",
+    "description": "Recovery page (download.html?held=1): button that cancels the discard"
+  },
+  "heldTakesDiscardWarning": {
+    "message": "Під час видалення збережену копію буде прибрано з цього комп'ютера. Це не можна скасувати.",
+    "description": "Recovery page (download.html?held=1): shown next to the confirm button"
+  },
+  "heldTakesSaved": {
+    "message": "Збережено в папку «Завантаження». Збережена копія залишається, доки ви її не видалите.",
+    "description": "Recovery page (download.html?held=1): note after a successful save"
+  },
+  "heldTakesSaveFailed": {
+    "message": "Деякі файли не вдалося зберегти. Запис досі зберігається, спробуйте ще раз.",
+    "description": "Recovery page (download.html?held=1): note after a failed save"
+  },
+  "heldTakesNoData": {
+    "message": "Для цього запису не знайдено збережених даних.",
+    "description": "Recovery page (download.html?held=1): note when a save finds nothing"
+  },
+  "heldTakesDiscardFailed": {
+    "message": "Не вдалося видалити цей запис. Спробуйте ще раз.",
+    "description": "Recovery page (download.html?held=1): note after a failed discard"
+  },
+  "heldTakesRetrying": {
+    "message": "Завантаження все ще триває. Якщо видалити запис, воно зупиниться.",
+    "description": "Recovery page (download.html?held=1): note on a take that is still retrying its upload"
+  },
+  "cameraPermissionBlockedError": {
+    "message": "Доступ до камери заблоковано. Дозвольте доступ до камери, щоб розпочати запис.",
+    "description": "Shown when a camera-only recording cannot start because camera permission is blocked"
+  },
+  "cameraBusyError": {
+    "message": "Screenity не може використати вашу камеру. Можливо, її використовує інший застосунок. Закрийте інші застосунки, які її використовують, і спробуйте ще раз.",
+    "description": "Shown when a camera-only recording cannot start because the camera is busy or unavailable"
+  },
+  "cameraNotFoundError": {
+    "message": "Screenity не знаходить камеру. Перевірте, що вона підключена, і спробуйте ще раз.",
+    "description": "Shown when a camera-only recording cannot start because no camera is found or the chosen camera is gone"
   }
 }

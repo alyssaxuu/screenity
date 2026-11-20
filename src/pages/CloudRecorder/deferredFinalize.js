@@ -33,7 +33,14 @@ export const isStillClosing = (uploader) =>
   (uploader.isFinalizing === true || uploader.status === "finalizing");
 
 // All or nothing: one track that can't be recovered keeps the blocking join.
-export const canDeferFinalize = ({ hostAllowed, tracks = [] }) => {
+// takeShort means the upload is behind the take. Such a take is finished from its own OPFS copy after
+// Stop ("drain") only when every own-bytes track can be re-read from disk, the mic's upload too.
+export const canDeferFinalize = ({
+  hostAllowed,
+  tracks = [],
+  takeShort = false,
+  audio = null,
+}) => {
   if (!hostAllowed) return { defer: false, reason: "host" };
   const present = tracks.filter((t) => t?.present);
   if (!present.length) return { defer: false, reason: "no-video-tracks" };
@@ -49,8 +56,67 @@ export const canDeferFinalize = ({ hostAllowed, tracks = [] }) => {
       return { defer: false, reason: `${t.track}-no-full-local-copy` };
     }
   }
+  if (takeShort) {
+    if (audio?.present && !isFullDurableCopy(audio.durable)) {
+      return { defer: false, reason: "audio-no-full-local-copy" };
+    }
+    return { defer: true, reason: "ok", drain: true };
+  }
   return { defer: true, reason: "ok" };
 };
+
+// No offset progress for this long means the link is dead: today's failure
+// path (modal, recovery file) takes over instead of draining forever.
+export const DRAIN_NO_PROGRESS_MS = 10 * 60 * 1000;
+export const DRAIN_RETRY_PAUSE_MS = 5000;
+
+// Re-sends what the server is missing from the local copy until level, then closes the upload. A park
+// (the next recording starting) ends it quietly, bytes and journal kept. Never rejects for a park.
+export const runDrain = async ({
+  shortBy,
+  getOffset,
+  resend,
+  finalize,
+  isParked,
+  now = Date.now,
+  sleep = (ms) => new Promise((r) => setTimeout(r, ms)),
+  noProgressMs = DRAIN_NO_PROGRESS_MS,
+  pauseMs = DRAIN_RETRY_PAUSE_MS,
+}) => {
+  let seenOffset = getOffset();
+  let seenAt = now();
+  while (shortBy() > 0) {
+    if (isParked()) return { outcome: "parked" };
+    await resend();
+    if (isParked()) return { outcome: "parked" };
+    const offset = getOffset();
+    if (offset > seenOffset) {
+      seenOffset = offset;
+      seenAt = now();
+    }
+    if (shortBy() <= 0) break;
+    if (now() - seenAt >= noProgressMs) throw new Error("drain-no-progress");
+    await sleep(pauseMs);
+  }
+  if (isParked()) return { outcome: "parked" };
+  try {
+    await finalize();
+  } catch (err) {
+    // Standing down aborts the closing PATCH; that is the park, not a failure.
+    if (isParked()) return { outcome: "parked" };
+    throw err;
+  }
+  return { outcome: "finalized" };
+};
+
+// Only the next recording's start parks, and only a take that is draining.
+// Discard, update and explicit flushes keep their existing handling.
+export const shouldParkForNextTake = ({
+  reason,
+  shouldFinalize = true,
+  drainActive = false,
+}) =>
+  reason === "new-recording-start" && shouldFinalize !== false && drainActive === true;
 
 // Resolves with the allSettled results and never rejects.
 export const createFinalizeSettle = (calls = []) => {

@@ -128,6 +128,8 @@ const TRANSIENT_ERROR_PATTERNS = [
   /track ended/i,
   /track inactive/i,
   /capture stream is not ready/i,
+  // No frame and no track size: capture starved, not a codec defect.
+  /cannot probe frame resolution/i,
   // Hardware codec reclaimed by Chrome (idle/background/pressure).
   /codec reclaimed/i,
   /reclaimed due to inactivity/i,
@@ -992,6 +994,34 @@ export const validateFastRecorderOutputBlob = async (
   } catch {}
 
   return { ok, hardFail, reasons, details };
+};
+
+// No video track, no blob or a wrong mime proves the encoder is defective.
+// demuxer-error / demuxer-timeout only say the check could not run; sticky-disabling on
+// them would drop a healthy device to MediaRecorder for 14 days.
+export const shouldStickyDisableOnValidation = (
+  validation: Pick<
+    FastRecorderValidationResult,
+    "ok" | "hardFail"
+  > & { inconclusive?: boolean } | null | undefined
+): boolean =>
+  Boolean(
+    validation && !validation.ok && validation.hardFail && !validation.inconclusive
+  );
+
+// A throw in the rebuild or validator says nothing about the encoder. A rebuild
+// timeout is also inconclusive (slow reassembly of a large take).
+export const validationFromException = (err: unknown) => {
+  const isRebuildTimeout = String((err as any)?.message || err).includes(
+    "rebuild-timeout"
+  );
+  return {
+    ok: false,
+    hardFail: false,
+    inconclusive: isRebuildTimeout,
+    reasons: [isRebuildTimeout ? "rebuild-timeout" : "validation-exception"],
+    details: { error: String(err) },
+  };
 };
 
 export const fastRecorderStorageKeys = STORAGE_KEYS;

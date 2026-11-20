@@ -952,7 +952,7 @@
     "description": "Títol d'espai insuficient"
   },
   "notEnoughSpaceDescription": {
-    "message": "Screenity necessita almenys 1 GB d'espai lliure per a la gravació. Si us plau, allibera espai i torna-ho a intentar.",
+    "message": "Screenity necessita almenys 500 MB d'espai lliure per a la gravació. Si us plau, allibera espai i torna-ho a intentar.",
     "description": "Descripció d'espai insuficient"
   },
   "clearSpaceButton": {
@@ -1078,7 +1078,7 @@
     "description": "Títol d'avís d'àudio per a altres sistemes"
   },
   "recordAudioWarningOtherDescription": {
-    "message": "Assegureu-vos d'activar l'opció 'Comparteix l'audio del sistema' si voleu enregistrar l'audio de l'ordinador. Si no veieu aquesta opció, proveu d'actualitzar Chrome o canviar a l'opció d'enregistrament de pestanyes.",
+    "message": "Assegureu-vos d'activar l'opció 'Comparteix l'audio del sistema' si voleu enregistrar l'audio de l'ordinador.",
     "description": "Descripció d'avís d'àudio per a altres sistemes"
   },
   "qualityLabel": {
@@ -1194,11 +1194,23 @@
     "description": "Toast message shown when the user is in an existing project and ready to record a new scene"
   },
   "reachingRecordingLimitToast": {
-    "message": "La gravació s'apropa al límit de 90 minuts, s'aturarà aviat",
-    "description": "Toast message shown when the recording is reaching the 90 minute limit"
+    "message": "La gravació s'apropa al límit de $MINUTES$ minuts, s'aturarà aviat",
+    "placeholders": {
+      "minutes": {
+        "content": "$1",
+        "example": "120"
+      }
+    },
+    "description": "Toast message shown when the recording is reaching the recording length limit"
   },
   "recordingLimitReachedToast": {
-    "message": "Gravació aturada pel límit de 90 minuts",
+    "message": "Gravació aturada pel límit de $MINUTES$ minuts",
+    "placeholders": {
+      "minutes": {
+        "content": "$1",
+        "example": "120"
+      }
+    },
     "description": "Toast message shown when the recording limit is reached"
   },
   "tabRecordingDisabledToast": {
@@ -1604,7 +1616,7 @@
     "description": "Reset pro onboarding option label in popup settings menu"
   },
   "recoverLastRecordingOption": {
-    "message": "Recover last recording",
+    "message": "Recupera les gravacions",
     "description": "Settings menu item to manually trigger cloud recording recovery"
   },
   "toastRecoveredSession": {
@@ -1614,6 +1626,10 @@
   "toastStorageCritical": {
     "message": "Poc espai al disc. S'està desant l'enregistrament. Tot el que s'ha capturat és segur.",
     "description": "Toast shown when available storage drops below the critical threshold during recording; reassures that captured data is preserved"
+  },
+  "recordingTailLostToast": {
+    "message": "El disc és ple i no s'ha pogut desar el final d'aquest enregistrament. La resta s'obre a l'editor. Allibera espai abans de tornar a enregistrar.",
+    "description": "Toast when the last part of a recording could not be written to disk"
   },
   "toastStorageLow": {
     "message": "Storage is running low. Upload reliability may degrade for long recordings.",
@@ -1626,6 +1642,10 @@
   "toastNetworkOffline": {
     "message": "Network offline. Upload paused. Screen chunks are saved locally.",
     "description": "Toast shown when the browser goes offline during a cloud recording upload"
+  },
+  "toastLocalCopyIncomplete": {
+    "message": "La còpia local s'ha aturat. Si la pujada falla, una part d'aquesta gravació no es podrà recuperar.",
+    "description": "Toast shown when the local copy of a cloud recording stops being saved because the disk keeps failing"
   },
   "longRecordingTitle": {
     "message": "Enregistrament llarg",
@@ -1683,9 +1703,25 @@
     "message": "La compartició de pantalla s'ha aturat. S'està desant l'enregistrament. Tot el que s'ha capturat és segur.",
     "description": "Toast shown when the video track ends mid-recording (e.g. monitor disconnected, screen share revoked)"
   },
-  "audioTrackEndedToast": {
-    "message": "L'àudio s'ha desconnectat. S'està desant l'enregistrament. El vídeo capturat és segur.",
-    "description": "Toast shown when the audio track ends mid-recording (e.g. mic unplugged, permission revoked)"
+  "micDisconnectedNote": {
+    "message": "El micro s'ha desconnectat a $TIME$. Falta l'àudio a partir d'aquí.",
+    "description": "Note shown in the editor when the microphone disconnected during the recording and could not be reconnected; $TIME$ is the recording time (m:ss) when it dropped",
+    "placeholders": {
+      "time": {
+        "content": "$1",
+        "example": "1:05"
+      }
+    }
+  },
+  "systemAudioDisconnectedNote": {
+    "message": "L'àudio del sistema s'ha desconnectat a $TIME$. Falta l'àudio a partir d'aquí.",
+    "description": "Note shown in the editor when the system or tab audio disconnected during the recording and the take was stopped; $TIME$ is the recording time (m:ss) when it dropped",
+    "placeholders": {
+      "time": {
+        "content": "$1",
+        "example": "1:05"
+      }
+    }
   },
   "captureAudioUnavailableToast": {
     "message": "No s'ha pogut capturar l'àudio de l'ordinador, així que aquesta gravació només té vídeo.",
@@ -2060,5 +2096,127 @@
   "sandboxEditorAudioPendingHint": {
     "message": "Afegeix primer un fitxer d'àudio per desar els canvis.",
     "description": "Tooltip on the disabled save button in the audio editor until an audio file is added"
+  },
+  "emptyTakeNotSaved": {
+    "message": "No s'ha capturat cap vídeo, així que no s'ha pogut desar aquesta gravació. Torna-ho a provar.",
+    "description": "Error shown when a cloud recording ended with no video frames captured, so nothing could be saved"
+  },
+  "idbBlockedModalTitle": {
+    "message": "Encara no es pot començar a gravar",
+    "description": "Modal title when an earlier recording is still stored in this browser"
+  },
+  "idbUploadingModalDescription": {
+    "message": "Una gravació encara s'està pujant. Espera que acabi i torna a gravar.",
+    "description": "Modal text: earlier recording still uploading"
+  },
+  "idbHeldModalDescription": {
+    "message": "Una gravació no ha acabat de pujar-se. Recupera-la o descarta-la primer des del menú de l'extensió.",
+    "description": "Modal text: earlier recording needs recover or discard"
+  },
+  "emptyTakeModalTitle": {
+    "message": "Gravació no desada",
+    "description": "Modal title when a take captured no video"
+  },
+  "heldTakesTitle": {
+    "message": "Gravacions conservades en aquest ordinador",
+    "description": "Recovery page (download.html?held=1): page heading"
+  },
+  "heldTakesLoading": {
+    "message": "S'està carregant",
+    "description": "Recovery page (download.html?held=1): shown while the list is read"
+  },
+  "heldTakesIntro": {
+    "message": "Aquestes gravacions no han pogut acabar de pujar-se, així que s'ha conservat una còpia aquí. Desa un fitxer o descarta la còpia quan ja no la necessitis. No s'esborra res fins que la descartis.",
+    "description": "Recovery page (download.html?held=1): intro under the heading"
+  },
+  "heldTakesEmpty": {
+    "message": "No hi ha res pendent. Pots tancar aquesta pestanya.",
+    "description": "Recovery page (download.html?held=1): shown when no take is held"
+  },
+  "heldTakesUntitled": {
+    "message": "Gravació sense títol",
+    "description": "Recovery page (download.html?held=1): card title when the recording has no title"
+  },
+  "heldTakesStored": {
+    "message": "$SIZE$ emmagatzemats",
+    "description": "Recovery page (download.html?held=1): size of the stored copy, e.g. 412.6 MB stored",
+    "placeholders": {
+      "size": {
+        "content": "$1",
+        "example": "412.6 MB"
+      }
+    }
+  },
+  "heldTakesTrackScreen": {
+    "message": "Pantalla",
+    "description": "Recovery page (download.html?held=1): track label on a card"
+  },
+  "heldTakesTrackCamera": {
+    "message": "Càmera",
+    "description": "Recovery page (download.html?held=1): track label on a card"
+  },
+  "heldTakesTrackAudio": {
+    "message": "Àudio",
+    "description": "Recovery page (download.html?held=1): track label on a card"
+  },
+  "heldTakesPartial": {
+    "message": "Una part d'aquesta gravació ja és al servidor, així que aquesta còpia pot estar incompleta.",
+    "description": "Recovery page (download.html?held=1): warning on a card"
+  },
+  "heldTakesGap": {
+    "message": "Aquest dispositiu s'ha quedat sense espai a mig camí, així que aquesta còpia té un buit i potser no es reprodueix més enllà.",
+    "description": "Recovery page (download.html?held=1): warning on a card"
+  },
+  "heldTakesSave": {
+    "message": "Desa en un fitxer",
+    "description": "Recovery page (download.html?held=1): button"
+  },
+  "heldTakesDiscard": {
+    "message": "Descarta",
+    "description": "Recovery page (download.html?held=1): button"
+  },
+  "heldTakesDiscardConfirm": {
+    "message": "Sí, descarta",
+    "description": "Recovery page (download.html?held=1): button that confirms the discard"
+  },
+  "heldTakesKeep": {
+    "message": "Conserva",
+    "description": "Recovery page (download.html?held=1): button that cancels the discard"
+  },
+  "heldTakesDiscardWarning": {
+    "message": "En descartar, s'elimina la còpia emmagatzemada d'aquest ordinador. No es pot desfer.",
+    "description": "Recovery page (download.html?held=1): shown next to the confirm button"
+  },
+  "heldTakesSaved": {
+    "message": "Desat a la carpeta Baixades. La còpia emmagatzemada es conserva fins que la descartis.",
+    "description": "Recovery page (download.html?held=1): note after a successful save"
+  },
+  "heldTakesSaveFailed": {
+    "message": "Alguns fitxers no s'han pogut desar. La gravació continua emmagatzemada, torna-ho a provar.",
+    "description": "Recovery page (download.html?held=1): note after a failed save"
+  },
+  "heldTakesNoData": {
+    "message": "No s'han trobat dades emmagatzemades per a aquesta gravació.",
+    "description": "Recovery page (download.html?held=1): note when a save finds nothing"
+  },
+  "heldTakesDiscardFailed": {
+    "message": "No s'ha pogut eliminar aquesta gravació. Torna-ho a provar.",
+    "description": "Recovery page (download.html?held=1): note after a failed discard"
+  },
+  "heldTakesRetrying": {
+    "message": "Encara s'intenta pujar. Si descartes, s'atura.",
+    "description": "Recovery page (download.html?held=1): note on a take that is still retrying its upload"
+  },
+  "cameraPermissionBlockedError": {
+    "message": "El permís de la càmera està bloquejat. Permet l'accés a la càmera per gravar.",
+    "description": "Shown when a camera-only recording cannot start because camera permission is blocked"
+  },
+  "cameraBusyError": {
+    "message": "Screenity no pot utilitzar la càmera. Pot estar en ús per una altra aplicació. Tanca les altres aplicacions que la fan servir i torna-ho a provar.",
+    "description": "Shown when a camera-only recording cannot start because the camera is busy or unavailable"
+  },
+  "cameraNotFoundError": {
+    "message": "Screenity no troba cap càmera. Comprova que estigui connectada i torna-ho a provar.",
+    "description": "Shown when a camera-only recording cannot start because no camera is found or the chosen camera is gone"
   }
 }

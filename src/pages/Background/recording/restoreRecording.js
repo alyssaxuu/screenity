@@ -80,8 +80,8 @@ const openInAnEditor = async () => {
 
 // Both slots. Retention leaves a finished recording in whichever slot the live
 // one is not using, so the live slot alone would miss it.
-const findIdbChunks = async (busySlots) => {
-  for (const slot of [CHUNK_SLOT_B, CHUNK_SLOT_A]) {
+const findIdbChunks = async (busySlots, onlySlot = null) => {
+  for (const slot of onlySlot ? [onlySlot] : [CHUNK_SLOT_B, CHUNK_SLOT_A]) {
     if (busySlots.has(slot)) continue;
     const chunks = [];
     try {
@@ -96,6 +96,19 @@ const findIdbChunks = async (busySlots) => {
   return { slot: null, chunks: [] };
 };
 
+// The retained recording the asking tab holds, when the ask comes from an
+// editor tab. The popup has no such tab.
+const ownEntryOf = async (sender) => {
+  const tabId = sender?.tab?.id;
+  if (typeof tabId !== "number") return null;
+  const alive = await pruneRetained().catch(() => []);
+  return alive.find((e) => e.tabId === tabId && !e.bytesGone) || null;
+};
+
+const isEditorPage = (sender) =>
+  typeof sender?.tab?.id === "number" &&
+  String(sender?.url || "").includes("/editor.html");
+
 export const checkRestore = async () => {
   const busy = await openInAnEditor();
   const [idb, opfsFiles] = await Promise.all([
@@ -107,7 +120,7 @@ export const checkRestore = async () => {
   return { restore };
 };
 
-export const restoreRecording = async () => {
+export const restoreRecording = async (_message, sender) => {
   // capture trigger tab now; restore can take 30s+ and the user may switch
   let triggerTabId = null;
   try {
@@ -116,10 +129,25 @@ export const restoreRecording = async () => {
   } catch {}
 
   // WebCodecs (4.4.0+) writes here; prefer most recent
+  const own = await ownEntryOf(sender);
+  if (own || isEditorPage(sender)) {
+    // The recorder writes the pointer once, when it opens its file. Pointing it back at an old
+    // take mid-recording would hand that file to the new editor and leave the new file unprotected.
+    const live = await chrome.storage.local.get([
+      "recording",
+      "pendingRecording",
+      "restarting",
+    ]);
+    if (live.recording || live.pendingRecording || live.restarting) return;
+  }
   const busy = await openInAnEditor();
-  const opfsFiles = (await listOpfsRecordings()).filter(
+  // The stuck tab asking is not a second claimant: it wants its own take back
+  if (own?.fileName) busy.fileNames.delete(own.fileName);
+  if (own?.slot) busy.slots.delete(own.slot);
+  let opfsFiles = (await listOpfsRecordings()).filter(
     (f) => !busy.fileNames.has(f.name),
   );
+  if (own) opfsFiles = opfsFiles.filter((f) => f.name === own.fileName);
   if (opfsFiles.length > 0) {
     opfsFiles.sort((a, b) => b.lastModified - a.lastModified);
     const latest = opfsFiles[0];
@@ -210,7 +238,10 @@ export const restoreRecording = async () => {
     messageType = "viewer-recording";
   }
 
-  const { slot: idbSlot, chunks } = await findIdbChunks(busy.slots);
+  const { slot: idbSlot, chunks } =
+    own && !own.slot
+      ? { slot: null, chunks: [] }
+      : await findIdbChunks(busy.slots, own?.slot || null);
   if (chunks.length === 0) {
     console.warn("[Screenity][BG] restoreRecording: no OPFS files and no IDB chunks");
     await notifyRestoreEmpty(triggerTabId);

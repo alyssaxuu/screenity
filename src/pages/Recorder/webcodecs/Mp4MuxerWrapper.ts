@@ -31,6 +31,13 @@ interface Mp4MuxerWrapperOptions {
 const FLUSH_BYTES = 1 * 1024 * 1024;
 const FLUSH_INTERVAL_MS = 1000;
 
+// The Output holds all video until every open track has delivered a first
+// sample, so an open audio track that never delivers keeps the file at its
+// 28-byte header. Close it once video is clearly flowing without it.
+const AUDIO_NEVER_STARTED_CLOSE_MS = 6000;
+const AUDIO_GAP_CLOSE_MS = 15000;
+const VIDEO_FLOWING_MS = 4000;
+
 export class Mp4MuxerWrapper {
   private output: Output;
   private target: StreamTarget;
@@ -51,6 +58,23 @@ export class Mp4MuxerWrapper {
   private _lastDecoderConfig: any = null;
   private _audioClosed = false;
   private _muxErrorReported = false;
+
+  private _firstVideoAddAt: number | null = null;
+  private _lastVideoAddAt: number | null = null;
+  private _audioSampleRate: number | null = null;
+  private _lastAudioAddAt: number | null = null;
+  private _audioBaselineAt: number | null = null;
+  private _audioIdleTimer: any = null;
+  private _stats = {
+    videoAdds: 0,
+    videoSettled: 0,
+    videoRejected: 0,
+    firstAddHadConfig: null as boolean | null,
+    audioAdds: 0,
+    audioIdleClosed: false,
+    audioDurationFallbacks: 0,
+    bytesWritten: 0,
+  };
 
   // Coalesces small StreamTarget writes (per-fragment headers, sample data,
   // trailing bytes) into fewer larger IDB puts.
@@ -107,6 +131,7 @@ export class Mp4MuxerWrapper {
 
   private bufferWrite(data: Uint8Array) {
     if (this._closed) return;
+    this._stats.bytesWritten += data.byteLength;
     // StreamTarget reuses its internal buffer across writes; must copy.
     const copy = new Uint8Array(data.byteLength);
     copy.set(data);
@@ -154,6 +179,35 @@ export class Mp4MuxerWrapper {
       this.log("[MUXER] enableAudio");
       this.audioSource = new EncodedAudioPacketSource(this.audioCodec);
       this.output.addAudioTrack(this.audioSource);
+      this.startAudioIdleWatch();
+    }
+  }
+
+  private startAudioIdleWatch() {
+    if (this._audioIdleTimer) return;
+    this._audioIdleTimer = setInterval(() => {
+      if (this._audioClosed || !this.audioSource) return this.stopAudioIdleWatch();
+      if (this._firstVideoAddAt == null || this._lastVideoAddAt == null) return;
+      const now = Date.now();
+      // A pause stops both tracks; the audio gap it leaves is not a dead source.
+      if (now - this._lastVideoAddAt > VIDEO_FLOWING_MS) return;
+      const neverStarted = this._lastAudioAddAt == null;
+      const since = Math.max(
+        this._lastAudioAddAt ?? this._firstVideoAddAt,
+        this._audioBaselineAt ?? 0,
+      );
+      const limit = neverStarted ? AUDIO_NEVER_STARTED_CLOSE_MS : AUDIO_GAP_CLOSE_MS;
+      if (now - since < limit) return;
+      this.warn("[MUXER] audio idle while video flows, closing audio source");
+      this._stats.audioIdleClosed = true;
+      this.closeAudio();
+    }, 1000);
+  }
+
+  private stopAudioIdleWatch() {
+    if (this._audioIdleTimer) {
+      clearInterval(this._audioIdleTimer);
+      this._audioIdleTimer = null;
     }
   }
 
@@ -162,6 +216,7 @@ export class Mp4MuxerWrapper {
   closeAudio() {
     if (!this.audioSource || this._audioClosed) return;
     this._audioClosed = true;
+    this.stopAudioIdleWatch();
     this.log("[MUXER] closeAudio");
     try {
       this.audioSource.close();
@@ -195,15 +250,56 @@ export class Mp4MuxerWrapper {
         ? { ...meta, decoderConfig: this._lastDecoderConfig }
         : meta;
 
+    const nowMs = Date.now();
+    if (this._firstVideoAddAt === null) this._firstVideoAddAt = nowMs;
+    if (
+      this._lastVideoAddAt !== null &&
+      nowMs - this._lastVideoAddAt > VIDEO_FLOWING_MS
+    ) {
+      this._audioBaselineAt = nowMs;
+    }
+    this._lastVideoAddAt = nowMs;
+    if (this._stats.firstAddHadConfig === null) {
+      this._stats.firstAddHadConfig = !!effectiveMeta?.decoderConfig;
+    }
+    this._stats.videoAdds += 1;
+
     const packet = this.buildPacket(chunk, effectiveMeta, "video");
-    return this.trackAdd(this.videoSource.add(packet, effectiveMeta), "video");
+    let added: any;
+    try {
+      added = this.videoSource.add(packet, effectiveMeta);
+    } catch {
+      // Thrown synchronously when the output is finalizing or the source is
+      // closed, which late encoder output after stop can hit.
+      this._stats.videoRejected += 1;
+      return;
+    }
+    if (added instanceof Promise) {
+      added.then(
+        () => {
+          this._stats.videoSettled += 1;
+        },
+        () => {
+          this._stats.videoRejected += 1;
+        },
+      );
+    }
+    return this.trackAdd(added, "video");
   }
 
   addAudioChunk(chunk: EncodedAudioChunk, meta: any) {
     if (!this.audioSource || this._audioClosed) return;
 
+    this._lastAudioAddAt = Date.now();
+    this._stats.audioAdds += 1;
     const packet = this.buildPacket(chunk, meta, "audio");
-    return this.trackAdd(this.audioSource.add(packet, meta), "audio");
+    let added: any;
+    try {
+      added = this.audioSource.add(packet, meta);
+    } catch {
+      return;
+    }
+    return this.trackAdd(added, "audio");
   }
 
   async start() {
@@ -215,6 +311,7 @@ export class Mp4MuxerWrapper {
 
   async finalize() {
     this.log("[MUXER] finalize");
+    this.stopAudioIdleWatch();
     try {
       await this.output.finalize();
     } finally {
@@ -231,6 +328,7 @@ export class Mp4MuxerWrapper {
   // Force-flush without finalize(). Used when the muxer hangs to preserve
   // already-streamed fragments for recovery.
   async flushPending() {
+    this.stopAudioIdleWatch();
     this.flushWriteBuffer();
     this._closed = true;
     await this._pendingFlush;
@@ -241,6 +339,15 @@ export class Mp4MuxerWrapper {
     return {
       totalEmittedBytes: this._totalEmittedBytes,
       emitCount: this._emitCount,
+      muxVideoAdds: this._stats.videoAdds,
+      muxVideoSettled: this._stats.videoSettled,
+      muxVideoRejected: this._stats.videoRejected,
+      muxFirstAddHadConfig: this._stats.firstAddHadConfig,
+      muxBytesWritten: this._stats.bytesWritten,
+      muxAudioAdds: this._stats.audioAdds,
+      muxAudioTrackOpen: !!this.audioSource && !this._audioClosed,
+      muxAudioIdleClosed: this._stats.audioIdleClosed,
+      muxAudioDurationFallbacks: this._stats.audioDurationFallbacks,
     };
   }
 
@@ -273,8 +380,22 @@ export class Mp4MuxerWrapper {
     const data = new Uint8Array(chunk.byteLength);
     chunk.copyTo(data);
 
-    const tsUs = this.normalizeTimestamp(type, chunk.timestamp, chunk.duration || 0);
-    const durSec = (chunk.duration || 0) / 1e6;
+    let durUs = chunk.duration || 0;
+    if (type === "audio") {
+      const sr = meta?.decoderConfig?.sampleRate
+      if (typeof sr === "number" && sr > 0) this._audioSampleRate = sr;
+      if (!(durUs > 0)) {
+        // Audio time is built as last + duration, so a missing duration would
+        // freeze the audio timeline at 0 and keep the Output waiting on audio.
+        durUs =
+          this.audioCodec === "aac"
+            ? Math.round((1024 * 1_000_000) / (this._audioSampleRate || 48000))
+            : 20_000;
+        this._stats.audioDurationFallbacks += 1;
+      }
+    }
+    const tsUs = this.normalizeTimestamp(type, chunk.timestamp, durUs);
+    const durSec = durUs / 1e6;
 
     return new EncodedPacket(data, chunk.type, tsUs / 1e6, durSec);
   }

@@ -16,7 +16,7 @@ const Settings = () => {
   // Check if Mac
   const isMac = navigator.platform.toUpperCase().indexOf("MAC") >= 0;
   // Set shortcut to Option+Shift+E on Mac and Alt+Shift+E on Windows, using character codes
-  const shortcut = isMac ? "⌥⇧E" : "Alt⇧E";
+  const shortcut = isMac ? "⌥⇧E" : "Alt+Shift+E";
 
   // Get Chrome version
   const getChromeVersion = () => {

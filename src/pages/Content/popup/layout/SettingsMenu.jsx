@@ -331,7 +331,7 @@ const SettingsMenu = (props) => {
             setRestore(response.restore);
           });
 
-        if (CLOUD_FEATURES_ENABLED && contentState.isSubscribed) {
+        if (CLOUD_FEATURES_ENABLED) {
           chrome.runtime
             .sendMessage({ type: "check-cloud-restore" })
             .then((response) => {
@@ -710,7 +710,7 @@ const SettingsMenu = (props) => {
                 </DropdownMenu.ItemIndicator>
               </DropdownMenu.CheckboxItem>
             )}
-          {!contentState.isSubscribed && !contentState.isLoggedIn && (
+          {!contentState.isSubscribed && (
             <DropdownMenu.Item
               className="DropdownMenuItem"
               onSelect={(e) => {
@@ -743,7 +743,16 @@ const SettingsMenu = (props) => {
               {chrome.i18n.getMessage("accountSettingsOption")}
             </DropdownMenu.Item>
           )}
-          {contentState.isLoggedIn && !CLOUD_FEATURES_ENABLED && (
+          <DropdownMenu.Item
+            className="DropdownMenuItem"
+            onSelect={(e) => {
+              e.preventDefault();
+              chrome.runtime.sendMessage({ type: "open-help" });
+            }}
+          >
+            {chrome.i18n.getMessage("getHelpNav")}
+          </DropdownMenu.Item>
+          {contentState.isLoggedIn && CLOUD_FEATURES_ENABLED && (
             <DropdownMenu.Item
               className="DropdownMenuItem"
               onSelect={(e) => {
@@ -790,7 +799,8 @@ const SettingsMenu = (props) => {
                     "Reset onboarding"}
                 </DropdownMenu.Item>
               )}
-              {contentState.isLoggedIn && contentState.isSubscribed && (
+              {((contentState.isLoggedIn && contentState.isSubscribed) ||
+                cloudRestore) && (
                 <DropdownMenu.Item
                   className="DropdownMenuItem"
                   onSelect={(e) => {

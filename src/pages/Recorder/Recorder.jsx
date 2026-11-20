@@ -1,4 +1,8 @@
 import React, { useEffect, useState, useRef } from "react";
+import {
+  createMintGuard,
+  resolveTabCaptureFallback,
+} from "./tabStreamMint";
 import { createDebugLogger } from "../utils/recorderDebug";
 import { selectMimeType, getCodecLabel, buildTrackSnapshot } from "../utils/recorderCodec";
 import localforage from "localforage";
@@ -19,7 +23,19 @@ import {
   createDimensionLockedStream,
   isDimensionLockDisabled,
 } from "./dimensionLock";
-import { activeChunksStore, loadActiveSlot } from "../utils/chunkStores";
+import {
+  activeChunksStore,
+  getActiveSlot,
+  loadActiveSlot,
+  LOCAL_CHUNK_TAG,
+} from "../utils/chunkStores";
+import {
+  currentTakeId,
+  isSupersededTake,
+  markTakeFinishing,
+} from "../OffscreenRecorder/takeFrameRouting";
+import { finishingLocalTakeKey } from "../Background/recording/finishingLocalTakes";
+import { guardedClear } from "../CloudRecorder/localCopyGate";
 import {
   getBitrates,
   getResolutionForQuality,
@@ -46,6 +62,14 @@ import { attachAudioContextWatchdog } from "../utils/audioContextWatchdog";
 import { beginFinalizeHeartbeat } from "../utils/finalizeHeartbeat";
 import { IS_OFFSCREEN_HOST } from "../utils/recordingHost";
 import { sendSystemAudioGuidanceToast } from "../utils/systemAudioGuidance";
+import {
+  resetRecordingSignals,
+  noteRecordingSignals,
+  bumpRecordingSignal,
+  reportTakeStart,
+  reportTakeStop,
+  noteTakeAttempt,
+} from "../utils/recordingSignals";
 import { createSourceProbe, snapshotProbes } from "./audioSourceProbe";
 import {
   isCaptureAudioSourceError,
@@ -58,9 +82,34 @@ import {
 import { acquireDisplayMediaWithFocusRetry } from "../utils/acquireDisplayMedia";
 import { chooseWriter } from "./recorderStorage/chooseWriter";
 import { chooseReader } from "./recorderStorage/chooseReader";
+import {
+  writeWithQuotaRetry,
+  looksLikeQuotaError as isQuotaLikeError,
+} from "./recorderStorage/retryChunkWrite";
 import { lifecycle } from "../utils/lifecycleLog";
+import {
+  SYSTEM_AUDIO_STOP_REASON,
+  createSystemAudioEndGate,
+  buildSystemAudioDropEvent,
+  resolveSystemAudioDropEvent,
+  shouldWriteMicRecoveredEvent,
+} from "../utils/systemAudioDrop";
 import { perfMark, perfSpan } from "../utils/perfMarks";
 import { markStartProgress } from "../utils/startProgress";
+import {
+  computeMicDropElapsedMs,
+  buildMicDropInWindowEvent,
+  buildMicDropRecoveredEvent,
+} from "../utils/micDropElapsed";
+import { isSameMicDevice, replaceProbe } from "../utils/micLabelMatch";
+import { stampNoticeAttempt, trackNoticeAttempt } from "../utils/noticeAttemptStamp";
+import {
+  reacquireMicWindow,
+  acquireExactMic,
+  MIC_REACQUIRE_WINDOW_MS,
+  MIC_REACQUIRE_MAX_PER_WINDOW,
+  MIC_REACQUIRE_RATE_WINDOW_MS,
+} from "../utils/micReacquire";
 import {
   debugRecordingEvent,
   resetRecordingDebugSession,
@@ -73,6 +122,8 @@ import {
   resolveFastRecorderUserSetting,
   getFastRecorderStickyState,
   markFastRecorderFailure,
+  shouldStickyDisableOnValidation,
+  validationFromException,
   validateFastRecorderOutputBlob,
   isTransientFastRecorderError,
   isFastRecorderFailureTransient,
@@ -92,6 +143,17 @@ localforage.config({
 // The retained recording sits in the other slot, so a hardcoded instance here
 // would have cleared it. Resolves the live slot on every call.
 const chunksStore = activeChunksStore;
+
+const refuseOnHeldTake = (res) => {
+  const progressing = res.kind === "progressing";
+  sendRecordingError(
+    progressing
+      ? "A recording is still uploading."
+      : "A recording did not finish uploading.",
+    false,
+    progressing ? "REC_START_IDB_UPLOADING" : "REC_START_IDB_HELD",
+  );
+};
 
 document.body.style.willChange = "contents";
 
@@ -166,9 +228,18 @@ function logRecordingSnapshot(label, data) {
 
 const Recorder = () => {
   const isRestarting = useRef(false);
+  // BG's attempt id for this take, from its start-recording-tab message. video-ready
+  // carries it so a late one cannot clear the next take's state.
+  const takeAttemptIdRef = useRef(null);
+  // Lets the SW hold this take's notices once a newer take records.
+  const [noticeAttempt] = useState(() => trackNoticeAttempt(takeAttemptIdRef));
+  useEffect(() => stampNoticeAttempt(chrome.runtime, noticeAttempt.get), []);
   const pendingStartAfterRestart = useRef(false);
   const recordingGeneration = useRef(0);
   const isFinishing = useRef(false);
+  // fastRecorderActiveRecordingId as it was when this take stopped.
+  const finalizeRecordingIdRef = useRef(null);
+  const lastElapsedMs = useRef(0);
   const stopPromiseRef = useRef(null);
   const sentLast = useRef(false);
   const lastTimecode = useRef(0);
@@ -209,6 +280,10 @@ const Recorder = () => {
   // 12s: cold SW wake-ups on Windows Chrome can take several seconds; 8s was too tight.
   const START_GATE_TIMEOUT_MS = 12000;
   const streamingDataRetryTimer = useRef(null);
+  // resetGateState clears streamingDataReceivedAt, so a push retry landing after a
+  // failed start re-ran capture and started a recording the SW had already torn
+  // down. This document asks for streaming-data once, at mount: one start only.
+  const streamingDataApplied = useRef(false);
 
   // Apply streaming-data once. Shared by the `get-streaming-data` pull
   // response and the `streaming-data` push message; whichever arrives
@@ -218,6 +293,21 @@ const Recorder = () => {
       slLog("msg-streaming-data-duplicate");
       return;
     }
+    // startRecording() clears streamingDataReceivedAt, so a late second
+    // response would re-run getUserMedia on a tab already being captured.
+    if (
+      recorder.current !== null ||
+      isStarting.current ||
+      helperVideoStream.current?.getVideoTracks()[0]?.readyState === "live"
+    ) {
+      slLog("msg-streaming-data-duplicate", { afterStart: true });
+      return;
+    }
+    if (streamingDataApplied.current) {
+      slLog("msg-streaming-data-duplicate", { afterFailedStart: true });
+      return;
+    }
+    streamingDataApplied.current = true;
     slLog("msg-streaming-data");
     perfMark("Recorder streaming-data.received");
     streamingDataReceivedAt.current = Date.now();
@@ -272,6 +362,10 @@ const Recorder = () => {
           if (response && response.data) {
             slLog("get-streaming-data-response-applied", { attempt });
             applyStreamingData(response.data);
+            return;
+          }
+          if (response?.error === "take-failed") {
+            slLog("get-streaming-data-refused", { attempt });
             return;
           }
           // No payload (e.g. older SW): fall back to the push; retry the
@@ -348,6 +442,9 @@ const Recorder = () => {
   const pending = useRef([]);
   const draining = useRef(false);
   const lowStorageAbort = useRef(false);
+  // A chunk write failed even after retries: later chunks would follow a hole.
+  const chunkWriteFailed = useRef(false);
+  const tailLostToastShown = useRef(false);
   const savedCount = useRef(0);
 
   const lastEstimateAt = useRef(0);
@@ -373,6 +470,8 @@ const Recorder = () => {
   const pausedStateRef = useRef(false);
   const pausedAtRef = useRef(null);
   const stopSignalSent = useRef(false);
+  // System-audio stop decided, storage read still pending.
+  const systemStopPendingRef = useRef(false);
   // True once a stop/restart/dismiss was initiated locally (by this tab).
   // The abandonment listener uses it to tell a real stop apart from the
   // background tearing the session down without telling this tab.
@@ -665,6 +764,8 @@ const Recorder = () => {
   };
 
   const persistSessionState = async (status = "recording") => {
+    // A newer take owns this key once it starts beside this one.
+    if (isSupersededTake()) return;
     try {
       await chrome.storage.local.set({
         freeRecorderSession: {
@@ -764,8 +865,23 @@ const Recorder = () => {
         0,
         now - recordingStartTime.current - basePaused - extraPaused,
       );
+      lastElapsedMs.current = elapsed;
       chrome.storage.local.set({ recordingNow: now, recordingDuration: elapsed });
     }, 1000);
+  };
+
+  // Where this take's bytes live, sent with video-ready: if the SW takes it after
+  // the next Start click, it opens this take's editor from it.
+  const localTakeInfo = () => {
+    const ref = chunkBackendRef.current || chunkWriterBackend.current;
+    if (!ref?.backend) return null;
+    return {
+      backend: ref.backend,
+      fileName: ref.fileName || null,
+      slot: ref.backend === "opfs" ? null : getActiveSlot(),
+      recordingId: finalizeRecordingIdRef.current || null,
+      durationMs: lastElapsedMs.current || 0,
+    };
   };
 
   const stopRecordingTick = () => {
@@ -797,6 +913,59 @@ const Recorder = () => {
     return true;
   };
 
+  const putChunkWithRetry = (i, chunk, timestamp) =>
+    writeWithQuotaRetry(
+      () =>
+        chunksStore.setItem(`chunk_${i}`, {
+          index: i,
+          chunk,
+          timestamp,
+          ...LOCAL_CHUNK_TAG,
+        }),
+      {
+        onRetry: ({ attempt, err }) =>
+          chrome.runtime
+            .sendMessage({
+              type: "diag-forward",
+              event: "recorder-chunk-write-retry",
+              data: {
+                attempt,
+                index: i,
+                bytes: chunk?.size ?? null,
+                err: String(err?.name || err).slice(0, 60),
+              },
+            })
+            .catch(() => {}),
+      },
+    );
+
+  // The take on disk now ends before what was captured. Said once, and the
+  // "everything is safe" toast is never the last word on it.
+  // With nothing saved the stop path reports "no recording data" itself.
+  const noteChunkLost = (i, bytes, err) => {
+    chunkWriteFailed.current = true;
+    if (tailLostToastShown.current) return;
+    tailLostToastShown.current = true;
+    if (savedCount.current > 0) {
+      chrome.runtime.sendMessage({
+        type: "show-toast",
+        message: chrome.i18n.getMessage(
+          isQuotaLikeError(err) ? "recordingTailLostToast" : "recordingWriterFailedToast",
+        ),
+        timeout: 10000,
+        // This take may still be capturing; the SW shows it once nothing records.
+        holdWhileRecording: true,
+      });
+    }
+    chrome.runtime
+      .sendMessage({
+        type: "diag-forward",
+        event: "recorder-chunk-write-lost",
+        data: { index: i, bytes, savedCount: savedCount.current },
+      })
+      .catch(() => {});
+  };
+
   async function saveChunk(e, i) {
     const ts = e.timecode ?? 0;
 
@@ -806,6 +975,8 @@ const Recorder = () => {
       return;
     }
 
+    // Stops the recording before the disk is full; this chunk is still written
+    // below, or the chunks the abort drain writes after it would follow a hole.
     if (!(await canFitChunk(e.data.size))) {
       debugWarn("Low storage, aborting recording");
       if (!lowStorageAbort.current) {
@@ -838,7 +1009,6 @@ const Recorder = () => {
         lowStorageAbortChunks: index.current,
       });
       requestStop("low-storage", { memoryError: true, savedChunks: savedCount.current });
-      return false;
     }
 
     try {
@@ -852,11 +1022,7 @@ const Recorder = () => {
         forced.name = "QuotaExceededError";
         throw forced;
       }
-      await chunksStore.setItem(`chunk_${i}`, {
-        index: i,
-        chunk: e.data,
-        timestamp: ts,
-      });
+      await putChunkWithRetry(i, e.data, ts);
       const heartbeatUpdate = { lastChunkAt: Date.now() };
       if (i === 0) heartbeatUpdate.firstChunkAt = Date.now();
       chrome.storage.local.set(heartbeatUpdate).catch(() => {});
@@ -875,13 +1041,7 @@ const Recorder = () => {
         name === "QuotaExceededError" ||
         msg.includes("quota") ||
         msg.includes("disk");
-      if (!lowStorageAbort.current) {
-        chrome.runtime.sendMessage({
-          type: "show-toast",
-          message: chrome.i18n.getMessage("toastStorageCritical"),
-          timeout: 8000,
-        });
-      }
+      noteChunkLost(i, e.data.size, err);
       lowStorageAbort.current = true;
       const stopReason = looksLikeQuotaError ? "low-storage" : "chunk-save-failed";
       chrome.storage.local.set({
@@ -927,21 +1087,18 @@ const Recorder = () => {
           // Bypass the 25MB headroom gate post-abort: chunks are <500KB so disk
           // usually accepts a few more, recovering the last 1-2s. Stop on first throw.
           let savedDuringAbort = 0;
-          while (pending.current.length) {
+          while (pending.current.length && !chunkWriteFailed.current) {
             const tail = pending.current.shift();
             pendingBytes.current -= tail.data.size;
+            const i = index.current;
             try {
-              const i = index.current;
-              await chunksStore.setItem(`chunk_${i}`, {
-                index: i,
-                chunk: tail.data,
-                timestamp: tail.timecode ?? 0,
-              });
+              await putChunkWithRetry(i, tail.data, tail.timecode ?? 0);
               index.current = i + 1;
               savedCount.current += 1;
               savedDuringAbort += 1;
             } catch (writeErr) {
               debugWarn("low-storage tail write failed, stopping drain", writeErr);
+              noteChunkLost(i, tail.data.size, writeErr);
               break;
             }
           }
@@ -975,20 +1132,20 @@ const Recorder = () => {
             lowStorageAbortChunks: index.current,
           });
           requestStop("low-storage", { memoryError: true, savedChunks: savedCount.current });
-          // Save the dequeued chunk as a tail; mirrors the abort branch above.
+          // Save the dequeued chunk as a tail, then let the abort branch above
+          // write what is still queued, so nothing queued is skipped over.
+          const i = index.current;
           try {
-            const i = index.current;
-            await chunksStore.setItem(`chunk_${i}`, {
-              index: i,
-              chunk: e.data,
-              timestamp: e.timecode ?? 0,
-            });
+            await putChunkWithRetry(i, e.data, e.timecode ?? 0);
             index.current = i + 1;
             savedCount.current += 1;
-          } catch {}
-          pending.current.length = 0;
-          pendingBytes.current = 0;
-          break;
+          } catch (tailErr) {
+            noteChunkLost(i, e.data.size, tailErr);
+            pending.current.length = 0;
+            pendingBytes.current = 0;
+            break;
+          }
+          continue;
         }
 
         const i = index.current;
@@ -1384,13 +1541,20 @@ const Recorder = () => {
     perfMark("Recorder.preflight.enter");
     markStartProgress("preflight-enter");
     const endChunksClear = perfSpan("Recorder.preflight chunksStore.clear");
+    let chunksClear;
     if (prewarmChunksClearRef.current) {
-      await prewarmChunksClearRef.current;
+      chunksClear = await prewarmChunksClearRef.current;
       prewarmChunksClearRef.current = null;
     } else {
-      await chunksStore.clear();
+      chunksClear = await guardedClear(chunksStore, loadActiveSlot);
     }
     endChunksClear();
+    if (chunksClear && chunksClear.cleared === false) {
+      refuseOnHeldTake(chunksClear);
+      stopTabKeepAlive();
+      isStarting.current = false;
+      return;
+    }
     debug("Cleared chunksStore");
 
     lastTimecode.current = 0;
@@ -1400,10 +1564,13 @@ const Recorder = () => {
     pending.current = [];
     draining.current = false;
     lowStorageAbort.current = false;
+    chunkWriteFailed.current = false;
+    tailLostToastShown.current = false;
     pendingBytes.current = 0;
     sentLast.current = false;
     isFinishing.current = false;
     stopSignalSent.current = false;
+    systemStopPendingRef.current = false;
     // Fresh recording (incl. restart, which reuses this tab): clear the
     // abandonment signals so a later teardown is detected correctly.
     localStopInitiated.current = false;
@@ -1766,6 +1933,8 @@ const Recorder = () => {
     let webcodecsWriteChain = Promise.resolve();
     let webcodecsWritesQueued = 0;
     let webcodecsWritesAbandoned = false;
+    // A write that failed for good: every later fragment would leave a hole.
+    let webcodecsWriteFailed = false;
     let webcodecsProgressDiagAt = Date.now();
 
     const handleChunk = async (data, timestampMs) => {
@@ -1773,7 +1942,9 @@ const Recorder = () => {
         return;
       }
       if (useWebCodecs.current) {
-        if (lowStorageAbort.current || webcodecsWritesAbandoned) return;
+        // After a low-storage stop the fragments still flushing are written
+        // anyway (the estimate keeps headroom); only a failed write ends them.
+        if (webcodecsWriteFailed || webcodecsWritesAbandoned) return;
 
         // fMP4 fragments stream in (~1MB each, coalesced upstream); concatenated
         // they form a valid fMP4 playable directly in <video> and re-muxable later.
@@ -1782,9 +1953,9 @@ const Recorder = () => {
 
         const ts = timestampMs ?? 0;
 
-        // Pre-flight quota: setItem throwing QuotaExceededError mid-write would
-        // silently drop subsequent fragments.
-        if (!(await canFitChunk(blob.size))) {
+        // Pre-flight quota: stop the recording before the disk is full. This
+        // fragment and the ones the stop flushes are still written below.
+        if (!lowStorageAbort.current && !(await canFitChunk(blob.size))) {
           if (!lowStorageAbort.current) {
             chrome.runtime.sendMessage({
               type: "show-toast",
@@ -1805,7 +1976,6 @@ const Recorder = () => {
             memoryError: true,
             savedChunks: savedCount.current,
           });
-          return;
         }
 
         try {
@@ -1823,19 +1993,20 @@ const Recorder = () => {
             throw forced;
           }
           const i = index.current;
-          if (chunkWriter.current) {
+          if (chunkWriter.current && chunkWriterBackend.current !== "idb") {
             await chunkWriter.current.write({
               chunk: blob,
               index: i,
               timestamp: ts,
             });
+          } else if (chunkWriter.current) {
+            const writer = chunkWriter.current;
+            await writeWithQuotaRetry(() =>
+              writer.write({ chunk: blob, index: i, timestamp: ts }),
+            );
           } else {
             // chooseWriter failed at start; write directly so data isn't lost.
-            await chunksStore.setItem(`chunk_${i}`, {
-              index: i,
-              chunk: blob,
-              timestamp: ts,
-            });
+            await putChunkWithRetry(i, blob, ts);
           }
 
           // First-fragment heartbeat + watchdog cancel keeps the SW stall detector quiet.
@@ -1863,13 +2034,15 @@ const Recorder = () => {
         } catch (err) {
           debugError("Failed to save WebCodecs chunk", err);
           // Stop recording but preserve what's on disk.
-          const name = err?.name || err?.errorName || "";
-          const msg = String(err?.message || err || "").toLowerCase();
-          const looksLikeQuotaError =
-            name === "QuotaExceededError" ||
-            msg.includes("quota") ||
-            msg.includes("disk");
+          const looksLikeQuotaError = isQuotaLikeError(err);
           const isOpfsWriterDead = err?.code === "opfs-writer-failed";
+          if (looksLikeQuotaError || isOpfsWriterDead) webcodecsWriteFailed = true;
+
+          // Retries are spent: this fragment is gone, so what was saved is a
+          // shorter take. Said once, and never "everything is safe".
+          if (looksLikeQuotaError && !isOpfsWriterDead) {
+            noteChunkLost(index.current, blob.size, err);
+          }
 
           if ((looksLikeQuotaError || isOpfsWriterDead) && !lowStorageAbort.current) {
             // Keep the OPFS ref: the partial MP4 is still readable.
@@ -1887,14 +2060,14 @@ const Recorder = () => {
                 ]);
               } catch {}
             }
-            const toastMessage = isOpfsWriterDead
-              ? chrome.i18n.getMessage("recordingWriterFailedToast")
-              : chrome.i18n.getMessage("toastStorageCritical");
-            chrome.runtime.sendMessage({
-              type: "show-toast",
-              message: toastMessage,
-              timeout: 8000,
-            });
+            // A quota failure already said the take lost its end, above.
+            if (isOpfsWriterDead) {
+              chrome.runtime.sendMessage({
+                type: "show-toast",
+                message: chrome.i18n.getMessage("recordingWriterFailedToast"),
+                timeout: 8000,
+              });
+            }
             lowStorageAbort.current = true;
             chrome.storage.local.set({
               recording: false,
@@ -1914,7 +2087,8 @@ const Recorder = () => {
         return;
       }
 
-      if (lowStorageAbort.current) return;
+      // Only a failed write ends queuing, so nothing follows a hole.
+      if (chunkWriteFailed.current) return;
 
       const blob =
         data instanceof Blob ? data : new Blob([data], { type: "video/mp4" });
@@ -2231,7 +2405,11 @@ const Recorder = () => {
             if (!sentLast.current) {
               sentLast.current = true;
               isFinishing.current = false;
-              chrome.runtime.sendMessage({ type: "video-ready" });
+              chrome.runtime.sendMessage({
+  type: "video-ready",
+  recordingAttemptId: takeAttemptIdRef.current,
+  localTake: localTakeInfo(),
+});
             }
             (async () => {
               let validation = null;
@@ -2274,21 +2452,7 @@ const Recorder = () => {
                   validation,
                 });
               } catch (err) {
-                const isRebuildTimeout = String(err?.message || err).includes(
-                  "rebuild-timeout",
-                );
-                // Timeout means slow reassembly (multi-GB take in a throttled
-                // tab), not a bad recording, and it already shipped. Mark it
-                // inconclusive so it neither fails the take nor penalizes fast.
-                validation = {
-                  ok: false,
-                  hardFail: !isRebuildTimeout,
-                  inconclusive: isRebuildTimeout,
-                  reasons: [
-                    isRebuildTimeout ? "rebuild-timeout" : "validation-exception",
-                  ],
-                  details: { error: String(err) },
-                };
+                validation = validationFromException(err);
               }
               endValidate({ ok: !!(validation && validation.ok) });
               // Done marker. A start with no done now pins a hang past the
@@ -2310,7 +2474,7 @@ const Recorder = () => {
                   },
                 })
                 .catch(() => {});
-              if (validation && !validation.ok && !validation.inconclusive) {
+              if (shouldStickyDisableOnValidation(validation)) {
                 await markFastRecorderFailure("validation-failed", validation);
                 await chrome.storage.local.set({
                   lastWebCodecsFailureAt: Date.now(),
@@ -2837,7 +3001,11 @@ const Recorder = () => {
             perfMark("Recorder video-ready.sent", {
               savedCount: savedCount.current,
             });
-            chrome.runtime.sendMessage({ type: "video-ready" });
+            chrome.runtime.sendMessage({
+  type: "video-ready",
+  recordingAttemptId: takeAttemptIdRef.current,
+  localTake: localTakeInfo(),
+});
           }
         };
 
@@ -2922,79 +3090,18 @@ const Recorder = () => {
     });
     isStarting.current = false;
     isRecording.current = true;
+    noticeAttempt.release();
     startSessionHeartbeat();
     startRecordingTick();
     persistSessionState("recording");
 
-    if (helperAudioStream.current) {
-      const track = helperAudioStream.current.getAudioTracks()[0];
-      if (track) {
-        // Mute fires when OS/driver silences the mic without ending the track
-        // (macOS DND, privacy revoke, BT disconnect): surface to avoid silent recordings.
-        track.onmute = () => {
-          if (isFinishing.current || !isRecording.current) return;
-          console.warn("[Recorder] mic track muted (device may have switched)");
-          try {
-            chrome.runtime.sendMessage({
-              type: "diag-forward",
-              event: "recorder-mic-track-muted",
-              data: {
-                trackLabel: String(track.label || "").slice(0, 80),
-                trackReadyState: track.readyState,
-              },
-            });
-          } catch {}
-        };
-        track.onunmute = () => {
-          try {
-            chrome.runtime.sendMessage({
-              type: "diag-forward",
-              event: "recorder-mic-track-unmuted",
-            });
-          } catch {}
-        };
-        track.onended = () => {
-          if (isFinishing.current || !isRecording.current) return;
-          const recordingDuration = recordingStartTime.current
-            ? Date.now() - recordingStartTime.current
-            : null;
-          // Below 30s the salvage prompt would over-promise (Continuity Mic
-          // often drops 10-20s in); reuse the generic stream-error copy.
-          const SALVAGE_THRESHOLD_MS = 30000;
-          const isShort =
-            !recordingDuration || recordingDuration < SALVAGE_THRESHOLD_MS;
-          const trackLabel = String(track?.label || "");
-          const isLikelyContinuityMic = /\biphone\b/i.test(trackLabel);
-          const diagnosticInfo = {
-            reason: "audio-track-ended",
-            ts: Date.now(),
-            savedChunks: savedCount.current,
-            lastTimecode: lastTimecode.current,
-            recordingDuration,
-            trackLabel: track?.label || null,
-            trackReadyState: track?.readyState || null,
-            isLikelyContinuityMic,
-            salvageOffered: !isShort,
-          };
-          console.warn(
-            "[Recorder] Audio track ended unexpectedly",
-            diagnosticInfo,
-          );
-          chrome.runtime.sendMessage({
-            type: "recording-error",
-            error: "stream-ended",
-            why: chrome.i18n.getMessage(
-              isShort
-                ? "streamErrorModalDescription"
-                : "audioTrackEndedToast",
-            ),
-          }).catch(() => {});
-          chrome.storage.local.set({
-            recording: false,
-            lastTrackEndEvent: diagnosticInfo,
-          });
-          requestStop("audio-track-ended");
-        };
+    const startMicTrack = helperAudioStream.current?.getAudioTracks?.()[0];
+    if (startMicTrack) {
+      attachMicTrackHandlers(startMicTrack);
+      // Restart keeps the old streams; a mic that ended in between would
+      // never fire onended again, leaving the new take voiceless.
+      if (startMicTrack.readyState === "ended") {
+        handleMicTrackEnded(startMicTrack);
       }
     }
 
@@ -3251,7 +3358,7 @@ const Recorder = () => {
     // Kick off the IDB clear in the background so startRecording's await
     // resolves immediately. Safe to re-run if it doesn't actually fire.
     if (!prewarmChunksClearRef.current) {
-      prewarmChunksClearRef.current = chunksStore.clear().catch(() => {});
+      prewarmChunksClearRef.current = guardedClear(chunksStore, loadActiveSlot).catch(() => null);
     }
     // Pre-open the OPFS writer in parallel. Default-on path: WebCodecs +
     // OPFS. If startRecording's preflight ends up wanting IDB instead, the
@@ -3332,9 +3439,14 @@ const Recorder = () => {
 
   const updateFreeFinalizeStatus = async (stage, percent = 0, error = null) => {
     try {
-      const { fastRecorderActiveRecordingId } = await chrome.storage.local.get([
-        "fastRecorderActiveRecordingId",
-      ]);
+      // Read once per stop: the next take, started beside this one while it
+      // finishes, replaces the live id.
+      if (!finalizeRecordingIdRef.current) {
+        const { fastRecorderActiveRecordingId: liveId } =
+          await chrome.storage.local.get(["fastRecorderActiveRecordingId"]);
+        finalizeRecordingIdRef.current = liveId || null;
+      }
+      const fastRecorderActiveRecordingId = finalizeRecordingIdRef.current;
       if (!fastRecorderActiveRecordingId) return;
       const key = `freeFinalizeStatus:${fastRecorderActiveRecordingId}`;
       const existing = await chrome.storage.local.get([key]);
@@ -3388,10 +3500,18 @@ const Recorder = () => {
       savedCount: savedCount.current,
     });
     debug("stopRecording()");
+    reportTakeStop({
+      attemptId: takeAttemptIdRef.current,
+      micStream: helperAudioStream.current,
+      captureStream: helperVideoStream.current,
+    });
     // Stop preempts any pending start gate.
     resetGateState();
     isFinishing.current = true;
+    noticeAttempt.freeze();
     isRecording.current = false;
+    finalizeRecordingIdRef.current = null;
+    markTakeFinishing();
     // Don't block stop() on telemetry IPCs; diag showed 9.5s of
     // sequential awaits under contention, delaying editor-open.
     void updateFreeFinalizeStatus("stopping", 0);
@@ -3449,7 +3569,11 @@ const Recorder = () => {
             });
             return;
           }
-          chrome.runtime.sendMessage({ type: "video-ready" });
+          chrome.runtime.sendMessage({
+  type: "video-ready",
+  recordingAttemptId: takeAttemptIdRef.current,
+  localTake: localTakeInfo(),
+});
         }, 15000);
       }
     } catch (err) {
@@ -3468,7 +3592,30 @@ const Recorder = () => {
 
     stopTabKeepAlive();
 
-    persistSessionState("completed");
+    // "completed" lets the next take start beside this one, so video-ready must be
+    // out first or the SW skips the editor. MediaRecorder sends it from onstop,
+    // which can land after the drain. The next take's start cleans local storage
+    // around this one until its editor holds it.
+    for (let i = 0; i < 60 && !sentLast.current && !isRestarting.current; i++) {
+      await new Promise((r) => setTimeout(r, 250));
+    }
+    const takeId = currentTakeId();
+    const backendRef = chunkBackendRef.current || chunkWriterBackend.current;
+    if (takeId && backendRef?.backend) {
+      try {
+        await chrome.storage.local.set({
+          [finishingLocalTakeKey(takeId)]: {
+            takeId,
+            backend: backendRef.backend,
+            fileName: backendRef.fileName || null,
+            slot: backendRef.backend === "opfs" ? null : getActiveSlot(),
+            at: Date.now(),
+          },
+        });
+      } catch {}
+    }
+
+    await persistSessionState("completed");
 
     if (!isRestarting.current) {
       debug("Stopping tracks and clearing streams");
@@ -3586,6 +3733,7 @@ const Recorder = () => {
     sentLast.current = false;
     isFinishing.current = false;
     stopSignalSent.current = false;
+    systemStopPendingRef.current = false;
     pausedStateRef.current = false;
 
     try {
@@ -3646,7 +3794,7 @@ const Recorder = () => {
     savedCount.current = 0;
     lastSize.current = 0;
     lastTimecode.current = 0;
-    await chunksStore.clear();
+    await guardedClear(chunksStore, loadActiveSlot);
     await setRecordingTimingState({
       recording: false,
       paused: false,
@@ -3675,7 +3823,269 @@ const Recorder = () => {
     return acquireMicStream(id, {
       bailOnNone: true,
       bluetoothDiag: true,
-      logger: { debug, warn: debugWarn },
+      logger: {
+        debug,
+        warn: (msg, err) => {
+          noteRecordingSignals({ micErrorName: err });
+          debugWarn(msg, err);
+        },
+      },
+    });
+  }
+
+  function attachMicTrackHandlers(track) {
+    // Mute fires when OS/driver silences the mic without ending the track
+    // (macOS DND, privacy revoke, BT disconnect): surface to avoid silent recordings.
+    track.onmute = () => {
+      if (isFinishing.current || !isRecording.current) return;
+      console.warn("[Recorder] mic track muted (device may have switched)");
+      try {
+        chrome.runtime.sendMessage({
+          type: "diag-forward",
+          event: "recorder-mic-track-muted",
+          data: {
+            trackLabel: String(track.label || "").slice(0, 80),
+            trackReadyState: track.readyState,
+          },
+        });
+      } catch {}
+    };
+    track.onunmute = () => {
+      try {
+        chrome.runtime.sendMessage({
+          type: "diag-forward",
+          event: "recorder-mic-track-unmuted",
+        });
+      } catch {}
+    };
+    track.onended = () => {
+      handleMicTrackEnded(track);
+    };
+  }
+
+  // Chrome on Windows can end a mic that is still there (offscreen host, ~4 min
+  // in, screenity#324). Reconnect the same device first (see utils/micReacquire.js,
+  // shared with Region); only a mic that can't come back stops the take. The cap
+  // is a rate, since Chrome keeps ending the same mic every few minutes.
+  const micReacquireCount = useRef({ generation: -1, count: 0, recent: [] });
+
+  async function handleMicTrackEnded(track) {
+    if (isFinishing.current || !isRecording.current) return;
+    // A replaced track can still fire late; only the live one counts.
+    if (helperAudioStream.current?.getAudioTracks?.()[0] !== track) return;
+    // A take with no audio track never recorded this mic (switched on mid-take,
+    // or kept across a restart), so its ending must not stop the take.
+    if (!liveStream.current?.getAudioTracks?.().length) return;
+    const generation = recordingGeneration.current;
+    const endedAt = Date.now();
+    const recordingDuration = recordingStartTime.current
+      ? endedAt - recordingStartTime.current
+      : null;
+    const trackLabel = String(track?.label || "");
+    const diagnosticInfo = {
+      reason: "audio-track-ended",
+      ts: endedAt,
+      savedChunks: savedCount.current,
+      lastTimecode: lastTimecode.current,
+      recordingDuration,
+      trackLabel: track?.label || null,
+      trackReadyState: track?.readyState || null,
+      isLikelyContinuityMic: /\biphone\b/i.test(trackLabel),
+      audioContextState: aCtx.current?.state ?? null,
+      docVisibility:
+        typeof document !== "undefined" ? document.visibilityState : null,
+    };
+    console.warn("[Recorder] Mic track ended, reconnecting", diagnosticInfo);
+    try {
+      chrome.runtime.sendMessage({
+        type: "diag-forward",
+        event: "recorder-mic-track-ended",
+        data: { ...diagnosticInfo, trackLabel: trackLabel.slice(0, 80) },
+      });
+    } catch {}
+    // Read before the reconnect wait so the time is when the mic dropped.
+    let elapsedMs = null;
+    try {
+      const pauseState = await chrome.storage.local.get([
+        "totalPausedMs",
+        "pausedAt",
+        "paused",
+      ]);
+      elapsedMs = computeMicDropElapsedMs({
+        endedAt,
+        startedAt: recordingStartTime.current,
+        ...pauseState,
+      });
+    } catch {}
+    // A user stop during the window still needs the editor note.
+    chrome.storage.local.set({
+      lastTrackEndEvent: buildMicDropInWindowEvent({
+        info: diagnosticInfo,
+        elapsedMs,
+      }),
+    });
+
+    const budget = micReacquireCount.current;
+    if (budget.generation !== generation) {
+      budget.generation = generation;
+      budget.count = 0;
+      budget.recent = [];
+    }
+    budget.count += 1;
+    budget.recent = budget.recent.filter(
+      (t) => endedAt - t < MIC_REACQUIRE_RATE_WINDOW_MS,
+    );
+    budget.recent.push(endedAt);
+    const outcome =
+      budget.recent.length <= MIC_REACQUIRE_MAX_PER_WINDOW
+        ? await reacquireMic(generation, trackLabel, endedAt).catch((err) => {
+            debugWarn("reacquireMic failed", err);
+            return {
+              ok: false,
+              attempts: 0,
+              reason: "error",
+              gapMs: Date.now() - endedAt,
+            };
+          })
+        : {
+            ok: false,
+            attempts: 0,
+            reason: "rate-cap",
+            gapMs: Date.now() - endedAt,
+          };
+    const { ok, attempts } = outcome;
+    // Recovered: the take is intact, so the note must not show even if the user
+    // stops right after. Skip only when a different take owns the event now.
+    if (
+      shouldWriteMicRecoveredEvent({
+        ok,
+        generation,
+        currentGeneration: recordingGeneration.current,
+        stopSent: stopSignalSent.current || systemStopPendingRef.current,
+      })
+    ) {
+      chrome.storage.local.set({
+        lastTrackEndEvent: buildMicDropRecoveredEvent({ info: diagnosticInfo }),
+      });
+    }
+    if (
+      recordingGeneration.current !== generation ||
+      isFinishing.current ||
+      !isRecording.current
+    ) {
+      return;
+    }
+    try {
+      chrome.runtime.sendMessage({
+        type: "diag-forward",
+        event: "recorder-mic-reacquire",
+        data: {
+          ok,
+          attempts,
+          reacquireNumber: budget.count,
+          gapMs: Date.now() - endedAt,
+        },
+      });
+    } catch {}
+    if (ok) return;
+    try {
+      chrome.runtime.sendMessage({
+        type: "diag-forward",
+        event: "recorder-mic-window-stop",
+        data: {
+          reason: outcome.reason,
+          gapMs: outcome.gapMs,
+          attempts,
+          docVisibility:
+            typeof document !== "undefined" ? document.visibilityState : null,
+        },
+      });
+    } catch {}
+    // Mic is really gone: stop rather than carry on without the voice. No toast,
+    // tab capture records the content-script UI into the video. The editor shows
+    // the drop time from lastTrackEndEvent.
+    chrome.storage.local.set({
+      recording: false,
+      lastTrackEndEvent: {
+        ...diagnosticInfo,
+        source: "mic",
+        elapsedMs,
+        reacquireAttempts: attempts,
+      },
+    });
+    requestStop("audio-track-ended");
+  }
+
+  async function reacquireMic(generation, previousLabel, startedAt) {
+    const stale = () =>
+      recordingGeneration.current !== generation ||
+      isFinishing.current ||
+      !isRecording.current;
+    // The storage read counts against the window too: it can take many
+    // seconds in a throttled tab.
+    const stored = await Promise.race([
+      chrome.storage.local.get(["defaultAudioInput"]),
+      new Promise((r) =>
+        setTimeout(
+          () => r(null),
+          Math.max(0, startedAt + MIC_REACQUIRE_WINDOW_MS - Date.now()),
+        ),
+      ),
+    ]);
+    if (!stored) {
+      return {
+        ok: false,
+        attempts: 0,
+        reason: "deadline",
+        gapMs: Date.now() - startedAt,
+      };
+    }
+    const { defaultAudioInput } = stored;
+    return reacquireMicWindow({
+      startedAt,
+      deviceId: defaultAudioInput,
+      previousLabel,
+      // Same device only: startAudioStream falls back to the default mic, and
+      // an unplugged mic should still stop the take, not switch devices.
+      sameDevice: (newLabel) =>
+        isSameMicDevice({
+          deviceId: defaultAudioInput,
+          previousLabel,
+          newLabel,
+        }),
+      isStale: stale,
+      acquire: () => startAudioStream(defaultAudioInput),
+      acquireExact: () => acquireExactMic(defaultAudioInput),
+      wire: (stream, newTrack) => {
+        if (!aCtx.current || !destination.current) return false;
+        try {
+          audioInputSource.current?.disconnect();
+        } catch {}
+        try {
+          const micSource = aCtx.current.createMediaStreamSource(
+            new MediaStream([newTrack]),
+          );
+          // The gain node carries the user's mic toggle, so reuse it.
+          if (!audioInputGain.current) {
+            audioInputGain.current = aCtx.current.createGain();
+            audioInputGain.current.connect(destination.current);
+          }
+          micSource.connect(audioInputGain.current);
+          audioInputSource.current = micSource;
+        } catch (err) {
+          // Wiring failed: don't hold a mic that isn't in the mix.
+          debugWarn("reacquireMic: wiring failed", err);
+          return false;
+        }
+        helperAudioStream.current = stream;
+        attachMicTrackHandlers(newTrack);
+        try {
+          replaceProbe(silenceWatchdogRef.current?.probes, "mic", () =>
+            createSourceProbe(aCtx.current, newTrack),
+          );
+        } catch {}
+        return true;
+      },
     });
   }
 
@@ -3748,6 +4158,12 @@ const Recorder = () => {
       );
       audioInputGain.current = aCtx.current.createGain();
       micSource.connect(audioInputGain.current).connect(destination.current);
+      audioInputSource.current = micSource;
+      // A take that started with no audio track never records this mic, so its
+      // ending must not stop the take.
+      if (liveStream.current?.getAudioTracks?.().length > 0) {
+        attachMicTrackHandlers(acquired.getAudioTracks()[0]);
+      }
     } finally {
       isLazyAcquiringMic.current = false;
     }
@@ -3756,7 +4172,9 @@ const Recorder = () => {
   async function startStream(data, id, options, permissions, permissions2, streamOpts = {}) {
     const useDisplayMedia = !!streamOpts.useDisplayMedia;
     let captureAudioDropped = false;
+    resetRecordingSignals();
     const reportCaptureAudioUnavailable = (err, extra) => {
+      noteRecordingSignals({ captureAudioDropped: true });
       slLog("capture-audio-unavailable", { ...extra });
       try {
         chrome.runtime.sendMessage({
@@ -4315,6 +4733,80 @@ const Recorder = () => {
       mixedAudioConnected = true;
       // Symmetric with mic onended: detect dead system/tab audio mid-recording
       // (closed tab, OS mute, BT disconnect) instead of silently capturing dead audio.
+      let sysEndGeneration = 0;
+      let sysEndedAt = 0;
+      let sysPauseState = null;
+      const sysEndGate = createSystemAudioEndGate({
+        isStale: () =>
+          recordingGeneration.current !== sysEndGeneration ||
+          isFinishing.current ||
+          !isRecording.current ||
+          stopSignalSent.current,
+        isVideoEnded: () =>
+          [helperVideoStream.current, liveStream.current].some((s) =>
+            s?.getVideoTracks?.().some((t) => t.readyState === "ended"),
+          ),
+        onSkip: (why) => {
+          try {
+            chrome.runtime.sendMessage({
+              type: "diag-forward",
+              event: "recorder-system-audio-stop-skipped",
+              data: { why },
+            });
+          } catch {}
+        },
+        onStop: async () => {
+          const generation = sysEndGeneration;
+          const endedAt = sysEndedAt;
+          let pauseState = {};
+          try {
+            pauseState = (await sysPauseState) || {};
+          } catch {}
+          // The take may have ended while the storage read was pending.
+          if (
+            recordingGeneration.current !== generation ||
+            isFinishing.current ||
+            !isRecording.current ||
+            stopSignalSent.current
+          ) {
+            return;
+          }
+          const elapsedMs = computeMicDropElapsedMs({
+            endedAt,
+            startedAt: recordingStartTime.current,
+            ...pauseState,
+          });
+          // Pending from here: a mic reconnect finishing during the read below
+          // must not write a recovered event this stop would then overwrite.
+          systemStopPendingRef.current = true;
+          let existing = null;
+          try {
+            existing = (await chrome.storage.local.get(["lastTrackEndEvent"]))
+              .lastTrackEndEvent;
+          } catch {}
+          if (
+            recordingGeneration.current !== generation ||
+            isFinishing.current ||
+            !isRecording.current ||
+            stopSignalSent.current
+          ) {
+            systemStopPendingRef.current = false;
+            return;
+          }
+          chrome.storage.local.set({
+            recording: false,
+            lastTrackEndEvent: resolveSystemAudioDropEvent({
+              existing,
+              next: buildSystemAudioDropEvent({
+                info: { trackLabel: String(sysTrack.label || "").slice(0, 80) },
+                ts: endedAt,
+                elapsedMs,
+              }),
+            }),
+          });
+          requestStop(SYSTEM_AUDIO_STOP_REASON);
+        },
+      });
       sysTrack.onended = () => {
         if (isFinishing.current || !isRecording.current) return;
         const info = {
@@ -4333,13 +4825,16 @@ const Recorder = () => {
             data: info,
           });
         } catch {}
-        chrome.storage.local.set({ lastTrackEndEvent: info });
-        // Don't kill recording: video/mic may still be capturing.
-        chrome.runtime.sendMessage({
-          type: "show-toast",
-          message: chrome.i18n.getMessage("audioTrackEndedToast"),
-          timeout: 8000,
-        }).catch(() => {});
+        // No lastTrackEndEvent write here: it would erase an earlier mic drop
+        // even when no stop follows. The stop decision writes it.
+        // Stop after a short settle unless the video ended too (a closing tab
+        // ends both; the video path owns that). No toast: burned into tab capture.
+        sysEndGeneration = recordingGeneration.current;
+        sysEndedAt = Date.now();
+        sysPauseState = chrome.storage.local
+          .get(["totalPausedMs", "pausedAt", "paused"])
+          .catch(() => ({}));
+        sysEndGate.arm();
       };
       sysTrack.onmute = () => {
         if (isFinishing.current || !isRecording.current) return;
@@ -4378,6 +4873,7 @@ const Recorder = () => {
       audioInputGain.current = aCtx.current.createGain();
       micSource.connect(audioInputGain.current).connect(destination.current);
       mixedAudioConnected = true;
+      audioInputSource.current = micSource;
       // Gate via gain so the user can toggle the mic mid-recording without re-acquiring it.
       if (!data.micActive) {
         audioInputGain.current.gain.value = 0;
@@ -4417,6 +4913,7 @@ const Recorder = () => {
         const analyser = aCtx.current.createAnalyser();
         analyser.fftSize = 1024;
         const buf = new Uint8Array(analyser.frequencyBinCount);
+        noteRecordingSignals({ silentStretchCount: 0 });
         // Parallel tap: analyser doesn't connect back, so the output graph is unaffected.
         destination.current.stream
           .getAudioTracks()
@@ -4466,6 +4963,7 @@ const Recorder = () => {
             silentSamples += 1;
             if (silentSamples >= SAMPLES_BEFORE_ALERT && !alreadyReported) {
               alreadyReported = true;
+              bumpRecordingSignal("silentStretchCount");
               const hasMic = !!helperAudioStream.current?.getAudioTracks?.()
                 ?.length;
               const hasSystemAudio = sysTracks.length > 0 && data.systemAudio;
@@ -4549,6 +5047,17 @@ const Recorder = () => {
     debug("liveStream ready", {
       videoTracks: liveStream.current.getVideoTracks().length,
       audioTracks: liveStream.current.getAudioTracks().length,
+    });
+    reportTakeStart({
+      micChosen: data.micActive === true,
+      micDeviceId: data.defaultAudioInput,
+      micPermission: permissions2?.state,
+      micStream: helperAudioStream.current,
+      captureStream: helperVideoStream.current,
+      systemAudio: data.systemAudio === true,
+      recordedStream: liveStream.current,
+      requestedFps: fps,
+      requestedHeight: height,
     });
 
     setStarted(true);
@@ -4678,6 +5187,9 @@ const Recorder = () => {
     });
 
     try {
+      // `loaded` carries isTab/tabID but can be lost to the cold-start race;
+      // the pulled payload carries the tab id too, so start the mint from it.
+      ensureTabMint(data);
       if (data.recordingType === "camera") {
         debug("Streaming camera recording");
         startStream(data, null, null, permissions, permissions2);
@@ -4807,7 +5319,7 @@ const Recorder = () => {
   // few times with backoff; a permanent failure (no API) breaks out at once.
   const ENABLE_TAB_STREAM_MINT_RETRY = true;
 
-  const getStreamID = async (id) => {
+  const mintTabStreamId = async (id) => {
     perfMark("Recorder getStreamID.enter", { tabId: id });
     debug("getStreamID()", id);
     tabIDError.current = null;
@@ -4884,10 +5396,24 @@ const Recorder = () => {
       chrome.storage.local.set({
         lastTabStreamMintMs: Date.now() - mintStartedAt,
         lastTabStreamMintOk: Boolean(tabID.current),
+        lastTabStreamMintErr: tabID.current
+          ? null
+          : String(tabIDError.current || "").slice(0, 120),
         lastTabStreamMintOffscreen: IS_OFFSCREEN_HOST,
       });
     } catch {}
   };
+
+  // Shared by the `loaded` handler and the streaming-data fallback so a late
+  // `loaded` never starts a second mint beside one already running.
+  const mintGuard = useRef(null);
+  if (!mintGuard.current) {
+    mintGuard.current = createMintGuard(
+      (id) => mintTabStreamId(id),
+      () => Boolean(tabID.current),
+    );
+  }
+  const getStreamID = (id) => mintGuard.current.run(id);
 
   // chromeMediaSource constraints have no "no padding" knob: any combo
   // (including no width/height) still produces the 1920x1080 padded box.
@@ -4921,6 +5447,25 @@ const Recorder = () => {
     } catch (err) {
       debugWarn("getRecordedTabViewport failed", err);
       return null;
+    }
+  };
+
+  const ensureTabMint = (data) => {
+    const plan = resolveTabCaptureFallback({
+      isTab: isTab.current,
+      tabPreferred: tabPreferred.current,
+      hasStreamId: Boolean(tabID.current),
+      minting: mintGuard.current.isInFlight(),
+      tabCaptureTabId: data?.tabCaptureTabId,
+    });
+    if (!plan.tabId) return;
+    isTab.current = plan.isTab;
+    if (recordedTabId.current == null) recordedTabId.current = plan.tabId;
+    if (plan.shouldMint) {
+      slLog("tab-stream-mint-from-streaming-data");
+      getStreamID(plan.tabId).catch((err) => {
+        tabIDError.current = String(err?.message || err);
+      });
     }
   };
 
@@ -5010,6 +5555,9 @@ const Recorder = () => {
         isTab.current = false;
         recordedTabId.current = null;
       }
+      // Confirm delivery (synchronously) so BG's retry loop stops; only
+      // sendResponse counts as a reply there.
+      try { sendResponse?.({ ok: true }); } catch {}
       // streaming-data is pulled on mount (see the mount effect), not
       // here; `loaded` can be lost to the cold-start race and must not
       // be the sole trigger for the pull.
@@ -5017,7 +5565,10 @@ const Recorder = () => {
       // Push path; the pull response usually wins. applyStreamingData
       // dedupes whichever arrives second.
       applyStreamingData(request.data);
+      try { sendResponse?.({ ok: true }); } catch {}
     } else if (request.type === "start-recording-tab") {
+      takeAttemptIdRef.current = request.recordingAttemptId || null;
+      noteTakeAttempt(takeAttemptIdRef.current);
       slLog("msg-start-recording-tab", {
         hasStream: !!helperVideoStream.current,
         streamReady: getStreamReadiness(),
@@ -5105,6 +5656,7 @@ const Recorder = () => {
       return true;
     } else if (request.type === "stop-recording-tab") {
       perfMark("Recorder stop-recording-tab.received");
+      chrome.runtime.sendMessage({ type: "recorder-stop-received" }).catch(() => {});
       stopRecording();
       sendResponse?.({ ok: true });
       return true;

@@ -91,6 +91,8 @@ export const readDevice = (nav = globalThis.navigator) => ({
 export const flattenPerfStats = ({ device, fps, longTask, encodeHardware, tier, targetFps }) => ({
   hardwareConcurrency: device?.hardwareConcurrency ?? null,
   deviceMemoryGb: device?.deviceMemoryGb ?? null,
+  cpuArch: device?.cpuArch ?? null,
+  onBattery: device?.onBattery ?? null,
   encodeHardware: encodeHardware ?? null,
   longTaskCount: longTask?.count ?? null,
   longTaskMaxMs: longTask?.maxMs ?? null,

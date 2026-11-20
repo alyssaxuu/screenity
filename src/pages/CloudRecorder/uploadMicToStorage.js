@@ -45,6 +45,52 @@ export const collectMicChunks = async (store, prefix = "audio_chunk_") => {
   return parts.map((p) => p.chunk);
 };
 
+// The shared IDB audio store holds whichever take wrote it last, each chunk tagged with its session.
+// A debt may only send its own: other takes' chunks are their voice, and `foreign` says the store must
+// not be cleared on this debt's account. Untagged chunks are a legacy store's, taken only when nothing
+// is tagged; with no sessionId every chunk is taken as before.
+// The tags a marker's own chunks can carry: the store's id, the recorder session, and (for a marker
+// written without it) the id of the snapshot whose store this is.
+export const ownChunkTags = (marker, all = {}) => {
+  const tags = new Set();
+  if (marker?.sessionId) tags.add(marker.sessionId);
+  if (marker?.chunkTagId) tags.add(marker.chunkTagId);
+  if (marker?.sessionId) {
+    for (const [k, v] of Object.entries(all || {})) {
+      if (k.startsWith("cloudRecorderSession:") && v?.opfsSessionId === marker.sessionId && v.id) {
+        tags.add(v.id);
+      }
+    }
+  }
+  return [...tags];
+};
+
+export const collectMicChunksFor = async (
+  store,
+  sessionIds,
+  prefix = "audio_chunk_"
+) => {
+  const parts = [];
+  await store.iterate((value, key) => {
+    if (!key.startsWith(prefix)) return;
+    if (!value?.chunk) return;
+    parts.push({
+      index: Number(value.index),
+      chunk: value.chunk,
+      tag: typeof value.sessionId === "string" ? value.sessionId : null,
+    });
+  });
+  parts.sort((a, b) => a.index - b.index);
+  const ids = new Set([].concat(sessionIds || []).filter(Boolean));
+  if (!ids.size) return { chunks: parts.map((p) => p.chunk), foreign: false };
+  const anyTagged = parts.some((p) => p.tag);
+  const own = parts.filter((p) => (anyTagged ? ids.has(p.tag) : true));
+  return {
+    chunks: own.map((p) => p.chunk),
+    foreign: parts.some((p) => p.tag && !ids.has(p.tag)),
+  };
+};
+
 /**
  * POST the mic recording to Bunny Storage and return its media doc. Resolves
  * { ok: false, reason } rather than throwing: the mic is supplementary and must
@@ -154,8 +200,12 @@ export const attachSceneAudio = async ({
     if (!res.ok) {
       return { ok: false, reason: `http-${res.status}`, status: res.status };
     }
-    // attached:false is a settled answer, not a failure to retry.
-    return { ok: true, attached: body?.attached !== false, reason: body?.reason };
+    // attached:false with a reason (already-set, scene-missing, ...) means this media is NOT
+    // on the scene, so keep the chunks. No reason: the scene already holds this media, settled.
+    if (body?.attached === false && body?.reason) {
+      return { ok: false, reason: String(body.reason) };
+    }
+    return { ok: true, attached: body?.attached !== false };
   } catch (err) {
     return { ok: false, reason: err?.message || String(err) };
   }

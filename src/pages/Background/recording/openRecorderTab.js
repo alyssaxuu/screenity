@@ -3,15 +3,24 @@ import { removeTab } from "../tabManagement/removeTab";
 import { sendMessageRecord } from "./sendMessageRecord.js";
 import { closeOffscreenDocumentWithFlush } from "../offscreen/closeOffscreenDocumentWithFlush";
 import { createCloudRecorderOffscreen } from "../offscreen/createCloudRecorderOffscreen.js";
+import {
+  readOffscreenContexts,
+  parkTakesForNextStart,
+  releaseHostActiveTake,
+} from "../offscreen/recorderHost.js";
 import { loginWithWebsite } from "../auth/loginWithWebsite.js";
 import { traceStep } from "../../utils/startFlowTrace.js";
 import { handleGetStreamingData } from "./recordingHelpers.js";
 import { perfMark, perfSpan } from "../../utils/perfMarks";
+import { pushWithRetry } from "./pushWithRetry";
 import { sweepRecorderTabs } from "./sweepRecorderTabs";
+import { claimedOverFor } from "./attemptLock";
 import { applyRetentionPlan } from "./recordingRetention";
 import {
   holdForPreviousRecorder,
   readPreviousRecorderState,
+  releaseWedgedTake,
+  leftoverProjectReset,
 } from "./previousRecorderGate";
 
 const openRecorderTab = async (
@@ -125,6 +134,9 @@ const openRecorderTab = async (
       wasRegion: false,
       clickEvents: [],
       recordingUiTabId: activeTab.id,
+      // Pulled with streaming-data so the recorder can start the tab mint even
+      // when the `loaded` push is acked by another frame first.
+      tabCaptureTabId: isTabCapture ? activeTab.id : null,
     });
     traceStep("recorderOffscreenCreated");
     perfMark("BG.openRecorderTab offscreen-loaded.send");
@@ -135,23 +147,16 @@ const openRecorderTab = async (
       ...(isTabCapture ? { isTab: true, tabID: activeTab.id } : {}),
     };
     // offscreen React app mounts its listener async, so early sends are lost; retry
-    (async () => {
-      const backoffMs = [0, 150, 300, 600, 1000, 1500, 2500];
-      for (let attempt = 0; attempt < backoffMs.length; attempt += 1) {
-        if (backoffMs[attempt] > 0) {
-          await new Promise((r) => setTimeout(r, backoffMs[attempt]));
-        }
-        try {
-          await sendMessageRecord(loadedMsg);
-          return;
-        } catch {
-          // offscreen recorder not ready yet; retry
-        }
+    pushWithRetry(
+      () => sendMessageRecord(loadedMsg),
+      [0, 150, 300, 600, 1000, 1500, 2500],
+    ).then((res) => {
+      if (!res.ok) {
+        console.warn(
+          "[Screenity][BG] offscreen recorder loaded-send exhausted retries",
+        );
       }
-      console.warn(
-        "[Screenity][BG] offscreen recorder loaded-send exhausted retries",
-      );
-    })();
+    });
     setTimeout(() => {
       handleGetStreamingData().catch(() => {});
     }, 300);
@@ -335,13 +340,6 @@ export const startRecorderSession = async (request, tabId = null) => {
     camera: Boolean(request?.camera),
   });
   console.log("[Screenity][startRecorderSession] entered", { request, tabId });
-  // Before the recorder page exists. It clears the chunk store as it warms up,
-  // and that clear reads this plan to know which slot is free.
-  try {
-    await applyRetentionPlan();
-  } catch (err) {
-    console.warn("[Screenity][BG] retention plan failed", err);
-  }
   const endTab = perfSpan("BG.startRecorderSession getCurrentTab");
   let activeTab = await getCurrentTab();
   endTab({ tabId: activeTab?.id || null });
@@ -363,45 +361,57 @@ export const startRecorderSession = async (request, tabId = null) => {
     chrome.storage.local.set({ tabPreferred: false });
   }
 
-  // Closing the offscreen doc below cuts off a take that is still finalizing,
-  // so hold for it and refuse this start rather than close it.
-  if (!request.customRegion) {
-    try {
-      const { useOffscreenCloud } = await chrome.storage.local.get([
-        "useOffscreenCloud",
-      ]);
-      if (useOffscreenCloud !== false) {
-        const toast = (message, timeout) =>
-          sendMessageTab(activeTab.id, {
-            type: "show-toast",
-            message,
-            timeout,
-          }).catch(() => {});
-        const gate = await holdForPreviousRecorder({
-          read: readPreviousRecorderState,
-          onHold: () =>
-            toast("Finishing your previous recording before starting.", 8000),
-        });
-        if (gate.refused) {
-          toast(
-            "Your previous recording is still uploading. Wait for it to finish, then start again.",
-            10000,
-          );
-          await chrome.storage.local.set({
-            lastStartAborted: {
-              ts: Date.now(),
-              waitedMs: gate.waitedMs,
-              reason: "previous-recording-finalizing",
-            },
-            recordingStartingAt: null,
-            pendingRecording: false,
+  // Takes run side by side in the host document, but never two captures: hold until the previous
+  // take releases its capture, moments after its Stop. No toast while holding, it would land in
+  // the new take's frames. Past the hold it is wedged: flush it and start anyway, rather than
+  // refusing every click until it goes stale.
+  try {
+    const gate = await holdForPreviousRecorder({
+      read: readPreviousRecorderState,
+    });
+    if (gate.refused) {
+      const takeId = await releaseWedgedTake({
+        readContexts: readOffscreenContexts,
+        readActiveTakeId: async () => {
+          const st = await chrome.storage.local.get([
+            "activeRecorderTakeId",
+            "claimedOverTakeId",
+          ]);
+          return claimedOverFor({
+            activeTakeId: st.activeRecorderTakeId,
+            claimedOverTakeId: st.claimedOverTakeId,
           });
-          return;
-        }
-      }
-    } catch (err) {
-      console.warn("[Screenity][BG] previous recorder gate failed", err);
+        },
+        flush: closeOffscreenDocumentWithFlush,
+      }).catch(() => null);
+      chrome.storage.local
+        .set({
+          lastStartPastWedgedTake: {
+            ts: Date.now(),
+            waitedMs: gate.waitedMs,
+            takeId,
+          },
+        })
+        .catch(() => {});
     }
+  } catch (err) {
+    console.warn("[Screenity][BG] previous recorder gate failed", err);
+  }
+  try {
+    const reset = leftoverProjectReset(
+      await chrome.storage.local.get(["projectId", "recordingToScene", "multiMode"]),
+    );
+    if (reset) await chrome.storage.local.set(reset);
+  } catch {}
+
+  // Before the recorder page exists, and after the gate: a take still
+  // stopping registers its chunks only as it releases its capture. The new
+  // page clears the chunk store as it warms up, and that clear reads this plan
+  // to know which slot is free.
+  try {
+    await applyRetentionPlan();
+  } catch (err) {
+    console.warn("[Screenity][BG] retention plan failed", err);
   }
 
   // The region recorder is already acquiring its stream and fires
@@ -417,9 +427,21 @@ export const startRecorderSession = async (request, tabId = null) => {
   }
 
   const endCloseOffscreen = perfSpan("BG.startRecorderSession closeOffscreenDocument");
-  // finalize any in-flight offscreen upload before teardown; a back-to-back
-  // start otherwise bare-closes the prior TUS finalize and loses it
-  await closeOffscreenDocumentWithFlush({ reason: "new-recording-start" });
+  // A host document keeps the previous takes running beside this one; only a
+  // take that is draining its backlog parks. Any other offscreen document
+  // (an older build's recorder) is flushed and closed as before.
+  const { host: hasHost } = await readOffscreenContexts();
+  if (hasHost) {
+    const { useOffscreenCloud: offscreenPref } = await chrome.storage.local.get([
+      "useOffscreenCloud",
+    ]);
+    if (request.customRegion || offscreenPref === false) {
+      await releaseHostActiveTake();
+    }
+    void parkTakesForNextStart().catch(() => {});
+  } else {
+    await closeOffscreenDocumentWithFlush({ reason: "new-recording-start" });
+  }
   endCloseOffscreen();
 
   if (request.region) {

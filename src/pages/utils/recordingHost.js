@@ -8,11 +8,22 @@ const isInjectedIframe = urlParams.has("injected");
 const isOffscreenUrl =
   hasWindow && window.location.pathname.endsWith("/offscreenrecorder.html");
 
+// A take frame inside the recorder host is an iframe of an extension page, but
+// not a content-script iframe; an empty referrer there must not say otherwise.
+export const isContentIframe = ({ injected, isTakeFrame, framed, referrer }) =>
+  Boolean(
+    injected ||
+      (!isTakeFrame && framed && !String(referrer || "").startsWith("chrome-extension://"))
+  );
+
 const isIframeUrl =
   hasWindow &&
-  (isInjectedIframe ||
-    (window.top !== window.self &&
-      !document.referrer.startsWith("chrome-extension://")));
+  isContentIframe({
+    injected: isInjectedIframe,
+    isTakeFrame: urlParams.has("take"),
+    framed: window.top !== window.self,
+    referrer: document.referrer,
+  });
 
 export const RECORDING_HOST = isOffscreenUrl
   ? "offscreen"

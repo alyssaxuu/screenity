@@ -952,7 +952,7 @@
     "description": "Not enough space title"
   },
   "notEnoughSpaceDescription": {
-    "message": "Screenity 需要至少 1GB 的空間才能錄製。請清出一些空間之後再試一次。",
+    "message": "Screenity 需要至少 500MB 的空間才能錄製。請清出一些空間之後再試一次。",
     "description": "Not enough space description"
   },
   "clearSpaceButton": {
@@ -1078,7 +1078,7 @@
     "description": "Record audio warning title"
   },
   "recordAudioWarningOtherDescription": {
-    "message": "如果您要錄製電腦音訊請確保您啟用「分享系統音訊」選項。如果您沒有看到這個選項，請嘗試更新 Chrome 或是改為使用分頁錄製。",
+    "message": "如果您要錄製電腦音訊請確保您啟用「分享系統音訊」選項。",
     "description": "Other audio warning description"
   },
   "qualityLabel": {
@@ -1194,11 +1194,23 @@
     "description": "Toast message shown when the user is in an existing project and ready to record a new scene"
   },
   "reachingRecordingLimitToast": {
-    "message": "錄製即將達到 90 分鐘上限，將會自動停止",
-    "description": "Toast message shown when the recording is reaching the 90 minute limit"
+    "message": "錄製即將達到 $MINUTES$ 分鐘上限，將會自動停止",
+    "placeholders": {
+      "minutes": {
+        "content": "$1",
+        "example": "120"
+      }
+    },
+    "description": "Toast message shown when the recording is reaching the recording length limit"
   },
   "recordingLimitReachedToast": {
-    "message": "已達 90 分鐘上限，錄製已停止",
+    "message": "已達 $MINUTES$ 分鐘上限，錄製已停止",
+    "placeholders": {
+      "minutes": {
+        "content": "$1",
+        "example": "120"
+      }
+    },
     "description": "Toast message shown when the recording limit is reached"
   },
   "tabRecordingDisabledToast": {
@@ -1604,7 +1616,7 @@
     "description": "Reset pro onboarding option label in popup settings menu"
   },
   "recoverLastRecordingOption": {
-    "message": "Recover last recording",
+    "message": "復原錄製",
     "description": "Settings menu item to manually trigger cloud recording recovery"
   },
   "toastRecoveredSession": {
@@ -1614,6 +1626,10 @@
   "toastStorageCritical": {
     "message": "磁碟空間不足，正在儲存錄製內容。已錄製的內容是安全的。",
     "description": "Toast shown when available storage drops below the critical threshold during recording; reassures that captured data is preserved"
+  },
+  "recordingTailLostToast": {
+    "message": "磁碟已滿，此錄製的結尾部分無法儲存。其餘部分會在編輯器中開啟。請在再次錄製前釋放空間。",
+    "description": "Toast when the last part of a recording could not be written to disk"
   },
   "toastStorageLow": {
     "message": "Storage is running low. Upload reliability may degrade for long recordings.",
@@ -1626,6 +1642,10 @@
   "toastNetworkOffline": {
     "message": "Network offline. Upload paused. Screen chunks are saved locally.",
     "description": "Toast shown when the browser goes offline during a cloud recording upload"
+  },
+  "toastLocalCopyIncomplete": {
+    "message": "本機備份已停止。如果上傳失敗，這段錄製的一部分將無法復原。",
+    "description": "Toast shown when the local copy of a cloud recording stops being saved because the disk keeps failing"
   },
   "longRecordingTitle": {
     "message": "長時間錄製",
@@ -1683,9 +1703,25 @@
     "message": "螢幕分享已停止，正在儲存錄製內容。已錄製的內容是安全的。",
     "description": "Toast shown when the video track ends mid-recording (e.g. monitor disconnected, screen share revoked)"
   },
-  "audioTrackEndedToast": {
-    "message": "音訊已中斷，正在儲存錄製內容。已錄製的影片是安全的。",
-    "description": "Toast shown when the audio track ends mid-recording (e.g. mic unplugged, permission revoked)"
+  "micDisconnectedNote": {
+    "message": "麥克風在 $TIME$ 中斷。之後的音訊遺失。",
+    "description": "Note shown in the editor when the microphone disconnected during the recording and could not be reconnected; $TIME$ is the recording time (m:ss) when it dropped",
+    "placeholders": {
+      "time": {
+        "content": "$1",
+        "example": "1:05"
+      }
+    }
+  },
+  "systemAudioDisconnectedNote": {
+    "message": "系統音訊在 $TIME$ 中斷。之後的音訊遺失。",
+    "description": "Note shown in the editor when the system or tab audio disconnected during the recording and the take was stopped; $TIME$ is the recording time (m:ss) when it dropped",
+    "placeholders": {
+      "time": {
+        "content": "$1",
+        "example": "1:05"
+      }
+    }
   },
   "captureAudioUnavailableToast": {
     "message": "無法擷取電腦音訊，因此這次錄製僅包含影像。",
@@ -2060,5 +2096,127 @@
   "sandboxEditorAudioPendingHint": {
     "message": "請先新增音訊檔案，再儲存變更。",
     "description": "Tooltip on the disabled save button in the audio editor until an audio file is added"
+  },
+  "emptyTakeNotSaved": {
+    "message": "沒有擷取到任何影片，所以無法儲存這段錄製。請再試一次。",
+    "description": "Error shown when a cloud recording ended with no video frames captured, so nothing could be saved"
+  },
+  "idbBlockedModalTitle": {
+    "message": "暫時無法開始錄製",
+    "description": "Modal title when an earlier recording is still stored in this browser"
+  },
+  "idbUploadingModalDescription": {
+    "message": "有一段錄製仍在上傳。請等它完成後再重新錄製。",
+    "description": "Modal text: earlier recording still uploading"
+  },
+  "idbHeldModalDescription": {
+    "message": "有一段錄製沒有上傳完成。請先在擴充功能選單中復原或捨棄它。",
+    "description": "Modal text: earlier recording needs recover or discard"
+  },
+  "emptyTakeModalTitle": {
+    "message": "錄製未儲存",
+    "description": "Modal title when a take captured no video"
+  },
+  "heldTakesTitle": {
+    "message": "儲存在這台電腦上的錄製",
+    "description": "Recovery page (download.html?held=1): page heading"
+  },
+  "heldTakesLoading": {
+    "message": "載入中",
+    "description": "Recovery page (download.html?held=1): shown while the list is read"
+  },
+  "heldTakesIntro": {
+    "message": "這些錄製沒能上傳完成，所以在這裡保留了一份副本。你可以儲存成檔案，或在不再需要時捨棄副本。在你捨棄之前不會刪除任何內容。",
+    "description": "Recovery page (download.html?held=1): intro under the heading"
+  },
+  "heldTakesEmpty": {
+    "message": "沒有等待處理的內容。你可以關閉這個分頁。",
+    "description": "Recovery page (download.html?held=1): shown when no take is held"
+  },
+  "heldTakesUntitled": {
+    "message": "未命名錄製",
+    "description": "Recovery page (download.html?held=1): card title when the recording has no title"
+  },
+  "heldTakesStored": {
+    "message": "已儲存 $SIZE$",
+    "description": "Recovery page (download.html?held=1): size of the stored copy, e.g. 412.6 MB stored",
+    "placeholders": {
+      "size": {
+        "content": "$1",
+        "example": "412.6 MB"
+      }
+    }
+  },
+  "heldTakesTrackScreen": {
+    "message": "螢幕",
+    "description": "Recovery page (download.html?held=1): track label on a card"
+  },
+  "heldTakesTrackCamera": {
+    "message": "相機",
+    "description": "Recovery page (download.html?held=1): track label on a card"
+  },
+  "heldTakesTrackAudio": {
+    "message": "音訊",
+    "description": "Recovery page (download.html?held=1): track label on a card"
+  },
+  "heldTakesPartial": {
+    "message": "這段錄製有一部分已經在伺服器上，所以這份副本可能不完整。",
+    "description": "Recovery page (download.html?held=1): warning on a card"
+  },
+  "heldTakesGap": {
+    "message": "錄製過程中這台裝置空間不足，所以這份副本有一段缺漏，之後的部分可能無法播放。",
+    "description": "Recovery page (download.html?held=1): warning on a card"
+  },
+  "heldTakesSave": {
+    "message": "儲存成檔案",
+    "description": "Recovery page (download.html?held=1): button"
+  },
+  "heldTakesDiscard": {
+    "message": "捨棄",
+    "description": "Recovery page (download.html?held=1): button"
+  },
+  "heldTakesDiscardConfirm": {
+    "message": "是，捨棄",
+    "description": "Recovery page (download.html?held=1): button that confirms the discard"
+  },
+  "heldTakesKeep": {
+    "message": "保留",
+    "description": "Recovery page (download.html?held=1): button that cancels the discard"
+  },
+  "heldTakesDiscardWarning": {
+    "message": "捨棄會從這台電腦上移除已儲存的副本，且無法復原。",
+    "description": "Recovery page (download.html?held=1): shown next to the confirm button"
+  },
+  "heldTakesSaved": {
+    "message": "已儲存到「下載」資料夾。已儲存的副本會保留，直到你捨棄它。",
+    "description": "Recovery page (download.html?held=1): note after a successful save"
+  },
+  "heldTakesSaveFailed": {
+    "message": "有些檔案未能儲存。你的錄製仍保留著，請再試一次。",
+    "description": "Recovery page (download.html?held=1): note after a failed save"
+  },
+  "heldTakesNoData": {
+    "message": "找不到這段錄製的儲存資料。",
+    "description": "Recovery page (download.html?held=1): note when a save finds nothing"
+  },
+  "heldTakesDiscardFailed": {
+    "message": "無法移除這段錄製。請再試一次。",
+    "description": "Recovery page (download.html?held=1): note after a failed discard"
+  },
+  "heldTakesRetrying": {
+    "message": "仍在嘗試上傳。捨棄會停止上傳。",
+    "description": "Recovery page (download.html?held=1): note on a take that is still retrying its upload"
+  },
+  "cameraPermissionBlockedError": {
+    "message": "攝影機權限已被封鎖。請允許存取攝影機以進行錄製。",
+    "description": "Shown when a camera-only recording cannot start because camera permission is blocked"
+  },
+  "cameraBusyError": {
+    "message": "Screenity 無法使用你的攝影機。它可能正被其他應用程式佔用。請關閉其他使用攝影機的應用程式後再試一次。",
+    "description": "Shown when a camera-only recording cannot start because the camera is busy or unavailable"
+  },
+  "cameraNotFoundError": {
+    "message": "Screenity 找不到攝影機。請檢查攝影機是否已連接，然後再試一次。",
+    "description": "Shown when a camera-only recording cannot start because no camera is found or the chosen camera is gone"
   }
 }

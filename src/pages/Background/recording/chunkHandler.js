@@ -1,5 +1,6 @@
 import { sendMessageTab } from "../tabManagement";
-import { activeChunksStore } from "../../utils/chunkStores";
+import { activeChunksStore, loadActiveSlot } from "../../utils/chunkStores";
+import { guardedClear } from "../../CloudRecorder/localCopyGate";
 
 // in-memory promise chain. storage-based sendingChunks flag was racy:
 // check-then-set via async chrome.storage let two concurrent triggers pass.
@@ -12,7 +13,7 @@ const DEBUG_POSTSTOP = false;
 
 export const clearAllRecordings = async () => {
   try {
-    await chunksStore.clear();
+    await guardedClear(chunksStore, loadActiveSlot);
   } catch (err) {
     console.error("Failed to clear chunksStore", err);
   }

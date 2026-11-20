@@ -4,6 +4,10 @@
 // 1-slot sweep), hands back the disk-backed File (O(1) memory), and won't return
 // a file that's still being written.
 
+import { IdbChunkReader } from "./idbChunkReader";
+import { matches, readMarker } from "./editorLoadMarker";
+import { downloadSource } from "./downloadSource";
+
 const OPFS_RECORDING_PREFIX = "recording-";
 const MIN_VALID_RECORDING_BYTES = 4096;
 // Above this, the base64-via-background fallback would spike memory, so skip it.
@@ -90,10 +94,58 @@ export const resolveRecordingFile = async () => {
   return candidate;
 };
 
+// What this tab owns: the service worker's answer, else the marker of what it
+// loaded, else the shared pointer.
+const resolveOwnRef = async () => {
+  try {
+    const owned = await chrome.runtime.sendMessage({
+      type: "resolve-editor-recording",
+    });
+    if (owned?.ref?.backend) return owned.ref;
+  } catch {}
+  const marker = readMarker();
+  if (marker) return { backend: "idb", slot: marker.slot };
+  try {
+    const { lastRecordingBackendRef } = await chrome.storage.local.get([
+      "lastRecordingBackendRef",
+    ]);
+    return lastRecordingBackendRef || null;
+  } catch {
+    return null;
+  }
+};
+
+// The IDB take as a Blob, or null when the slot is empty or now holds a
+// different recording than this tab loaded.
+const resolveIdbRecording = async (ref) => {
+  const reader = new IdbChunkReader();
+  try {
+    await reader.open(ref);
+    const read = await reader.readBlob();
+    const marker = readMarker();
+    if (marker && marker.slot === read.slot && !matches(marker, read)) {
+      return null;
+    }
+    if (!read.chunkCount || read.byteSize < MIN_VALID_RECORDING_BYTES) {
+      return null;
+    }
+    const ext = read.blob.type.includes("mp4") ? "mp4" : "webm";
+    return { name: `recording.${ext}`, file: read.blob };
+  } catch {
+    return null;
+  } finally {
+    await reader.close().catch(() => {});
+  }
+};
+
 // Download a resolved recording File via chrome.downloads, streaming from disk.
 // onResult(status) where status is "started" | "no-data" | "active" | "failed".
 export const downloadResolvedRecording = async (titleBase, onResult) => {
-  const resolved = await resolveRecordingFile();
+  const ref = await resolveOwnRef();
+  const resolved =
+    downloadSource(ref) === "idb"
+      ? await resolveIdbRecording(ref)
+      : await resolveRecordingFile();
   if (!resolved) {
     onResult?.("no-data");
     return;

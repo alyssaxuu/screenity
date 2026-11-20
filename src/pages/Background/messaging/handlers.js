@@ -3,6 +3,7 @@ import { registerMessage } from "../../../messaging/messageRouter";
 import { appendUploadTelemetryEventSerialized } from "../utils/serializedTelemetryStore";
 import { noteApiError, noteApiResponse } from "../utils/apiReachability";
 import { perfMark, perfSpan } from "../../utils/perfMarks";
+import { HELP_LINKS, HELP_CENTER_URL } from "../../utils/helpLinks";
 import {
   focusTab,
   createTab,
@@ -12,6 +13,8 @@ import {
 } from "../tabManagement";
 
 import { startAfterCountdown, startRecording } from "../recording/startRecording";
+import { awaitEditorRegistration } from "../recording/editorRegistration";
+import { withAttemptLock, ATTEMPT_STATE_KEYS, isAttemptSuperseded, claimRecordingAttempt, releaseAttemptClaim } from "../recording/attemptLock";
 import { noteCountdownStarted } from "../recording/countdownFallback";
 import {
   handleStopRecordingTab,
@@ -20,6 +23,7 @@ import {
 import { chunksStore } from "../recording/chunkHandler";
 import { openExistingChunksStore } from "../../CloudRecorder/recorderStorage/chooseChunksStore";
 import { destroySessionDir } from "../../CloudRecorder/recorderStorage/opfsKvStore";
+import { clearOfferBytes } from "../../CloudRecorder/localPlaybackRetention";
 import { handleSaveToDrive } from "../drive/handleSaveToDrive";
 import { addAlarmListener } from "../alarms/addAlarmListener";
 import { cancelRecording, handleDismiss } from "../recording/cancelRecording";
@@ -28,6 +32,21 @@ import { sendMessageRecord } from "../recording/sendMessageRecord";
 import { acquireStreamForOffscreen } from "../offscreen/acquireStream";
 import { registerProxyStorageHandlers } from "../offscreen/proxyStorageHandlers";
 import { ensureRemuxOffscreen } from "../offscreen/ensureRemuxOffscreen";
+import { closeHostIfEmpty } from "../offscreen/recorderHost";
+import {
+  holdNoticeFromFinishingTake,
+  initHeldNoticeDelivery,
+  editorReadyQuiet,
+} from "../recording/finishingTakeNotices";
+import {
+  conflictClearWrites,
+  holdsCapture,
+  isFromSupersededTake,
+  mergeStoredSession,
+  sessionStateKeyFor,
+} from "../recording/sessionConflict";
+import { noteTakeFailed } from "../recording/failedTakes";
+import { noteTakeWritesSettled } from "../recording/takeWritesSettled";
 import { forceProcessing } from "../recording/forceProcessing";
 import {
   restartActiveTab,
@@ -62,6 +81,7 @@ import { FIRST_CHUNK_WATCHDOG_ALARM, RECORDER_KEEPALIVE_ALARM } from "../alarms/
 import { desktopCapture } from "../recording/desktopCapture";
 import {
   videoReady,
+  isVideoReadyForEarlierTake,
   handleGetStreamingData,
   handleRecordingError,
   handleRecordingComplete,
@@ -72,6 +92,7 @@ import {
 import { clearAllRecordings } from "../recording/chunkHandler";
 import {
   markRetainedSaved,
+  registerRetainable,
   unsavedRetained,
 } from "../recording/recordingRetention";
 import { setMicActiveTab } from "../tabManagement/tabHelpers";
@@ -84,9 +105,16 @@ import {
   diagEvent,
 } from "../../utils/diagnosticLog";
 import { supportContextQuery } from "../../utils/buildSupportContext";
+import { lifecycle } from "../../utils/lifecycleLog";
+import { micDropFields } from "../../utils/micDropHandoff";
+import { startRecoveryDownload } from "../utils/recoveryDownload";
+import { armConfirmAlarm, armMicAwaitSceneAlarm } from "../recording/resumePendingUploads";
+import { handleRecordingSignals } from "../recording/recordingSignals";
+import { noteStopReceived } from "../recording/stopReceipt";
 
 const API_BASE = process.env.SCREENITY_API_BASE_URL;
 const APP_BASE = process.env.SCREENITY_APP_BASE;
+let startupTelemetryTail = Promise.resolve();
 
 // Flip a project to isPublic:true after recording finishes. v2 removed
 // the publish system, so isPublic is the only access gate; without
@@ -443,20 +471,37 @@ const clearStoredLocalPlaybackOffer = async ({
     await chrome.alarms.clear(CLOUD_LOCAL_PLAYBACK_ALARM).catch(() => {});
   }
 
+  let bytesKept = false;
   if (clearChunks) {
-    const targetStore = offerScreenStore(existing);
-    await targetStore.clear().catch((err) => {
-      console.warn(
-        "[Screenity][BG] Failed to clear screen chunks while clearing local playback offer",
-        err,
-      );
+    const result = await clearOfferBytes({
+      offer: existing,
+      readSession: async (sessionId) => {
+        const key = `cloudRecorderSession:${sessionId}`;
+        return (await chrome.storage.local.get([key]))?.[key] || null;
+      },
+      clearStore: () =>
+        offerScreenStore(existing)
+          .clear()
+          .catch((err) => {
+            console.warn(
+              "[Screenity][BG] Failed to clear screen chunks while clearing local playback offer",
+              err,
+            );
+          }),
+      destroyDir: (sessionId) =>
+        destroySessionDir(sessionId)
+          .then((res) => {
+            // The folder leaks: its snapshot keeps the orphan reaper off it.
+            if (res?.removed === false) {
+              lifecycle("BG", "offer-folder-left", {
+                opfsSessionId: sessionId,
+                error: res.error || null,
+              });
+            }
+          })
+          .catch(() => {}),
     });
-    if (
-      existing?.storageBackend === "opfs" &&
-      existing?.opfsSessionId
-    ) {
-      await destroySessionDir(existing.opfsSessionId).catch(() => {});
-    }
+    bytesKept = result.kept;
   }
 
   await chrome.storage.local.set({
@@ -465,7 +510,8 @@ const clearStoredLocalPlaybackOffer = async ({
       reason,
       clearedAt: Date.now(),
       clearedOfferId: existing?.offerId || null,
-      clearChunks: Boolean(clearChunks),
+      clearChunks: Boolean(clearChunks) && !bytesKept,
+      bytesKept,
     },
   });
 
@@ -473,7 +519,8 @@ const clearStoredLocalPlaybackOffer = async ({
     console.info("[Screenity][BG] Cleared local screen playback offer", {
       reason,
       offerId: existing.offerId,
-      clearChunks: Boolean(clearChunks),
+      clearChunks: Boolean(clearChunks) && !bytesKept,
+      bytesKept,
     });
   }
 
@@ -867,19 +914,56 @@ const clearRecordingSession = () => {
 };
 
 const clearRecordingSessionSafe = async (reason = "unknown", details = {}) => {
+  // A newer attempt in storage owns the session and pending flag, so leave both alone.
+  // Read and write run under the lock of startRecording's id write; an unreadable id skips the clear.
+  const { expectedAttemptId = null, ...markerDetails } = details;
+  if (!expectedAttemptId) {
+    return clearRecordingSessionUnguarded(reason, markerDetails);
+  }
+  return withAttemptLock(async () => {
+    try {
+      const state = await chrome.storage.local.get(ATTEMPT_STATE_KEYS);
+      if (isAttemptSuperseded(state, expectedAttemptId)) return;
+    } catch (err) {
+      diagEvent("warning", {
+        note: "clear-session skipped, attempt id unreadable",
+        err: String(err).slice(0, 80),
+      });
+      return;
+    }
+    await clearRecordingSessionUnguarded(reason, markerDetails);
+  });
+};
+
+const clearRecordingSessionUnguarded = async (reason, details) => {
   const prev = activeRecordingSession;
   clearRecordingSession();
   // Remove the stored session (not just the in-memory var) when done, so a 2nd
   // recording on the same tab doesn't route to a stale one. Kept on interruption.
-  const recordingIsDone =
-    reason === "video-ready" ||
+  const recordingIsDone = reason === "video-ready";
+  // A conflict is resolved for the incoming take, which has already written its
+  // own pointer and pending flag: only a pointer still naming the old session goes.
+  const isConflictClear =
     reason === "non-recording-session-conflict" ||
     reason === "stale-conflict-recovered";
+  let conflictWrites = {};
+  if (isConflictClear) {
+    try {
+      const { recorderSession: stored } = await chrome.storage.local.get([
+        "recorderSession",
+      ]);
+      conflictWrites = conflictClearWrites({
+        previousId: prev?.id || null,
+        storedPointerId: stored?.id || null,
+      });
+    } catch {}
+  }
   try {
     await chrome.storage.local.set({
       ...(recordingIsDone
         ? { recorderSession: null, pendingRecording: false }
         : {}),
+      ...conflictWrites,
       lastRecordingSessionClear: {
         ts: Date.now(),
         reason,
@@ -987,7 +1071,15 @@ const resolveActiveSessionConflict = async (incomingSession) => {
     return { allow: true, staleRecovered: false };
   }
 
-  if (!isSessionRecording(activeRecordingSession)) {
+  // Memory holds the status from registration; the recorder's own key is newer.
+  try {
+    const key = sessionStateKeyFor(activeRecordingSession.id);
+    const stored = (await chrome.storage.local.get([key]))?.[key] || null;
+    activeRecordingSession = mergeStoredSession(activeRecordingSession, stored);
+  } catch {}
+
+  // Stopped and released its capture: it finishes in its own frame or tab.
+  if (!holdsCapture(activeRecordingSession)) {
     await clearRecordingSessionSafe("non-recording-session-conflict");
     return { allow: true, staleRecovered: true };
   }
@@ -1328,10 +1420,16 @@ export const setupHandlers = () => {
   registerMessage("reset-active-tab-restart", (message) =>
     resetActiveTabRestart(message),
   );
-  registerMessage("video-ready", async (message) => {
+  registerMessage("video-ready", async (message, sender) => {
     perfMark("BG.handlers video-ready.received");
-    await videoReady(message);
-    await clearRecordingSessionSafe("video-ready");
+    noteTakeWritesSettled(message?.recordingAttemptId);
+    const earlierTake = await isVideoReadyForEarlierTake(message);
+    await videoReady(message, { earlierTake, sender });
+    if (!earlierTake) {
+      await clearRecordingSessionSafe("video-ready", {
+        expectedAttemptId: message?.recordingAttemptId || null,
+      });
+    }
     // video-ready fires for every recorder type once finalized and playable, so
     // count successful recordings here instead of the tab-only start-flow "ok"
     // branch (which missed region recordings). Best-effort.
@@ -1475,13 +1573,22 @@ export const setupHandlers = () => {
     await videoReady();
   });
 
+  registerMessage("claim-recording-attempt", async () => ({
+    ok: true,
+    attemptId: await claimRecordingAttempt(),
+  }));
+  registerMessage("release-recording-attempt", async (message) => {
+    await releaseAttemptClaim(message?.attemptId || null);
+    return { ok: true };
+  });
   registerMessage("start-recording", (message) => startRecording("start-recording-message"));
   registerMessage("countdown-finished", async (message) => {
-    const { recording, restarting, pendingRecording } =
+    const { recording, restarting, pendingRecording, activeCountdownId } =
       await chrome.storage.local.get([
       "recording",
       "restarting",
       "pendingRecording",
+      "activeCountdownId",
     ]);
     const writeDecision = (reason, started, extra = {}) => {
       const decisionAt = Date.now();
@@ -1520,6 +1627,17 @@ export const setupHandlers = () => {
       await writeDecision("stale-dispatch", false, { ageMs });
       return { ok: true, skipped: true };
     }
+    if (message?.countdownId && message.countdownId !== activeCountdownId) {
+      await writeDecision("countdown-mismatch", false);
+      return { ok: true, skipped: true };
+    }
+    // A countdown can outlive an error or cancel; its completion must not start
+    // a new attempt. Restart sequences itself and may have no pending flag.
+    if (pendingRecording === false && !restarting) {
+      diagEvent("countdown-finished", { skipped: true, reason: "not-pending" });
+      await writeDecision("not-pending", false);
+      return { ok: true, skipped: true };
+    }
     diagEvent("countdown-finished", { skipped: false });
     const decisionAt = Date.now();
     // Don't block startAfterCountdown on the diagnostic write; the
@@ -1539,7 +1657,7 @@ export const setupHandlers = () => {
         started: true,
       },
     });
-    startAfterCountdown("countdown-finished");
+    startAfterCountdown("countdown-finished", message?.countdownId || null);
     return { ok: true };
   });
   registerMessage("restarted", (message) => restartActiveTab(message));
@@ -1632,11 +1750,11 @@ export const setupHandlers = () => {
     })();
   });
 
-  registerMessage("diag-countdown-started", () => {
+  registerMessage("diag-countdown-started", (message) => {
     diagEvent("countdown-started");
     // countdown started means stream setup is done; extend the fallback window
     // so it doesn't fire during countdown (and start the recording too early)
-    noteCountdownStarted();
+    void noteCountdownStarted(message?.countdownId || null);
   });
   registerMessage("diag-countdown-cancelled", () => diagEvent("countdown-cancelled"));
   registerMessage("diag-editor-ready", (message) =>
@@ -1648,6 +1766,7 @@ export const setupHandlers = () => {
     const tabId = sender?.tab?.id;
     if (typeof tabId !== "number") return { ref: null };
     try {
+      await awaitEditorRegistration(tabId);
       const { retainedRecordings } = await chrome.storage.local.get([
         "retainedRecordings",
       ]);
@@ -1668,6 +1787,39 @@ export const setupHandlers = () => {
       };
     } catch {
       return { ref: null };
+    }
+  });
+
+  // A reloaded IDB editor whose entry was pruned (a restored tab has a new id)
+  // asks to be protected again.
+  registerMessage("register-editor-retention", async (message, sender) => {
+    const tabId = sender?.tab?.id;
+    const slot = message?.slot;
+    if (
+      typeof tabId !== "number" ||
+      !String(sender?.url || "").includes("/editor.html") ||
+      (slot !== "chunks" && slot !== "chunks_b")
+    ) {
+      return { ok: false };
+    }
+    try {
+      const { retainedRecordings } = await chrome.storage.local.get([
+        "retainedRecordings",
+      ]);
+      const list = Array.isArray(retainedRecordings) ? retainedRecordings : [];
+      if (list.some((e) => e.tabId === tabId && e.slot === slot)) {
+        return { ok: true };
+      }
+      await registerRetainable({
+        recordingId: null,
+        backend: "idb",
+        fileName: null,
+        slot,
+        tabId,
+      });
+      return { ok: true };
+    } catch {
+      return { ok: false };
     }
   });
 
@@ -1701,6 +1853,11 @@ export const setupHandlers = () => {
     }
   });
 
+  // The stop path's inline mic upload failed: start recovery now, not at the
+  // next launch or resume.
+  registerMessage("mic-recovery-now", async () => {
+    await armMicAwaitSceneAlarm();
+  });
   // The editor reports a download or Drive save so retention can stop
   // protecting a recording the user already has a copy of.
   registerMessage("recording-saved", async (message, sender) => {
@@ -1708,6 +1865,9 @@ export const setupHandlers = () => {
       message?.recordingId || null,
       sender?.tab?.id ?? null,
     );
+  });
+  registerMessage("recorder-stop-received", () => {
+    noteStopReceived();
   });
   // prefix allowlist so a compromised context can't spoof lifecycle events
   registerMessage("diag-forward", (message) => {
@@ -1733,6 +1893,24 @@ export const setupHandlers = () => {
     if (!allowedPrefixes.some((p) => ev.startsWith(p))) return;
     diagEvent(ev, message?.data ?? null);
   });
+  registerMessage("recording-signals", (message) => {
+    void handleRecordingSignals(message);
+  });
+  registerMessage("startup-failure-telemetry", (message) => {
+    const attemptId = message?.attemptId;
+    if (typeof attemptId !== "string" || !/^ra-[a-z0-9-]+$/.test(attemptId)) return;
+    // Key on the click ID: recorderSession can still point at the previous take before
+    // uploaders have a media ID. Serialized because the early and enriched snapshots
+    // share a row and the server's read/modify/write loses one.
+    startupTelemetryTail = startupTelemetryTail.catch(() => {}).then(() =>
+      emitRecordingTelemetry("recording_forensic_event", {
+        recordingId: attemptId,
+        recordingSessionId: attemptId,
+        name: "cloud-startup-failure",
+        startupFailure: message?.snapshot || null,
+      }),
+    );
+  });
   registerMessage("open-editor-recovery", async () => {
     const { editorRecoveryUrl } = await chrome.storage.local.get(["editorRecoveryUrl"]);
     if (!editorRecoveryUrl) return;
@@ -1750,7 +1928,24 @@ export const setupHandlers = () => {
       });
       return;
     }
+    // A finishing take's late failure: its journal and recovery keep its data,
+    // and tearing down here would end the take that is recording now.
+    let activeTakeId = null;
+    try {
+      ({ activeRecorderTakeId: activeTakeId } = await chrome.storage.local.get([
+        "activeRecorderTakeId",
+      ]));
+    } catch {}
+    if (isFromSupersededTake({ message, activeTakeId })) {
+      diagEvent("warning", {
+        note: "recording-error from finishing take ignored",
+        error: message?.error || null,
+      });
+      return;
+    }
+    if (message?.error !== "stream-ended") noteTakeFailed(message?.__takeId);
     await handleRecordingError(message);
+    if (message?.error === "stream-ended") return;
     await clearRecordingSessionSafe("recording-error", {
       error: message?.error || null,
     });
@@ -1854,19 +2049,19 @@ export const setupHandlers = () => {
   });
   registerMessage("open-processing-info", () =>
     createTab(
-      "https://help.screenity.io/editing-and-exporting/dJRFpGq56JFKC7k8zEvsqb/why-is-there-a-5-minute-limit-for-editing/ddy4e4TpbnrFJ8VoRT37tQ",
+      HELP_LINKS.editingLimit,
       true,
     ),
   );
   registerMessage("upgrade-info", () =>
     createTab(
-      "https://help.screenity.io/getting-started/77KizPC8MHVGfpKpqdux9D/what-are-the-technical-requirements-for-using-screenity/6kdB6qru6naVD8ZLFvX3m9",
+      HELP_LINKS.technicalRequirements,
       true,
     ),
   );
   registerMessage("trim-info", () =>
     createTab(
-      "https://help.screenity.io/editing-and-exporting/dJRFpGq56JFKC7k8zEvsqb/how-to-cut-trim-or-mute-parts-of-your-video/svNbM7YHYY717MuSWXrKXH",
+      HELP_LINKS.trimAndCut,
       true,
     ),
   );
@@ -1875,7 +2070,7 @@ export const setupHandlers = () => {
   );
   registerMessage("chrome-update-info", () =>
     createTab(
-      "https://help.screenity.io/getting-started/77KizPC8MHVGfpKpqdux9D/what-are-the-technical-requirements-for-using-screenity/6kdB6qru6naVD8ZLFvX3m9",
+      HELP_LINKS.technicalRequirements,
       true,
     ),
   );
@@ -1884,11 +2079,11 @@ export const setupHandlers = () => {
   registerMessage("pip-started", () => handlePip(true));
   registerMessage("sign-out-drive", (message) => handleSignOutDrive(message));
   registerMessage("open-help", () =>
-    createTab("https://help.screenity.io/", true),
+    createTab(HELP_CENTER_URL, true),
   );
   registerMessage("memory-limit-help", () =>
     createTab(
-      "https://help.screenity.io/troubleshooting/9Jy5RGjNrBB42hqUdREQ7W/what-does-%E2%80%9Cmemory-limit-reached%E2%80%9D-mean-when-recording/8WkwHbt3puuXunYqQnyPcb",
+      HELP_LINKS.memoryLimit,
       true,
     ),
   );
@@ -2006,7 +2201,9 @@ export const setupHandlers = () => {
     } catch {
     }
   });
-  registerMessage("restore-recording", (message) => restoreRecording(message));
+  registerMessage("restore-recording", (message, sender) =>
+    restoreRecording(message, sender),
+  );
   registerMessage("check-restore", async (message, sender, sendResponse) => {
     const response = await checkRestore();
     sendResponse(response);
@@ -2450,6 +2647,8 @@ export const setupHandlers = () => {
       console.warn("Cloud features disabled");
       return;
     }
+    // An earlier take's scene landing while the next take already records.
+    if (await holdNoticeFromFinishingTake(message, null)) return;
     await handleReopenPopupMulti();
   });
   registerMessage(
@@ -2613,9 +2812,13 @@ export const setupHandlers = () => {
       console.warn("Cloud features disabled");
       return;
     }
-    const { pendingEditorOpen } = await chrome.storage.local.get([
-      "pendingEditorOpen",
-    ]);
+    const { pendingEditorOpen, recording, pendingRecording } =
+      await chrome.storage.local.get([
+        "pendingEditorOpen",
+        "recording",
+        "pendingRecording",
+      ]);
+    const quiet = editorReadyQuiet({ recording, pendingRecording });
 
     let messageTab = null;
     const projectId = message.projectId || pendingEditorOpen?.projectId || null;
@@ -2655,16 +2858,17 @@ export const setupHandlers = () => {
         expectedProjectId: projectId,
         expectedKind,
         reason: "editor-ready:new-project",
+        focus: !quiet,
       });
       messageTab = resolved.tabId;
 
-      chrome.runtime.sendMessage({ type: "turn-off-pip" });
+      if (!quiet) chrome.runtime.sendMessage({ type: "turn-off-pip" });
 
       // New-project recordings are user-facing public-shareable, so
       // flip isPublic before we hand the share URL to the clipboard.
       markProjectPublic(projectId);
 
-      if (publicUrl) {
+      if (publicUrl && !quiet) {
         copyToClipboard(publicUrl);
       }
     } else if (message.multiMode) {
@@ -2675,15 +2879,16 @@ export const setupHandlers = () => {
         expectedProjectId: projectId,
         expectedKind,
         reason: "editor-ready:existing-project",
+        focus: !quiet,
       });
       messageTab = resolved.tabId;
 
-      chrome.runtime.sendMessage({ type: "turn-off-pip" });
+      if (!quiet) chrome.runtime.sendMessage({ type: "turn-off-pip" });
     }
 
     // non-newProject paths only; scene additions have null publicUrl, multiMode
     // new-project goes through handleFinishMultiRecording with its own clipboard
-    if (publicUrl && !message.newProject) {
+    if (publicUrl && !message.newProject && !quiet) {
       copyToClipboard(publicUrl);
     }
 
@@ -2694,6 +2899,7 @@ export const setupHandlers = () => {
         newProject: Boolean(message.newProject),
         sceneId: sceneId,
         projectId,
+        ...micDropFields(message),
         localPlayback: localPlaybackOffer
           ? {
               available: true,
@@ -2788,6 +2994,15 @@ export const setupHandlers = () => {
     });
     return { ok: true };
   });
+  // The offscreen resume document cannot set alarms, so a take that finished
+  // and now waits on Bunny asks the service worker to arm the confirm alarm.
+  registerMessage("arm-confirm-alarm", async () => {
+    await armConfirmAlarm();
+    return { ok: true };
+  });
+  registerMessage("download-recovery-file", async (message, sender) =>
+    startRecoveryDownload(message, sender)
+  );
   registerMessage("cloud-local-playback-clear", async (message) => {
     const result = await clearStoredLocalPlaybackOffer({
       reason: message?.reason || "explicit-clear",
@@ -3077,50 +3292,39 @@ export const setupHandlers = () => {
     await chrome.alarms.clear("recording-alarm");
   });
   // extension pages can't message content scripts directly
-  registerMessage("show-toast", async (message) => {
+  // Toasts and modals from a take still finishing wait until no take records.
+  initHeldNoticeDelivery((tabId, payload) => sendMessageTab(tabId, payload));
+  const sendNoticeToActiveTab = async (message, payload) => {
     try {
+      if (await holdNoticeFromFinishingTake(message, payload)) return;
       const { activeTab } = await chrome.storage.local.get(["activeTab"]);
-      if (activeTab) {
-        sendMessageTab(activeTab, {
-          type: "show-toast",
-          message: message.message,
-          timeout: message.timeout,
-        }).catch(() => {});
-      }
+      if (activeTab) sendMessageTab(activeTab, payload).catch(() => {});
     } catch {}
+  };
+  registerMessage("show-toast", async (message) => {
+    await sendNoticeToActiveTab(message, {
+      type: "show-toast",
+      message: message.message,
+      timeout: message.timeout,
+    });
   });
   // Offscreen recorder can't mount the styled "record computer audio" Warning,
   // so it relays here and we forward to the content script's Warning component.
   registerMessage("show-audio-warning", async (message) => {
-    try {
-      const { activeTab } = await chrome.storage.local.get(["activeTab"]);
-      if (activeTab) {
-        sendMessageTab(activeTab, {
-          type: "show-audio-warning",
-          variant: message.variant,
-          timeout: message.timeout,
-        }).catch(() => {});
-      }
-    } catch {}
+    await sendNoticeToActiveTab(message, {
+      type: "show-audio-warning",
+      variant: message.variant,
+      timeout: message.timeout,
+    });
   });
   registerMessage("finalize-failure", async (message) => {
-    try {
-      const { activeTab } = await chrome.storage.local.get(["activeTab"]);
-      if (activeTab) {
-        sendMessageTab(activeTab, {
-          type: "finalize-failure",
-          reason: message.reason,
-        }).catch(() => {});
-      }
-    } catch {}
+    await sendNoticeToActiveTab(message, {
+      type: "finalize-failure",
+      reason: message.reason,
+    });
   });
-  registerMessage("finalize-recovered", async () => {
-    try {
-      const { activeTab } = await chrome.storage.local.get(["activeTab"]);
-      if (activeTab) {
-        sendMessageTab(activeTab, { type: "finalize-recovered" }).catch(() => {});
-      }
-    } catch {}
+  registerMessage("finalize-recovered", async (message) => {
+    await sendNoticeToActiveTab(message, { type: "finalize-recovered" });
   });
   registerMessage("get-tab-id", (message, sender, sendResponse) => {
     sendResponse({ tabId: sender?.tab?.id ?? null });
@@ -3185,9 +3389,50 @@ export const setupHandlers = () => {
   registerMessage(
     "clear-recording-session",
     async (message, sender, sendResponse) => {
+      // A finishing take names its session; a newer one registered since owns
+      // the guard and must stay registered.
+      if (
+        message?.sessionId &&
+        activeRecordingSession?.id &&
+        activeRecordingSession.id !== message.sessionId
+      ) {
+        sendResponse({ ok: true, skipped: "not-active-session" });
+        return true;
+      }
       await clearRecordingSessionSafe(
         message?.reason || "clear-recording-session",
       );
+      sendResponse({ ok: true });
+      return true;
+    },
+  );
+
+  // A take frame closed itself. The host document goes with its last take.
+  registerMessage(
+    "recorder-host-take-closed",
+    async (message, sender, sendResponse) => {
+      if (message?.remaining === 0) {
+        const closed = await closeHostIfEmpty("take-closed");
+        if (closed) chrome.storage.local.set({ offscreen: false }).catch(() => {});
+      }
+      sendResponse({ ok: true });
+      return true;
+    },
+  );
+
+  registerMessage(
+    "recording-session-capture-ended",
+    async (message, sender, sendResponse) => {
+      if (
+        message?.sessionId &&
+        activeRecordingSession?.id === message.sessionId
+      ) {
+        activeRecordingSession = {
+          ...activeRecordingSession,
+          status: "finishing",
+          captureReleasedAt: Date.now(),
+        };
+      }
       sendResponse({ ok: true });
       return true;
     },
@@ -3200,6 +3445,7 @@ export const setupHandlers = () => {
         message?.reason || "clear-recording-session-safe",
         {
           sourceTabId: sender?.tab?.id || null,
+          expectedAttemptId: message?.expectedAttemptId || null,
         },
       );
       sendResponse({ ok: true });

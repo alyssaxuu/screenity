@@ -6,14 +6,22 @@ import { openExistingChunksStore } from "./recorderStorage/chooseChunksStore";
 import {
   uploadMicToStorage,
   attachSceneAudio,
-  collectMicChunks,
+  collectMicChunksFor,
+  ownChunkTags,
 } from "./uploadMicToStorage";
+import { micUploadInFlightTtlMs } from "../utils/recordingLimit";
+import { readMicUploadFlags } from "../utils/micUploadFlag";
 
 const API_BASE = process.env.SCREENITY_API_BASE_URL;
 const MARKER_KEY = "pendingMicRecovery";
 export const MIC_AWAIT_SCENE_ALARM = "mic-recovery-await-scene";
-// Longer than the stop path's 120s inline budget plus margin, so a flag left
-// behind by a closed tab can't block the scan forever.
+// Same name as CONFIRM_ALARM in resumePendingUploads.js, kept literal so this
+// module stays free of the background's imports.
+const CONFIRM_ALARM = "confirm-awaiting-takes";
+const CONFIRM_AFTER_MIC_MIN = 1;
+// A flag left behind by a closed tab can't block the scan forever. The flag
+// carries the stop path's budget; 5 min is for an older build's flag, which
+// had a flat 120 s budget.
 const INLINE_UPLOAD_FRESH_MS = 5 * 60 * 1000;
 // Past a week the Bunny signature is useless and the marker is likelier a
 // stale profile than a real debt.
@@ -97,6 +105,100 @@ export const listPendingMicRecovery = async () => {
   return Object.values(map).sort((a, b) => (a.at || 0) - (b.at || 0));
 };
 
+// Any IDB mic debt still unpaid: its chunks sit in the shared store the next
+// start would clear, however old the marker is.
+export const hasPendingIdbMicDebt = async () =>
+  (await listPendingMicRecovery()).some((m) => (m.backend || "idb") === "idb");
+
+// Within this age a running upload may still pay the debt, so Start waits. Past it the take is
+// held for the user: an unpaid marker is the only pointer to bytes that exist nowhere else.
+const MIC_DEBT_REFUSE_MAX_AGE_MS = 60 * 60 * 1000;
+// Mirrors RECOVERABLE_SESSION_STATUSES in localCopyGate.js (this module takes
+// no imports): a held snapshot outside these is not offered by the held list.
+const LISTED_SNAPSHOT_STATUSES = new Set([
+  "awaiting-confirm",
+  "recording",
+  "hidden",
+  "unload",
+  "stopping",
+  "finalize-failed",
+  "upload-stalled",
+  "stale-cleared",
+  "crashed",
+]);
+
+// What Start does about unpaid IDB mic debts, decided before it clears the shared audio store:
+//   "none"        no debt, clear as usual
+//   "progressing" a young debt: refuse, an upload may still pay it
+//   "held"        every old debt is a held take the user can Save or Discard
+//   "marker-only" an old debt with no listable snapshot: refuse, clear nothing; the held page shows it as "mic-debt"
+// Old debts with a listable snapshot are put on hold here, as settle does for an unattached mic.
+export const classifyIdbMicDebt = async ({ now = Date.now() } = {}) => {
+  const idb = (await listPendingMicRecovery()).filter(
+    (m) => (m.backend || "idb") === "idb"
+  );
+  if (!idb.length) return "none";
+  let young = false;
+  let markerOnly = false;
+  let held = false;
+  let all = null;
+  for (const m of idb) {
+    if (!isMicSuspended(m) && now - (m.at || 0) < MIC_DEBT_REFUSE_MAX_AGE_MS) {
+      young = true;
+      continue;
+    }
+    try {
+      all = all || (await chrome.storage.local.get(null)) || {};
+    } catch {
+      markerOnly = true;
+      continue;
+    }
+    const key = m.sessionId
+      ? Object.keys(all).find((k) => {
+          if (!k.startsWith("cloudRecorderSession:")) return false;
+          const snap = all[k];
+          return snap?.opfsSessionId === m.sessionId || snap?.id === m.sessionId;
+        })
+      : null;
+    const snap = key ? all[key] : null;
+    const openJournal =
+      snap &&
+      Object.entries(all).some(
+        ([k, j]) =>
+          k.startsWith("uploadJournal-") &&
+          j?.sessionId === snap.id &&
+          j.status !== "completed"
+      );
+    if (
+      !snap ||
+      snap.discardedAt ||
+      (!LISTED_SNAPSHOT_STATUSES.has(snap.status) && !openJournal)
+    ) {
+      markerOnly = true;
+      continue;
+    }
+    if (snap.holdUntilRecovered !== true) {
+      try {
+        await chrome.storage.local.set({
+          [key]: {
+            ...snap,
+            holdUntilRecovered: true,
+            heldReason: "mic-unattached",
+            heldAt: now,
+          },
+        });
+      } catch {
+        markerOnly = true;
+        continue;
+      }
+    }
+    held = true;
+  }
+  if (young) return "progressing";
+  if (held) return "held";
+  return markerOnly ? "marker-only" : "none";
+};
+
 export const hasAwaitSceneMarkers = async () =>
   (await listPendingMicRecovery()).some((m) => m.awaitScene);
 
@@ -121,37 +223,56 @@ export const uploadAndAttachMic = async ({
   duration,
   mimeType,
   token,
+  // IDB only: the marker's session, so another take's chunks in the shared
+  // store are never sent as this debt's voice.
+  sessionId = null,
+  // Every tag the marker's own chunks may carry (see ownChunkTags).
+  sessionIds = null,
+  // A media a failed attach left on Storage: attach it again, send nothing.
+  reuseMediaId = null,
 }) => {
-  const chunks = await collectMicChunks(store);
-  if (!chunks.length) return { ok: false, reason: "no-chunks" };
-
-  const uploaded = await uploadMicToStorage({
-    chunks,
-    mimeType,
-    sceneId,
-    projectId,
-    duration,
-    token,
-  });
-  if (!uploaded.ok) return { ok: false, reason: `upload-${uploaded.reason}` };
+  let foreign = false;
+  let mediaId = reuseMediaId;
+  if (!mediaId) {
+    const found = await collectMicChunksFor(store, sessionIds || sessionId);
+    foreign = found.foreign;
+    if (!found.chunks.length) {
+      return {
+        ok: false,
+        reason: foreign ? "store-owned-by-other" : "no-chunks",
+        foreign,
+      };
+    }
+    const uploaded = await uploadMicToStorage({
+      chunks: found.chunks,
+      mimeType,
+      sceneId,
+      projectId,
+      duration,
+      token,
+    });
+    if (!uploaded.ok) return { ok: false, reason: `upload-${uploaded.reason}`, foreign };
+    mediaId = uploaded.mediaId;
+  }
 
   const attached = await attachSceneAudio({
     projectId,
     sceneId,
-    audioMediaId: uploaded.mediaId,
+    audioMediaId: mediaId,
     duration,
     token,
   });
   if (!attached.ok) {
-    // Media is on Storage but unreferenced. Retrying costs a duplicate, not
-    // the voice.
+    // Media is on Storage but unreferenced: the caller keeps its id so the
+    // next pass attaches it instead of uploading a second copy.
     return {
       ok: false,
       reason: `attach-${attached.reason}`,
-      mediaId: uploaded.mediaId,
+      mediaId,
+      foreign,
     };
   }
-  return { ok: true, mediaId: uploaded.mediaId, attached: attached.attached };
+  return { ok: true, mediaId, attached: attached.attached, foreign };
 };
 
 // The scene POST had no mic media to name as transcription source yet. Fire
@@ -185,7 +306,7 @@ const queueTranscription = async ({
 };
 
 // Attempt count only. setPendingMicRecovery would restamp `at`, half the
-// one-shot key, so a burnt attempt would read as a new debt.
+// pass key, so a burnt attempt would read as a new debt.
 const bumpAttempts = async (marker) => {
   try {
     const map = await readMarkerMap();
@@ -198,8 +319,82 @@ const bumpAttempts = async (marker) => {
   } catch {}
 };
 
-const fetchScene = async ({ projectId, sceneId }, token) => {
-  if (!API_BASE || !token || !projectId || !sceneId) return null;
+// Whether a failed pass got an answer from the server about this mic. Only an
+// answer burns an attempt; a thrown fetch, 408, 429, 5xx or an offline machine
+// says nothing about the mic and must not run the cap down.
+const SERVER_ANSWERS = new Set([
+  "no-chunks",
+  "upload-no-media-id",
+  "upload-empty-blob",
+  "upload-too-large",
+  "attach-already-set",
+  "attach-scene-missing",
+  "attach-not-separated-audio",
+]);
+const wasAnswered = (reason) => {
+  const r = String(reason || "");
+  if (SERVER_ANSWERS.has(r) || r.startsWith("upload-unsupported-mime")) return true;
+  const m = /^(?:upload|attach)-http-(\d+)$/.exec(r);
+  if (!m) return false;
+  const status = Number(m[1]);
+  return status >= 400 && status < 500 && status !== 408 && status !== 429;
+};
+
+// The server answered but is failing (5xx), or a media sits on Storage that no scene points at.
+// Not the mic's fault, so no attempt is burned, but each pass re-sends up to 300 MB: back off
+// exponentially to a cap, where the marker stays (held page lists it) and the scan sends nothing.
+export const MIC_SERVER_FAIL_CAP = 8;
+const SERVER_BACKOFF_BASE_MS = 5 * 60 * 1000;
+const SERVER_BACKOFF_MAX_MS = 6 * 60 * 60 * 1000;
+export const micBackoffMs = (fails) =>
+  Math.min(SERVER_BACKOFF_MAX_MS, SERVER_BACKOFF_BASE_MS * 2 ** Math.max(0, fails - 1));
+export const isMicSuspended = (m) => (m?.serverFails || 0) >= MIC_SERVER_FAIL_CAP;
+const isServerFailure = (reason) => /^(?:upload|attach)-http-5\d\d$/.test(String(reason || ""));
+
+const recordServerFailure = async (marker, result) => {
+  try {
+    const map = await readMarkerMap();
+    if (!map[marker.sceneId]) return;
+    const fails = (map[marker.sceneId].serverFails || 0) + 1;
+    map[marker.sceneId] = {
+      ...map[marker.sceneId],
+      attempts: marker.attempts || 0,
+      serverFails: fails,
+      nextTryAt: Date.now() + micBackoffMs(fails),
+      ...(result?.mediaId ? { uploadedMediaId: result.mediaId } : {}),
+    };
+    await chrome.storage.local.set({ [MARKER_KEY]: map });
+  } catch {}
+};
+
+const restoreAttempts = async (marker, result = null) => {
+  try {
+    const map = await readMarkerMap();
+    if (!map[marker.sceneId]) return;
+    map[marker.sceneId] = {
+      ...map[marker.sceneId],
+      attempts: marker.attempts || 0,
+      ...(result?.mediaId ? { uploadedMediaId: result.mediaId } : {}),
+    };
+    await chrome.storage.local.set({ [MARKER_KEY]: map });
+  } catch {}
+};
+
+// An answered refusal of a reused media: it is gone or not attachable, so the
+// next pass uploads afresh.
+const dropUploadedMedia = async (marker) => {
+  try {
+    const map = await readMarkerMap();
+    if (!map[marker.sceneId]?.uploadedMediaId) return;
+    const { uploadedMediaId, ...rest } = map[marker.sceneId];
+    map[marker.sceneId] = rest;
+    await chrome.storage.local.set({ [MARKER_KEY]: map });
+  } catch {}
+};
+
+// Every scene of the project, or null when the server could not be asked.
+export const fetchScenes = async ({ projectId }, token) => {
+  if (!API_BASE || !token || !projectId) return null;
   try {
     // Uncached, or a "not yet" answer sticks for a minute.
     const res = await fetch(`${API_BASE}/videos/${projectId}/?refresh=true`, {
@@ -208,21 +403,37 @@ const fetchScene = async ({ projectId, sceneId }, token) => {
     });
     if (!res.ok) return null;
     const body = await res.json().catch(() => null);
-    return body?.video?.data?.scenes?.[sceneId] || null;
+    return body?.video?.data?.scenes || null;
   } catch {
     return null;
   }
 };
 
-// Keyed on the marker, not a bare "ever": a worker outlives several recordings
-// and a new debt deserves a fresh attempt.
-const _attempted = new Set();
+const fetchScene = async ({ projectId, sceneId }, token) => {
+  if (!sceneId) return null;
+  const scenes = await fetchScenes({ projectId }, token);
+  return scenes?.[sceneId] || null;
+};
 
-const recoverOne = async (marker, { logger, token, ignoreLiveRecording }) => {
+// Keyed on the marker: one pass at a time per debt. Later passes run again.
+const _inFlight = new Set();
+
+const recoverOne = async (marker, opts) => {
+  const key = `${marker.sceneId}:${marker.at}`;
+  // Guards a concurrent pass only: a later alarm or launch pass retries,
+  // bounded by MAX_ATTEMPTS.
+  if (_inFlight.has(key)) return { ran: false, reason: "already-ran" };
+  _inFlight.add(key);
+  try {
+    return await recoverOneInner(marker, opts);
+  } finally {
+    _inFlight.delete(key);
+  }
+};
+
+const recoverOneInner = async (marker, { logger, token }) => {
   const key = `${marker.sceneId}:${marker.at}`;
   const targetSceneId = marker.effectiveSceneId || marker.sceneId;
-  if (_attempted.has(key)) return { ran: false, reason: "already-ran" };
-
   if (Date.now() - (marker.at || 0) > MAX_MARKER_AGE_MS) {
     await clearPendingMicRecovery(marker.sceneId);
     return { ran: false, reason: "stale-marker" };
@@ -272,7 +483,6 @@ const recoverOne = async (marker, { logger, token, ignoreLiveRecording }) => {
     }
   }
 
-  _attempted.add(key);
   // Counted before the attempt, so a crash mid-upload still burns one.
   await bumpAttempts(marker);
 
@@ -283,6 +493,12 @@ const recoverOne = async (marker, { logger, token, ignoreLiveRecording }) => {
     duration: marker.duration,
     mimeType: marker.mimeType || "audio/webm",
     token,
+    sessionId: marker.backend === "idb" ? marker.sessionId || null : null,
+    sessionIds:
+      marker.backend === "idb"
+        ? ownChunkTags(marker, (await chrome.storage.local.get(null)) || {})
+        : null,
+    reuseMediaId: marker.uploadedMediaId || null,
   });
 
   if (result.ok) {
@@ -294,15 +510,14 @@ const recoverOne = async (marker, { logger, token, ignoreLiveRecording }) => {
       targetMediaId: marker.targetMediaId,
       token,
     });
-    // Re-checked: the guard above ran before an upload that can take minutes,
-    // and on IDB this is the same shared store a take started since is writing
-    // its only copy of the voice into.
-    const live = ignoreLiveRecording
-      ? {}
-      : await chrome.storage.local.get(["recording", "pendingRecording"]);
-    if (!live.recording && !live.pendingRecording) {
+    // Re-checked even on the start path: the upload can outlast the start's
+    // 15 s budget, and on IDB this is the same shared store the take that
+    // started since is writing its only copy of the voice into.
+    const live = await chrome.storage.local.get(["recording", "pendingRecording"]);
+    if (!live.recording && !live.pendingRecording && !result.foreign) {
       await store.clear().catch(() => {});
     }
+    await nudgeConfirmAfterMic(marker.sessionId);
     logger.info?.("[micRecovery] recovered separated mic", {
       sceneId: marker.sceneId,
       attached: result.attached,
@@ -311,6 +526,13 @@ const recoverOne = async (marker, { logger, token, ignoreLiveRecording }) => {
   }
 
   if (isPermanent(result.reason)) await clearPendingMicRecovery(marker.sceneId);
+  // The bump before the attempt stays only for a crash; a failure with no
+  // answer from the server gives it back.
+  else if (isServerFailure(result.reason)) await recordServerFailure(marker, result);
+  else if (!wasAnswered(result.reason)) await restoreAttempts(marker, result);
+  else if (marker.uploadedMediaId && String(result.reason).startsWith("attach-")) {
+    await dropUploadedMedia(marker);
+  }
   // Reason inline; in the object it arrives collapsed.
   logger.warn?.(`[micRecovery] recovery pass failed: ${result.reason}`, {
     sceneId: marker.sceneId,
@@ -318,6 +540,26 @@ const recoverOne = async (marker, { logger, token, ignoreLiveRecording }) => {
     ...result,
   });
   return { ran: true, ok: false, reason: result.reason };
+};
+
+// The mic is on the scene, so the take's confirm check need not wait for its 1/2/5 min slot.
+// Nothing is cleared here: settle needs the same proof as ever.
+const nudgeConfirmAfterMic = async (sessionId) => {
+  if (!sessionId) return;
+  try {
+    const all = (await chrome.storage.local.get(null)) || {};
+    const updates = {};
+    for (const [key, snap] of Object.entries(all)) {
+      if (!key.startsWith("cloudRecorderSession:")) continue;
+      if (snap?.opfsSessionId !== sessionId) continue;
+      updates[key] = { ...snap, micAttached: true, nextConfirmAt: Date.now() };
+    }
+    if (!Object.keys(updates).length) return;
+    await chrome.storage.local.set(updates);
+    await chrome.alarms?.create?.(CONFIRM_ALARM, {
+      delayInMinutes: CONFIRM_AFTER_MIC_MIN,
+    });
+  } catch {}
 };
 
 /**
@@ -340,17 +582,23 @@ export const runMicRecoveryScan = async ({
   const all = await listPendingMicRecovery();
   // The stop path writes its marker before its own inline upload, so scanning
   // that marker then would send the same mic twice.
-  const { micUploadInFlight } = await chrome.storage.local.get([
-    "micUploadInFlight",
-  ]);
-  const inFlightScene =
-    micUploadInFlight &&
-    Date.now() - (micUploadInFlight.at || 0) < INLINE_UPLOAD_FRESH_MS
-      ? micUploadInFlight.sceneId
-      : null;
+  const inFlightScenes = new Set(
+    Object.values(await readMicUploadFlags())
+      .filter(
+        (flag) =>
+          flag?.sceneId &&
+          Date.now() - (flag.at || 0) <
+            micUploadInFlightTtlMs(flag, INLINE_UPLOAD_FRESH_MS)
+      )
+      .map((flag) => flag.sceneId)
+  );
   const markers = (
     backend ? all.filter((m) => (m.backend || "idb") === backend) : all
-  ).filter((m) => !inFlightScene || m.sceneId !== inFlightScene);
+  )
+    .filter((m) => !inFlightScenes.has(m.sceneId))
+    // Backing off after server failures, or suspended at the cap: the marker
+    // stays for the user, nothing is sent for it.
+    .filter((m) => !isMicSuspended(m) && !(m.nextTryAt > Date.now()));
   if (!markers.length) return { ran: false, reason: "no-marker" };
 
   if (!ignoreLiveRecording) {
@@ -372,7 +620,6 @@ export const runMicRecoveryScan = async ({
       await recoverOne(marker, {
         logger,
         token: screenityToken,
-        ignoreLiveRecording,
       })
     );
   }

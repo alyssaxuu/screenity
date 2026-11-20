@@ -297,7 +297,7 @@ const config = {
         process.env.SCREENITY_ENABLE_CLOUD_FEATURES
       ),
       "process.env.MAX_RECORDING_DURATION": JSON.stringify(
-        process.env.MAX_RECORDING_DURATION || 3600 // Default to 1 hour
+        process.env.MAX_RECORDING_DURATION || 7200 // Default to 2 hours
       ),
       "process.env.RECORDING_WARNING_THRESHOLD": JSON.stringify(
         process.env.RECORDING_WARNING_THRESHOLD || 60 // Default to 1 minute

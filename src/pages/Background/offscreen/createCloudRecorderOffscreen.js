@@ -1,30 +1,9 @@
-import { noteOffscreenClose } from "./hostWatch";
-// Offscreen doc host for the recorder; immune to background-tab freeze/discard.
-// ?cloud=1 renders <CloudRecorder/>, else <Recorder/>. Chrome allows only one
-// offscreen doc per extension, so any existing one is closed first.
+import { addRecorderTake, newTakeId } from "./recorderHost";
+// Offscreen host for the recorder; immune to background-tab freeze/discard.
+// Each take gets its own frame in the one offscreen document Chrome allows (?cloud=1 renders
+// <CloudRecorder/>, else <Recorder/>), so starting a take never closes a finishing one.
 export const createCloudRecorderOffscreen = async ({ cloud = true } = {}) => {
-  if (!chrome.offscreen || typeof chrome.offscreen.createDocument !== "function") {
-    throw new Error("chrome.offscreen API unavailable");
-  }
-
-  try {
-    const contexts = await chrome.runtime.getContexts({});
-    const hasOffscreen = (contexts || []).some(
-      (c) => c.contextType === "OFFSCREEN_DOCUMENT",
-    );
-    if (hasOffscreen) {
-      noteOffscreenClose("create-preclose");
-      await chrome.offscreen.closeDocument();
-    }
-  } catch (err) {
-    // non-fatal; still attempt create, a stale doc surfaces as a create error
-    console.warn("[createCloudRecorderOffscreen] pre-close failed", err);
-  }
-
-  await chrome.offscreen.createDocument({
-    url: cloud ? "offscreenrecorder.html?cloud=1" : "offscreenrecorder.html",
-    reasons: ["USER_MEDIA", "DISPLAY_MEDIA", "BLOBS", "WORKERS"],
-    justification:
-      "Host the screen recorder so a long recording survives background-tab freeze/discard.",
-  });
+  const takeId = newTakeId();
+  await addRecorderTake({ takeId, cloud });
+  return { takeId };
 };

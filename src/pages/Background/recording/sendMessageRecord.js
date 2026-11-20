@@ -1,5 +1,6 @@
 import { sendMessageTab } from "../tabManagement";
 import { diagEvent } from "../../utils/diagnosticLog";
+import { isActiveRecorderAlive } from "../offscreen/recorderHost";
 
 // Offscreen docs survive a SW restart. If the SW died mid-start and lost the
 // `offscreen` flag, look for a live recorder offscreen doc before giving up.
@@ -9,7 +10,18 @@ const ENABLE_RESILIENT_HANDOFF = true;
 // broadcast and didn't reply (camera page). Only sendResponse confirms delivery.
 const isDeliveredWithoutReply = () => false;
 
-export const sendMessageRecord = (message, responseCallback = null) => {
+// onRoute names the receiver it picked, for a caller that has to explain a
+// missing answer.
+export const sendMessageRecord = (
+  message,
+  responseCallback = null,
+  { onRoute = null } = {}
+) => {
+  const route = (r) => {
+    try {
+      onRoute?.(r);
+    } catch {}
+  };
   return new Promise((resolve, reject) => {
     chrome.storage.local.get(["recordingTab", "offscreen"], (result) => {
       if (chrome.runtime.lastError) {
@@ -21,6 +33,7 @@ export const sendMessageRecord = (message, responseCallback = null) => {
       }
 
       if (result.offscreen) {
+        route("offscreen");
         chrome.runtime.sendMessage(message, (response) => {
           const err = chrome.runtime.lastError?.message;
           if (err && !isDeliveredWithoutReply(err)) {
@@ -32,6 +45,7 @@ export const sendMessageRecord = (message, responseCallback = null) => {
           }
         });
       } else if (result.recordingTab) {
+        route(`recordingTab:${result.recordingTab}`);
         sendMessageTab(result.recordingTab, message, responseCallback)
           .then(resolve)
           .catch((err) => {
@@ -47,6 +61,7 @@ export const sendMessageRecord = (message, responseCallback = null) => {
           });
       } else {
         const sendViaOffscreen = () => {
+          route("recovered-offscreen");
           chrome.runtime.sendMessage(message, (response) => {
             const err = chrome.runtime.lastError?.message;
             if (err && !isDeliveredWithoutReply(err)) {
@@ -71,6 +86,7 @@ export const sendMessageRecord = (message, responseCallback = null) => {
               session?.status === "recording" ||
               session?.status === "starting";
             if (sessionLive && recorderTabId) {
+              route(`session-tab:${recorderTabId}`);
               sendMessageTab(recorderTabId, message, responseCallback)
                 .then(resolve)
                 .catch(reject);
@@ -88,15 +104,10 @@ export const sendMessageRecord = (message, responseCallback = null) => {
         // If a recorder offscreen is alive (the SW restart wiped the flag but
         // not the doc), resume the handoff to it instead of giving up.
         if (ENABLE_RESILIENT_HANDOFF && chrome.runtime.getContexts) {
-          chrome.runtime
-            .getContexts({})
-            .then((contexts) => {
-              const hasRecorderOffscreen = (contexts || []).some(
-                (c) =>
-                  c.contextType === "OFFSCREEN_DOCUMENT" &&
-                  typeof c.documentUrl === "string" &&
-                  c.documentUrl.includes("offscreenrecorder.html")
-              );
+          // Frames of earlier takes still finishing in the host do not count:
+          // they ignore the live take's controls.
+          isActiveRecorderAlive()
+            .then((hasRecorderOffscreen) => {
               if (hasRecorderOffscreen) {
                 diagEvent("send-record-recovered-offscreen", {
                   messageType: message?.type || null,
