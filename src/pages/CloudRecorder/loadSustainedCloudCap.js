@@ -11,6 +11,8 @@ import { resolveSustainedTier, measureEncodeRate } from "./sustainedEncode";
 import { avcCodecForSize } from "../../media/avcLevel";
 import { prewarmSustainedEncode, prewarmSpeedTest } from "../Recorder/prewarmSustained";
 import { smootherMotionActive } from "./screenFps";
+import { prewarmLowspec } from "./lowspecSustained";
+import { policyFlagsFromStorage } from "./adaptivePolicyStore";
 
 const CAP_BY_TIER = { "2160p": CAP_2160P, "1440p": CAP_1440P, "1080p": CAP_1080P };
 
@@ -92,4 +94,24 @@ export const prewarmCloudEncodeCap = () =>
     // After the cloud run, not beside it: two flat-out encodes skew each
     // other's rates. Local Auto reads the same cache.
     await prewarmSustainedEncode();
+    // Adaptive policy's start rung reads these; a no-op unless the server flag is on.
+    try {
+      const stored = await chrome.storage.local.get([
+        "adaptivePolicy",
+        "adaptivePolicyThresholds",
+        "adaptivePolicyAt",
+      ]);
+      await prewarmLowspec({
+        flags: policyFlagsFromStorage(stored),
+        measure: (test) =>
+          measureEncodeRate(test, { fps: test.fps, codecFor: avcCodecForSize }),
+        storage: localStorage,
+        // Not while a take is under way or the tab is hidden.
+        canRun: async () => {
+          if (document.hidden) return false;
+          const { recording } = await chrome.storage.local.get("recording");
+          return recording !== true;
+        },
+      });
+    } catch {}
   });

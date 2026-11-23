@@ -1,4 +1,4 @@
-import React, { useContext } from "react";
+import React, { useContext, useEffect, useState } from "react";
 import * as Toggle from "@radix-ui/react-toggle";
 
 // Components
@@ -11,12 +11,33 @@ import { contentStateContext } from "../../context/ContentState";
 
 const MicToggle = (props) => {
   const [contentState, setContentState] = useContext(contentStateContext);
+  // Set by the cloud recorder while it is getting the same mic back mid-take.
+  const [reconnecting, setReconnecting] = useState(false);
+
+  useEffect(() => {
+    let live = true;
+    chrome.storage.local.get(["micReconnecting"]).then((r) => {
+      if (live) setReconnecting(r.micReconnecting === true);
+    });
+    const onChanged = (changes, area) => {
+      if (area === "local" && changes.micReconnecting) {
+        setReconnecting(changes.micReconnecting.newValue === true);
+      }
+    };
+    chrome.storage.onChanged.addListener(onChanged);
+    return () => {
+      live = false;
+      chrome.storage.onChanged.removeListener(onChanged);
+    };
+  }, []);
 
   return (
     <TooltipWrap
       shortcut={contentState.toggleMicShortcut}
       content={
-        contentState.microphonePermission && contentState.micActive
+        reconnecting
+          ? chrome.i18n.getMessage("micReconnectingTooltip")
+          : contentState.microphonePermission && contentState.micActive
           ? chrome.i18n.getMessage("disableMicrophoneTooltip")
           : contentState.microphonePermission && !contentState.micActive
           ? chrome.i18n.getMessage("enableMicrophoneTooltip")
@@ -29,6 +50,7 @@ const MicToggle = (props) => {
           aria-label="Toggle microphone"
           pressed={contentState.micActive}
           disabled={
+            reconnecting ||
             !contentState.microphonePermission ||
             contentState.defaultAudioInput === "none"
           }

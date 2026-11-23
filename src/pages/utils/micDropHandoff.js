@@ -20,6 +20,19 @@ export function micDropFields(drop) {
   }
   const ms = drop.micLostAtMs ?? drop.elapsedMs;
   if (typeof ms !== "number" || !Number.isFinite(ms) || ms < 0) return {};
-  if (reason !== MIC_DROP_STOP_REASON) return {};
-  return { micLostAtMs: ms, stopReason: MIC_DROP_STOP_REASON };
+  const extra = {};
+  if (Number.isFinite(drop.micBackAtMs) && drop.micBackAtMs >= ms) {
+    extra.micBackAtMs = drop.micBackAtMs;
+  }
+  if (Number.isFinite(drop.micDropCount) && drop.micDropCount > 1) {
+    extra.micDropCount = drop.micDropCount;
+  }
+  // A take that kept recording has no stop reason: only a return time says the
+  // mic dropped and came back.
+  if (reason !== MIC_DROP_STOP_REASON) {
+    return extra.micBackAtMs !== undefined
+      ? { micLostAtMs: ms, ...extra }
+      : {};
+  }
+  return { micLostAtMs: ms, stopReason: MIC_DROP_STOP_REASON, ...extra };
 }

@@ -59,6 +59,8 @@ export const cancelRecording = async () => {
       restarting: false,
       offscreen: false,
       memoryError: false,
+      // Ends the start re-check without a second teardown.
+      lastStartEndedAt: Date.now(),
     });
 
     // URL-guard so we never close a user tab by mistake

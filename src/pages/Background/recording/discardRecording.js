@@ -87,6 +87,8 @@ export const discardRecording = async ({
     region: false,
     customRegion: false,
     memoryError: false,
+    // Ends the start re-check without a second teardown.
+    lastStartEndedAt: Date.now(),
     ...multiState,
   });
   chrome.storage.local.set({ pipForceClose: Date.now() });

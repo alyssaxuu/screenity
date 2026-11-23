@@ -4,6 +4,9 @@ import { appendUploadTelemetryEventSerialized } from "../utils/serializedTelemet
 import { noteApiError, noteApiResponse } from "../utils/apiReachability";
 import { perfMark, perfSpan } from "../../utils/perfMarks";
 import { HELP_LINKS, HELP_CENTER_URL } from "../../utils/helpLinks";
+import { awaitStartStages, getStartFlowTrace } from "../../utils/startFlowTrace";
+import { sendWhenTabReady } from "../tabManagement/sendWhenTabReady";
+import { focusWindowForPicker } from "../tabManagement/focusWindowForPicker";
 import {
   focusTab,
   createTab,
@@ -16,6 +19,7 @@ import { startAfterCountdown, startRecording } from "../recording/startRecording
 import { awaitEditorRegistration } from "../recording/editorRegistration";
 import { withAttemptLock, ATTEMPT_STATE_KEYS, isAttemptSuperseded, claimRecordingAttempt, releaseAttemptClaim } from "../recording/attemptLock";
 import { noteCountdownStarted } from "../recording/countdownFallback";
+import { cancelCountdownForStop } from "../recording/stopDuringCountdown";
 import {
   handleStopRecordingTab,
   clearInMemoryEditorLock,
@@ -107,6 +111,7 @@ import {
 import { supportContextQuery } from "../../utils/buildSupportContext";
 import { lifecycle } from "../../utils/lifecycleLog";
 import { micDropFields } from "../../utils/micDropHandoff";
+import { degradedTakeFields } from "../../utils/degradedHandoff";
 import { startRecoveryDownload } from "../utils/recoveryDownload";
 import { armConfirmAlarm, armMicAwaitSceneAlarm } from "../recording/resumePendingUploads";
 import { handleRecordingSignals } from "../recording/recordingSignals";
@@ -841,16 +846,16 @@ export const handleFinishMultiRecording = async () => {
 
       if (messageTab) {
         await focusTab(messageTab, { reason: "finish-multi-recording:notify" });
-        await sendMessageTab(messageTab, {
-          type: "update-project-ready",
-          share: false,
-          newProject: false,
-          projectId: projectId || null,
-        }).catch((err) =>
-          console.warn(
-            "[Screenity][BG] Failed to send update-project-ready (finish-multi-recording)",
-            err,
-          ),
+        // Not awaited: a tab that just opened can take seconds to take messages.
+        void sendWhenTabReady(
+          messageTab,
+          {
+            type: "update-project-ready",
+            share: false,
+            newProject: false,
+            projectId: projectId || null,
+          },
+          { send: sendMessageTab, label: " (finish-multi-recording)" },
         );
       } else {
         console.warn(
@@ -1694,7 +1699,11 @@ export const setupHandlers = () => {
 
     stopRecordingTabInFlight = true;
     stopRecordingTabLastAt = now;
-    Promise.resolve(handleStopRecordingTab(message))
+    cancelCountdownForStop({
+      get: (keys) => chrome.storage.local.get(keys),
+      send: sendMessageTab,
+    })
+      .then((cancelled) => (cancelled ? null : handleStopRecordingTab(message)))
       .catch((err) => {
         console.error("Failed to handle stop-recording-tab", err);
       })
@@ -2174,7 +2183,10 @@ export const setupHandlers = () => {
       if (!startFlowTrace || !screenityToken) return;
       const trigger = message?.trigger || "manual";
       const isSuccess = trigger === "success-summary";
-      const trace = startFlowTrace;
+      const startStages = isSuccess
+        ? await awaitStartStages(startFlowTrace.attemptId)
+        : (await getStartFlowTrace())?.startStages || null;
+      const trace = { ...startFlowTrace, startStages };
       await postDiagnosticReport({
         attemptId: trace.attemptId,
         projectId: projectId || null,
@@ -2195,6 +2207,7 @@ export const setupHandlers = () => {
               error: null,
               errorCode: null,
               stuck: null,
+              startStages: trace.startStages || null,
             }
           : trace,
       });
@@ -2893,13 +2906,15 @@ export const setupHandlers = () => {
     }
 
     if (messageTab) {
-      await sendMessageTab(messageTab, {
+      // Not awaited: a tab that just opened can take seconds to take messages.
+      void sendWhenTabReady(messageTab, {
         type: "update-project-ready",
         share: Boolean(publicUrl),
         newProject: Boolean(message.newProject),
         sceneId: sceneId,
         projectId,
         ...micDropFields(message),
+        ...degradedTakeFields(message),
         localPlayback: localPlaybackOffer
           ? {
               available: true,
@@ -2919,9 +2934,7 @@ export const setupHandlers = () => {
               available: false,
               trackType: "screen",
             },
-      }).catch((err) =>
-        console.warn("[Screenity][BG] Failed to send update-project-ready", err),
-      );
+      }, { send: sendMessageTab });
     } else {
       console.warn("❗ No valid messageTab found in editor-ready");
     }
@@ -3462,6 +3475,10 @@ export const setupHandlers = () => {
       sendResponse({ recorderSession: recorderSession || null });
       return true;
     },
+  );
+
+  registerMessage("focus-tab-for-picker", (message, sender) =>
+    focusWindowForPicker(chrome.windows, sender?.tab?.windowId)
   );
 
   registerMessage("activate-recorder-tab", async (message, sender) => {

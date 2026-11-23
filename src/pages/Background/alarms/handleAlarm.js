@@ -12,6 +12,7 @@ import { chunksStore } from "../recording/chunkHandler";
 import { openExistingChunksStore } from "../../CloudRecorder/recorderStorage/chooseChunksStore";
 import { destroySessionDir } from "../../CloudRecorder/recorderStorage/opfsKvStore";
 import { emitRecordingTelemetry } from "../recording/emitRecordingTelemetry";
+import { buildWatchdogGaveUp } from "./watchdogReport";
 import { clearOfferBytes } from "../../CloudRecorder/localPlaybackRetention";
 import { markFastRecorderFailure } from "../../../media/fastRecorderGate";
 import {
@@ -343,7 +344,11 @@ export const handleAlarm = async (alarm) => {
           rearms: rearmCount + 1,
         });
         await chrome.storage.local.set({
-          firstChunkWatchdogState: { rearms: rearmCount + 1, at: Date.now() },
+          firstChunkWatchdogState: {
+            rearms: rearmCount + 1,
+            at: Date.now(),
+            reasons: [...(watchdogState?.reasons || []), reason].slice(-8),
+          },
         });
         await chrome.alarms.create(FIRST_CHUNK_WATCHDOG_ALARM, {
           delayInMinutes: FIRST_CHUNK_WATCHDOG_REARM_MS / 60000,
@@ -414,6 +419,17 @@ export const handleAlarm = async (alarm) => {
         } catch (err) {
           console.warn("[Screenity][BG] watchdog sticky-disable failed", err);
         }
+        const gaveUp = buildWatchdogGaveUp({
+          snapshot,
+          snapshotError,
+          reasons: watchdogState?.reasons || [],
+          rearms: rearmCount,
+        });
+        void emitRecordingTelemetry("recording_forensic_event", {
+          name: "first-chunk-watchdog-gave-up",
+          reason: gaveUp.reason,
+          errMsg: gaveUp.errMsg,
+        });
         // handleRecordingError (not sendMessageRecord) so the editor gets notified
         try {
           await handleRecordingError({

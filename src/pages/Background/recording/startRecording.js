@@ -7,20 +7,20 @@ import { makeRecordingAttemptId } from "../../utils/errorCodes";
 import { lifecycle } from "../../utils/lifecycleLog";
 import { sweepRecorderTabs } from "./sweepRecorderTabs";
 import { emitRecordingTelemetry } from "./emitRecordingTelemetry";
+import { noteTakeStart, noteTakeEvent } from "./adaptiveHistory";
 import { retainedTabIdsFor } from "./recordingRetention";
 import { awaitPendingEditorRegistrations } from "./editorRegistration";
+import {
+  RECHECK_INTERVAL_MS,
+  isWatchedStart,
+  judgeStartRecheck,
+  START_WATCH_MAX_MS,
+} from "./startRecheck";
 
 // `recording` flag isn't set until the recorder iframe inits (seconds later),
 // so countdown-finished + 8s fallback can both fire and open two recorder tabs
 let _startRecordingInFlight = false;
 const STARTRECORDING_GUARD_TIMEOUT_MS = 30000;
-// Start-fail re-check keeps polling while the recorder reports stage progress,
-// so a slow-but-live start isn't torn down. The caps bound a wedged start.
-const RECHECK_INTERVAL_MS = 2500;
-// Generous: the encoder probe stage can legitimately run several seconds on a
-// flaky encoder, and killing a live start is the worse bug.
-const PROGRESS_STALE_MS = 10000;
-const START_PROGRESS_CAP_MS = 25000;
 let _startRecordingGuardTimer = null;
 const releaseStartRecordingGuard = () => {
   _startRecordingInFlight = false;
@@ -102,6 +102,7 @@ const _startRecordingInner = async (caller, countdownId) => {
     }
   } catch {}
   if (!recordingAttemptId) recordingAttemptId = makeRecordingAttemptId();
+  void noteTakeStart(recordingAttemptId);
   // only gate countdown-finished; direct/fallback/restart don't share it.
   try {
     const {
@@ -302,6 +303,8 @@ const _startRecordingInner = async (caller, countdownId) => {
     sandboxTab: null,
     // a prior recording's track-end would be blamed for this attempt in reports
     lastTrackEndEvent: null,
+    // a toolbar left on 'reconnecting' by a take that ended mid-window
+    micReconnecting: false,
     // paused leak from a prior errored recording would mis-account duration
     paused: false,
     pausedAt: null,
@@ -524,57 +527,79 @@ const _startRecordingInner = async (caller, countdownId) => {
     : { type: "start-recording-tab", recordingAttemptId };
 
   const startDispatchedAt = Date.now();
+  // The guard timer began at entry; slow setup must not let it lapse before
+  // the watch's own longest run.
+  if (_startRecordingInFlight) {
+    if (_startRecordingGuardTimer) clearTimeout(_startRecordingGuardTimer);
+    _startRecordingGuardTimer = setTimeout(
+      releaseStartRecordingGuard,
+      START_WATCH_MAX_MS,
+    );
+  }
 
-  sendMessageRecord(startMsg).catch((err) => {
-    const errStr = String(err).slice(0, 120);
+  // A reply is no proof of a start: "message port closed" can come from a
+  // healthy start, and an accepted start can still wedge. Both get re-checked.
+  const watchStart = (errStr) => {
     const isStaleTab =
       errStr.includes("Receiving end does not exist") ||
       errStr.includes("No tab with id") ||
       errStr.includes("No recording tab available");
-    // sendMessage can reject "message port closed" even on a healthy start; re-check
     const recheck = async () => {
-      let isReallyRecording = false;
-      let trackEnd = null;
-      let progress = null;
+      let snap = {};
       try {
-        const snap = await chrome.storage.local.get([
+        snap = await chrome.storage.local.get([
           "recording",
           "pendingRecording",
           "lastTrackEndEvent",
           "recorderStartProgress",
+          "lastRecordingError",
+          "lastStartEndedAt",
+          "recordingStoppedAt",
         ]);
-        isReallyRecording = Boolean(snap.recording);
-        trackEnd = snap.lastTrackEndEvent || null;
-        progress = snap.recorderStartProgress || null;
       } catch {}
-      if (isReallyRecording) return;
+      const judged = judgeStartRecheck(snap, startDispatchedAt, Date.now());
+      if (judged.verdict === "recording") return;
+      // A second teardown here could hit the next take; just free the guard.
+      if (judged.verdict === "ended") {
+        releaseStartRecordingGuard();
+        // A stop that ended in neither video-ready nor an error leaves the
+        // pending flag and icon up. A newer click owns the flag.
+        const cur = await chrome.storage.local.get([
+          "pendingRecording",
+          "pendingRecordingAt",
+          "recording",
+          "restarting",
+        ]);
+        const newerClick =
+          typeof cur.pendingRecordingAt === "number" &&
+          cur.pendingRecordingAt > startDispatchedAt;
+        if (cur.pendingRecording && !cur.recording && !cur.restarting && !newerClick) {
+          chrome.storage.local.set({ pendingRecording: false });
+          chrome.action.setIcon({ path: "assets/icon-34.png" });
+        }
+        return;
+      }
       // Still moving mid-start: a slow encoder probe outlasts one window, and
       // discarding the offscreen doc here is what killed the recording.
-      const isThisStart = progress?.ts && progress.ts >= startDispatchedAt;
-      const isFresh = isThisStart && Date.now() - progress.ts < PROGRESS_STALE_MS;
-      const withinCap = Date.now() - startDispatchedAt < START_PROGRESS_CAP_MS;
-      if (isFresh && withinCap) {
+      if (judged.verdict === "wait") {
         setTimeout(recheck, RECHECK_INTERVAL_MS);
         return;
       }
-      // No writer at all reads the same as a stalled one, so keep them apart.
-      const stalledStage = isThisStart
-        ? String(progress.stage || "unknown").slice(0, 40)
-        : "none";
-      if (isThisStart) {
+      const { stage: stalledStage, stalledMs } = judged;
+      if (stalledMs != null) {
         diagEvent("warning", {
           note: "start-fail after progress stalled",
           stage: stalledStage,
-          stalledMs: Date.now() - progress.ts,
+          stalledMs,
         });
       }
       // Stream came up then died (native Stop sharing, source window gone).
       // That handler already stopped it, so don't overwrite the real reason.
-      if (trackEnd?.ts && trackEnd.ts >= startDispatchedAt) {
+      if (judged.verdict === "stream-ended") {
         diagEvent("warning", {
           note: "start-fail suppressed, stream ended after start",
-          reason: String(trackEnd.reason || "").slice(0, 60),
-          afterMs: trackEnd.ts - startDispatchedAt,
+          reason: String(judged.trackEnd.reason || "").slice(0, 60),
+          afterMs: judged.trackEnd.ts - startDispatchedAt,
         });
         releaseStartRecordingGuard();
         return;
@@ -590,10 +615,11 @@ const _startRecordingInner = async (caller, countdownId) => {
         recordingSessionId: recordingAttemptId,
         name: "start-fail-progress",
         reason: `start-progress-${stalledStage}`,
-        stalledMs: isThisStart ? Date.now() - progress.ts : null,
+        stalledMs,
         elapsedMs: Date.now() - startDispatchedAt,
         errMsg: errStr,
       });
+      void noteTakeEvent({ startFail: true });
       releaseStartRecordingGuard();
       chrome.storage.local.set({
         pendingRecording: false,
@@ -620,7 +646,15 @@ const _startRecordingInner = async (caller, countdownId) => {
       chrome.action.setIcon({ path: "assets/icon-34.png" });
     };
     setTimeout(recheck, RECHECK_INTERVAL_MS);
-  });
+  };
+
+  sendMessageRecord(startMsg).then(
+    (reply) => {
+      if (isWatchedStart(reply)) watchStart("accepted-no-progress");
+      else if (reply?.ignored === "start-failed") releaseStartRecordingGuard();
+    },
+    (err) => watchStart(String(err).slice(0, 120))
+  );
   chrome.action.setIcon({ path: "assets/recording-logo.png" });
   // chrome.alarms 30s minimum in prod; sub-30s silently bumps or never fires
   if (alarm) {

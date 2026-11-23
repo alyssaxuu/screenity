@@ -26,5 +26,14 @@ export function flagUpdatesFromUser(user, { subscribed = false } = {}) {
   };
   copy(FLAG_KEYS);
   if (subscribed === true) copy(SUBSCRIBER_FLAG_KEYS);
+  // Adaptive quality policy: the flag and its optional threshold object travel
+  // together. The stamp lets the recorder treat a stale copy as off.
+  if (typeof flags.adaptivePolicy === "boolean") {
+    updates.adaptivePolicy = flags.adaptivePolicy;
+    const t = flags.adaptivePolicyThresholds;
+    updates.adaptivePolicyThresholds =
+      t && typeof t === "object" && !Array.isArray(t) ? t : null;
+    updates.adaptivePolicyAt = Date.now();
+  }
   return updates;
 }

@@ -11,3 +11,11 @@ export function markStartProgress(stage) {
     });
   } catch {}
 }
+
+// Tells the background re-check this start ended with nothing left to tear
+// down (Stop or dismiss while it was still waiting).
+export function markStartEnded() {
+  try {
+    chrome.storage.local.set({ lastStartEndedAt: Date.now() });
+  } catch {}
+}

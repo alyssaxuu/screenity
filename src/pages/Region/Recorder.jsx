@@ -1378,6 +1378,7 @@ const Recorder = () => {
             );
             markFastRecorderFailure(failureCode, {
               error: errStr,
+              detail: err?.detail || null,
               finalized: fatalFinalized || undefined,
             });
             // Keep useWebCodecsRecorder on for transient stream errors.

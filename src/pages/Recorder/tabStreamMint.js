@@ -1,6 +1,5 @@
-// Tab-capture stream id mint: one in flight at a time, and a fallback for
-// when the pushed `loaded` message (which carries isTab/tabID) never reached
-// this document.
+// Tab-capture stream id mint: one in flight at a time, plus a fallback for
+// when the pushed `loaded` message (isTab/tabID) never reached this document.
 
 // A second concurrent mint can fail with "active stream", so a late `loaded`
 // and the streaming-data fallback must share one mint. `mint` runs at most

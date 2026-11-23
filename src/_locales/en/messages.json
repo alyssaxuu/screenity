@@ -2236,5 +2236,9 @@
   "cameraNotFoundError": {
     "message": "Screenity can't find a camera. Check that it is connected and try again.",
     "description": "Shown when a camera-only recording cannot start because no camera is found or the chosen camera is gone"
+  },
+  "micReconnectingTooltip": {
+    "message": "Mic disconnected. Trying to reconnect…",
+    "description": "Toolbar mic button tooltip while the recorder is getting the same microphone back during a recording"
   }
 }

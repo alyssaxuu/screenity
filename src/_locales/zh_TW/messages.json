@@ -1620,7 +1620,7 @@
     "description": "Settings menu item to manually trigger cloud recording recovery"
   },
   "toastRecoveredSession": {
-    "message": "Recovered unsaved recording from the previous session.",
+    "message": "已復原上一次工作階段中未儲存的錄製內容。",
     "description": "Toast shown when a crashed recording session is auto-recovered on startup"
   },
   "toastStorageCritical": {
@@ -1632,15 +1632,15 @@
     "description": "Toast when the last part of a recording could not be written to disk"
   },
   "toastStorageLow": {
-    "message": "Storage is running low. Upload reliability may degrade for long recordings.",
+    "message": "儲存空間不足。錄製時間較長時，上傳的穩定性可能會下降。",
     "description": "Toast shown when available storage drops below the warning threshold during recording"
   },
   "toastAudioCaptureDegraded": {
-    "message": "Transcription capture paused due to memory pressure. Video upload continues.",
+    "message": "由於記憶體不足，轉錄擷取已暫停。影片上傳仍在繼續。",
     "description": "Toast shown when the audio recorder is stopped early because the audio buffer limit was reached"
   },
   "toastNetworkOffline": {
-    "message": "Network offline. Upload paused. Screen chunks are saved locally.",
+    "message": "網路已離線。上傳已暫停。螢幕片段已儲存在本機。",
     "description": "Toast shown when the browser goes offline during a cloud recording upload"
   },
   "toastLocalCopyIncomplete": {
@@ -2218,5 +2218,9 @@
   "cameraNotFoundError": {
     "message": "Screenity 找不到攝影機。請檢查攝影機是否已連接，然後再試一次。",
     "description": "Shown when a camera-only recording cannot start because no camera is found or the chosen camera is gone"
+  },
+  "micReconnectingTooltip": {
+    "message": "麥克風已中斷連線。正在嘗試重新連線…",
+    "description": "Toolbar mic button tooltip while the recorder is getting the same microphone back during a recording"
   }
 }

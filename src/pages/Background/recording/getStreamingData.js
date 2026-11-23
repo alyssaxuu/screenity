@@ -27,8 +27,8 @@ export const getStreamingData = async () => {
       defaultVideoInput,
       systemAudio,
       recordingType,
-      // Only the offscreen route stores it; a tab-hosted recorder gets its
-      // tab id from the `loaded` retry loop, so a stale value must not leak.
+      // Only the offscreen route stores it; a tab-hosted recorder gets its tab id
+      // from the `loaded` retry loop, so a stale value must not leak.
       tabCaptureTabId: offscreen ? (tabCaptureTabId ?? null) : null,
     };
   } catch (error) {

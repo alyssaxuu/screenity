@@ -1620,7 +1620,7 @@
     "description": "Settings menu item to manually trigger cloud recording recovery"
   },
   "toastRecoveredSession": {
-    "message": "Recovered unsaved recording from the previous session.",
+    "message": "Uma gravação não salva da sessão anterior foi recuperada.",
     "description": "Toast shown when a crashed recording session is auto-recovered on startup"
   },
   "toastStorageCritical": {
@@ -1632,15 +1632,15 @@
     "description": "Toast when the last part of a recording could not be written to disk"
   },
   "toastStorageLow": {
-    "message": "Storage is running low. Upload reliability may degrade for long recordings.",
+    "message": "O armazenamento está acabando. A confiabilidade do envio pode diminuir em gravações longas.",
     "description": "Toast shown when available storage drops below the warning threshold during recording"
   },
   "toastAudioCaptureDegraded": {
-    "message": "Transcription capture paused due to memory pressure. Video upload continues.",
+    "message": "A captura da transcrição foi pausada por falta de memória. O envio do vídeo continua.",
     "description": "Toast shown when the audio recorder is stopped early because the audio buffer limit was reached"
   },
   "toastNetworkOffline": {
-    "message": "Network offline. Upload paused. Screen chunks are saved locally.",
+    "message": "Rede offline. Envio pausado. Os trechos da tela estão salvos localmente.",
     "description": "Toast shown when the browser goes offline during a cloud recording upload"
   },
   "toastLocalCopyIncomplete": {
@@ -2218,5 +2218,9 @@
   "cameraNotFoundError": {
     "message": "O Screenity não encontra uma câmera. Verifique se ela está conectada e tente de novo.",
     "description": "Shown when a camera-only recording cannot start because no camera is found or the chosen camera is gone"
+  },
+  "micReconnectingTooltip": {
+    "message": "Microfone desconectado. Tentando reconectar…",
+    "description": "Toolbar mic button tooltip while the recorder is getting the same microphone back during a recording"
   }
 }

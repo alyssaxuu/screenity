@@ -29,6 +29,7 @@ import {
   smootherMotionActive,
 } from "./screenFps";
 import { advanceTimecode } from "./chunkClock";
+import { stickyTelemetryFields } from "./stickyTelemetry";
 import { planGapResend } from "./uploadGapRecovery";
 import {
   describeTrack,
@@ -81,12 +82,36 @@ import {
   flattenProbeDiag,
 } from "../Recorder/audioSourceProbe";
 import { attachGapDetector, flattenGapDiag } from "../Recorder/audioGapDetector";
-import { longTasks, readDevice, flattenPerfStats } from "../Recorder/perfTelemetry";
+import {
+  longTasks,
+  lagTracker,
+  pressureWatcher,
+  readDevice,
+  flattenPerfStats,
+  composeEncodeStats,
+} from "../Recorder/perfTelemetry";
 import { getDeviceHints } from "../Recorder/deviceHints";
 import { readHeap } from "../utils/deviceSnapshot";
+import {
+  planStart,
+  capEncodeForPlan,
+  capBitrateForPlan,
+} from "./adaptivePolicyRuntime";
+import { createPolicyTake } from "./adaptivePolicyTake";
+import { cameraReacquireConstraints } from "./adaptivePolicyApply";
+import { recordTakeEvent } from "./adaptivePolicyStore";
+import { degradedTakeFields } from "../utils/degradedHandoff";
 import { startTabKeepalive, stopTabKeepalive } from "../utils/tabKeepalive";
-import { traceStep } from "../utils/startFlowTrace";
-import { markStartProgress } from "../utils/startProgress";
+import { traceStep, writeStartStages } from "../utils/startFlowTrace";
+import { markStartProgress, markStartEnded } from "../utils/startProgress";
+import { createStartStageLog } from "./startStages";
+import { timedAcquire as timedAcquireRaw } from "./timedAcquire";
+import { buildMicEndContext, probeMicEnd } from "./micEndContext";
+import {
+  readTrackFrameStats,
+  computeHeadLossMs,
+  createChunkDeltas,
+} from "./frameHealth";
 import { IS_OFFSCREEN_HOST, isContentIframe } from "../utils/recordingHost";
 import {
   upsertPendingScene,
@@ -130,7 +155,11 @@ import {
 } from "../Recorder/encoderPrewarm";
 import { perfMark, perfSpan } from "../utils/perfMarks";
 import { createWriteCoalescer } from "../utils/writeCoalescer";
-import { computeMicDropElapsedMs } from "../utils/micDropElapsed";
+import {
+  computeMicDropElapsedMs,
+  buildMicDropInWindowEvent,
+  buildMicDropRecoveredEvent,
+} from "../utils/micDropElapsed";
 import {
   SYSTEM_AUDIO_STOP_REASON,
   createSystemAudioEndGate,
@@ -138,6 +167,16 @@ import {
   resolveSystemAudioDropEvent,
 } from "../utils/systemAudioDrop";
 import { micDropFields } from "../utils/micDropHandoff";
+import {
+  reconnectCloudMic,
+  createMicEndHandler,
+  stopReconnectedMic,
+  applyBusMicMute,
+  ensureLiveMic as ensureLiveMicImpl,
+  clearReconnectFlag,
+} from "./micReconnect";
+import { acquireExactMic } from "../utils/micReacquire";
+import { isSameMicDevice } from "../utils/micLabelMatch";
 import {
   TRACK_KEY_PREFIX,
   chooseChunksStore,
@@ -222,6 +261,12 @@ import {
   shouldDeliverToTabRecorder,
 } from "../OffscreenRecorder/takeFrameRouting";
 import { micUploadFlagKey } from "../utils/micUploadFlag";
+import {
+  retryCreate,
+  isPermanentCreateFailure,
+  isAuthCreateFailure,
+} from "./createRetry";
+import { pendingStartStep, PENDING_START_POLL_MS } from "./pendingStart";
 import { stampNoticeAttempt, trackNoticeAttempt } from "../utils/noticeAttemptStamp";
 import {
   claimMultiSceneTurn,
@@ -401,7 +446,10 @@ let encoderHwSlots = null;
 let encoderReasons = { screen: null, audio: null, camera: null };
 // WebCodecs sticky-disable device state at plan time, from
 // getFastRecorderStickyState().
-let encoderSticky = { disabled: null, reason: null };
+// Stop's onstop wait on the save path is 5 s; this adds 10 s. With the 5 s
+// pending-write drain, 20 s worst case, equal to the previous-recorder hold.
+const STOP_SAVE_EXTRA_WAIT_MS = 10_000;
+let encoderSticky = { disabled: null, reason: null, details: null };
 
 // Diagnostic-only snapshot taken once at session start. userAgent is
 // fingerprinting-grade but is already covered by the crash-reports
@@ -518,6 +566,17 @@ const CloudRecorder = () => {
   const screenFpsRef = useRef(30);
   const prewarmRef = useRef(null);
   const cameraStream = useRef(null);
+  const chunkDeltas = useRef(createChunkDeltas());
+  // Adaptive policy (server flag, default off); null when off.
+  const policyTake = useRef(null);
+  if (!policyTake.current) {
+    policyTake.current = createPolicyTake({
+      recordEvent: (marks) => recordTakeEvent(chrome.storage.local, marks),
+    });
+  }
+  const startStageLog = useRef(createStartStageLog());
+  const timedAcquire = (kind, fn) =>
+    timedAcquireRaw(kind, fn, { mark: perfMark });
   const micStream = useRef(null);
   const rawMicStream = useRef(null);
   // Set at start and not re-read, so a take stays separated or muxed for its
@@ -555,9 +614,25 @@ const CloudRecorder = () => {
   const audioBusChannels = useRef(null);
 
   const uploadersInitialized = useRef(false);
+  // Uploader objects exist with container, codec and dims. Server creates may
+  // still be in flight; chunks wait on disk meanwhile.
+  const uploadersPrepared = useRef(false);
+  const createsAbandonedRef = useRef(false);
+  // False from initializeUploaders until a screen or camera create lands for this
+  // take; null in a recorder that never started one, which keeps the old behavior.
+  const videoCreatedRef = useRef(null);
+  const uploadGenRef = useRef(0);
+  const createRefusedRef = useRef(null);
+  // The start has passed its uploaders gate: a refusal from here on is mid-take.
+  const startPastGateRef = useRef(false);
+  // The last init failed with its error already sent; a later start is dropped,
+  // not answered with a second error.
+  const initFailedRef = useRef(false);
   const pendingStartRef = useRef(false);
   const pendingStartAttempts = useRef(0);
   const pendingStartTimer = useRef(null);
+  const pendingStartSinceRef = useRef(0);
+  const pendingStartMarkAtRef = useRef(null);
 
   const isRestarting = useRef(false);
   const isFinishing = useRef(false);
@@ -567,6 +642,12 @@ const CloudRecorder = () => {
   const takeContextRef = useRef(null);
   // Set when a mic drop stops the take; sent with editor-ready for the web editor.
   const micDropRef = useRef(null);
+  const micReconnectGen = useRef(0);
+  const micReconnectBudget = useRef({ recent: [] });
+  const liveMicTrackRef = useRef(null);
+  const micReconnectFlagSet = useRef(false);
+  const micDropHistory = useRef(null);
+  const reconnectedMicStream = useRef(null);
   // Bumped when a take starts or is dismissed, so a system-audio end that was
   // waiting never acts on a later take.
   const takeSeqRef = useRef(0);
@@ -710,6 +791,9 @@ const CloudRecorder = () => {
   const startupStageRef = useRef(null);
   const startupClickLookupRef = useRef(null);
   const startupCaptureStartedAtRef = useRef(null);
+  // Set once this start has reported its own error, so the flush that follows
+  // does not replace it with a generic cancel.
+  const startErrorSentRef = useRef(false);
   const pausedStateRef = useRef(false);
   const audioCaptureDegradedRef = useRef(false);
   const storagePressureRef = useRef({
@@ -796,6 +880,7 @@ const CloudRecorder = () => {
   // stage in flight, not the last completed one.
   const markCloudStartProgress = (stage) => {
     startupStageRef.current = { stage, ts: Date.now() };
+    startStageLog.current.note(stage);
     markStartProgress(stage);
   };
 
@@ -840,15 +925,25 @@ const CloudRecorder = () => {
     }
   };
 
-  const canBeginRecording = () => {
-    const hasStreams =
-      Boolean(screenStream.current) || Boolean(cameraStream.current);
-    return Boolean(uploadersInitialized.current) && hasStreams;
-  };
-
   const maybeStartRecording = (reason = "unknown") => {
     if (!pendingStartRef.current || isFinishing.current) return;
-    if (canBeginRecording()) {
+    const now = Date.now();
+    if (pendingStartAttempts.current === 0) {
+      pendingStartSinceRef.current = now;
+      pendingStartMarkAtRef.current = null;
+    }
+    const attempt = pendingStartAttempts.current + 1;
+    const step = pendingStartStep({
+      elapsedMs: now - pendingStartSinceRef.current,
+      sinceMarkMs:
+        pendingStartMarkAtRef.current == null
+          ? null
+          : now - pendingStartMarkAtRef.current,
+      hasStreams:
+        Boolean(screenStream.current) || Boolean(cameraStream.current),
+      uploadersReady: Boolean(uploadersPrepared.current),
+    });
+    if (step.action === "start") {
       if (pendingStartAttempts.current > 0) {
         perfMark("CloudRecorder capture-late-recovered", {
           polls: pendingStartAttempts.current,
@@ -866,7 +961,13 @@ const CloudRecorder = () => {
       return;
     }
 
-    const attempt = pendingStartAttempts.current + 1;
+    if (step.action === "fail") {
+      clearPendingStart();
+      sendRecordingError(
+        "Recording is taking too long to start. Please try again."
+      );
+      return;
+    }
     pendingStartAttempts.current = attempt;
     if (attempt === 1) {
       // The countdown finished before the recorder was ready, so capture
@@ -874,12 +975,9 @@ const CloudRecorder = () => {
       // is 200ms; the attempt count at start tells us how much was lost.
       perfMark("CloudRecorder capture-late-after-countdown", { reason });
     }
-    if (attempt > 75) {
-      clearPendingStart();
-      sendRecordingError(
-        "Recording is taking too long to start. Please try again."
-      );
-      return;
+    if (step.mark) {
+      pendingStartMarkAtRef.current = now;
+      markCloudStartProgress(step.mark);
     }
 
     if (pendingStartTimer.current) {
@@ -888,7 +986,7 @@ const CloudRecorder = () => {
     pendingStartTimer.current = setTimeout(() => {
       pendingStartTimer.current = null;
       maybeStartRecording(reason);
-    }, 200);
+    }, PENDING_START_POLL_MS);
   };
 
   const logStartFlow = (event, data = {}) => {
@@ -1325,6 +1423,7 @@ const CloudRecorder = () => {
             : null,
         encoderStickyReason:
           eventPayload.encoderStickyReason || encoderSticky.reason || null,
+        ...stickyTelemetryFields(encoderSticky.details),
         // Capture identity. `event` is a fixed allowlist, so these were
         // dropped client-side before the server sanitizer saw them: that's
         // why upload_sessions logs recordingType/isTab/region as "unknown" on
@@ -1374,6 +1473,23 @@ const CloudRecorder = () => {
         storageInitMs:
           typeof eventPayload.storageInitMs === "number"
             ? eventPayload.storageInitMs
+            : null,
+        // Set on the mic-track-ended forensic event.
+        micAcquireAgeMs:
+          typeof eventPayload.micAcquireAgeMs === "number"
+            ? eventPayload.micAcquireAgeMs
+            : null,
+        countdownEndAgeMs:
+          typeof eventPayload.countdownEndAgeMs === "number"
+            ? eventPayload.countdownEndAgeMs
+            : null,
+        micListed:
+          typeof eventPayload.micListed === "boolean"
+            ? eventPayload.micListed
+            : null,
+        micPermission:
+          typeof eventPayload.micPermission === "string"
+            ? eventPayload.micPermission
             : null,
         screenStorageBackend: eventPayload.screenStorageBackend || null,
         cameraStorageBackend: eventPayload.cameraStorageBackend || null,
@@ -1506,6 +1622,52 @@ const CloudRecorder = () => {
     } catch {}
   };
 
+  // The mic ending is the one event whose cause (device or load) is in question,
+  // so it carries its own context: mic age, device listing, permission, audio
+  // and host health. Not awaited by the stop.
+  const emitMicEndTelemetry = (track, endedAt) => {
+    try {
+      const startedAt = recorderSession.current?.startedAt || null;
+      const tMs = startedAt ? endedAt - startedAt : null;
+      const sessionId =
+        recorderSession.current?.id || recordingSessionId.current || null;
+      const micAcquiredAt = micAcquireRef.current?.at ?? null;
+      const audioDiag = getAudioDiagSnapshot();
+      const encodeStats = buildEncodeStats();
+      const deviceId = track?.getSettings?.().deviceId || null;
+      const host = IS_OFFSCREEN_HOST
+        ? "offscreen"
+        : IS_IFRAME_CONTEXT
+        ? "iframe"
+        : "tab";
+      void probeMicEnd(deviceId)
+        .then(async ({ devices, permissionState }) => {
+          const st = await chrome.storage.local
+            .get(["countdownFinishedAt"])
+            .catch(() => ({}));
+          const ctx = buildMicEndContext({
+            now: Date.now(),
+            micAcquiredAt,
+            countdownEndAt: st?.countdownFinishedAt,
+            deviceId,
+            devices,
+            permissionState,
+          });
+          void emitUploadTelemetry("recording_forensic_event", {
+            name: "mic-track-ended",
+            recordingSessionId: sessionId,
+            tMs,
+            host,
+            ...(captureContextRef.current || {}),
+            ...ctx,
+            audioDiag,
+            encodeStats,
+          });
+        })
+        .catch(() => {});
+    } catch {}
+  };
+
   // Uncoded failures are raw encoder errors; name and message are what tell a codec/OS problem apart.
   const describeRecorderError = (err) => {
     const name = String(err?.name || "?").slice(0, 40);
@@ -1557,25 +1719,29 @@ const CloudRecorder = () => {
       device: { ...readDevice(), ...getDeviceHints() },
       fps: snap?.fps || null,
       longTask: longTasks.snapshot(),
+      lag: lagTracker.snapshot(),
+      pressure: pressureWatcher.snapshot(),
       encodeHardware: snap?.encodeHardware ?? null,
       tier: encodeCapRef.current?.tier ?? null,
       targetFps: screenFpsRef.current ?? null,
     };
   };
 
-  // Screen stats win over camera, as before. The perf keys ride only with a
-  // token: signed-out takes keep them in the diagnostic zip.
-  const buildEncodeStats = () => {
-    const screenStats = screenRecorder.current?.getEncodeStats?.() || null;
-    const cameraStats = cameraRecorder.current?.getEncodeStats?.() || null;
-    const base = screenStats
-      ? { ...screenStats, track: "screen" }
-      : cameraStats
-      ? { ...cameraStats, track: "camera" }
-      : null;
-    if (!base || !uploadTelemetryTokenRef.current) return base;
-    return { ...base, ...flattenPerfStats(collectPerf()) };
-  };
+  // The perf keys ride only with a token: signed-out takes keep them in the
+  // diagnostic zip. They go on the MediaRecorder path too, which has no counters.
+  const buildEncodeStats = () =>
+    composeEncodeStats({
+      screenStats: screenRecorder.current?.getEncodeStats?.() || null,
+      cameraStats: cameraRecorder.current?.getEncodeStats?.() || null,
+      track: screenRecorder.current
+        ? "screen"
+        : cameraRecorder.current
+        ? "camera"
+        : null,
+      perf: uploadTelemetryTokenRef.current
+        ? flattenPerfStats(collectPerf())
+        : null,
+    });
 
   const emitRecordingOutcome = (outcome, extra = {}) => {
     const session = recorderSession.current;
@@ -1668,13 +1834,28 @@ const CloudRecorder = () => {
   const noteTrackChunk = (track, blob, extra = {}) => {
     if (!blob || !track || !sessionTrackState.current[track]) return;
     const current = sessionTrackState.current[track];
+    const firstChunk = !(current.chunkCount > 0);
+    const at = Date.now();
     sessionTrackState.current[track] = {
       ...current,
       chunkCount: (current.chunkCount || 0) + 1,
       bytesRecorded: (current.bytesRecorded || 0) + (blob.size || 0),
-      lastChunkAt: Date.now(),
+      lastChunkAt: at,
       ...extra,
     };
+    if (firstChunk) {
+      // Head of the take lost to a late start: first chunk minus countdown end.
+      try {
+        chrome.storage.local
+          .get(["countdownFinishedAt"])
+          .then((st) =>
+            patchTrackState(track, {
+              headLossMs: computeHeadLossMs(st?.countdownFinishedAt, at),
+            })
+          )
+          .catch(() => {});
+      } catch {}
+    }
     writeLiveProgress();
   };
 
@@ -3198,7 +3379,7 @@ const CloudRecorder = () => {
   // For the failed-take bundle and heartbeat, to tell a dead capture from a slow one.
   // Adds uploader-side bytes and the live track to the WebCodecs counters; it is all
   // the MediaRecorder path has, since it lacks getDiagSnapshot().
-  const withScreenDiagBasics = (diag) => {
+  const withScreenDiagBasics = (diag, { deltas = false } = {}) => {
     try {
       const st = sessionTrackState.current?.screen || {};
       const track = screenStream.current?.getVideoTracks?.()[0] || null;
@@ -3211,6 +3392,46 @@ const CloudRecorder = () => {
         lastChunkAt: st.lastChunkAt || null,
         trackMuted: track ? Boolean(track.muted) : null,
         trackReadyState: track?.readyState || null,
+        ...frameHealthFields("screen", diag, st, track, deltas),
+      };
+    } catch {
+      return diag || null;
+    }
+  };
+
+  // Frame delivery on the MediaRecorder path, which has no recorder-side counters.
+  const frameHealthFields = (name, diag, st, track, deltas) => {
+    const frame = readTrackFrameStats(track);
+    return {
+      trackStats: diag?.trackStats ?? frame.trackStats,
+      frameRateActual: diag?.frameRateActual ?? frame.frameRateActual,
+      msSinceLastChunk:
+        diag?.msSinceLastChunk ??
+        (st.lastChunkAt ? Date.now() - st.lastChunkAt : null),
+      headLossMs: st.headLossMs ?? null,
+      ...(deltas
+        ? chunkDeltas.current.take(
+            name,
+            diag?.chunksOut ?? (st.chunkCount || 0),
+            st.bytesRecorded || 0
+          )
+        : {}),
+    };
+  };
+
+  // No recorder-side snapshot for the camera on the MediaRecorder path; the
+  // heartbeat builds the basics from its track.
+  const withCameraDiagBasics = (diag) => {
+    try {
+      const track = cameraStream.current?.getVideoTracks?.()[0] || null;
+      if (!diag && !track) return null;
+      const st = sessionTrackState.current?.camera || {};
+      return {
+        ...(diag || {}),
+        chunksOut: diag?.chunksOut ?? (st.chunkCount || 0),
+        trackReadyState: track?.readyState || null,
+        trackMuted: track ? Boolean(track.muted) : null,
+        ...frameHealthFields("camera", diag, st, track, true),
       };
     } catch {
       return diag || null;
@@ -3428,6 +3649,7 @@ const CloudRecorder = () => {
           });
         } catch {}
         // The server accepts encodeStats on any event type, so attach it here too.
+        endPolicyForTake();
         void emitUploadTelemetry(eventType, {
           status,
           screenDiag,
@@ -3435,6 +3657,7 @@ const CloudRecorder = () => {
           audioDiag,
           lifecycleBundle,
           encodeStats: buildEncodeStats(),
+          ...policyTelemetry(),
         });
         diagForward("recorder-perf", collectPerf());
       }
@@ -3532,7 +3755,7 @@ const CloudRecorder = () => {
         camera: "mediarecorder",
       };
       encoderReasons = { screen: null, audio: null, camera: null };
-      encoderSticky = { disabled: null, reason: null };
+      encoderSticky = { disabled: null, reason: null, details: null };
       trackContainers = {
         screen: "video/webm",
         audio: "video/webm",
@@ -3820,6 +4043,8 @@ const CloudRecorder = () => {
       if (["completed", "aborted", "stood-down"].includes(uploader.status)) {
         return;
       }
+      // Its server create is still pending; the create's success starts this.
+      if (!uploader.uploadUrl) return;
       if (uploader.isPaused || networkStateRef.current.online === false) {
         return later();
       }
@@ -4633,6 +4858,11 @@ const CloudRecorder = () => {
 
   const setMic = async (result) => {
     pendingMicIntent.current = Boolean(result.active);
+    // A mic that came back is on the bus through its own stream and gain.
+    if (reconnectedMicStream.current && audioInputGain.current) {
+      applyReconnectedMicMute(Boolean(result.active));
+      return;
+    }
     // Separated takes have no audioInputGain (nothing is on the bus), so the
     // gain branch below never runs and the mic file records through a mute.
     if (separatedAudio.current && rawMicStream.current) {
@@ -5232,6 +5462,8 @@ const CloudRecorder = () => {
     // hand its "recording" id to the next take (the BG clear skips the editor).
     if (!supersededTake()) {
       chrome.storage.local.set({ sceneIdStatus: "failed" }).catch(() => {});
+      // A late error from an earlier take must not hide this start's own cancel.
+      startErrorSentRef.current = true;
     }
     void cleanupIfEmptyUploads("error");
     sendRecordingErrorBase(why, cancel, errorCode);
@@ -5333,7 +5565,7 @@ const CloudRecorder = () => {
         codecs: { ...trackCodecs },
         reasons: { ...encoderReasons },
         hwSlots: encoderHwSlots,
-        sticky: { ...encoderSticky },
+        sticky: { disabled: encoderSticky.disabled, reason: encoderSticky.reason },
       },
       device: captureSessionDiag(),
       jsHeap: memory
@@ -5493,7 +5725,10 @@ const CloudRecorder = () => {
   };
 
   const dismissRecording = async (restarting = false, reason = "dismiss") => {
+    // A discarded take says nothing about the machine: stop without a record.
+    endPolicyForTake({ record: false });
     takeSeqRef.current += 1;
+    if (pendingStartRef.current) markStartEnded();
     clearPendingStart();
     cancelLiveTap();
     await markSessionDiscarded();
@@ -5553,6 +5788,7 @@ const CloudRecorder = () => {
       cameraUploader.current = null;
       audioUploader.current = null;
       uploadersInitialized.current = false;
+      uploadersPrepared.current = false;
       cleanupTimers();
       return;
     }
@@ -5631,6 +5867,11 @@ const CloudRecorder = () => {
 
   const restartRecording = async () => {
     micDropRef.current = null;
+    micDropHistory.current = null;
+    micReconnectGen.current += 1;
+    micReconnectBudget.current = { recent: [] };
+    liveMicTrackRef.current = null;
+    clearMicReconnectFlag();
     await setCloudRestartPhase("restart-requested", {
       hasTarget: Boolean(target.current),
       hadRegionMode: Boolean(regionRef.current),
@@ -5639,8 +5880,30 @@ const CloudRecorder = () => {
     await dismissRecording(true, "restart");
     await setCloudRestartPhase("restart-dismissed");
     // Keep capture streams; only stop recorder instances.
-    await stopAllRecorders({ stopStreams: false });
+    await stopAllRecorders({ stopStreams: false, saveTake: false });
     await setCloudRestartPhase("restart-recorders-stopped");
+    // The tracks are reused: restore the rates the policy lowered and the camera
+    // it stopped. The plan stays for the new take.
+    try {
+      const { cameraWasStopped, original } = await policyTake.current.reset({
+        restoreTracks: true,
+        keepPlan: true,
+      });
+      if (cameraWasStopped) {
+        const camConstraints = cameraReacquireConstraints(original);
+        try {
+          cameraStream.current = await getVideoStreamWithFallback(
+            camConstraints,
+            original?.cameraDeviceId || null
+          );
+          bindCameraTrack(cameraStream.current?.getVideoTracks?.()[0]);
+        } catch (err) {
+          console.warn("Camera not reacquired on restart:", err);
+          cameraStream.current = null;
+        }
+      }
+    } catch {}
+    await ensureLiveMic();
     screenChunks.current = [];
     cameraChunks.current = [];
     audioChunks.current = [];
@@ -5668,10 +5931,19 @@ const CloudRecorder = () => {
       return false;
     }
 
+    const initGen = uploadGenRef.current + 1;
     uploadersInitialized.current = await initializeUploaders({
       forceNewSceneId: true,
+      onPrepared: () => {
+        uploadersPrepared.current = true;
+      },
     });
     if (!uploadersInitialized.current) {
+      if (uploadGenRef.current !== initGen || createsAbandonedRef.current)
+        return false;
+      uploadersPrepared.current = false;
+      clearPendingStart();
+      initFailedRef.current = true;
       await setCloudRestartPhase("restart-failed", {
         reason: "uploaders-init-failed",
       });
@@ -5689,7 +5961,115 @@ const CloudRecorder = () => {
     return true;
   };
 
-  const initializeUploaders = async ({ forceNewSceneId = false } = {}) => {
+  // A failed create is retried while the take is live (backoff in createRetry.js);
+  // the recorder is already buffering, so it costs upload latency only. Stop ends
+  // the retries and finalize holds the take for Recover, local bytes untouched.
+  const createUploadWithRetry = async (
+    track,
+    uploader,
+    projectId,
+    opts,
+    gen,
+    onRefusedEarly
+  ) => {
+    const takeOver = () =>
+      gen !== uploadGenRef.current ||
+      Boolean(createRefusedRef.current) ||
+      isFinishing.current ||
+      catchUpStoppedRef.current ||
+      createsAbandonedRef.current ||
+      uploader !== uploaderRefFor(track).current ||
+      ["aborted", "stood-down", "completed"].includes(uploader.status);
+    const created = await retryCreate({
+      create: () => uploader.initialize(projectId, opts),
+      shouldStop: takeOver,
+      wait: (ms) => new Promise((r) => setTimeout(r, ms)),
+      onFail: (err, attempt) => {
+        void emitUploadTelemetry("upload_create_retry", {
+          projectId,
+          trackType: track,
+          attempt: attempt + 1,
+          message: err?.message || String(err),
+          recording: Boolean(screenRecorder.current || cameraRecorder.current),
+        });
+        const live =
+          startPastGateRef.current ||
+          Boolean(screenRecorder.current || cameraRecorder.current);
+        // A refusal (quota, ownership, bad request) cannot change on retry. A missing
+        // sign-in is the same before the first frame; mid-take it is retried.
+        if (
+          track !== "audio" &&
+          (isPermanentCreateFailure(err) || (!live && isAuthCreateFailure(err)))
+        ) {
+          if (gen === uploadGenRef.current && !createRefusedRef.current) {
+            createRefusedRef.current = { track, status: err.status, live };
+            if (!live) onRefusedEarly?.();
+          }
+          return "give-up";
+        }
+        if (track !== "audio") return undefined;
+        // Audio is supplementary: record without it.
+        console.warn("Audio uploader init failed; continuing without it:", err);
+        logDebugEvent("audio-uploader-init-failed", {
+          error: err?.message || String(err),
+        });
+        if (gen === uploadGenRef.current && audioUploader.current === uploader) {
+          audioUploader.current = null;
+        }
+        return "give-up";
+      },
+    });
+    if (!created) {
+      if (
+        track !== "audio" &&
+        gen === uploadGenRef.current &&
+        !createRefusedRef.current &&
+        takeOver()
+      ) {
+        createsAbandonedRef.current = true;
+      }
+      return false;
+    }
+    // The take ended or was replaced while this create was in flight. Leave
+    // the new media idle: no catch-up, no heartbeat.
+    if (takeOver()) {
+      uploader.pause?.();
+      uploader.stopHeartbeat?.();
+      return false;
+    }
+    // Brings the track level with what was recorded while it had no upload.
+    uploader.setTakeBytes?.(takeBytesRef.current[track] || 0);
+    if (catchUpRef.current[track]) catchUpRef.current[track].retryAt = 0;
+    if (uploadBehindRef.current[track]) void catchUpUpload(track);
+    return true;
+  };
+
+  const uploaderRefFor = (track) =>
+    track === "screen"
+      ? screenUploader
+      : track === "camera"
+        ? cameraUploader
+        : audioUploader;
+
+  const initializeUploaders = async ({
+    forceNewSceneId = false,
+    onPrepared = null,
+  } = {}) => {
+    // A new generation. A retry loop left over from an earlier take sees the
+    // mismatch and stops without touching this take's flags.
+    const gen = (uploadGenRef.current += 1);
+    createsAbandonedRef.current = false;
+    videoCreatedRef.current = false;
+    createRefusedRef.current = null;
+    startPastGateRef.current = false;
+    initFailedRef.current = false;
+    catchUpStoppedRef.current = false;
+    takeBytesRef.current = { screen: 0, camera: 0, audio: 0 };
+    uploadBehindRef.current = { screen: false, camera: false, audio: false };
+    catchUpRef.current = {};
+    screenChunkByteRangesRef.current = [];
+    cameraChunkByteRangesRef.current = [];
+    audioChunkByteRangesRef.current = [];
     try {
       emptyCleanupRef.current = false;
       // Set when a supersampled screen track is lowered for MediaRecorder, so the
@@ -5796,7 +6176,13 @@ const CloudRecorder = () => {
         const before = screenVideoTrack?.getSettings?.() || {};
         let outcome;
         if (encoderKinds.screen === "mediarecorder") {
-          const cloudTier = getResolutionForQuality();
+          // R3 caps capture at 720p too; the user's own smaller tier wins.
+          const tier = getResolutionForQuality();
+          const planCap = policyTake.current.plan()?.rungInfo?.size === "720p";
+          const cloudTier =
+            planCap && tier.width * tier.height > 1280 * 720
+              ? { width: 1280, height: 720 }
+              : tier;
           outcome = await constrainTrackDown(
             screenVideoTrack,
             cloudTier.width,
@@ -5846,9 +6232,10 @@ const CloudRecorder = () => {
         encoderSticky = {
           disabled: sticky?.disabled === true,
           reason: sticky?.reason || null,
+          details: sticky?.disabled === true ? sticky?.details || null : null,
         };
       } catch {
-        encoderSticky = { disabled: null, reason: null };
+        encoderSticky = { disabled: null, reason: null, details: null };
       }
       trackContainers.screen = screenPlan.container;
       trackContainers.camera = cameraPlan.container;
@@ -6077,66 +6464,77 @@ const CloudRecorder = () => {
         }
       }
 
+      // Everything the recorders read from the uploaders is settled, so the
+      // countdown can start. The creates race it: chunks recorded before a create
+      // lands wait on disk.
+      uploadersPrepared.current = true;
+      await onPrepared?.();
+
       // All 3 TUS inits in parallel. No serial dependency anymore -
       // sceneId-based partner discovery on the server side replaces
       // the old screen.mediaId → linkedMediaId chain.
+      const creates = [
+        ["screen", screenUploader, screenInitOpts],
+        ["camera", cameraUploader, cameraInitOpts],
+        ["audio", audioUploader, audioInitOpts],
+      ];
       const parallelInits = [];
-      if (screenUploader.current && screenInitOpts) {
+      let refuseEarly = () => {};
+      const refusedEarly = new Promise((r) => {
+        refuseEarly = r;
+      });
+      for (const [track, ref, opts] of creates) {
+        const uploader = ref.current;
+        if (!uploader || !opts) continue;
         parallelInits.push(
-          screenUploader.current
-            .initialize(projectId, screenInitOpts)
-            .then(() => {
+          createUploadWithRetry(
+            track,
+            uploader,
+            projectId,
+            opts,
+            gen,
+            () => refuseEarly()
+          ).then(
+            (created) => {
+              if (!created) return;
+              if (track !== "audio" && gen === uploadGenRef.current) {
+                videoCreatedRef.current = true;
+              }
               logDebugEvent("uploader-ready", {
-                type: "screen",
+                type: track,
                 projectId,
                 sceneId,
-                mediaId: screenUploader.current?.getMeta()?.mediaId || null,
-                videoId: screenUploader.current?.getMeta()?.videoId || null,
+                mediaId: uploader.getMeta()?.mediaId || null,
+                videoId: uploader.getMeta()?.videoId || null,
               });
-            })
+            }
+          )
         );
       }
-      if (cameraUploader.current && cameraInitOpts) {
-        parallelInits.push(
-          cameraUploader.current
-            .initialize(projectId, cameraInitOpts)
-            .then(() => {
-              logDebugEvent("uploader-ready", {
-                type: "camera",
-                projectId,
-                sceneId,
-                mediaId: cameraUploader.current?.getMeta()?.mediaId || null,
-                videoId: cameraUploader.current?.getMeta()?.videoId || null,
-              });
-            })
-        );
+      // A refusal before the first frame ends the wait at once; a create
+      // still in flight is left to land idle (see createUploadWithRetry).
+      if (parallelInits.length) {
+        await Promise.race([Promise.all(parallelInits), refusedEarly]);
       }
-      if (audioUploader.current && audioInitOpts) {
-        parallelInits.push(
-          audioUploader.current
-            .initialize(projectId, audioInitOpts)
-            .then(() => {
-              logDebugEvent("uploader-ready", {
-                type: "audio",
-                projectId,
-                sceneId,
-                mediaId: audioUploader.current?.getMeta()?.mediaId || null,
-                videoId: audioUploader.current?.getMeta()?.videoId || null,
-              });
-            })
-            .catch((audioErr) => {
-              console.warn(
-                "⚠️ Audio uploader init failed; recording will continue without an audio track:",
-                audioErr
-              );
-              logDebugEvent("audio-uploader-init-failed", {
-                error: audioErr?.message || String(audioErr),
-              });
-              audioUploader.current = null;
-            })
-        );
+      if (gen !== uploadGenRef.current) return false;
+      if (createRefusedRef.current) {
+        const refused = createRefusedRef.current;
+        void emitUploadTelemetry("upload_create_refused", {
+          projectId,
+          trackType: refused.track,
+          status: refused.status,
+          recording: refused.live,
+        });
+        // Before the first frame the start fails with the usual error. Once
+        // recording, nothing is shown: the take stays on disk and is held
+        // for Recover at Stop.
+        if (refused.live) createsAbandonedRef.current = true;
+        return false;
       }
-      if (parallelInits.length) await Promise.all(parallelInits);
+      if (isFinishing.current || catchUpStoppedRef.current) {
+        createsAbandonedRef.current = true;
+      }
+      if (createsAbandonedRef.current) return false;
 
       await setPipelineState("uploaders-ready", {
         projectId,
@@ -6348,6 +6746,11 @@ const CloudRecorder = () => {
   const startRecording = async () => {
     startRefusedNoCapture = false;
     micDropRef.current = null;
+    micDropHistory.current = null;
+    micReconnectGen.current += 1;
+    micReconnectBudget.current = { recent: [] };
+    liveMicTrackRef.current = null;
+    clearMicReconnectFlag();
     takeSeqRef.current += 1;
     // The BG start-fail re-check tears the recorder down after 2.5s unless a
     // stage lands. The free recorders mark, this one never did.
@@ -6382,16 +6785,26 @@ const CloudRecorder = () => {
       return;
     }
 
-    if (!uploadersInitialized.current) {
+    if (!uploadersPrepared.current) {
       sendRecordingError(
         "Uploaders not initialized. Please restart recording."
       );
       return;
     }
 
+    startPastGateRef.current = true;
+
     if (!screenStream.current && !cameraStream.current) {
       sendRecordingError("No streams to record");
       logStartFlow("recording_error", { reason: "no-streams" });
+      return;
+    }
+
+    // The mic can end between the stream and Start (countdown). Retry it after the
+    // held-take, uploader and stream checks, else stop as an ended mic always did.
+    if ((await ensureLiveMic({ atStart: true })).action === "lost") {
+      micDropRef.current = { elapsedMs: 0, reason: "audio-track-ended" };
+      stopRecording(true, "audio-track-ended");
       return;
     }
 
@@ -6477,6 +6890,7 @@ const CloudRecorder = () => {
         multiSceneCount: danglingState?.multiSceneCount || 0,
         recordingAttemptId: danglingState?.recordingAttemptId || null,
         uploadersInitialized: Boolean(uploadersInitialized.current),
+        uploadersPrepared: Boolean(uploadersPrepared.current),
         hasScreenUploader: Boolean(screenUploader.current),
         hasCameraUploader: Boolean(cameraUploader.current),
       });
@@ -6523,15 +6937,18 @@ const CloudRecorder = () => {
     markCloudStartProgress("session-ready");
 
     await Promise.allSettled([
-      screenUploader.current?.setSessionId?.(
-        recorderSession.current?.id || null
-      ),
-      cameraUploader.current?.setSessionId?.(
-        recorderSession.current?.id || null
-      ),
-      audioUploader.current?.setSessionId?.(
-        recorderSession.current?.id || null
-      ),
+      screenUploader.current?.uploadUrl &&
+        screenUploader.current.setSessionId?.(
+          recorderSession.current?.id || null
+        ),
+      cameraUploader.current?.uploadUrl &&
+        cameraUploader.current.setSessionId?.(
+          recorderSession.current?.id || null
+        ),
+      audioUploader.current?.uploadUrl &&
+        audioUploader.current.setSessionId?.(
+          recorderSession.current?.id || null
+        ),
     ]);
 
     if (!screenUploader.current && !cameraUploader.current) {
@@ -6714,10 +7131,26 @@ const CloudRecorder = () => {
         });
         liveDeclared = true;
         noticeAttempt.release();
+        // Uploaded with the diagnostic report: where the start spent its time.
+        // Built here so the encoder probe marks are already in the log.
+        try {
+          const liveAt = Date.now();
+          chrome.storage.local
+            .get(["countdownFinishedAt", "startFlowTrace"])
+            .then((st) => {
+              const startStages = startStageLog.current.build({
+                countdownEndAt: st?.countdownFinishedAt,
+                startedAt: liveAt,
+              });
+              writeStartStages(st?.startFlowTrace?.attemptId, startStages);
+            })
+            .catch(() => {});
+        } catch {}
         pausedStateRef.current = false;
         persistSessionState({ status: "recording" });
         startSessionHeartbeat();
         setStarted(true);
+        await startPolicyForTake();
         await setPipelineState("recording", {
           projectId,
           sceneId:
@@ -6794,9 +7227,9 @@ const CloudRecorder = () => {
         const screenEncodeCap = encodeCapRef.current || CAP_1080P;
         const screenOptions = {
           mimeType: "video/webm;codecs=vp9,opus",
-          videoBitsPerSecond: cloudBitrateForCap(
-            screenEncodeCap,
-            screenFpsRef.current
+          videoBitsPerSecond: capBitrateForPlan(
+            cloudBitrateForCap(screenEncodeCap, screenFpsRef.current),
+            policyTake.current.plan()
           ),
           audioBitsPerSecond: 128000,
         };
@@ -6936,7 +7369,7 @@ const CloudRecorder = () => {
               requestSessionPersist({ lastChunkIndex: chunkIndex });
             }
 
-            if (uploadersInitialized.current && screenUploader.current) {
+            if (screenUploader.current) {
               const uploader = screenUploader.current;
               // No pre-write backpressure gate here: parking before write()
               // lets the next chunk overtake this one into the byte stream.
@@ -7215,7 +7648,7 @@ const CloudRecorder = () => {
               }
               return;
             }
-            if (uploadersInitialized.current && audioUploader.current) {
+            if (audioUploader.current) {
               const uploader = audioUploader.current;
               let placed = null;
               try {
@@ -7432,7 +7865,7 @@ const CloudRecorder = () => {
               }
             }
 
-            if (uploadersInitialized.current && cameraUploader.current) {
+            if (cameraUploader.current) {
               const uploader = cameraUploader.current;
               const { endByte, write } = placeChunk(
                 "camera",
@@ -7587,19 +8020,47 @@ const CloudRecorder = () => {
     audioTimer.current.paused = false;
   }
 
-  const stopAllRecorders = async ({ stopStreams = true } = {}) => {
-    const stopRecorder = async (recorderRef) => {
+  const stopAllRecorders = async ({ stopStreams = true, saveTake = true } = {}) => {
+    const stopRecorder = async (recorderRef, kind) => {
       if (recorderRef.current && recorderRef.current.state !== "inactive") {
-        try {
-          await Promise.race([
-            new Promise((resolve) => {
-              recorderRef.current.onstop = resolve;
-              recorderRef.current.stop();
-            }),
-            new Promise((_, reject) =>
-              setTimeout(() => reject(new Error("Stop timeout")), 5000)
-            ),
+        const stopStartedAt = Date.now();
+        // Restart and Discard throw this take away. A chunk delivered after
+        // we move on would land in the next take's upload, so drop it here.
+        if (!saveTake) recorderRef.current.ondataavailable = null;
+        const stopped = new Promise((resolve) => {
+          recorderRef.current.onstop = resolve;
+          recorderRef.current.stop();
+        });
+        const within = (ms) =>
+          Promise.race([
+            stopped.then(() => true),
+            new Promise((resolve) => setTimeout(() => resolve(false), ms)),
           ]);
+        try {
+          if (!(await within(5000))) {
+            if (!saveTake) throw new Error("Stop timeout");
+            // A busy machine can deliver the last chunk late; moving on let finalize close
+            // the upload without it, silently. Wait for onstop (follows the final
+            // dataavailable), bounded below the 20 s previous-recorder hold and flush ack.
+            void emitUploadTelemetry("recording_forensic_event", {
+              name: "recorder-stop-slow",
+              reason: `stop-over-5s:${kind}`,
+              errMsg: "waiting for the final chunk",
+            });
+            if (!(await within(STOP_SAVE_EXTRA_WAIT_MS))) {
+              void emitUploadTelemetry("recording_forensic_event", {
+                name: "recorder-stop-gave-up",
+                reason: `stop-over-15s:${kind}`,
+                errMsg: `final chunk may be lost, waited ${Date.now() - stopStartedAt}ms`,
+              });
+              throw new Error("Stop timeout");
+            }
+            void emitUploadTelemetry("recording_forensic_event", {
+              name: "recorder-stop-late-ok",
+              reason: `late-ok:${kind}`,
+              errMsg: `waited ${Date.now() - stopStartedAt}ms`,
+            });
+          }
         } catch (err) {
           console.error("Error stopping recorder:", err);
         }
@@ -7630,9 +8091,9 @@ const CloudRecorder = () => {
     }
 
     await Promise.all([
-      stopRecorder(screenRecorder),
-      stopRecorder(cameraRecorder),
-      stopRecorder(audioRecorder),
+      stopRecorder(screenRecorder, "screen"),
+      stopRecorder(cameraRecorder, "camera"),
+      stopRecorder(audioRecorder, "audio"),
     ]);
 
     if (stopStreams) {
@@ -7641,6 +8102,7 @@ const CloudRecorder = () => {
         ref.current?.getTracks().forEach((track) => track.stop());
         ref.current = null;
       });
+      releaseReconnectedMic();
       tabID.current = null;
       stopSourceProbes({ summarize: true });
       // Close the AudioContext: without this the audio thread keeps
@@ -7926,9 +8388,11 @@ const CloudRecorder = () => {
         online: false,
         offlineSince: Date.now(),
       };
-      screenUploader.current?.pause?.();
-      cameraUploader.current?.pause?.();
-      audioUploader.current?.pause?.();
+      // One whose create has not landed has nothing to pause, and pausing it
+      // would block that create.
+      if (screenUploader.current?.uploadUrl) screenUploader.current.pause?.();
+      if (cameraUploader.current?.uploadUrl) cameraUploader.current.pause?.();
+      if (audioUploader.current?.uploadUrl) audioUploader.current.pause?.();
       void emitUploadTelemetry("upload_stalled", {
         reason: "network-offline",
         uploaderType: "cloud_recorder",
@@ -8034,6 +8498,40 @@ const CloudRecorder = () => {
     };
   }, []);
 
+  // From mount, before recording begins: a host that dies during start has no
+  // recording heartbeat to say how loaded it was. The service worker reads this
+  // key when it reports recorder-host-lost.
+  useEffect(() => {
+    const stamp = () => {
+      try {
+        chrome.storage.local
+          .set({
+            recorderHostHealth: {
+              ...readHeap(),
+              ...readDevice(),
+              lagP90Ms: lagTracker.snapshot().p90Ms,
+              lagMaxMs: lagTracker.snapshot().maxMs,
+              cpuPressure: pressureWatcher.snapshot().state,
+              cpuPressureWorst: pressureWatcher.snapshot().worst,
+              cpuPressureStatus: pressureWatcher.snapshot().status,
+              at: Date.now(),
+            },
+          })
+          .catch(() => {});
+      } catch {}
+    };
+    lagTracker.reset();
+    lagTracker.start();
+    void pressureWatcher.start();
+    stamp();
+    const id = setInterval(stamp, 5000);
+    return () => {
+      clearInterval(id);
+      lagTracker.stop();
+      pressureWatcher.stop();
+    };
+  }, []);
+
   // 30s heartbeat snapshots track counters mid-recording so a session
   // that dies before stop (tab kill, sleep, crash) still leaves
   // breadcrumbs at the server. Covers the WebCodecs screen/camera diags
@@ -8043,15 +8541,20 @@ const CloudRecorder = () => {
     if (!started) return;
     longTasks.reset();
     longTasks.start();
+    lagTracker.reset();
+    pressureWatcher.reset();
+    chunkDeltas.current.reset();
     const emitHeartbeat = (early = false) => {
       try {
         if (!recorderSession.current?.id) return;
         const rawScreen = screenRecorder.current?.getDiagSnapshot?.();
         const screen =
           rawScreen || screenStream.current
-            ? withScreenDiagBasics(rawScreen)
+            ? withScreenDiagBasics(rawScreen, { deltas: true })
             : null;
-        const camera = cameraRecorder.current?.getDiagSnapshot?.();
+        const camera = withCameraDiagBasics(
+          cameraRecorder.current?.getDiagSnapshot?.()
+        );
         const audio = getAudioDiagSnapshot();
         if (!screen && !camera && !audio) return;
         // offsetBytes used to stay 0 all session then jump at finalize, leaving
@@ -8088,6 +8591,7 @@ const CloudRecorder = () => {
           storageUsageBytes:
             typeof pressure.usage === "number" ? pressure.usage : null,
           encodeStats: buildEncodeStats(),
+          ...policyTelemetry(),
           localWriteStats: writeStats.count
             ? {
                 count: writeStats.count,
@@ -8113,6 +8617,69 @@ const CloudRecorder = () => {
       longTasks.stop();
     };
   }, [started]);
+
+  // Adaptive policy for the take (design.md Q3). Every function is a no-op while
+  // the plan is off, so a flag-off take runs exactly as before.
+  const startPolicyForTake = async () => {
+    try {
+      const screenTrack = () =>
+        screenStream.current?.getVideoTracks?.()[0] || null;
+      const cameraTrack = () =>
+        cameraStream.current?.getVideoTracks?.()[0] || null;
+      await policyTake.current.begin({
+        screenTrack,
+        cameraTrack,
+        stopCameraTracks: () =>
+          cameraStream.current?.getTracks?.().forEach((t) => t.stop()),
+        sources: {
+          isPaused: () => pausedStateRef.current,
+          cameraLive: () => cameraTrack()?.readyState === "live",
+          lagP90Ms: () => lagTracker.snapshot().p90Ms,
+          longTaskTotalMs: () => longTasks.snapshot().totalMs,
+          chunks: () => {
+            const st = sessionTrackState.current?.screen;
+            return st
+              ? { count: st.chunkCount || 0, lastAt: st.lastChunkAt || 0 }
+              : null;
+          },
+          micGaps: () => {
+            const det = micGapDetector.current;
+            const snap = det?.snapshot?.();
+            return snap
+              ? {
+                  id: det,
+                  count: snap.gapCount || 0,
+                  gaps: snap.gaps || [],
+                  maxMs: snap.gapMaxMs || 0,
+                }
+              : null;
+          },
+          heap: () => {
+            const m = performance.memory;
+            return m
+              ? { used: m.usedJSHeapSize, limit: m.jsHeapSizeLimit }
+              : null;
+          },
+          pressure: () => pressureWatcher.snapshot().state,
+        },
+      });
+    } catch {}
+  };
+
+  // End of take: stop ticking, freeze the record and, for a take that ran to its
+  // end, write marks to the device history. Safe to call twice.
+  const endPolicyForTake = ({ record = true } = {}) => {
+    try {
+      const drop = micDropRef.current;
+      policyTake.current.end({
+        record,
+        micEnded: (drop?.stopReason ?? drop?.reason) === "audio-track-ended",
+      });
+    } catch {}
+  };
+
+  // T7 and T8 for the heartbeat and stop diag; nothing when the flag is off.
+  const policyTelemetry = () => policyTake.current.telemetry();
 
   const sendEditorReady = ({
     projectId,
@@ -8150,6 +8717,7 @@ const CloudRecorder = () => {
     chrome.runtime.sendMessage({
       type: "editor-ready",
       ...micDropFields(micDropRef.current),
+      ...degradedTakeFields(policyTake.current.editorFacts()),
       publicUrl: !recordingToScene
         ? `${process.env.SCREENITY_APP_BASE}/view/${projectId}/`
         : undefined,
@@ -8614,7 +9182,13 @@ const CloudRecorder = () => {
     // Lock immediately: prevents duplicate stop/finalize races under unload pressure.
     isFinishing.current = true;
     takeStoppedRef.current = true;
+    // The take is over: the policy must not read the stop tail as load.
+    endPolicyForTake();
     noticeAttempt.freeze();
+    // A mic retry still waiting must not stop the take again if finalize fails
+    // and isFinishing is reset.
+    micReconnectGen.current += 1;
+    clearMicReconnectFlag();
     // In the host document the next take may start once this capture is
     // released; this take then acts only on messages addressed to it.
     markTakeFinishing();
@@ -8624,9 +9198,7 @@ const CloudRecorder = () => {
       micStream: rawMicStream.current,
       captureStream: screenStream.current,
     });
-    screenUploader.current?.markRecorderStopped?.();
-    cameraUploader.current?.markRecorderStopped?.();
-    audioUploader.current?.markRecorderStopped?.();
+    if (pendingStartRef.current) markStartEnded();
     clearPendingStart();
 
     // Timing trace for stop → scene-create → close. T+0 stop pressed,
@@ -8714,8 +9286,14 @@ const CloudRecorder = () => {
           type: "prepare-editor-existing",
           multiMode: multiMode,
         });
-      } else if (!multiMode && !recordingToScene && projectId) {
-        // /editor/null on cancelled-before-create yields a broken page.
+      } else if (
+        !multiMode &&
+        !recordingToScene &&
+        projectId &&
+        videoCreatedRef.current !== false
+      ) {
+        // /editor/null on cancelled-before-create yields a broken page. With no
+        // upload created the take is held for Recover, so the editor would be empty.
         chrome.runtime.sendMessage({
           type: "prepare-open-editor",
           projectId,
@@ -8739,12 +9317,23 @@ const CloudRecorder = () => {
     }
     // Drain recorders before clearing `recording` so the next start
     // gets a free tab-capture binding.
-    await stopAllRecorders();
+    try {
+      await stopAllRecorders({ saveTake: shouldFinalize });
+    } finally {
+      // Only now are the final chunks placed. Earlier, a stall recovery that
+      // found a quiet track idle could close it before its last chunk.
+      screenUploader.current?.markRecorderStopped?.();
+      cameraUploader.current?.markRecorderStopped?.();
+      audioUploader.current?.markRecorderStopped?.();
+    }
     stopFlowRef.current?.tick?.("recorders-drained");
     if (shouldFinalize) liveStopRef.current = liveTapRef.current?.stop() || null;
     else cancelLiveTap();
     // A retry runs after the next take may have started; its flags are not ours.
     if (!supersededTake()) {
+      // recordingStoppedAt only lands with video-ready after finalize, which
+      // can outlast the start watch on a short take.
+      markStartEnded();
       await setRecordingTimingState({
         recording: false,
         paused: false,
@@ -9368,10 +9957,13 @@ const CloudRecorder = () => {
         await clearCameraChunkStore("no-upload");
         await clearLocalScreenPlaybackOffer("no-upload");
         if (captureNeverStarted) {
-          sendRecordingError(
-            "Recording cancelled: no capture stream was acquired.",
-            true
-          );
+          // A failed acquire already said why; this stop is the teardown after it.
+          if (!startErrorSentRef.current) {
+            sendRecordingError(
+              "Recording cancelled: no capture stream was acquired.",
+              true
+            );
+          }
           return;
         }
         sendRecordingError(
@@ -10087,6 +10679,239 @@ const CloudRecorder = () => {
     }
   };
 
+  const attachCloudMicEnded = (rawTrack) => {
+    liveMicTrackRef.current = rawTrack;
+    rawTrack.addEventListener("ended", () => {
+      void handleCloudMicEnded(rawTrack);
+    });
+  };
+
+  const handleCloudMicEnded = (rawTrack) => {
+    if (!isFinishing.current && !sentLast.current) {
+      emitMicEndTelemetry(rawTrack, Date.now());
+    }
+    return createMicEndHandler({
+      isFinishing: () => isFinishing.current,
+      isSent: () => sentLast.current,
+      getLiveTrack: () => liveMicTrackRef.current,
+      getGeneration: () => micReconnectGen.current,
+      now: () => Date.now(),
+      freezeAudioClock: (endedAt) => {
+        if (!audioTimer.current.paused && audioTimer.current.start) {
+          audioTimer.current.total += endedAt - audioTimer.current.start;
+          audioTimer.current.paused = true;
+        }
+      },
+      stopMicRecorder: () => {
+        try {
+          const st = audioRecorder.current?.state;
+          if (st === "recording" || st === "paused") audioRecorder.current.stop();
+        } catch {}
+      },
+      describeTrack: (track, endedAt) => {
+        const startMs = screenTimer.current?.start || null;
+        const label = String(track?.label || "");
+        return {
+          fullLabel: label,
+          trackLabel: label.slice(0, 80),
+          readyState: track?.readyState || null,
+          recordingDuration: startMs ? endedAt - startMs : null,
+          isLikelyContinuityMic: /\biphone\b/i.test(label),
+          audioContextState: aCtx.current?.state ?? null,
+          docVisibility:
+            typeof document !== "undefined" ? document.visibilityState : null,
+        };
+      },
+      elapsedAt: async (at) => {
+        try {
+          const st = await chrome.storage.local.get([
+            "recordingStartTime",
+            "totalPausedMs",
+            "pausedAt",
+            "paused",
+          ]);
+          return computeMicDropElapsedMs({
+            endedAt: at,
+            startedAt: st.recordingStartTime,
+            totalPausedMs: st.totalPausedMs,
+            pausedAt: st.pausedAt,
+            paused: st.paused,
+          });
+        } catch {
+          return null;
+        }
+      },
+      diag: (event, data) => {
+        try {
+          chrome.runtime.sendMessage({
+            type: "diag-forward",
+            event,
+            data: { ...data, separated: separatedAudio.current },
+          });
+        } catch {}
+      },
+      storageSet: (obj) => chrome.storage.local.set(obj),
+      getHistory: () => micDropHistory.current,
+      setHistory: (h) => {
+        micDropHistory.current = h;
+      },
+      setHandoff: (v) => {
+        micDropRef.current = v;
+      },
+      budget: micReconnectBudget.current,
+      getFlagSet: () => micReconnectFlagSet.current,
+      setFlagSet: (v) => {
+        micReconnectFlagSet.current = v;
+      },
+      reconnect: async ({ startedAt, previousLabel, isStale }) => {
+        const { defaultAudioInput } = await chrome.storage.local.get([
+          "defaultAudioInput",
+        ]);
+        return reconnectCloudMic({
+          startedAt,
+          deviceId: defaultAudioInput,
+          previousLabel,
+          sameDevice: (newLabel) =>
+            isSameMicDevice({
+              deviceId: defaultAudioInput,
+              previousLabel,
+              newLabel,
+            }),
+          separated: separatedAudio.current,
+          systemOnBus: busSources.current?.system === true,
+          enumerate: () => navigator.mediaDevices.enumerateDevices(),
+          queryPermission: () =>
+            navigator.permissions.query({ name: "microphone" }),
+          isStale,
+          acquireExact: () => acquireExactMic(defaultAudioInput),
+          wire: (stream, newTrack) => {
+            if (!connectMicToBus(newTrack)) return false;
+            // Own ref: the mic recorder keeps the original (dead) stream. Cleanup stops
+            // this one; setMic mutes through the bus gain.
+            releaseReconnectedMic();
+            reconnectedMicStream.current = stream;
+            // A mixed take adopts it so a later Restart sees a live mic. A separate-mic
+            // take keeps its recorder's stream: the voice is on the bus, adopting would
+            // double it.
+            if (!separatedAudio.current) rawMicStream.current = stream;
+            attachCloudMicEnded(newTrack);
+            return true;
+          },
+        });
+      },
+      afterReturn: async () => {
+        try {
+          const { micActive } = await chrome.storage.local.get(["micActive"]);
+          if (micActive === false) applyReconnectedMicMute(false);
+        } catch {}
+      },
+      stop: (reason) => stopRecording(true, reason),
+    })(rawTrack);
+  };
+
+  const connectMicToBus = (newTrack) => {
+    if (!aCtx.current || !destination.current) return false;
+    try {
+      busSourceNodes.current.mic?.disconnect();
+    } catch {}
+    try {
+      const micSource = aCtx.current.createMediaStreamSource(
+        new MediaStream([newTrack])
+      );
+      if (!audioInputGain.current) {
+        audioInputGain.current = aCtx.current.createGain();
+        audioInputGain.current.connect(destination.current);
+        if (busTap.current) audioInputGain.current.connect(busTap.current);
+      }
+      audioInputGain.current.gain.value =
+        pendingMicIntent.current === false ? 0 : 1;
+      micSource.connect(audioInputGain.current);
+      busSourceNodes.current.mic = micSource;
+      busSources.current.mic = true;
+    } catch {
+      return false;
+    }
+    return true;
+  };
+
+  const clearMicReconnectFlag = () =>
+    clearReconnectFlag({
+      getFlagSet: () => micReconnectFlagSet.current,
+      setFlagSet: (v) => {
+        micReconnectFlagSet.current = v;
+      },
+      storageSet: (o) => chrome.storage.local.set(o),
+    });
+
+  // The one place that rebuilds the mic after its track died (Restart, start of a take).
+  const ensureLiveMic = ({ atStart = false } = {}) =>
+    ensureLiveMicImpl({
+      atStart,
+      getRawTrack: () => rawMicStream.current?.getAudioTracks?.()[0] || null,
+      isSeparated: () => separatedAudio.current,
+      teardown: () => {
+        releaseReconnectedMic();
+        try {
+          busSourceNodes.current.mic?.disconnect();
+        } catch {}
+        busSourceNodes.current.mic = null;
+        busSources.current.mic = false;
+        try {
+          audioInputGain.current?.disconnect();
+        } catch {}
+        audioInputGain.current = null;
+      },
+      acquire: async (separated) => {
+        const { defaultAudioInput } = await chrome.storage.local.get([
+          "defaultAudioInput",
+        ]);
+        return acquireExactMic(
+          defaultAudioInput,
+          undefined,
+          separated ? RAW_MIC_PROCESSING : null
+        );
+      },
+      setRaw: (stream) => {
+        rawMicStream.current = stream;
+      },
+      useOnBus: (stream, track) => {
+        if (!connectMicToBus(track)) return false;
+        reconnectedMicStream.current = stream;
+        return true;
+      },
+      muteIfOff: async (stream) => {
+        const { micActive } = await chrome.storage.local.get(["micActive"]);
+        if (micActive === false) {
+          stream.getAudioTracks().forEach((t) => {
+            t.enabled = false;
+          });
+        }
+      },
+      watch: (track) => attachCloudMicEnded(track),
+      onLost: () => {
+        if (separatedAudio.current) {
+          separatedAudio.current = false;
+          diagForward("separated-fallback-restart-dead-mic", {});
+        }
+      },
+      persistOff: () => {
+        chrome.storage.local.set({ micActive: false }).catch(() => {});
+      },
+    });
+
+  const releaseReconnectedMic = () => {
+    stopReconnectedMic(reconnectedMicStream.current);
+    reconnectedMicStream.current = null;
+  };
+
+  const applyReconnectedMicMute = (active) => {
+    applyBusMicMute({
+      gain: audioInputGain.current,
+      stream: reconnectedMicStream.current,
+      active,
+    });
+  };
+
   const startAudioStream = (id, { separatedMic = false } = {}) =>
     acquireMicStream(id, {
       toastOnBlocked: true,
@@ -10094,7 +10919,12 @@ const CloudRecorder = () => {
       logger: { warn: console.warn },
     });
 
-  const getVideoStreamWithFallback = async (constraints, deviceId) => {
+  const getVideoStreamWithFallback = (constraints, deviceId) =>
+    timedAcquire("camera", () =>
+      getVideoStreamWithFallbackUntimed(constraints, deviceId)
+    );
+
+  const getVideoStreamWithFallbackUntimed = async (constraints, deviceId) => {
     if (!deviceId || deviceId === "none") {
       return navigator.mediaDevices.getUserMedia(constraints);
     }
@@ -10173,7 +11003,9 @@ const CloudRecorder = () => {
     streamOpts = {}
   ) => {
     startupStageRef.current = null;
+    startStageLog.current.reset();
     startupCaptureStartedAtRef.current = Date.now();
+    startErrorSentRef.current = false;
     startupClickLookupRef.current = chrome.storage.local.get(["startFlowTrace"])
       .then(({ startFlowTrace }) => startFlowTrace?.attemptId || null)
       .catch(() => null);
@@ -10207,6 +11039,7 @@ const CloudRecorder = () => {
     captureCapRef.current = null;
     encodeCapRef.current = null;
     screenFpsRef.current = 30;
+    void policyTake.current.reset();
     if (await refuseOverHeldIdbTake()) return;
     // Same for the reported surface: unknown until this attempt's
     // stream is up, and a camera take never sets one.
@@ -10290,12 +11123,14 @@ const CloudRecorder = () => {
             audio: data.systemAudio,
           };
           void traceStep("pickerRequested");
-          const stream = await acquireDisplayMediaWithFocusRetry({
-            getDisplayMedia: (c) => navigator.mediaDevices.getDisplayMedia(c),
-            constraints,
-            onReactivate: () =>
-              chrome.runtime.sendMessage({ type: "activate-recorder-tab" }),
-          });
+          const stream = await timedAcquire("screen-region-gdm", () =>
+            acquireDisplayMediaWithFocusRetry({
+              getDisplayMedia: (c) => navigator.mediaDevices.getDisplayMedia(c),
+              constraints,
+              onReactivate: () =>
+                chrome.runtime.sendMessage({ type: "activate-recorder-tab" }),
+            })
+          );
           screenStream.current = stream;
           regionRef.current = true;
           if (!screenStream.current?.getVideoTracks?.().length) {
@@ -10495,14 +11330,34 @@ const CloudRecorder = () => {
             const smootherStored = await chrome.storage.local.get([
               "smootherMotion",
               "fpsValue",
+              "adaptivePolicy",
+              "adaptivePolicyThresholds",
+              "adaptivePolicyAt",
+              "adaptivePolicyHistory",
+              "qualityValue",
             ]);
             const smootherMotion = smootherMotionActive(smootherStored);
-            const encodeCap = isRegionRequest
+            // Adaptive policy: start rung from the cached sustained result and device
+            // history. Flag off (default): plan.enabled is false, nothing below changes.
+            try {
+              const policyStored = smootherStored;
+              const plan = planStart({
+                stored: policyStored,
+                ls: localStorage,
+                ceilingQuality: policyStored.qualityValue,
+              });
+              policyTake.current.setPlan(plan);
+            } catch {}
+            const baseEncodeCap = isRegionRequest
               ? CAP_1080P
               : await loadCloudEncodeCapForClick({
                   smootherMotion,
                   trackFps: smootherMotion ? 60 : targetFps,
                 });
+            const encodeCap = capEncodeForPlan(
+              baseEncodeCap,
+              policyTake.current.plan()
+            );
             encodeCapRef.current = encodeCap;
             const captureFps = requestedScreenFps(encodeCap, {
               isRegion: isRegionRequest,
@@ -10580,7 +11435,9 @@ const CloudRecorder = () => {
               });
             void traceStep("pickerRequested");
             try {
-              screenStream.current = await acquireDisplay(displayConstraints);
+              screenStream.current = await timedAcquire("screen-gdm", () =>
+                acquireDisplay(displayConstraints)
+              );
             } catch (err) {
               // System audio that won't open rejects the video request with it.
               // Retrying without audio costs a second pick but saves the take.
@@ -10693,8 +11550,8 @@ const CloudRecorder = () => {
               })
               .catch(() => {});
             try {
-              screenStream.current = await navigator.mediaDevices.getUserMedia(
-                desktopConstraints
+              screenStream.current = await timedAcquire("screen-desktop", () =>
+                navigator.mediaDevices.getUserMedia(desktopConstraints)
               );
             } catch (err) {
               // A dead loopback endpoint fails the video too. Video with no
@@ -10942,10 +11799,9 @@ const CloudRecorder = () => {
                   displaySurface: "browser",
                 },
               };
-              screenStream.current =
-                await navigator.mediaDevices.getDisplayMedia(
-                  displayConstraints
-                );
+              screenStream.current = await timedAcquire("screen-tab-gdm", () =>
+                navigator.mediaDevices.getDisplayMedia(displayConstraints)
+              );
               console.log(
                 "[CloudRecorder] getDisplayMedia fallback OK after streamId rejection"
               );
@@ -11085,7 +11941,7 @@ const CloudRecorder = () => {
         // startAudioStream swallows errors and returns null, so a failed mic
         // looked like no mic requested. offscreen-diag is the only channel that
         // prints into the BG console from here.
-        micStream.current = await startAudioStream(data.defaultAudioInput, {
+        micStream.current = await timedAcquire("mic", () => startAudioStream(data.defaultAudioInput, {
           separatedMic: separatedAudio.current,
           bluetoothDiag: true,
           logger: {
@@ -11108,11 +11964,12 @@ const CloudRecorder = () => {
                 .catch(() => {});
             },
           },
-        });
+        }));
         rawMicStream.current = micStream.current;
         const micTrack = rawMicStream.current?.getAudioTracks?.()[0] || null;
         micAcquireRef.current = {
           ...micAcquireRef.current,
+          at: Date.now(),
           acquired: Boolean(micTrack),
           readyState: micTrack?.readyState || null,
           muted: micTrack?.muted ?? null,
@@ -11151,75 +12008,13 @@ const CloudRecorder = () => {
         micError: micAcquireRef.current?.err,
       });
 
-      // Mic track death mid-recording (unplug, OS revoke, BT disconnect): stop through the
-      // normal stop path. No reconnect (a separate mic file would need a new encoder) and
-      // no toast (it would be burned into the video).
+      // Mic track death mid-recording (unplug, OS revoke, BT disconnect, or Chrome
+      // ending a starved mic): try to get the same device back for 30 s before
+      // stopping. A revoked mic, or a separated take with no bus to carry the voice,
+      // still stops at once. No toast (it would be burned into the video).
       try {
         const rawTrack = rawMicStream.current?.getAudioTracks?.()[0];
-        if (rawTrack) {
-          rawTrack.addEventListener("ended", async () => {
-            if (isFinishing.current || sentLast.current) return;
-            const endedAt = Date.now();
-            // The mic file stops here, so freeze its clock or it claims the
-            // session's length.
-            if (!audioTimer.current.paused && audioTimer.current.start) {
-              audioTimer.current.total += endedAt - audioTimer.current.start;
-              audioTimer.current.paused = true;
-            }
-            const startMs = screenTimer.current?.start || null;
-            const dur = startMs ? endedAt - startMs : null;
-            const trackLabel = String(rawTrack?.label || "");
-            const isLikelyContinuityMic = /\biphone\b/i.test(trackLabel);
-            const info = {
-              trackLabel: trackLabel.slice(0, 80),
-              readyState: rawTrack?.readyState || null,
-              recordingDuration: dur,
-              isLikelyContinuityMic,
-              audioContextState: aCtx.current?.state ?? null,
-              docVisibility:
-                typeof document !== "undefined"
-                  ? document.visibilityState
-                  : null,
-            };
-            try {
-              chrome.runtime.sendMessage({
-                type: "diag-forward",
-                event: "cloudrecorder-mic-track-ended",
-                data: info,
-              });
-            } catch {}
-            let elapsedMs = null;
-            try {
-              const st = await chrome.storage.local.get([
-                "recordingStartTime",
-                "totalPausedMs",
-                "pausedAt",
-                "paused",
-              ]);
-              elapsedMs = computeMicDropElapsedMs({
-                endedAt,
-                startedAt: st.recordingStartTime,
-                totalPausedMs: st.totalPausedMs,
-                pausedAt: st.pausedAt,
-                paused: st.paused,
-              });
-            } catch {}
-            try {
-              await chrome.storage.local.set({
-                lastTrackEndEvent: {
-                  reason: "audio-track-ended",
-                  source: "mic",
-                  ts: endedAt,
-                  elapsedMs,
-                  trackLabel: info.trackLabel,
-                  recordingDuration: dur,
-                },
-              });
-            } catch {}
-            micDropRef.current = { elapsedMs, reason: "audio-track-ended" };
-            stopRecording(true, "audio-track-ended");
-          });
-        }
+        if (rawTrack) attachCloudMicEnded(rawTrack);
       } catch {}
 
       // Force 48 kHz: Opus is fixed at 48k, AAC accepts it natively.
@@ -11536,25 +12331,50 @@ const CloudRecorder = () => {
           multiMode: Boolean(multiMode),
         });
 
-        // Run countdown + uploader-init in parallel. maybeStartRecording
-        // polls uploadersInitialized.current at countdown-end (200ms ×
-        // 75). Saves ~2-3s vs awaiting init before the countdown.
-        traceStep("resetActiveTabSent");
-        chrome.runtime.sendMessage({ type: "reset-active-tab" });
-
-        // Races the countdown; if it loses, capture is delayed in 200ms polls
-        // (canBeginRecording).
+        // Uploaders are prepared first (encoder plan, containers, dims), then the
+        // countdown starts with the server creates running alongside. The start never
+        // waits on them: chunks recorded before a create lands sit on disk and are fed
+        // in after.
         const endUploaderInit = perfSpan("CloudRecorder initializeUploaders");
         const uploaderInitStartedAt = Date.now();
         // A take that died before a session registered leaves this set, and the
         // next take on this instance would reuse its id.
         if (!recorderSession.current) recordingSessionId.current = null;
+        uploadersPrepared.current = false;
+        // initializeUploaders bumps the generation before its first await.
+        const initGen = uploadGenRef.current + 1;
         uploadersInitialized.current = await initializeUploaders({
           forceNewSceneId: true,
+          onPrepared: async () => {
+            setStarted(true);
+            setInitProject(false);
+            if (screenStream.current) {
+              await stopPrewarm(prewarmRef.current);
+              prewarmRef.current = startPrewarm(screenStream.current);
+              preloadWebCodecsModules();
+            }
+            // Open the local stores before the countdown, not after it. Both
+            // are idempotent; startRecording finds them ready.
+            if (!(await ensureChunkStoreReady())) return;
+            await ensureAudioChunkStoreReady();
+            await ensureCameraChunkStoreReady();
+            traceStep("resetActiveTabSent");
+            chrome.runtime.sendMessage({ type: "reset-active-tab" });
+            if (pendingStartRef.current) maybeStartRecording("uploaders-ready");
+          },
         });
         const uploaderInitMs = Date.now() - uploaderInitStartedAt;
         endUploaderInit({ ok: Boolean(uploadersInitialized.current) });
         if (!uploadersInitialized.current) {
+          // Abandoned by Stop or a dismiss, or replaced by a newer take's
+          // init: the take is held or gone, not an error.
+          if (uploadGenRef.current !== initGen || createsAbandonedRef.current)
+            return;
+          // A failed start must not be started by a message that arrives later
+          // (countdown off sends it before the creates have answered).
+          uploadersPrepared.current = false;
+          clearPendingStart();
+          initFailedRef.current = true;
           throw new Error("Failed to initialize uploaders");
         }
         traceStep("apiUploadersReady", {
@@ -11566,16 +12386,6 @@ const CloudRecorder = () => {
           },
         });
 
-        setStarted(true);
-        setInitProject(false);
-        if (screenStream.current) {
-          await stopPrewarm(prewarmRef.current);
-          prewarmRef.current = startPrewarm(screenStream.current);
-          preloadWebCodecsModules();
-        }
-        if (pendingStartRef.current) {
-          maybeStartRecording("uploaders-ready");
-        }
       } catch (err) {
         if (err?.message !== "Failed to initialize uploaders") {
           void captureStartupFailure(err, "project-or-recorder-start");
@@ -11978,6 +12788,10 @@ const CloudRecorder = () => {
       if (!isInit.current) return;
       takeAttemptIdRef.current = request.recordingAttemptId || null;
       takeContextRef.current = null;
+      if (initFailedRef.current) {
+        sendResponse?.({ ok: true, ignored: "start-failed" });
+        return;
+      }
 
       chrome.storage.local.set({
         lastStartRecordingTabMessage: {
@@ -11987,6 +12801,8 @@ const CloudRecorder = () => {
         },
       });
 
+      // The background re-checks a start nobody answered as possibly dead,
+      // so say the start was taken even when it has to wait for uploaders.
       if (IS_IFRAME_CONTEXT) {
         if (request.region || target.current) {
           if (target.current) {
@@ -11994,11 +12810,17 @@ const CloudRecorder = () => {
           }
           pendingStartRef.current = true;
           pendingStartAttempts.current = 0;
+          sendResponse?.({ ok: true, accepted: true, host: "iframe" });
           maybeStartRecording("start-message");
         }
       } else if (!regionRef.current || (IS_OFFSCREEN_HOST && isTab.current)) {
         pendingStartRef.current = true;
         pendingStartAttempts.current = 0;
+        sendResponse?.({
+          ok: true,
+          accepted: true,
+          host: IS_OFFSCREEN_HOST ? "offscreen" : "tab",
+        });
         maybeStartRecording("start-message");
       }
     } else if (request.type === "restart-recording-tab") {

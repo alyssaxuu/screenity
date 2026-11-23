@@ -245,6 +245,7 @@ export const onTabRemovedListener = () => {
         pendingRecording && !isActivelyRecording && !restarting;
       if (tabId === recordingTab && pendingOnly) {
         await chrome.storage.local.set({
+          lastStartEndedAt: Date.now(),
           pendingRecording: false,
           recording: false,
           recordingTab: null,

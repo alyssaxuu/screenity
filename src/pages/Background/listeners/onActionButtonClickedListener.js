@@ -12,6 +12,7 @@ import { clearInMemoryEditorLock } from "../recording/stopRecording";
 import { sendMessageEnsuringContentScript } from "../utils/executeScripts";
 import { traceStep } from "../../utils/startFlowTrace";
 import { isActiveRecorderAlive } from "../offscreen/recorderHost";
+import { cancelCountdownForStop } from "../recording/stopDuringCountdown";
 
 const CLOUD_FEATURES_ENABLED =
   process.env.SCREENITY_ENABLE_CLOUD_FEATURES === "true";
@@ -28,6 +29,11 @@ const handleTabMessaging = async (tab) => {
 
   if (offscreen) {
     try {
+      const cancelled = await cancelCountdownForStop({
+        get: (keys) => chrome.storage.local.get(keys),
+        send: sendMessageTab,
+      });
+      if (cancelled) return true;
       await sendMessageRecord({ type: "stop-recording-tab", reason: "action-click" });
       return true;
     } catch (err) {

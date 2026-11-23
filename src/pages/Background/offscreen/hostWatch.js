@@ -1,6 +1,7 @@
 // Passive breadcrumbs for a recorder document that vanishes mid-recording:
 // stamps why we closed the offscreen doc, reports disconnects we didn't cause.
 import { emitRecordingTelemetry } from "../recording/emitRecordingTelemetry";
+import { noteTakeEvent } from "../recording/adaptiveHistory";
 
 const PORT_NAME = "recorder-host";
 const INTENT_WINDOW_MS = 15000;
@@ -11,11 +12,13 @@ const RESUME_AFTER_LOST_MIN = 5.5;
 // A take parked for the next recording resumes once that recording stops. Nothing runs
 // the resume chain after a keyboard-shortcut start, so the close that parked it arms the first retry.
 const RESUME_AFTER_PARK_MIN = 2;
+const HEALTH_KEY = "recorderHostHealth";
 const STATE_KEYS = [
   "recording",
   "pendingRecording",
   "firstChunkAt",
   "lastChunkAt",
+  HEALTH_KEY,
 ];
 
 let lastIntent = null;
@@ -28,12 +31,25 @@ const docKind = (url) => {
   return url.includes("cloud=1") ? "cloud" : "plain";
 };
 
+// The recorder document stamps its heap and device memory while it lives, so a
+// death during start still says how loaded it was. Absent on older documents.
+const healthText = (h) => {
+  if (!h || typeof h !== "object") return "";
+  const n = (v) => (Number.isFinite(v) ? v : "na");
+  return ` heap=${n(h.jsHeapUsedMb)}/${n(h.jsHeapLimitMb)}MB mem=${n(h.deviceMemoryGb)}GB cpu=${n(
+    h.hardwareConcurrency,
+  )} health=${ageS(h.at)}s lag=${n(h.lagP90Ms)}/${n(h.lagMaxMs)}ms press=${h.cpuPressure || "na"}/${
+    h.cpuPressureWorst || "na"
+  }/${h.cpuPressureStatus || "na"}`;
+};
+
 // Only during a live recording: emitRecordingTelemetry falls back to the last
 // stored session, which would tag an unrelated one once recording is over.
 const emit = async (name, reason, statePromise, contextsPromise) => {
   try {
     const s = await (statePromise || chrome.storage.local.get(STATE_KEYS));
     if (!(s.recording || s.pendingRecording)) return;
+    if (name === "recorder-host-lost") void noteTakeEvent({ hostLost: true });
     let kind = "na";
     if (contextsPromise) {
       const ctx = await contextsPromise.catch(() => null);
@@ -44,7 +60,7 @@ const emit = async (name, reason, statePromise, contextsPromise) => {
       reason,
       errMsg: `rec=${s.recording ? 1 : 0} pend=${s.pendingRecording ? 1 : 0} first=${ageS(
         s.firstChunkAt,
-      )}s last=${ageS(s.lastChunkAt)}s doc=${kind}`,
+      )}s last=${ageS(s.lastChunkAt)}s doc=${kind}${healthText(s[HEALTH_KEY])}`,
     });
   } catch {}
 };

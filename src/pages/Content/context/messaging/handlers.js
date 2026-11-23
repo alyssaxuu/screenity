@@ -17,7 +17,10 @@ import { perfMark } from "../../../utils/perfMarks";
 import { triggerSupportDownload } from "../../../utils/triggerSupportDownload";
 import { recordingLimitMinutes } from "../../../utils/recordingLimit";
 import { micDropFields } from "../../../utils/micDropHandoff";
+import { degradedTakeFields } from "../../../utils/degradedHandoff";
 import { clearCaptureStarting } from "../captureStarting";
+import { handoffReplayDelays } from "./handoffReplays";
+import { inCountdown, cancelCountdownForStop } from "./countdownStop";
 const CLOUD_FEATURES_ENABLED =
   process.env.SCREENITY_ENABLE_CLOUD_FEATURES === "true";
 
@@ -82,16 +85,18 @@ export const setupHandlers = () => {
 
     window.postMessage(payload, targetOrigin);
     // Replay shortly after to reduce races with late listeners.
-    setTimeout(() => {
-      window.postMessage(
-        {
-          ...payload,
-          replay: true,
-          replayAt: Date.now(),
-        },
-        targetOrigin,
-      );
-    }, 250);
+    for (const delay of handoffReplayDelays(payload?.source, performance.now())) {
+      setTimeout(() => {
+        window.postMessage(
+          {
+            ...payload,
+            replay: true,
+            replayAt: Date.now(),
+          },
+          targetOrigin,
+        );
+      }, delay);
+    }
     return true;
   };
 
@@ -696,11 +701,26 @@ export const setupHandlers = () => {
     }
   });
 
+  const readRestarting = () =>
+    chrome.storage.local
+      .get(["restarting"])
+      .then((r) => Boolean(r?.restarting))
+      .catch(() => false);
   registerMessage("stop-recording-tab", () => {
     const state = getState();
+    if (inCountdown(state)) {
+      return cancelCountdownForStop({ getState, readRestarting }).then(
+        (cancelled) => (cancelled ? { countdownCancelled: true } : undefined),
+      );
+    }
     if (!state.recording) return;
     state.stopRecording();
   });
+  registerMessage("cancel-countdown-for-stop", () =>
+    cancelCountdownForStop({ getState, readRestarting }).then(
+      (countdownCancelled) => ({ countdownCancelled }),
+    ),
+  );
 
   // Used to nest a second registerMessage call inside the handler,
   // which added a listener per fire and made the toggle fire N+1 times.
@@ -1342,9 +1362,13 @@ export const setupHandlers = () => {
     }
   });
 
-  registerMessage("stop-pending", () => {
+  registerMessage("stop-pending", (message) => {
     abortStartGate(getState());
-    setStartFlowOutcome("error");
+    // Arrives alone when the recording-error relay had no recorder to reach.
+    setStartFlowOutcome("error", {
+      error: message?.why || message?.error || null,
+      errorCode: message?.errorCode || null,
+    });
     setContentState((prev) => ({
       ...prev,
       startGateOpen: false,
@@ -1601,6 +1625,7 @@ export const setupHandlers = () => {
       sceneId: message.sceneId,
       projectId,
       ...micDropFields(message),
+      ...degradedTakeFields(message),
       localPlayback:
         localPlayback?.available && localPlayback?.trackType === "screen"
           ? {

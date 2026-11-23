@@ -348,7 +348,12 @@ export const handleRecordingError = async (request) => {
         (id, idx, arr) => Number.isInteger(id) && arr.indexOf(id) === idx,
       );
       candidateTabs.forEach((id) => {
-        sendMessageTab(id, { type: "stop-pending" }).catch(() => {});
+        sendMessageTab(id, {
+          type: "stop-pending",
+          error: request?.error || null,
+          why: request?.why || null,
+          errorCode,
+        }).catch(() => {});
       });
       // refocus only when no editor is open
       if (!sandboxAlive) {

@@ -1620,7 +1620,7 @@
     "description": "Settings menu item to manually trigger cloud recording recovery"
   },
   "toastRecoveredSession": {
-    "message": "Recovered unsaved recording from the previous session.",
+    "message": "Rekaman yang belum disimpan dari sesi sebelumnya berhasil dipulihkan.",
     "description": "Toast shown when a crashed recording session is auto-recovered on startup"
   },
   "toastStorageCritical": {
@@ -1632,15 +1632,15 @@
     "description": "Toast when the last part of a recording could not be written to disk"
   },
   "toastStorageLow": {
-    "message": "Storage is running low. Upload reliability may degrade for long recordings.",
+    "message": "Penyimpanan hampir penuh. Keandalan unggahan dapat menurun untuk rekaman yang panjang.",
     "description": "Toast shown when available storage drops below the warning threshold during recording"
   },
   "toastAudioCaptureDegraded": {
-    "message": "Transcription capture paused due to memory pressure. Video upload continues.",
+    "message": "Perekaman transkripsi dijeda karena memori terbatas. Unggahan video tetap berlanjut.",
     "description": "Toast shown when the audio recorder is stopped early because the audio buffer limit was reached"
   },
   "toastNetworkOffline": {
-    "message": "Network offline. Upload paused. Screen chunks are saved locally.",
+    "message": "Jaringan offline. Unggahan dijeda. Potongan layar disimpan secara lokal.",
     "description": "Toast shown when the browser goes offline during a cloud recording upload"
   },
   "toastLocalCopyIncomplete": {
@@ -2218,5 +2218,9 @@
   "cameraNotFoundError": {
     "message": "Screenity tidak dapat menemukan kamera. Pastikan kamera terhubung lalu coba lagi.",
     "description": "Shown when a camera-only recording cannot start because no camera is found or the chosen camera is gone"
+  },
+  "micReconnectingTooltip": {
+    "message": "Mikrofon terputus. Mencoba menyambungkan kembali…",
+    "description": "Toolbar mic button tooltip while the recorder is getting the same microphone back during a recording"
   }
 }

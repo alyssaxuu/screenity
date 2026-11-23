@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { listHeldTakes } from "./heldTakeList";
+import { listHeldTakes, chipTracks } from "./heldTakeList";
 import { readTrack, discardHeldTake } from "./heldTakeActions";
 import { openExistingChunksStore, TRACK_KEY_PREFIX } from "../CloudRecorder/recorderStorage/chooseChunksStore";
 import { destroySessionDir } from "../CloudRecorder/recorderStorage/opfsKvStore";
@@ -126,7 +126,7 @@ const HeldTakes = () => {
             count: entries.length,
           };
         } catch {
-          next[`${take.sessionId}:${tr.track}`] = { owned: false, bytes: 0, count: 0 };
+          next[`${take.sessionId}:${tr.track}`] = { owned: false, bytes: 0, count: 0, error: true };
         }
       }
     }
@@ -252,7 +252,7 @@ const HeldTakes = () => {
                     {msg("heldTakesStored", [fmtBytes(total)])}
                   </div>
                   <div className="ht-chips">
-                    {take.tracks.map((t) => (
+                    {chipTracks(take, sizes).map((t) => (
                       <span key={t.track} className="ht-chip">
                         <Icon d={ICONS[t.track]} />
                         {trackLabel(t.track)}

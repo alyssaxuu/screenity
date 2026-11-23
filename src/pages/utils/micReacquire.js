@@ -34,9 +34,10 @@ export const resolveMicDeviceId = (storedId, currentId) =>
 export const acquireExactMic = (
   deviceId,
   getUserMedia = (c) => navigator.mediaDevices.getUserMedia(c),
+  processing = null,
 ) => {
   if (!deviceId || deviceId === "none") return Promise.resolve(null);
-  return getUserMedia({ audio: { deviceId: { exact: deviceId } } });
+  return getUserMedia({ audio: { deviceId: { exact: deviceId }, ...processing } });
 };
 
 const defaultSubscribe = (handler) => {

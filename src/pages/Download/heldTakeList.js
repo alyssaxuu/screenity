@@ -39,6 +39,14 @@ export const mimeFor = (track, container) => {
 };
 
 // Mirrors MIC_DEBT_REFUSE_MAX_AGE_MS in micRecovery.js (this file has no imports).
+// Chips name only tracks with local bytes: a camera-off take still has a camera
+// store entry. A track waits for its size, and stays if reading it failed.
+export const chipTracks = (take, sizes = {}) =>
+  take.tracks.filter((t) => {
+    const size = sizes[`${take.sessionId}:${t.track}`];
+    return Boolean(size) && (size.error || size.count > 0);
+  });
+
 export const MIC_DEBT_MAX_AGE_MS = 60 * 60 * 1000;
 // Mirrors MIC_SERVER_FAIL_CAP in micRecovery.js.
 export const MIC_SERVER_FAIL_CAP = 8;

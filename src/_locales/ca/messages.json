@@ -176,7 +176,7 @@
     "description": "Etiqueta de 'Estableix un límit de temps'"
   },
   "blurTypeLabel": {
-    "message": "Blur",
+    "message": "Difuminat",
     "description": "Etiqueta de fons 'Difumina'"
   },
   "noneDropdownLabel": {
@@ -1620,7 +1620,7 @@
     "description": "Settings menu item to manually trigger cloud recording recovery"
   },
   "toastRecoveredSession": {
-    "message": "Recovered unsaved recording from the previous session.",
+    "message": "S'ha recuperat un enregistrament no desat de la sessió anterior.",
     "description": "Toast shown when a crashed recording session is auto-recovered on startup"
   },
   "toastStorageCritical": {
@@ -1632,15 +1632,15 @@
     "description": "Toast when the last part of a recording could not be written to disk"
   },
   "toastStorageLow": {
-    "message": "Storage is running low. Upload reliability may degrade for long recordings.",
+    "message": "Queda poc espai d'emmagatzematge. La fiabilitat de la pujada pot empitjorar en enregistraments llargs.",
     "description": "Toast shown when available storage drops below the warning threshold during recording"
   },
   "toastAudioCaptureDegraded": {
-    "message": "Transcription capture paused due to memory pressure. Video upload continues.",
+    "message": "La captura de la transcripció s'ha posat en pausa per falta de memòria. La pujada del vídeo continua.",
     "description": "Toast shown when the audio recorder is stopped early because the audio buffer limit was reached"
   },
   "toastNetworkOffline": {
-    "message": "Network offline. Upload paused. Screen chunks are saved locally.",
+    "message": "Sense connexió. La pujada està en pausa. Els fragments de pantalla es desen localment.",
     "description": "Toast shown when the browser goes offline during a cloud recording upload"
   },
   "toastLocalCopyIncomplete": {
@@ -2218,5 +2218,9 @@
   "cameraNotFoundError": {
     "message": "Screenity no troba cap càmera. Comprova que estigui connectada i torna-ho a provar.",
     "description": "Shown when a camera-only recording cannot start because no camera is found or the chosen camera is gone"
+  },
+  "micReconnectingTooltip": {
+    "message": "Micròfon desconnectat. S'està intentant tornar a connectar…",
+    "description": "Toolbar mic button tooltip while the recorder is getting the same microphone back during a recording"
   }
 }

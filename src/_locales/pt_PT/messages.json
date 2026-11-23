@@ -176,7 +176,7 @@
     "description": "Etiqueta de alarme"
   },
   "blurTypeLabel": {
-    "message": "Blur",
+    "message": "Desfoque",
     "description": "Etiqueta de desfocar fundo"
   },
   "noneDropdownLabel": {
@@ -1620,7 +1620,7 @@
     "description": "Settings menu item to manually trigger cloud recording recovery"
   },
   "toastRecoveredSession": {
-    "message": "Recovered unsaved recording from the previous session.",
+    "message": "Foi recuperada uma gravação não guardada da sessão anterior.",
     "description": "Toast shown when a crashed recording session is auto-recovered on startup"
   },
   "toastStorageCritical": {
@@ -1632,15 +1632,15 @@
     "description": "Toast when the last part of a recording could not be written to disk"
   },
   "toastStorageLow": {
-    "message": "Storage is running low. Upload reliability may degrade for long recordings.",
+    "message": "O armazenamento está quase cheio. A fiabilidade do envio pode diminuir em gravações longas.",
     "description": "Toast shown when available storage drops below the warning threshold during recording"
   },
   "toastAudioCaptureDegraded": {
-    "message": "Transcription capture paused due to memory pressure. Video upload continues.",
+    "message": "A captura da transcrição foi pausada por falta de memória. O envio do vídeo continua.",
     "description": "Toast shown when the audio recorder is stopped early because the audio buffer limit was reached"
   },
   "toastNetworkOffline": {
-    "message": "Network offline. Upload paused. Screen chunks are saved locally.",
+    "message": "Rede offline. Envio em pausa. Os segmentos do ecrã são guardados localmente.",
     "description": "Toast shown when the browser goes offline during a cloud recording upload"
   },
   "toastLocalCopyIncomplete": {
@@ -2218,5 +2218,9 @@
   "cameraNotFoundError": {
     "message": "O Screenity não encontra uma câmara. Verifique se está ligada e tente novamente.",
     "description": "Shown when a camera-only recording cannot start because no camera is found or the chosen camera is gone"
+  },
+  "micReconnectingTooltip": {
+    "message": "Microfone desligado. A tentar voltar a ligar…",
+    "description": "Toolbar mic button tooltip while the recorder is getting the same microphone back during a recording"
   }
 }

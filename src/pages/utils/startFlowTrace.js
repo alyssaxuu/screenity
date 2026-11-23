@@ -68,9 +68,23 @@ export const initStartFlowTrace = async (attemptId, config = {}) => {
   return trace;
 };
 
+// Writes from one context run in order. recording-error and stop-pending
+// arrive together, each read the trace before the other wrote, and the second
+// write put back a copy without the first one's error.
+let traceQueue = Promise.resolve();
+const inOrder = (fn) => {
+  const run = traceQueue.then(fn, fn);
+  traceQueue = run.catch(() => {});
+  return run;
+};
+
 /** Write a timestamp checkpoint. Merges extra fields without overwriting others. */
-export const traceStep = async (stepName, extra = {}) => {
+export const traceStep = (stepName, extra = {}) => {
   const now = Date.now();
+  return inOrder(() => writeTraceStep(stepName, extra, now));
+};
+
+const writeTraceStep = async (stepName, extra, now) => {
   try {
     const res = await chrome.storage.local.get(STORAGE_KEY);
     const trace = res?.[STORAGE_KEY];
@@ -119,7 +133,10 @@ export const traceStep = async (stepName, extra = {}) => {
 };
 
 /** Set the final outcome. Only overwrites "in-progress". */
-export const setStartFlowOutcome = async (outcome, extra = {}) => {
+export const setStartFlowOutcome = (outcome, extra = {}) =>
+  inOrder(() => writeStartFlowOutcome(outcome, extra));
+
+const writeStartFlowOutcome = async (outcome, extra) => {
   try {
     const res = await chrome.storage.local.get(STORAGE_KEY);
     const trace = res?.[STORAGE_KEY];
@@ -130,8 +147,13 @@ export const setStartFlowOutcome = async (outcome, extra = {}) => {
       trace.outcome = outcome;
     }
 
-    if (extra.error) trace.error = sanitize(extra.error);
-    if (extra.errorCode) trace.errorCode = extra.errorCode;
+    // The first failure is the cause; what follows is its fallout.
+    if (extra.error && (wasInProgress || !trace.error)) {
+      trace.error = sanitize(extra.error);
+    }
+    if (extra.errorCode && (wasInProgress || !trace.errorCode)) {
+      trace.errorCode = extra.errorCode;
+    }
     if (extra.stuck) trace.stuck = extra.stuck;
 
     await chrome.storage.local.set({ [STORAGE_KEY]: trace });
@@ -153,11 +175,67 @@ export const setStartFlowOutcome = async (outcome, extra = {}) => {
   }
 };
 
+// The recorder's start stages live under their own key. Written into the trace,
+// they raced the content script's outcome write from another context, and the
+// success report went out before they landed in about half of the takes.
+export const START_STAGES_KEY = "startFlowStartStages";
+const START_STAGES_WAIT_MS = 10000;
+
+export const writeStartStages = async (attemptId, startStages) => {
+  if (!startStages) return;
+  try {
+    await chrome.storage.local.set({
+      [START_STAGES_KEY]: { attemptId: attemptId || null, startStages },
+    });
+  } catch {}
+};
+
+const stagesFor = (entry, attemptId) =>
+  attemptId && entry?.attemptId === attemptId ? entry.startStages || null : null;
+
+// The success report is posted when the take goes live, a moment before the
+// recorder writes its stages. Waits for them, bounded; null if they never come.
+export const awaitStartStages = (attemptId, timeoutMs = START_STAGES_WAIT_MS) =>
+  new Promise((resolve) => {
+    if (!attemptId) {
+      resolve(null);
+      return;
+    }
+    let done = false;
+    let timer = null;
+    const onChange = (changes, area) => {
+      if (area !== "local") return;
+      const stages = stagesFor(changes?.[START_STAGES_KEY]?.newValue, attemptId);
+      if (stages) finish(stages);
+    };
+    const finish = (stages) => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      try {
+        chrome.storage.onChanged.removeListener(onChange);
+      } catch {}
+      resolve(stages);
+    };
+    timer = setTimeout(() => finish(null), timeoutMs);
+    try {
+      chrome.storage.onChanged.addListener(onChange);
+    } catch {}
+    Promise.resolve(chrome.storage.local.get(START_STAGES_KEY))
+      .then((res) => {
+        const stages = stagesFor(res?.[START_STAGES_KEY], attemptId);
+        if (stages) finish(stages);
+      })
+      .catch(() => {});
+  });
+
 /** Read the current trace for export. */
 export const getStartFlowTrace = async () => {
   try {
-    const res = await chrome.storage.local.get(STORAGE_KEY);
-    return res?.[STORAGE_KEY] || null;
+    const res = await chrome.storage.local.get([STORAGE_KEY, START_STAGES_KEY]);
+    const trace = res?.[STORAGE_KEY] || null;
+    const stages = stagesFor(res?.[START_STAGES_KEY], trace?.attemptId);
+    return trace && stages ? { ...trace, startStages: stages } : trace;
   } catch {
     return null;
   }

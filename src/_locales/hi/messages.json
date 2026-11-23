@@ -1620,7 +1620,7 @@
     "description": "Settings menu item to manually trigger cloud recording recovery"
   },
   "toastRecoveredSession": {
-    "message": "Recovered unsaved recording from the previous session.",
+    "message": "पिछले सत्र की बिना सहेजी रिकॉर्डिंग वापस मिल गई है।",
     "description": "Toast shown when a crashed recording session is auto-recovered on startup"
   },
   "toastStorageCritical": {
@@ -1632,15 +1632,15 @@
     "description": "Toast when the last part of a recording could not be written to disk"
   },
   "toastStorageLow": {
-    "message": "Storage is running low. Upload reliability may degrade for long recordings.",
+    "message": "स्टोरेज कम हो रहा है। लंबी रिकॉर्डिंग के लिए अपलोड की विश्वसनीयता कम हो सकती है।",
     "description": "Toast shown when available storage drops below the warning threshold during recording"
   },
   "toastAudioCaptureDegraded": {
-    "message": "Transcription capture paused due to memory pressure. Video upload continues.",
+    "message": "मेमोरी के दबाव के कारण ट्रांसक्रिप्शन कैप्चर रोक दिया गया है। वीडियो अपलोड जारी है।",
     "description": "Toast shown when the audio recorder is stopped early because the audio buffer limit was reached"
   },
   "toastNetworkOffline": {
-    "message": "Network offline. Upload paused. Screen chunks are saved locally.",
+    "message": "नेटवर्क ऑफ़लाइन है। अपलोड रुका हुआ है। स्क्रीन के हिस्से स्थानीय रूप से सहेजे जा रहे हैं।",
     "description": "Toast shown when the browser goes offline during a cloud recording upload"
   },
   "toastLocalCopyIncomplete": {
@@ -2218,5 +2218,9 @@
   "cameraNotFoundError": {
     "message": "Screenity को कोई कैमरा नहीं मिल रहा है। जांचें कि वह जुड़ा हुआ है और फिर कोशिश करें।",
     "description": "Shown when a camera-only recording cannot start because no camera is found or the chosen camera is gone"
+  },
+  "micReconnectingTooltip": {
+    "message": "माइक डिस्कनेक्ट हो गया। फिर से कनेक्ट करने की कोशिश की जा रही है…",
+    "description": "Toolbar mic button tooltip while the recorder is getting the same microphone back during a recording"
   }
 }

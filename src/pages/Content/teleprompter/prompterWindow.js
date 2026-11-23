@@ -59,6 +59,9 @@ const setLayers = (patch) => {
 // layer to a window that is already open needs no gesture.
 let opening = null;
 
+export const waitForPipOpening = () =>
+  opening ? opening.then(() => {}, () => {}) : Promise.resolve();
+
 export const openPipLayer = async (layer, reason) => {
   trace("open", layer, reason);
   const existing = getPrompterWindow();

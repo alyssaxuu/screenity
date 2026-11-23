@@ -196,7 +196,7 @@
     "description": "Segnaposto per la selezione della sorgente"
   },
   "offLabel": {
-    "message": "Off",
+    "message": "Disattivato",
     "description": "Etichetta per disattivare nel menu a discesa"
   },
   "regionWidthLabel": {
@@ -1600,7 +1600,7 @@
     "description": "Settings menu item to manually trigger cloud recording recovery"
   },
   "toastRecoveredSession": {
-    "message": "Recovered unsaved recording from the previous session.",
+    "message": "Recuperata una registrazione non salvata della sessione precedente.",
     "description": "Toast shown when a crashed recording session is auto-recovered on startup"
   },
   "toastStorageCritical": {
@@ -1612,15 +1612,15 @@
     "description": "Toast when the last part of a recording could not be written to disk"
   },
   "toastStorageLow": {
-    "message": "Storage is running low. Upload reliability may degrade for long recordings.",
+    "message": "Spazio di archiviazione in esaurimento. L'affidabilità del caricamento può peggiorare con le registrazioni lunghe.",
     "description": "Toast shown when available storage drops below the warning threshold during recording"
   },
   "toastAudioCaptureDegraded": {
-    "message": "Transcription capture paused due to memory pressure. Video upload continues.",
+    "message": "L'acquisizione della trascrizione è stata sospesa per mancanza di memoria. Il caricamento del video continua.",
     "description": "Toast shown when the audio recorder is stopped early because the audio buffer limit was reached"
   },
   "toastNetworkOffline": {
-    "message": "Network offline. Upload paused. Screen chunks are saved locally.",
+    "message": "Rete offline. Caricamento in pausa. I segmenti dello schermo sono salvati in locale.",
     "description": "Toast shown when the browser goes offline during a cloud recording upload"
   },
   "toastLocalCopyIncomplete": {
@@ -2213,5 +2213,9 @@
   "cameraNotFoundError": {
     "message": "Screenity non trova nessuna fotocamera. Controlla che sia collegata e riprova.",
     "description": "Shown when a camera-only recording cannot start because no camera is found or the chosen camera is gone"
+  },
+  "micReconnectingTooltip": {
+    "message": "Microfono scollegato. Tentativo di riconnessione…",
+    "description": "Toolbar mic button tooltip while the recorder is getting the same microphone back during a recording"
   }
 }

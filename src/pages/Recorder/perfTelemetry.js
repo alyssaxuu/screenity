@@ -88,7 +88,16 @@ export const readDevice = (nav = globalThis.navigator) => ({
 
 // Flat keys for the server sanitizer, which whitelists encodeStats one key at a
 // time. The per-window series travels in the diag event instead.
-export const flattenPerfStats = ({ device, fps, longTask, encodeHardware, tier, targetFps }) => ({
+export const flattenPerfStats = ({
+  device,
+  fps,
+  longTask,
+  encodeHardware,
+  tier,
+  targetFps,
+  lag,
+  pressure,
+}) => ({
   hardwareConcurrency: device?.hardwareConcurrency ?? null,
   deviceMemoryGb: device?.deviceMemoryGb ?? null,
   cpuArch: device?.cpuArch ?? null,
@@ -102,4 +111,119 @@ export const flattenPerfStats = ({ device, fps, longTask, encodeHardware, tier, 
   fpsWindowMax: fps?.max ?? null,
   encodeTier: tier ?? null,
   encodeTargetFps: targetFps ?? null,
+  lagP90Ms: lag?.p90Ms ?? null,
+  lagMaxMs: lag?.maxMs ?? null,
+  cpuPressure: pressure?.state ?? null,
+  cpuPressureWorst: pressure?.worst ?? null,
+  cpuPressureStatus: pressure?.status ?? null,
 })
+
+// Screen counters win over camera. Only the WebCodecs recorders have counters,
+// so on the MediaRecorder fallback the host keys go alone, tagged with the
+// recording track. perf is null when signed out: the zip keeps it then.
+export const composeEncodeStats = ({ screenStats, cameraStats, track, perf }) => {
+  const base = screenStats
+    ? { ...screenStats, track: "screen" }
+    : cameraStats
+    ? { ...cameraStats, track: "camera" }
+    : null
+  if (!perf) return base
+  return { ...(base || { track: track || null }), ...perf }
+}
+
+// How late a fixed-interval timer fires: a starved document runs timers late
+// before anything else visibly breaks. p90 covers the last windowMs; maxMs is
+// the worst since the take began.
+export const LAG_INTERVAL_MS = 100
+export const LAG_WINDOW_MS = 10_000
+
+export const createLagTracker = ({
+  intervalMs = LAG_INTERVAL_MS,
+  windowMs = LAG_WINDOW_MS,
+  now = () => performance.now(),
+  setTimer = globalThis.setInterval,
+  clearTimer = globalThis.clearInterval,
+} = {}) => {
+  let timer = null
+  let last = 0
+  let samples = []
+  let maxMs = 0
+  const tick = () => {
+    const t = now()
+    const late = Math.max(0, t - last - intervalMs)
+    last = t
+    samples.push({ t, late })
+    maxMs = Math.max(maxMs, late)
+    const cutoff = t - windowMs
+    let drop = 0
+    while (drop < samples.length && samples[drop].t < cutoff) drop += 1
+    if (drop) samples = samples.slice(drop)
+  }
+  return {
+    start() {
+      if (timer || typeof setTimer !== "function") return
+      last = now()
+      timer = setTimer(tick, intervalMs)
+    },
+    stop() {
+      if (timer) clearTimer(timer)
+      timer = null
+    },
+    reset() {
+      samples = []
+      maxMs = 0
+      last = now()
+    },
+    snapshot() {
+      if (!samples.length) return { p90Ms: null, maxMs: null }
+      const sorted = samples.map((s) => s.late).sort((a, b) => a - b)
+      const idx = Math.min(sorted.length - 1, Math.ceil(sorted.length * 0.9) - 1)
+      return { p90Ms: Math.round(sorted[idx]), maxMs: Math.round(maxMs) }
+    },
+  }
+}
+
+export const lagTracker = createLagTracker()
+
+// Browser CPU pressure state (nominal, fair, serious, critical). Not every
+// document may observe it, so "unsupported" and "denied" are kept as findings.
+export const createPressureWatcher = ({ Observer = globalThis.PressureObserver } = {}) => {
+  let observer = null
+  let state = null
+  let status = typeof Observer === "function" ? "idle" : "unsupported"
+  let worst = null
+  const RANK = { nominal: 0, fair: 1, serious: 2, critical: 3 }
+  return {
+    async start() {
+      if (observer || typeof Observer !== "function") return status
+      try {
+        observer = new Observer((records) => {
+          const rec = records[records.length - 1]
+          if (!rec || typeof rec.state !== "string") return
+          state = rec.state
+          if (worst === null || (RANK[state] ?? -1) > (RANK[worst] ?? -1)) worst = state
+        })
+        await observer.observe("cpu", { sampleInterval: 1000 })
+        status = "observing"
+      } catch (err) {
+        observer = null
+        status = err?.name === "NotAllowedError" ? "denied" : "error"
+      }
+      return status
+    },
+    stop() {
+      try {
+        observer?.disconnect()
+      } catch {}
+      observer = null
+    },
+    reset() {
+      worst = state
+    },
+    snapshot() {
+      return { status, state, worst }
+    },
+  }
+}
+
+export const pressureWatcher = createPressureWatcher()

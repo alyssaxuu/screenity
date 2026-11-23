@@ -2,6 +2,7 @@ import React, { useState, useEffect, useContext, useRef } from "react";
 
 import { contentStateContext } from "../context/ContentState";
 import { lifecycle } from "../../utils/lifecycleLog";
+import { traceStep } from "../../utils/startFlowTrace";
 
 const COUNTDOWN_TIME = 3;
 const DEBUG_START_FLOW =
@@ -224,6 +225,7 @@ const Countdown = () => {
               endedAt,
               ageMs: Date.now() - endedAt,
             });
+            traceStep("countdownEnd");
             chrome.runtime
               .sendMessage({
                 type: "countdown-finished",

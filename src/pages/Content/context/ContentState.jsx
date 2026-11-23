@@ -8,9 +8,17 @@ import React, {
 } from "react";
 
 import { updateFromStorage } from "./utils/updateFromStorage";
-import { shouldResendCropTarget } from "./cropTargetGate";
+import { resendCropTargetAfterFocus } from "./cropTargetGate";
 import { cameraPipOnOtherTab } from "../teleprompter/prompterRules";
-import { getPrompterWindow } from "../teleprompter/prompterWindow";
+import {
+  getPrompterWindow,
+  waitForPipOpening,
+} from "../teleprompter/prompterWindow";
+import {
+  focusBeforeRegionPicker,
+  focusTabForPicker,
+  hasFloatingWindow,
+} from "../teleprompter/pickerFocus";
 import { lifecycle } from "../../utils/lifecycleLog";
 import { perfMark, perfReset } from "../../utils/perfMarks";
 import { HELP_LINKS } from "../../utils/helpLinks";
@@ -31,6 +39,20 @@ import { triggerSupportDownload } from "../../utils/triggerSupportDownload";
 import { sendRecordingSignals } from "../../utils/recordingSignals";
 import { isLowOnSpace, lowSpaceRestore } from "../utils/lowSpaceModal";
 import { apiIssueCopy } from "../utils/apiIssueCopy";
+
+// Region's share prompt previews the focused window; with a floating window
+// focused it offers that instead of this tab.
+const focusTabBeforeRegionPicker = (state) =>
+  focusBeforeRegionPicker(state, {
+    focus: () =>
+      focusTabForPicker({
+        waitForOpening: waitForPipOpening,
+        hasWindow: () => hasFloatingWindow(getPrompterWindow(), window),
+        focusTab: () =>
+          chrome.runtime.sendMessage({ type: "focus-tab-for-picker" }),
+      }),
+    trace: (outcome) => traceStep("pickerFocus", { pickerFocus: outcome }),
+  });
 
 // Re-asking can't change these, so the retry would only re-open the modal.
 // Anything else (a busy or still-waking device) is worth another pass.
@@ -1007,7 +1029,8 @@ const ContentState = (props) => {
         showOnboardingArrow: false,
       }));
 
-      const startAfterMicMuted = () => {
+      const startAfterMicMuted = async () => {
+        await focusTabBeforeRegionPicker(contentStateRef.current);
         // Crop target first (after the user confirmed mic-off): this flushes
         // the recorder's deferred streaming-data and starts getDisplayMedia.
         sendRegionCropTarget();
@@ -1081,6 +1104,7 @@ const ContentState = (props) => {
         if (!contentStateRef.current.micActive) {
           sendRecordingSignals("mic-modal", { micModal: "skipped-dont-ask" }, attempt.claimedId);
         }
+        await focusTabBeforeRegionPicker(contentStateRef.current);
         // Crop target first: flushes the recorder's deferred streaming-data and
         // starts getDisplayMedia (no mic modal to gate behind in this branch).
         sendRegionCropTarget();
@@ -2168,6 +2192,16 @@ const ContentState = (props) => {
               ? { ...prev, restartingRecording: false }
               : prev
           );
+          // With the countdown on, startRecording never runs in this tab, so
+          // this is the only place the trace learns the take began.
+          if (
+            changes.recording.oldValue !== true &&
+            contentStateRef.current?.countdownEverShown &&
+            isTargetTab()
+          ) {
+            traceStep("recordingStarted");
+            setStartFlowOutcome("ok");
+          }
         }
         // Recording true → false: clear start-side flow flags the
         // sandboxTab listener might have missed on a hidden tab. Leave
@@ -2609,21 +2643,12 @@ const ContentState = (props) => {
   // re-send it over storage (postMessage can drop). Gated to an active start.
   const cropTargetWantedRef = useRef(false);
   const sendCropTargetToRecorder = useCallback(() => {
-    const s = contentStateRef.current;
-    // Hard gate (see cropTargetGate): only answer the recorder during an actual
-    // start, never on an idle region toggle/tweak.
-    if (!shouldResendCropTarget(s)) return;
-    const regionWin = s.regionCaptureRef?.contentWindow || null;
-    if (!regionWin) return;
-    regionWin.postMessage(
-      {
-        type: "crop-target",
-        target: s.cropTarget,
-        width: s.regionWidth,
-        height: s.regionHeight,
-      },
-      "*"
-    );
+    // Hard gate (see cropTargetGate): only during an actual start. The free
+    // recorder asks for the screen on this re-send too, so focus the tab first.
+    void resendCropTargetAfterFocus({
+      getState: () => contentStateRef.current,
+      focus: focusTabBeforeRegionPicker,
+    });
   }, []);
 
   useEffect(() => {

@@ -2218,5 +2218,9 @@
   "cameraNotFoundError": {
     "message": "Screenity-ஆல் கேமராவைக் கண்டுபிடிக்க முடியவில்லை. அது இணைக்கப்பட்டுள்ளதா என்று சரிபார்த்து மீண்டும் முயலவும்.",
     "description": "Shown when a camera-only recording cannot start because no camera is found or the chosen camera is gone"
+  },
+  "micReconnectingTooltip": {
+    "message": "மைக் துண்டிக்கப்பட்டது. மீண்டும் இணைக்க முயற்சிக்கிறது…",
+    "description": "Toolbar mic button tooltip while the recorder is getting the same microphone back during a recording"
   }
 }
