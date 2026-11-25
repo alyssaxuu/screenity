@@ -195,9 +195,12 @@ export const attachGapDetector = (ctx, track, { isPaused, onGap } = {}) => {
   let detector = createWorkletGapSink({ sampleRate: ctx.sampleRate, onGap });
   let disposed = false;
   let teardown = null;
+  let scanNode = null;
+  let source = null;
 
   const connect = (node) => {
-    const source = ctx.createMediaStreamSource(new MediaStream([track]));
+    source = ctx.createMediaStreamSource(new MediaStream([track]));
+    scanNode = node;
     // Private sink so the node is pulled without touching the recording bus.
     const sink = ctx.createMediaStreamDestination();
     source.connect(node);
@@ -297,6 +300,22 @@ export const attachGapDetector = (ctx, track, { isPaused, onGap } = {}) => {
   return {
     snapshot: () => detector.snapshot(),
     finish: () => detector.finish(),
+    // A mic that came back: scan the new track into the same node, so the
+    // counts and offsets carry on. Before the node exists, connect() picks
+    // up the new track itself.
+    retarget(next) {
+      if (disposed || !next) return;
+      track = next;
+      if (!scanNode) return;
+      try {
+        const fresh = ctx.createMediaStreamSource(new MediaStream([next]));
+        fresh.connect(scanNode);
+        try {
+          source?.disconnect();
+        } catch {}
+        source = fresh;
+      } catch {}
+    },
     dispose() {
       disposed = true;
       teardown?.();

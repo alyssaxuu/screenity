@@ -22,6 +22,7 @@ import {
 import { lifecycle } from "../../utils/lifecycleLog";
 import { perfMark, perfReset } from "../../utils/perfMarks";
 import { HELP_LINKS } from "../../utils/helpLinks";
+import { countdownCancelReason } from "../../utils/countdownCancelReason";
 
 import Shortcuts from "../shortcuts/Shortcuts";
 import DevHUD from "../DevHUD";
@@ -1570,6 +1571,11 @@ const ContentState = (props) => {
     },
     cancelCountdown: () => {
       setStartFlowOutcome("cancelled");
+      // Read before the write below clears it.
+      const duringRestart = Boolean(
+        restartingFlagRef.current ||
+          contentStateRef.current?.restartingRecording,
+      );
       // Eagerly clear flags so the action button doesn't see stale
       // isRecordingActive before BG processes dismiss-recording-tab.
       chrome.storage.local.set({
@@ -1589,7 +1595,9 @@ const ContentState = (props) => {
         showPopup: true,
         showExtension: true,
       }));
-      contentStateRef.current.dismissRecording("countdown-cancelled");
+      contentStateRef.current.dismissRecording(
+        countdownCancelReason({ duringRestart }),
+      );
     },
     resetCountdown: () => {
       setContentState((prev) => ({

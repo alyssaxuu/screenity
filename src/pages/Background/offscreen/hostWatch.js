@@ -33,7 +33,7 @@ const docKind = (url) => {
 
 // The recorder document stamps its heap and device memory while it lives, so a
 // death during start still says how loaded it was. Absent on older documents.
-const healthText = (h) => {
+export const healthText = (h) => {
   if (!h || typeof h !== "object") return "";
   const n = (v) => (Number.isFinite(v) ? v : "na");
   return ` heap=${n(h.jsHeapUsedMb)}/${n(h.jsHeapLimitMb)}MB mem=${n(h.deviceMemoryGb)}GB cpu=${n(

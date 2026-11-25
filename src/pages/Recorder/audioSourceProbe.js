@@ -44,11 +44,11 @@ export const createSourceStats = (now = Date.now) => {
   };
 };
 
-export const createSourceProbe = (ctx, track) => {
+// Taps a node already in the graph. Dispose removes only the probe's branch.
+export const createNodeProbe = (ctx, node) => {
   const analyser = ctx.createAnalyser();
   analyser.fftSize = 1024;
-  const source = ctx.createMediaStreamSource(new MediaStream([track]));
-  source.connect(analyser);
+  node.connect(analyser);
   const buf = new Uint8Array(analyser.frequencyBinCount);
   const stats = createSourceStats();
 
@@ -63,10 +63,33 @@ export const createSourceProbe = (ctx, track) => {
       stats.record(maxDev);
     },
     snapshot: (opts) => stats.snapshot(opts),
+    analyser,
     dispose() {
       try {
+        node.disconnect(analyser);
+      } catch {}
+    },
+  };
+};
+
+export const createSourceProbe = (ctx, track) => {
+  let source = ctx.createMediaStreamSource(new MediaStream([track]));
+  const probe = createNodeProbe(ctx, source);
+  return {
+    ...probe,
+    // Feeds the same analyser from a returned mic, so the stats carry on.
+    retarget(next) {
+      const fresh = ctx.createMediaStreamSource(new MediaStream([next]));
+      fresh.connect(probe.analyser);
+      try {
         source.disconnect();
-        analyser.disconnect();
+      } catch {}
+      source = fresh;
+    },
+    dispose() {
+      probe.dispose();
+      try {
+        source.disconnect();
       } catch {}
     },
   };

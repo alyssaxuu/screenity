@@ -17,6 +17,7 @@ import { handleGetStreamingData } from "./recording/recordingHelpers";
 import { initUninstallSurvey } from "./utils/uninstallSurvey";
 import { initRecorderHostWatch } from "./offscreen/hostWatch";
 import { isActiveRecorderAlive } from "./offscreen/recorderHost";
+import { noteSwStart, reportStaleTake } from "./recording/staleTakeReport";
 
 // Don't tear down an in-flight start on SW restart: a fresh start is
 // mid-setup (recorder tab not loaded yet), not dead. Mirrors the alarm
@@ -26,6 +27,7 @@ const START_GRACE_MS = 30_000;
 
 // Must run before any message/alarm handler can bail on a stale lock.
 const clearStaleLocks = async () => {
+  const swStart = noteSwStart();
   try {
     const {
       sendingChunks,
@@ -109,6 +111,7 @@ const clearStaleLocks = async () => {
         });
       }
       if (!recorderAlive && !startIsFresh) {
+        void reportStaleTake(swStart);
         stale.recording = false;
         stale.pendingRecording = false;
         stale.restarting = false;

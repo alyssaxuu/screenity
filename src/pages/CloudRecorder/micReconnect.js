@@ -17,11 +17,12 @@ export const classifyMicEnd = ({ deviceListed, permissionState }) => {
   return "transient";
 };
 
-// A returning mic needs a bus in the screen file: always there in a mixed take,
-// in a separated take only when system audio put an audio track in it. The
-// separated mic file holds the dead track and cannot swap it.
-export const canReconnectMic = ({ separated, systemOnBus }) =>
-  !separated || Boolean(systemOnBus);
+// A returning mic needs somewhere to go: the screen file's bus in a mixed take,
+// the mic file's own bus in a separated take that records through one, else
+// the screen bus when system audio put an audio track in it. A separated mic
+// file on the raw track holds the dead track and cannot swap it.
+export const canReconnectMic = ({ separated, systemOnBus, ownBus = false }) =>
+  !separated || Boolean(ownBus) || Boolean(systemOnBus);
 
 export const MIC_DROP_NONE = { count: 0, firstLostAtMs: null, firstBackAtMs: null };
 
@@ -62,6 +63,56 @@ export const handoffFor = (history, openLostAtMs) => {
   return null;
 };
 
+// A mixed take's mic file stops at the drop (a MediaRecorder cannot take a new
+// track, and a second recorder's bytes are a new file with its clock back at
+// zero). A mic that comes back goes on the bus, so the screen (or camera) file
+// is the one holding the whole voice on the take's timeline. Only worth it when
+// the returned mic was heard: otherwise the bus adds nothing the mic file lacks
+// except system audio, which would then show up in the captions.
+export const voiceOnlyOnBus = ({ separated, history, heardAfterReturn }) =>
+  !separated && history?.firstBackAtMs != null && Boolean(heardAfterReturn);
+
+// About 2 s of sound (probes sample every 500 ms), so a replug click is not speech.
+export const MIC_BACK_MIN_ACTIVE_SAMPLES = 4;
+
+// One probe per bus mic gain node. A return that reuses the node is already
+// heard by its probe; a second one would count the same seconds twice.
+export const addMicBackProbe = (probes, node, create) => {
+  if (!node || probes.some((p) => p.node === node)) return null;
+  const probe = create(node);
+  probes.push({ node, probe });
+  return probe;
+};
+
+// Snapshots of the probes on the bus mic gain. Each node hears its own stretch
+// of the take, so they add up.
+export const micHeardAfterReturn = (snapshots) =>
+  (snapshots || []).reduce((n, s) => n + (s?.activeSamples || 0), 0) >=
+  MIC_BACK_MIN_ACTIVE_SAMPLES;
+
+// What the scene POST names as the voice to transcribe. busId is the file the
+// bus was recorded into; without one the short mic file beats no captions.
+// silent is the mic file's verdict, which says nothing about the bus after the
+// drop, so it does not apply there.
+export const pickVoiceSources = ({
+  silent,
+  separated,
+  voiceOnBus,
+  micId,
+  separatedMicId,
+  busId,
+}) => {
+  if (!separated && voiceOnBus && busId) {
+    return { transcriptionSourceMediaId: busId, audioSourceMediaId: busId };
+  }
+  const transcriptionSourceMediaId = silent
+    ? null
+    : separated
+      ? separatedMicId || null
+      : micId || separatedMicId || null;
+  return { transcriptionSourceMediaId, audioSourceMediaId: separatedMicId || null };
+};
+
 const permissionOf = async (query) => {
   try {
     return (await query())?.state ?? null;
@@ -90,6 +141,7 @@ export async function reconnectCloudMic({
   sameDevice,
   separated,
   systemOnBus,
+  ownBus = false,
   startedAt = Date.now(),
   enumerate,
   queryPermission,
@@ -107,7 +159,7 @@ export async function reconnectCloudMic({
   if (klass === "revoked") {
     return { ok: false, klass, reason: "revoked", attempts: 0, gapMs: now() - startedAt };
   }
-  if (!canReconnectMic({ separated, systemOnBus })) {
+  if (!canReconnectMic({ separated, systemOnBus, ownBus })) {
     return { ok: false, klass, reason: "no-target", attempts: 0, gapMs: now() - startedAt };
   }
   const out = await reacquire({
@@ -134,8 +186,12 @@ export const createMicEndHandler = (d) => async (rawTrack) => {
   if (live && live !== rawTrack) return;
   const generation = d.getGeneration();
   const endedAt = d.now();
-  d.freezeAudioClock(endedAt);
-  d.stopMicRecorder();
+  // A mic file on its own bus keeps recording: the bus fills the gap with
+  // silence until the mic is back, or until the take stops.
+  if (!d.micHasOwnBus?.()) {
+    d.freezeAudioClock(endedAt);
+    d.stopMicRecorder();
+  }
   const { fullLabel, ...info } = d.describeTrack(rawTrack, endedAt);
   d.diag("cloudrecorder-mic-track-ended", info);
   const elapsedMs = await d.elapsedAt(endedAt);
@@ -290,7 +346,11 @@ export async function ensureLiveMic(d) {
   if (!fresh) return lost();
   d.setRaw(stream);
   if (!separated && !d.useOnBus(stream, fresh)) return lost();
-  if (separated) await d.muteIfOff(stream);
+  if (separated) {
+    // The mic file's own bus, when the take has one, follows the new track.
+    d.useOnMicBus?.(fresh);
+    await d.muteIfOff(stream);
+  }
   d.watch(fresh);
   return { action: "reacquired" };
 }

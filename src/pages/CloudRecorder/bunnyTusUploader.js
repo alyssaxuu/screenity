@@ -182,6 +182,10 @@ export default class BunnyTusUploader {
     this.projectId = null;
     this.videoId = null;
     this.mediaId = null;
+    // Set while this uploader's POST /bunny/videos has not answered. A take
+    // thrown away meanwhile waits on it, or the stub the server creates after
+    // the take's delete is never deleted.
+    this.pendingCreate = null;
     this.signature = null;
     this.expires = null;
     this.libraryId = null;
@@ -1095,6 +1099,7 @@ export default class BunnyTusUploader {
     // Fire-and-forget orphan-journal cleanup; doesn't block the hot path.
     void sweepStaleUploadJournals();
 
+    let createAnswered = null;
     try {
       this.projectId = projectId;
       this.metadata = { title, type, linkedMediaId, sceneId };
@@ -1194,6 +1199,12 @@ export default class BunnyTusUploader {
       }
 
       if (!this.videoId || !this.mediaId) {
+        let answer;
+        this.pendingCreate = new Promise((resolve) => (answer = resolve));
+        createAnswered = () => {
+          this.pendingCreate = null;
+          answer();
+        };
         const { authenticated, user } = await new Promise((resolve) => {
           chrome.runtime.sendMessage({ type: "check-auth-status" }, resolve);
         });
@@ -1286,6 +1297,7 @@ export default class BunnyTusUploader {
         const data = await res.json();
         this.videoId = data.videoId;
         this.mediaId = data.mediaId;
+        createAnswered();
         // The server now inlines the TUS upload signature in this
         // response (data.tusAuth). When present, stash it so the
         // immediate-next refreshTusAuth() can skip its GET round-trip.
@@ -1383,6 +1395,7 @@ export default class BunnyTusUploader {
       this.scheduleJournalPersist({ force: true });
       return { videoId: this.videoId, mediaId: this.mediaId };
     } catch (err) {
+      createAnswered?.();
       if (this.status !== "error") {
         this.setUploaderError("initialize-failed", err);
       } else {

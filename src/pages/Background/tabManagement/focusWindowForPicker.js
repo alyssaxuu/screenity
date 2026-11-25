@@ -1,5 +1,5 @@
-// Brings the tab's window in front of its document PiP window before a share
-// prompt. `focused` is Chrome's own active-window state, the one the prompt reads.
+// Puts the tab's window in front of its document PiP window before a share
+// prompt. `focused` is Chrome's active-window state, which the prompt reads.
 export const focusWindowForPicker = async (
   windows,
   windowId,

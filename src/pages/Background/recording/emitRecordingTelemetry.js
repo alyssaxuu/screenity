@@ -59,7 +59,8 @@ export const emitRecordingTelemetry = async (eventType, extra = {}) => {
       eventType === "recording_click_beacon" ||
       // Keyed on the attempt id from the click on, like the beacons.
       eventType === "recording_signals" ||
-      (eventType === "recording_forensic_event" && extra.name === "cloud-startup-failure");
+      (eventType === "recording_forensic_event" &&
+        (extra.name === "cloud-startup-failure" || extra.name === "stale-take-cleared"));
     const mediaId =
       extra.mediaId ||
       (isEarlyBeacon

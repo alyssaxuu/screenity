@@ -21,9 +21,10 @@ export const needsContextResume = ({ state, paused = false } = {}) =>
 // the same live track carries signal. Swap each for a fresh one into the same
 // gain. The fresh node is connected before the old one is dropped, and a
 // failure keeps the old node rather than leaving the gain without a source.
+// micFile is a separated mic's own bus (separatedMicBus.js).
 export const rebuildBusSources = ({ ctx, sources = {}, gains = {} } = {}) => {
   const next = { ...sources };
-  for (const key of ["mic", "system"]) {
+  for (const key of ["mic", "system", "micFile"]) {
     const old = sources[key];
     const gain = gains[key];
     if (!ctx || !old?.mediaStream || !gain) continue;

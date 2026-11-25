@@ -491,6 +491,10 @@ const _startRecordingInner = async (caller, countdownId) => {
         hardwareConcurrency: Number.isFinite(navigator?.hardwareConcurrency)
           ? navigator.hardwareConcurrency
           : null,
+        // Covers attempts that die before the recorder's heartbeat reports it.
+        deviceMemoryGb: Number.isFinite(navigator?.deviceMemory)
+          ? navigator.deviceMemory
+          : null,
         recordingType: startContext.recordingType,
         // Storage canonical key is qualityValue, not quality. `quality`
         // is unset on this read path; reading it returned undefined and

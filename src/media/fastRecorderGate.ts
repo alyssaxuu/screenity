@@ -949,7 +949,13 @@ export const validateFastRecorderOutputBlob = async (
     }
   } catch (err: any) {
     details.demuxerError = String(err?.message || err);
-    reasons.push("demuxer-error");
+    // mediabunny 1.66.4 throws on a file with no moov/Segment (it used to
+    // report zero tracks). Keep that a no-video-track defect.
+    reasons.push(
+      /No "moov" box found|No Segment element found/.test(details.demuxerError)
+        ? "demuxer-no-video-track"
+        : "demuxer-error"
+    );
   }
 
   const containerKind = blob.type.includes("webm") ? "webm" : "mp4";
